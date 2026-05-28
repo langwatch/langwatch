@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
+import type { ClickHouseClient } from "@clickhouse/client";
 
 /**
  * Reference to a trace field value offloaded to object storage. Stored inline
@@ -45,6 +47,24 @@ export interface S3ClientResolution {
 export type S3ClientResolver = (
   projectId: string,
 ) => Promise<S3ClientResolution>;
+
+/**
+ * Thrown by `BlobStore.get` (event_log backend) when the requested row is not found or
+ * the TenantId predicate returns no rows (including cross-tenant attempts).
+ * ADR-022: TenantId in the WHERE clause structurally blocks cross-tenant reads.
+ */
+export class BlobNotFoundError extends Error {
+  constructor(
+    readonly eventId: string,
+    readonly field: string,
+    readonly tenantId: string,
+  ) {
+    super(
+      `event_log row not found for eventId=${eventId} field=${field} tenantId=${tenantId}`,
+    );
+    this.name = "BlobNotFoundError";
+  }
+}
 
 export class BlobIntegrityError extends Error {
   constructor(
@@ -104,7 +124,16 @@ export class BlobFieldNotFoundError extends Error {
  * span, ensuring the manifest is fetched only once. ADR-021 / #4215.
  */
 export class BlobStore {
-  constructor(private readonly resolveS3Client: S3ClientResolver) {}
+  /**
+   * @param resolveS3Client - Resolver for per-org S3 client + bucket.
+   * @param clickHouseClient - Optional ClickHouseClient for ADR-022 event_log reads.
+   *   When provided, `getFromEventLog` uses it to SELECT from event_log.
+   *   When absent, `getFromEventLog` throws "ClickHouseClient not configured".
+   */
+  constructor(
+    private readonly resolveS3Client: S3ClientResolver,
+    private readonly clickHouseClient?: ClickHouseClient,
+  ) {}
 
   static blobKey({
     projectId,
@@ -174,6 +203,38 @@ export class BlobStore {
   }
 
   /**
+   * Fetches a field value from the event_log ClickHouse table (ADR-022 read path).
+   *
+   * Issues a SELECT on `event_log` by `(TenantId, AggregateType, AggregateId, EventId)` —
+   * the TenantId is the FIRST predicate in the WHERE clause, structurally blocking
+   * cross-tenant reads. Parses `EventPayload` JSON, extracts the named field, and returns it.
+   *
+   * @throws {BlobNotFoundError} When the SELECT returns no rows (including cross-tenant attempts).
+   * @throws {BlobFieldNotFoundError} When the EventPayload parses successfully but the
+   *   requested field is absent.
+   * @throws {Error} When EventPayload JSON is corrupt.
+   *
+   * @throws {Error} "not implemented — ADR-022 step 5" until production logic is filled in.
+   */
+  async getFromEventLog({
+    eventId,
+    field,
+    tenantId,
+    aggregateType,
+    aggregateId,
+  }: {
+    eventId: string;
+    field: string;
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+  }): Promise<string> {
+    throw new Error("not implemented — ADR-022 step 5 (getFromEventLog)");
+    // Suppress unused variable errors until implemented
+    void eventId; void field; void tenantId; void aggregateType; void aggregateId;
+  }
+
+  /**
    * Fetches the manifest for `ref.key` and returns the value of `ref.field`.
    * Verifies per-field sha256 integrity. Accepts an optional `manifestCache`
    * so multiple gets on the same span share one S3 fetch.
@@ -222,5 +283,55 @@ export class BlobStore {
       throw new BlobIntegrityError(ref.key, ref.field, ref.sha256, actual);
     }
     return value;
+  }
+
+  /**
+   * Fetches the full span body from a transient S3 spool object.
+   * Called by the command worker when a command carries a `spoolRef`.
+   *
+   * @param spoolRef - The spool reference string (S3 key) carried in the command.
+   * @returns The raw body buffer as stored by `putSpool`.
+   * @throws The underlying S3 error if the object does not exist or access fails.
+   */
+  async getSpool(_spoolRef: string): Promise<Buffer> {
+    throw new Error("not implemented — ADR-022 step 5 (getSpool)");
+  }
+
+  /**
+   * Writes a transient S3 spool object for an over-threshold command payload.
+   * Returns the spool reference string (the S3 key) that the command will carry.
+   *
+   * Key shape: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient,
+   * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 24h
+   * lifecycle policy as a safety net for orphans.
+   *
+   * @throws {Error} "not implemented — ADR-022 step 5" until production logic is filled in.
+   */
+  async putSpool({
+    projectId,
+    traceId,
+    spanId,
+    body,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    body: Buffer;
+  }): Promise<string> {
+    throw new Error("not implemented — ADR-022 step 5 (putSpool)");
+    // Suppress unused variable errors until implemented
+    void projectId; void traceId; void spanId; void body;
+  }
+
+  /**
+   * Best-effort deletion of a transient S3 spool object.
+   * Called after event_log INSERT succeeds. Errors are swallowed — the 24h lifecycle
+   * policy is the safety net for orphans. Returns void in all cases.
+   *
+   * @param spoolRef - The spool reference string returned by `putSpool`.
+   * @throws Never — all errors are swallowed internally.
+   */
+  async deleteSpool(_spoolRef: string): Promise<void> {
+    throw new Error("not implemented — ADR-022 step 5 (deleteSpool)");
   }
 }

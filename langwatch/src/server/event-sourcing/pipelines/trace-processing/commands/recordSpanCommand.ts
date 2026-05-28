@@ -90,8 +90,10 @@ export class RecordSpanCommand implements CommandHandler<
   );
   private readonly deps: RecordSpanCommandDependencies;
 
-  constructor(deps?: RecordSpanCommandDependencies) {
+  constructor(deps?: RecordSpanCommandDependencies, blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore) {
     this.deps = deps ?? createDefaultDependencies();
+    // ADR-022: blobStore is used for spool GET/DELETE in the oversized command path (Step 5).
+    void blobStore; // Stub — used in oversized tests; real wiring in Step 5.
   }
 
   async handle(
