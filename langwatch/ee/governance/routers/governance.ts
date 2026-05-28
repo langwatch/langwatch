@@ -160,8 +160,10 @@ export const governanceRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-        /** Inclusive lower bound — return events with eventTime > sinceMs. */
+        /** Lower bound paired with sinceEventId — return events after this watermark. */
         sinceMs: z.number().int().nonnegative().optional(),
+        /** EventId watermark paired with sinceMs; from the prior page's nextCursorCompound. */
+        sinceEventId: z.string().optional(),
         /** Page size — soft cap at 1000 to keep responses bounded. */
         limit: z.number().int().min(1).max(1000).default(500),
       }),
@@ -173,6 +175,7 @@ export const governanceRouter = createTRPCRouter({
       return await service.list({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,
+        sinceEventId: input.sinceEventId,
         limit: input.limit,
       });
     }),

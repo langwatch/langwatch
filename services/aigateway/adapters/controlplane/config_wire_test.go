@@ -108,3 +108,25 @@ func TestBuildGuardrails(t *testing.T) {
 		assert.Empty(t, got.StreamChunk)
 	})
 }
+
+// buildPolicyRules must convert the model dimension of policy_rules, not just
+// tools/mcp/urls — otherwise control-plane model allow/deny is a silent no-op
+// at the gateway.
+func TestBuildPolicyRules_Models(t *testing.T) {
+	pr := policyRulesWire{
+		Models: policyRuleSetWire{
+			Deny:  []string{"^gpt-4.*"},
+			Allow: []string{"^claude-.*"},
+		},
+	}
+	rules := buildPolicyRules(pr)
+
+	var modelRules []domain.PolicyRule
+	for _, r := range rules {
+		if r.Target == domain.PolicyTargetModel {
+			modelRules = append(modelRules, r)
+		}
+	}
+	assert.Contains(t, modelRules, domain.PolicyRule{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel})
+	assert.Contains(t, modelRules, domain.PolicyRule{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel})
+}

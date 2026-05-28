@@ -61,6 +61,12 @@ const EXEMPT_MODELS = [
    */
   "ApiKey",
   /**
+   * Cost centers are organization-level accounting dimensions, scoped by
+   * organizationId (never projectId). The service layer enforces org
+   * scoping on every query. See cost-centers.feature.
+   */
+  "CostCenter",
+  /**
    * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
    * - GatewayBudget: org-level (scopeType + scopeId identifies which
    *   target); no projectId column by design.

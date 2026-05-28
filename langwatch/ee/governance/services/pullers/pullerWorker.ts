@@ -41,6 +41,7 @@ import {
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { PULLER_QUEUE } from "~/server/background/queues/constants";
+import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 
 import {
   GovernanceOcsfEventsClickHouseRepository,
@@ -123,10 +124,7 @@ export async function runIngestionPullerJob(
     return;
   }
 
-  const credentials =
-    typeof pullConfig.credentials === "object" && pullConfig.credentials !== null
-      ? (pullConfig.credentials as Record<string, string>)
-      : {};
+  const credentials = decryptCredentials(pullConfig.credentials);
 
   const cursor =
     typeof source.pollerCursor === "string"

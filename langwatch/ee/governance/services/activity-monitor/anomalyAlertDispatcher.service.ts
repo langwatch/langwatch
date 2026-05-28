@@ -21,6 +21,7 @@ import { createHmac } from "node:crypto";
 import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
 
 import { createLogger } from "~/utils/logger/server";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import {
   safeParseDestinationConfig,
@@ -236,8 +237,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// SSRF-safe by default: an `anomalyRules:manage` admin sets the webhook URL,
+// so a raw fetch could be pointed at cloud IMDS, the internal gateway, or any
+// in-cluster service. ssrfSafeFetch resolves and pins the destination IP and
+// blocks private/link-local hosts when BLOCK_LOCAL_HTTP_CALLS is set (SaaS),
+// the same guard the ingestion pullers already use. A blocked host throws and
+// surfaces as a dispatch failure, which is the intended outcome.
 const defaultFetch: FetchLike = async (url, init) => {
-  const res = await fetch(url, init);
+  const res = await ssrfSafeFetch(url, init);
   return {
     status: res.status,
     ok: res.ok,

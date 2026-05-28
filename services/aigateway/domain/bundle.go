@@ -153,9 +153,10 @@ const (
 type PolicyRuleTarget string
 
 const (
-	PolicyTargetTool PolicyRuleTarget = "tool"
-	PolicyTargetMCP  PolicyRuleTarget = "mcp"
-	PolicyTargetURL  PolicyRuleTarget = "url"
+	PolicyTargetTool  PolicyRuleTarget = "tool"
+	PolicyTargetMCP   PolicyRuleTarget = "mcp"
+	PolicyTargetURL   PolicyRuleTarget = "url"
+	PolicyTargetModel PolicyRuleTarget = "model"
 )
 
 // CacheRule is a priority-ordered cache control rule.

@@ -983,8 +983,16 @@ export async function hasOrganizationPermission(
   // that org ADMINs / team ADMINs have broad access to org-scoped gateway
   // resources (audit, org-level budgets, cache rules) without requiring a
   // RoleBinding backfill first.
+  //
+  // Personal teams are excluded: every user is ADMIN of their own
+  // single-member personal workspace team, so unioning it here would let
+  // any member escalate to the full org ADMIN template (including
+  // virtualKeys:viewOtherPersonal / organization:manage) just by owning a
+  // personal workspace. A personal team's legitimate ADMIN power is
+  // team-scoped and flows through its TEAM-scoped RoleBinding, never this
+  // org-wide union.
   const teamMemberships = await ctx.prisma.teamUser.findMany({
-    where: { userId, team: { organizationId } },
+    where: { userId, team: { organizationId, isPersonal: false } },
     select: { role: true, assignedRoleId: true },
   });
   for (const tu of teamMemberships) {

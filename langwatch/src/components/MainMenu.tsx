@@ -24,7 +24,7 @@ import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
 
-export const MENU_WIDTH_EXPANDED = "228px";
+export const MENU_WIDTH_EXPANDED = "200px";
 export const MENU_WIDTH_COMPACT = "56px";
 export const MENU_WIDTH = MENU_WIDTH_EXPANDED;
 

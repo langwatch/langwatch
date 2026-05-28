@@ -7,46 +7,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { useState } from "react";
 
+import { IngestionTemplateInstallDrawer } from "~/components/me/IngestionTemplateInstallDrawer";
+import { usePersonalIngestionBinding } from "~/components/me/usePersonalIngestionBinding";
+import { Dialog } from "~/components/ui/dialog";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { getDocsBaseUrl } from "~/utils/docsUrl";
 
+import { InstallCliCard } from "../InstallCliCard";
 import { TileIcon } from "./TileIcon";
 import type { CodingAssistantConfig } from "./types";
-
-/**
- * Admins typed the canonical `https://docs.langwatch.ai/...` URL when
- * curating the catalog — but on a localhost dev install where Mintlify
- * is also running locally, those clicks should land on the worktree's
- * docs preview instead of bouncing to production. Rewrite the host
- * piece transparently at render time so admin-stored URLs round-trip
- * to whichever docs host matches the user's current control plane.
- * Foreign URLs (acme-internal docs, public links the admin pasted on
- * purpose) are returned untouched.
- */
-const PRODUCTION_DOCS_HOST = "docs.langwatch.ai";
-
-function rewriteDocsHostForLocalDev(url: string | undefined): string | undefined {
-  if (!url) return url;
-  // Parse and compare hosts explicitly so an attacker URL like
-  // `https://docs.langwatch.ai.evil.example/...` cannot be rewritten
-  // through a substring/startsWith match.
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return url;
-  }
-  if (parsed.protocol !== "https:" || parsed.host !== PRODUCTION_DOCS_HOST) {
-    return url;
-  }
-  const base = getDocsBaseUrl();
-  if (base === `https://${PRODUCTION_DOCS_HOST}`) return url;
-  return base + parsed.pathname + parsed.search + parsed.hash;
-}
 
 interface Props {
   displayName: string;
@@ -54,25 +25,13 @@ interface Props {
   iconAsset?: string | null;
   iconKey?: string | null;
   /**
-   * Catalog slug — drives surface-specific UX. Today only `claude-code`
-   * gets the optional OTLP-from-existing-OAuth section (Anthropic
-   * monitoring-usage path, see Sergey baf9445e3 receiver). Other
-   * assistants surface the bare wrapper-command flow today.
+   * Catalog slug — drives surface-specific UX. Only `claude-code` gets the
+   * "send your existing usage to LangWatch" trace-ingest section, which
+   * mints the caller's personal ingestion binding and shows a working
+   * endpoint + token (no admin handoff). Other assistants surface the bare
+   * wrapper-command flow.
    */
   slug?: string;
-}
-
-const ENDPOINT_PLACEHOLDER = "<your-org-LangWatch-ingestion-URL>";
-
-function buildClaudeCodeOtlpEnvBlock(endpoint: string | null): string {
-  return [
-    `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-    `export OTEL_LOGS_EXPORTER=otlp`,
-    `export OTEL_METRICS_EXPORTER=otlp`,
-    `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-    `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint ?? ENDPOINT_PLACEHOLDER}"`,
-    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ingest-secret-from-admin>"`,
-  ].join("\n");
 }
 
 export function CodingAssistantTile({
@@ -84,7 +43,8 @@ export function CodingAssistantTile({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [otlpCopied, setOtlpCopied] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
   const isClaudeCode = slug === "claude-code";
 
   const { organization } = useOrganizationTeamProject({
@@ -92,29 +52,13 @@ export function CodingAssistantTile({
   });
   const orgId = organization?.id ?? "";
 
-  // Auto-fill the URL when the admin has already published a
-  // claude_code IngestionSource in the org. Only the bearer token
-  // stays in the admin-handoff path (ingestSecret is hash-only on
-  // the server). Falls back to the all-placeholder template when no
-  // source has been published yet — copy still works, just with
-  // both fields as <…> placeholders.
-  const otlpEndpointQuery = api.aiTools.claudeCodeOtlpEndpoint.useQuery(
-    { organizationId: orgId },
-    {
-      enabled: isClaudeCode && expanded && !!orgId,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const resolvedEndpoint = useMemo(() => {
-    const path = otlpEndpointQuery.data?.endpoint;
-    if (!path) return null;
-    if (typeof window === "undefined") return path;
-    return `${window.location.origin}${path}`;
-  }, [otlpEndpointQuery.data]);
-  const claudeCodeEnvBlock = useMemo(
-    () => buildClaudeCodeOtlpEnvBlock(resolvedEndpoint),
-    [resolvedEndpoint],
-  );
+  const binding = usePersonalIngestionBinding({
+    organizationId: orgId,
+    // The Trace Ingest catalog seeds this template under the `claude_code`
+    // slug; the tool-catalog tile carries the dashed `claude-code` slug.
+    slug: "claude_code",
+    enabled: isClaudeCode && expanded,
+  });
 
   const onCopy = () => {
     void navigator.clipboard.writeText(config.setupCommand);
@@ -122,10 +66,11 @@ export function CodingAssistantTile({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const onCopyOtlpTemplate = () => {
-    void navigator.clipboard.writeText(claudeCodeEnvBlock);
-    setOtlpCopied(true);
-    setTimeout(() => setOtlpCopied(false), 1500);
+  const openIngest = () => {
+    setIngestOpen(true);
+    if (!binding.hasExistingBinding && !binding.installResult) {
+      void binding.install();
+    }
   };
 
   return (
@@ -136,11 +81,7 @@ export function CodingAssistantTile({
       padding={4}
       width="full"
     >
-      <HStack
-        cursor="pointer"
-        onClick={() => setExpanded(!expanded)}
-        gap={3}
-      >
+      <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon
           iconAsset={iconAsset}
           iconKey={iconKey}
@@ -189,25 +130,18 @@ export function CodingAssistantTile({
             </Text>
           )}
 
-          {config.setupDocsUrl && (
+          <HStack gap={2} fontSize="xs" color="fg.muted">
+            <Text>New to LangWatch?</Text>
             <Button
               size="xs"
               variant="outline"
-              asChild
-              alignSelf="start"
+              onClick={() => setSetupOpen(true)}
             >
-              <a
-                href={rewriteDocsHostForLocalDev(config.setupDocsUrl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-              >
-                Setup guide <ExternalLink size={12} />
-              </a>
+              Setup guide
             </Button>
-          )}
+          </HStack>
 
-          {isClaudeCode && (
+          {isClaudeCode && binding.template && (
             <Box
               marginTop={2}
               paddingTop={3}
@@ -215,61 +149,57 @@ export function CodingAssistantTile({
               borderColor="border.muted"
             >
               <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
-                Already using Claude Code with your Anthropic OAuth login?
+                Already using Claude Code?
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={2}>
-                Keep your existing seat — your admin can publish a
-                LangWatch OTLP ingestion source so spend, anomaly rules,
-                and budgets work against your Claude Code traffic without
-                changing how you call the API. Paste the env block below
-                in your shell once your admin shares the bearer token.
+                Send its usage to your personal workspace and see cost,
+                tokens, and model on every request, no change to how you call
+                the API.
               </Text>
-              <HStack justifyContent="space-between" marginBottom={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Shell env block
-                </Text>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={onCopyOtlpTemplate}
-                >
-                  <Copy size={12} /> {otlpCopied ? "Copied" : "Copy"}
-                </Button>
-              </HStack>
-              <Code
-                padding={3}
-                fontSize="xs"
-                whiteSpace="pre"
-                display="block"
-                overflowX="auto"
-              >
-                {claudeCodeEnvBlock}
-              </Code>
-              <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                Replace{" "}
-                <Code fontSize="xs" backgroundColor="transparent">
-                  &lt;ingest-secret-from-admin&gt;
-                </Code>{" "}
-                with the bearer token your admin shares
-                {resolvedEndpoint ? null : (
-                  <>
-                    {" "}and{" "}
-                    <Code fontSize="xs" backgroundColor="transparent">
-                      &lt;your-org-LangWatch-ingestion-URL&gt;
-                    </Code>{" "}
-                    once they publish a Claude Code OTLP source
-                  </>
-                )}
-                . Optional: also export{" "}
-                <Code fontSize="xs" backgroundColor="transparent">
-                  OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
-                </Code>{" "}
-                for team / department slicing.
-              </Text>
+              <Button size="xs" variant="outline" onClick={openIngest}>
+                Connect Claude Code
+              </Button>
             </Box>
           )}
         </VStack>
       )}
+
+      {isClaudeCode && binding.template && (
+        <IngestionTemplateInstallDrawer
+          open={ingestOpen}
+          onOpenChange={(next) => setIngestOpen(next)}
+          template={{
+            slug: binding.template.slug,
+            displayName: binding.template.displayName,
+            description: binding.template.description,
+            credentialSchema: binding.template.credentialSchema,
+          }}
+          installResult={binding.installResult}
+          isInstalling={binding.isInstalling}
+          installError={binding.installError}
+          hasExistingBinding={binding.hasExistingBinding}
+          onInstall={() => void binding.install()}
+          onRotate={() => void binding.rotate()}
+          onMarkInstalled={() => setIngestOpen(false)}
+        />
+      )}
+
+      <Dialog.Root
+        open={setupOpen}
+        onOpenChange={(d) => setSetupOpen(d.open)}
+        size="md"
+        modal
+      >
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Set up LangWatch</Dialog.Title>
+            <Dialog.CloseTrigger />
+          </Dialog.Header>
+          <Dialog.Body paddingBottom={6}>
+            <InstallCliCard />
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
     </Box>
   );
 }
