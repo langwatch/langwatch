@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { getProjectSlug } from "./helpers";
+
 /**
  * Smoke Tests
  *
@@ -13,8 +15,8 @@ test("app loads after authentication", async ({ page }) => {
   // Verify we're not redirected to login
   await expect(page).not.toHaveURL(/\/auth\/signin/);
 
-  // Verify navigation is visible (indicates app is functional)
-  await expect(
-    page.getByRole("link", { name: "Home", exact: true })
-  ).toBeVisible({ timeout: 15000 });
+  // The app is functional if it redirects to a project route (the personal
+  // portal landing) rather than bouncing to login. getProjectSlug throws if
+  // it never reaches one.
+  await getProjectSlug(page);
 });
