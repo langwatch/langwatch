@@ -145,6 +145,11 @@ export function registerModelDefaultsRoutes(
       );
       return c.json(apiResponseConfigCreatedSchema.parse({ id }));
     } catch (err) {
+      // Preserve typed HTTP errors (e.g. the 404 orphan-config backstop);
+      // only generic errors collapse to a 400.
+      if (err instanceof HTTPException) {
+        throw err;
+      }
       if (err instanceof Error) {
         throw new HTTPException(400, { message: err.message });
       }
@@ -208,6 +213,11 @@ export function registerModelDefaultsRoutes(
       );
       return c.body(null, 204);
     } catch (err) {
+      // Preserve typed HTTP errors (e.g. the 404 orphan-config backstop);
+      // only generic errors collapse to a 400.
+      if (err instanceof HTTPException) {
+        throw err;
+      }
       if (err instanceof Error) {
         throw new HTTPException(400, { message: err.message });
       }
@@ -249,6 +259,11 @@ export function registerModelDefaultsRoutes(
         );
         return c.body(null, 204);
       } catch (err) {
+        // Preserve typed HTTP errors (e.g. the 404 orphan-config backstop);
+        // only generic errors collapse to a 400.
+        if (err instanceof HTTPException) {
+          throw err;
+        }
         if (err instanceof Error) {
           throw new HTTPException(400, { message: err.message });
         }

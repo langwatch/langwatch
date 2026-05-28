@@ -244,6 +244,37 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
     });
   });
 
+  describe("when targeting a model-defaults config that has no scope attachments", () => {
+    // An orphan/unknown config resolves to zero scope attachments, so the
+    // per-scope write check never runs. The handler must 404 rather than let
+    // any authenticated caller mutate it. This also pins the error-mapping bug
+    // where the catch block downgraded the typed 404 to a generic 400.
+
+    /** @scenario "A model-defaults config with no scope attachments is treated as not found" */
+    it("returns 404 (not 400) on PUT to an unknown config id", async () => {
+      const res = await modelDefaultsApp.request(
+        "/api/model-defaults/cfg_does_not_exist",
+        {
+          method: "PUT",
+          headers: headers(adminTokenA, projectA1.id),
+          body: JSON.stringify({ config: {} }),
+        },
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 (not 400) on DELETE to an unknown config id", async () => {
+      const res = await modelDefaultsApp.request(
+        "/api/model-defaults/cfg_does_not_exist",
+        {
+          method: "DELETE",
+          headers: headers(adminTokenA, projectA1.id),
+        },
+      );
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("when a key from another organization targets this project", () => {
     /** @scenario "A key for one organization cannot resolve another organization's project" */
     it("cannot resolve the cross-tenant project (401)", async () => {

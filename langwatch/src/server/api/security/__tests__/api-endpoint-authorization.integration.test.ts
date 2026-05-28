@@ -73,7 +73,7 @@ describe("API router endpoint authorization guarantee", () => {
     });
   });
 
-  describe("every SecuredApp-registered route", () => {
+  describe("when a route is registered through SecuredApp", () => {
     it("is actually mounted in the composed router", async () => {
       const live = await liveEndpoints();
       const missing = allRegisteredRoutes()

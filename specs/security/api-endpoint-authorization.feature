@@ -86,6 +86,12 @@ Feature: Hono API endpoint authorization and tenant isolation
       When the run belongs to a different project than the caller's credential
       Then the request is rejected with 404 before the run is acted upon
 
+    @integration
+    Scenario: A model-defaults config with no scope attachments is treated as not found
+      Given a model-defaults config id that resolves to no scope attachments
+      When an authenticated caller tries to update or delete it
+      Then the response status is 404 and the per-scope write check never runs
+
   # ============================================================================
   Rule: Internal/service routes authenticate with a shared secret, fail-closed
 
