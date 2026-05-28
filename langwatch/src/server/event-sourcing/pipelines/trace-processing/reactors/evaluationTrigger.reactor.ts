@@ -56,13 +56,13 @@ export function createEvaluationTriggerReactor(
       // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
       // processing cap the fold uses to stop deriving the summary
       // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
-      // large to keep evaluating — re-running every ON_MESSAGE monitor per span
+      // large to keep evaluating: re-running every ON_MESSAGE monitor per span
       // on a 26k-span trace is pure amplification for no added signal. Skip the
       // eval dispatch (lighter processing). The span itself is still stored and
       // the trace stays fully queryable: we drop the WORK, never the DATA.
       if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
         // Log once, on the first crossing only. This is a per-span hot path: a
-        // runaway trace would otherwise emit thousands of identical warns — the
+        // runaway trace would otherwise emit thousands of identical warns, the
         // very per-span amplification we are skipping the eval to avoid.
         if (foldState.spanCount === MAX_PROCESSED_SPANS) {
           logger.warn(
@@ -72,7 +72,7 @@ export function createEvaluationTriggerReactor(
               spanCount: foldState.spanCount,
               cap: MAX_PROCESSED_SPANS,
             },
-            "Skipping evaluation dispatch — trace reached the processing cap (spans still stored)",
+            "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
           );
         }
         return;
