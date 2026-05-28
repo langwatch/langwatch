@@ -13,7 +13,7 @@ import { SideMenuLink } from "./SideMenuLink";
  * GOVERN section rendered identically in both the project-scope MainMenu
  * and the personal-scope PersonalSidebar. Single source of truth for
  * icons, labels, FF gating, and beta pills so the two sidebars never
- * drift apart (rchaves bug 25).
+ * drift apart.
  */
 export const GovernSection = React.memo(function GovernSection({
   showExpanded,
@@ -76,8 +76,6 @@ export const GovernSection = React.memo(function GovernSection({
           href="/settings/gateway/virtual-keys"
           isActive={isGatewayActive}
           showLabel={showExpanded}
-          beta
-          betaLabel="Beta"
         />
       )}
       {showGovernanceEntry && (
@@ -88,7 +86,7 @@ export const GovernSection = React.memo(function GovernSection({
           isActive={isGovernanceActive}
           showLabel={showExpanded}
           beta
-          betaLabel="Preview"
+          betaLabel="Beta"
         />
       )}
     </>

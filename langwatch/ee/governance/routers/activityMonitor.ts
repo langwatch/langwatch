@@ -121,6 +121,32 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
+   * Spend rolled up by cost center across every project in the org.
+   * Powers the bird's-eye "Spend by cost center" card and answers the
+   * marketing-versus-engineering comparison, including personal AI use.
+   * Unlike `spendByUser`/`spendByTeam` this reads the whole org's spend,
+   * not just the governance ingestion silo.
+   *
+   * Spec: specs/ai-gateway/governance/cost-centers.feature
+   */
+  spendByCostCenter: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.spendByCostCenter({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+      });
+    }),
+
+  /**
    * Spend-over-time daily buckets, grouped by team / user / model.
    * Powers the bird's-eye `<SpendOverTimeChart>` (Recharts stacked
    * area). Bucket-major envelope so the chart can iterate days

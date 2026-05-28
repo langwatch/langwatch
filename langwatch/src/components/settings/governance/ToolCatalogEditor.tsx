@@ -27,8 +27,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, PackageOpen, Plus } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 
 import type { AiToolEntry } from "~/components/me/tiles/types";
+import { Checkbox } from "~/components/ui/checkbox";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
@@ -114,6 +116,19 @@ export function ToolCatalogEditor({
     },
   });
 
+  const starterPackQuery = api.aiTools.starterPackCatalog.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+
+  // A slug is selected unless the admin explicitly unchecks it, so the
+  // checklist defaults to the full pack without waiting on the query.
+  const [unchecked, setUnchecked] = useState<Record<string, boolean>>({});
+  const starterTiles = starterPackQuery.data ?? [];
+  const selectedSlugs = starterTiles
+    .filter((t) => !unchecked[t.slug])
+    .map((t) => t.slug);
+
   if (adminListQuery.isLoading) {
     return (
       <HStack padding={6} justifyContent="center">
@@ -195,29 +210,59 @@ export function ToolCatalogEditor({
             <Box color="orange.600" paddingTop="2px">
               <PackageOpen size={20} />
             </Box>
-            <VStack align="start" gap={1} flex={1} minWidth={0}>
+            <VStack align="start" gap={2} flex={1} minWidth={0}>
               <Text fontSize="sm" fontWeight="semibold">
                 Publish a starter pack to get going
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                One click adds the standard set — Coding assistants
-                (Claude Code, GitHub Copilot, Cursor, Codex) and Model
-                providers (Anthropic, OpenAI, Bedrock, Gemini) — at org
-                scope so every member sees them on /me. You can
-                rename, reorder, disable, or remove individual tiles
-                afterwards. Re-running is safe; only new slugs get
-                added.
+                Pick the tools to publish at org scope so every member sees
+                them on /me. You can rename, reorder, disable, or remove
+                individual tiles afterwards. Re-running is safe; only new
+                slugs get added.
               </Text>
+              <VStack align="start" gap={2} paddingTop={1} width="full">
+                {SECTION_ORDER.map((type) => {
+                  const tiles = starterTiles.filter((t) => t.type === type);
+                  if (tiles.length === 0) return null;
+                  return (
+                    <VStack key={type} align="start" gap={1}>
+                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                        {SECTION_LABELS[type]}
+                      </Text>
+                      {tiles.map((tile) => (
+                        <Checkbox
+                          key={tile.slug}
+                          size="sm"
+                          checked={!unchecked[tile.slug]}
+                          onChange={(e) =>
+                            setUnchecked((prev) => ({
+                              ...prev,
+                              [tile.slug]: !e.target.checked,
+                            }))
+                          }
+                        >
+                          <Text fontSize="sm">{tile.displayName}</Text>
+                        </Checkbox>
+                      ))}
+                    </VStack>
+                  );
+                })}
+              </VStack>
               <HStack paddingTop={1}>
                 <Button
                   size="sm"
                   colorPalette="orange"
                   loading={importStarterPackMutation.isPending}
+                  disabled={selectedSlugs.length === 0}
                   onClick={() =>
-                    importStarterPackMutation.mutate({ organizationId })
+                    importStarterPackMutation.mutate({
+                      organizationId,
+                      slugs: selectedSlugs,
+                    })
                   }
                 >
-                  <PackageOpen size={14} /> Import starter pack
+                  <PackageOpen size={14} /> Import selected (
+                  {selectedSlugs.length})
                 </Button>
               </HStack>
             </VStack>

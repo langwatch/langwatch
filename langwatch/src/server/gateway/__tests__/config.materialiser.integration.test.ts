@@ -250,7 +250,10 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { projectId: PROJECT_ID },
     });
     await prisma.monitor.deleteMany({
-      where: { projectId: PROJECT_ID, id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] },
+      },
     });
     await prisma.routingPolicyScope.deleteMany({
       where: { routingPolicyId: RP_ID },

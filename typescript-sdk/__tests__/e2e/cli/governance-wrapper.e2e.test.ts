@@ -56,7 +56,7 @@ let toolStubsDir: string;
 let configPath: string;
 const cliPath = path.resolve(__dirname, "../../../dist/cli/index.js");
 
-const TEST_VK = "lw_vk_test_xyz_phase11";
+const TEST_VK = "vk-lw-test_xyz_phase11";
 const TEST_ACCESS_TOKEN = "lw_at_test_phase11";
 
 // ─────────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ async function startFakeControlPlane(): Promise<{
           default_personal_vk: {
             id: "vk_auto_login",
             secret: TEST_VK,
-            prefix: "lw_vk_t",
+            prefix: "vk-lw-t",
           },
         }),
       );
@@ -356,7 +356,7 @@ function writeLoggedInConfig(): void {
     default_personal_vk: {
       id: "vk_phase11",
       secret: TEST_VK,
-      prefix: "lw_vk_t",
+      prefix: "vk-lw-t",
     },
   };
   fs.mkdirSync(path.dirname(configPath), { recursive: true });

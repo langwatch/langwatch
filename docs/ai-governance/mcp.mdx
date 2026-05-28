@@ -8,7 +8,7 @@ sidebarTitle: MCP server
 
 <Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `langwatch/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `UserIngestionBindingService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
 
-<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every MCP tool call resolves the caller's apiKey to its RBAC scopes and rejects with `FORBIDDEN` if the scope is missing. No tool can bypass the service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
+<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain `list`/`get` read tools are available to a project API key without a user. No tool can bypass the service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
 
 ## Why an MCP server for governance
 
@@ -52,8 +52,8 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 
 Governance MCP tools register inside LangWatch's existing MCP server (mounted at `/api/mcp/*` on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
 
-- **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), read tools work immediately. Sufficient to call `governance_*_list`, `governance_*_get`, `governance_*_admin_list`.
-- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+- **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
+- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
 // MCP client config, points at the LangWatch instance's MCP endpoint
@@ -118,7 +118,7 @@ Payload shapes are identical to the REST API's audit rows apart from `metadata.s
 
 The contract is service-layer-asserted by `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_user_ingestion_bindings_install` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
 
-For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (admin_list + get with project apiKey) → write-tool walkthrough (clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → binding install (1 audit row + one-time `ik-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
+For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (list + get with project apiKey) → write-tool walkthrough (admin_list + clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → binding install (1 audit row + one-time `ik-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
 
 ## Agent setup-from-scratch (the dogfood gate)
 

@@ -47,6 +47,13 @@ const ALLOWED_FILE_PATTERNS = [
   // bypass the repo layer by design.
   "src/server/pat/token-resolver.ts",
   "src/server/api-key/token-resolver.ts",
+  // One-off backfill task (`pnpm task encryptIngestionCredentials`) that
+  // re-encrypts credentials already landed in dogfood / S0. Like the
+  // platform seeder, it's a maintenance data-migration over the table, not
+  // a production request path that needs the audit-emitting service
+  // contract — routing a single throwaway sweep through the repo would
+  // only shuffle the call site.
+  "src/tasks/encryptIngestionCredentials.ts",
 ];
 
 const GATED_TABLE_PATTERNS = [

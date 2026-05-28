@@ -4,6 +4,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
+import type { LLMSpan } from "./types";
 import { spanSchema } from "./types.generated";
 
 const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
@@ -988,5 +989,30 @@ IGNORED_CONTENT`,
         id: "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
       },
     });
+  });
+
+  it("lifts cost + tokens + model off claude_code api_request records", async () => {
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
+      claudeCodeLogsRequest,
+    );
+
+    const apiRequestSpan = traces[0]?.spans.find(
+      (s) => s.name === "claude_code.api_request",
+    ) as LLMSpan | undefined;
+    expect(apiRequestSpan?.model).toBe("claude-3-5-haiku-20241022");
+    expect(apiRequestSpan?.metrics).toEqual({
+      cost: 0.0001736,
+      prompt_tokens: 87,
+      completion_tokens: 26,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    });
+
+    // The user_prompt record carries no cost — it stays metric-less.
+    const promptSpan = traces[0]?.spans.find(
+      (s) => s.name === "claude_code.user_prompt",
+    ) as LLMSpan | undefined;
+    expect(promptSpan?.metrics).toBeUndefined();
+    expect(promptSpan?.model).toBeUndefined();
   });
 });

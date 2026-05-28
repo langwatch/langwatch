@@ -89,6 +89,12 @@ export function InstallCliCard({
           {subline}
         </Text>
 
+        <Text fontSize="xs" color="fg.muted">
+          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code>{" "}
+          command ships with it). Get it at{" "}
+          <Code fontSize="xs">nodejs.org</Code>.
+        </Text>
+
         <CommandRow
           label="1. Install"
           command={installCommand}

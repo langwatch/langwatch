@@ -39,9 +39,9 @@ export const webhookDestinationSchema = z.object({
   type: z.literal("webhook"),
   url: z
     .string()
-    .url({ message: "url must be an absolute http(s) URL" })
-    .refine((u) => u.startsWith("http://") || u.startsWith("https://"), {
-      message: "url must use http or https scheme",
+    .url({ message: "url must be an absolute https URL" })
+    .refine((u) => u.startsWith("https://"), {
+      message: "url must use the https scheme",
     }),
   sharedSecret: z.string().min(1).max(512).optional(),
 });
