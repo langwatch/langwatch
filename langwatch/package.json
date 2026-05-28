@@ -79,7 +79,7 @@
     "@aws-sdk/client-sts": "^3.1041.0",
     "@aws-sdk/s3-request-presigner": "^3.1041.0",
     "@chakra-ui/react": "^3.35.0",
-    "@clickhouse/client": "^1.18.3",
+    "@clickhouse/client": "^1.18.5",
     "@copilotkit/react-core": "~1.8.14",
     "@copilotkit/react-ui": "~1.8.14",
     "@copilotkit/runtime": "~1.8.14",
