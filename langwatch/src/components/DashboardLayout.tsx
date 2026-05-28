@@ -397,9 +397,12 @@ export const DashboardLayout = ({
   // The "My Workspace" entry in the user-avatar dropdown is part of the
   // governance preview surface, distinct from the existing AI Gateway
   // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
+  // The flag is org-targeted, so it must resolve on the org id — gating on
+  // project would diverge from the /me pages (which key off the org) and
+  // show the menu entry while the page it links to 404s.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
   usePostHogIdentify({

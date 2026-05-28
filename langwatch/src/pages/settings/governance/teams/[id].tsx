@@ -11,11 +11,9 @@ import numeral from "numeral";
 import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -65,18 +63,11 @@ function GovernanceTeamDetailPage() {
     organizations
       ?.flatMap((org) => org.teams ?? [])
       .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
-  const { enabled, isLoading: ffLoading } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: orgId, enabled: !!orgId },
-  );
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
 
   const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
   const pageTitle = team
@@ -217,6 +208,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(GovernanceTeamDetailPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceTeamDetailPage),
+);

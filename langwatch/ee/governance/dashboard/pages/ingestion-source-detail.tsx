@@ -28,8 +28,8 @@ import { useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
@@ -42,7 +42,6 @@ import {
 } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -93,16 +92,10 @@ const fmtRelative = (iso: string | null): string => {
 function IngestionSourceDetailPage() {
   const router = useRouter();
   const sourceId = router.query.id as string | undefined;
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
 
   const sourceQuery = api.ingestionSources.get.useQuery(
     { organizationId: orgId, id: sourceId ?? "" },
@@ -153,12 +146,6 @@ function IngestionSourceDetailPage() {
       }),
   });
 
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
   if (!sourceId) {
     return <NotFoundScene />;
   }
@@ -804,6 +791,10 @@ function SecretRevealModal({
   );
 }
 
-export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-  IngestionSourceDetailPage,
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
+    IngestionSourceDetailPage,
+  ),
 );

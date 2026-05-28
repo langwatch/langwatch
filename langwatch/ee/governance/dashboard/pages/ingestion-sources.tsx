@@ -32,8 +32,7 @@ import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monito
 
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
@@ -48,7 +47,6 @@ import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { useActivePlan } from "~/hooks/useActivePlan";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -234,16 +232,10 @@ function fmtRelative(date: Date | string | null): string {
 }
 
 function IngestionSourcesPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
   const { isEnterprise } = useActivePlan();
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
@@ -385,12 +377,6 @@ function IngestionSourcesPage() {
     return out;
   }, [sourcesQuery.data]);
 
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
 
   return (
     <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
@@ -1682,6 +1668,10 @@ function SecretModal({
   );
 }
 
-export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-  IngestionSourcesPage,
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
+    IngestionSourcesPage,
+  ),
 );
