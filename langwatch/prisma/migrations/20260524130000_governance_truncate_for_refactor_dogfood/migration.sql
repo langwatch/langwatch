@@ -40,17 +40,29 @@
 -- TRUNCATE CASCADE handles dependencies — keeps the order auditable).
 -- ---------------------------------------------------------------------------
 
-TRUNCATE TABLE "UserIngestionBinding" RESTART IDENTITY CASCADE;
-TRUNCATE TABLE "IngestionTemplate"    RESTART IDENTITY CASCADE;
-TRUNCATE TABLE "IngestionSource"      RESTART IDENTITY CASCADE;
-TRUNCATE TABLE "AnomalyRule"          RESTART IDENTITY CASCADE;
-
--- AnomalyEvent table exists conditionally; the schema declares it but the
--- worktree may not have applied the prior add-anomaly-events migration in
--- every preset. Wrap in DO/IF EXISTS so this step is robust against partial
--- governance-stack states encountered during the cutover.
+-- Fail-safe gate: this reset is destructive and runs on every
+-- `migrate deploy`, so it MUST NOT fire in an environment that holds real
+-- governance rows. It only truncates when the operator explicitly opts in
+-- for a dogfood reset by setting the GUC before running:
+--
+--     SET langwatch.allow_governance_truncate = 'true';
+--
+-- With the setting absent (the default, including every fresh deploy) the
+-- block is a no-op and the migration is recorded as applied either way.
+-- AnomalyEvent / ActivityMonitorEvent exist conditionally, so they stay
+-- behind IF EXISTS for partial governance-stack states during the cutover.
 DO $$
 BEGIN
+  IF current_setting('langwatch.allow_governance_truncate', true) IS DISTINCT FROM 'true' THEN
+    RAISE NOTICE 'governance truncate skipped: set langwatch.allow_governance_truncate = ''true'' to enable (dogfood reset only)';
+    RETURN;
+  END IF;
+
+  TRUNCATE TABLE "UserIngestionBinding" RESTART IDENTITY CASCADE;
+  TRUNCATE TABLE "IngestionTemplate"    RESTART IDENTITY CASCADE;
+  TRUNCATE TABLE "IngestionSource"      RESTART IDENTITY CASCADE;
+  TRUNCATE TABLE "AnomalyRule"          RESTART IDENTITY CASCADE;
+
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'AnomalyEvent') THEN
     EXECUTE 'TRUNCATE TABLE "AnomalyEvent" RESTART IDENTITY CASCADE';
   END IF;

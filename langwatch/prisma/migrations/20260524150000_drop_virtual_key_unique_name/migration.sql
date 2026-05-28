@@ -14,4 +14,4 @@
 -- index is dropped. Prisma implements `@@unique` as a UNIQUE INDEX
 -- (not a table CONSTRAINT), so DROP INDEX is the right knob.
 
-DROP INDEX "VirtualKey_organizationId_name_key";
+DROP INDEX IF EXISTS "VirtualKey_organizationId_name_key";

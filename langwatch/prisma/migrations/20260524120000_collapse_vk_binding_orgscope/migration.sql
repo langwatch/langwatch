@@ -70,10 +70,13 @@ ALTER TABLE "VirtualKey" ALTER COLUMN "organizationId" SET NOT NULL;
 
 CREATE INDEX "VirtualKey_organizationId_idx" ON "VirtualKey"("organizationId");
 
--- Replace the (projectId, name) unique with (organizationId, name).
+-- Drop the (projectId, name) unique. The old invariant allowed two
+-- projects in one org to hold a same-named key, so promoting it to a
+-- transient (organizationId, name) unique here could fail mid-migration
+-- on existing data. VK identity is the row id post-iter-110 and name
+-- uniqueness is dropped entirely a few migrations later, so no
+-- replacement unique is created.
 DROP INDEX IF EXISTS "VirtualKey_projectId_name_key";
-CREATE UNIQUE INDEX "VirtualKey_organizationId_name_key"
-    ON "VirtualKey"("organizationId", "name");
 
 -- ---------------------------------------------------------------------------
 -- Step 4: ModelProvider — add advanced gateway fields, backfill from GPC.
