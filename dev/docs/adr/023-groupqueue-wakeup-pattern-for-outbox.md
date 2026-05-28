@@ -9,11 +9,11 @@
 [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) establishes `ReactorOutbox` as the durable source of truth for stake-sensitive dispatch state. A scheduling mechanism is still needed to:
 
 - Fire dispatch at the right time (immediate for persist actions; end-of-window for digest cadences).
-- Guarantee at-most-once dispatch per trigger window across multiple worker pods.
+- Run a single leased dispatcher per trigger window across multiple worker pods, with at-least-once external delivery and per-provider idempotency where the provider supports it (see [ADR-027](./027-typed-dispatcherror-contract.md)).
 - Provide per-tenant fairness so one customer's notification storm doesn't starve others.
 - Recover gracefully from worker crashes.
 
-LangWatch does not use BullMQ. The existing event-sourcing infrastructure runs on `GroupQueue` (`src/server/event-sourcing/queues/groupQueue/`), which already provides:
+New LangWatch features do not use BullMQ — the remaining BullMQ queues under `src/server/background/queues/` are legacy and deprecated. The event-sourcing infrastructure (the substrate for all new async work, including this outbox) runs on `GroupQueue` (`src/server/event-sourcing/queues/groupQueue/`), which already provides:
 
 - Per-group FIFO with cross-group parallelism (via `groupKey`).
 - Native delayed dispatch (`delay` parameter + per-send override).
@@ -30,7 +30,7 @@ Use the existing `GroupQueue` infrastructure for outbox scheduling. Define a sin
 
 **Queue payload is a wakeup only**: `{ reactorName, groupKey }`. The worker reads the actual outbox rows from PG when it fires. The queue is a scheduling primitive; PG is the source of truth.
 
-**Per-trigger FIFO** is guaranteed by setting `groupKey = ${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines).
+**Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: the outbox dispatch queue is a free-standing global queue, not a pipeline command/projection, so `queueManager`'s automatic `${tenantId}/` wrapping does not apply — the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
 
 **Cadence windows** are handled natively by setting `delay = scheduledFor - now()` on send. The queue dispatches the job when the delay elapses; no polling needed.
 
@@ -74,6 +74,6 @@ If runtime testing in Phase 1 reveals that `extend: false` doesn't behave as the
 - [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) — the outbox pattern this schedules
 - [ADR-022](./022-two-tier-dedup-triggersent-reactor-outbox.md) — schema this queue reads
 - ADR-007 — event-sourcing architecture (the GroupQueue substrate this builds on)
-- ADR-014 — Skynet BullMQ removal (why we're not reintroducing it)
+- [ADR-014 (Skynet BullMQ removal)](./014-skynet-bullmq-removal.md) — why we're not reintroducing it
 - `src/server/event-sourcing/queues/groupQueue/` — the queue implementation
 - `src/server/event-sourcing/queues/queue.types.ts` — `EventSourcedQueueDefinition`, `DeduplicationConfig`

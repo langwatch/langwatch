@@ -74,7 +74,12 @@ try {
 
 The in-line callers (today's `dispatchTriggerAction`, used by reactors that haven't migrated to `.withOutbox`) keep working — the existing catch block logs + captures `DispatchError` the same way it logs + captures any other `Error`. No behavior change for the in-line path.
 
-Email dispatches also pass `Idempotency-Key: ${outboxRowId}` (Resend supports this) so a retry after the dispatch succeeded but our status update didn't doesn't double-send.
+Email dispatches set a deterministic `X-Idempotency-Key` header on the outbound message:
+
+- **Digest cadences:** `${triggerId}:${scheduledForBucketUnix}` — stable across retries of the same digest window.
+- **Immediate dispatches:** `${outboxRowId}` — stable across retries of the same row.
+
+Both SES (via `Message.Headers` on `SendEmail`) and SendGrid (via `headers` in the request body) accept arbitrary custom headers, and surface them on bounce/delivery webhooks — so operators can detect a true double-send in the provider dashboard after the fact. Neither provider enforces idempotency server-side, so this header is for **operator observability**, not provider-enforced dedup. Actual protection against double-send comes from the outbox state machine: the two-phase `queued → dispatching → dispatched` transition with `leasedUntil` ensures only one worker dispatches a given row, and `dispatched` rows are skipped on replay.
 
 ## Rationale
 
@@ -90,15 +95,19 @@ The only path where the result type would help is if we wanted to compose retry 
 
 ### Why HTTP-status-based classification
 
-It's well-understood, vendor-documented, and uniform across providers. Slack, Resend, internal services all use HTTP semantics. A more sophisticated classification (e.g., per-provider error codes) would be premature optimization until we see real failure-mode distributions.
+It's well-understood, vendor-documented, and uniform across providers. Slack, SES, SendGrid, internal services all use HTTP semantics. A more sophisticated classification (e.g., per-provider error codes) would be premature optimization until we see real failure-mode distributions.
 
 ### Why default unknown errors to `retryable: true`
 
 The conservative default for "we don't know what happened" is to assume transience. The cost of a few wasted retries on a deterministic error is low; the cost of marking a recoverable error as `dead` is operator inbox spam.
 
-### Why pass `Idempotency-Key` to Resend specifically
+### Why a custom `X-Idempotency-Key` header on email, and not on Slack
 
-Resend supports it; Slack webhooks don't. We accept the rare double-send risk on Slack — surfaced in operator activity tab — but eliminate it for email where the primitive exists.
+The current mailer uses AWS SES and SendGrid (`src/server/mailer/emailSender.ts`); neither provides a first-class idempotency key, but both accept arbitrary custom headers that flow through to their event webhooks. A deterministic key derived from `(triggerId, window)` or `outboxRowId` therefore costs nothing to attach and makes a true double-send observable in the provider dashboard — a useful signal during Phase 2 bring-up.
+
+Slack incoming webhooks accept arbitrary headers too, but Slack surfaces nothing about them — no dashboard, no delivery webhook with header echo — so an `X-Idempotency-Key` there would be write-only. We skip it on Slack and rely on the outbox state machine alone.
+
+In all cases the **enforcement** lives in the outbox state machine, not the provider. The headers are diagnostic.
 
 ## Consequences
 

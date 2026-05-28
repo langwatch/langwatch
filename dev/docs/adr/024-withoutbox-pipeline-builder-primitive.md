@@ -41,7 +41,7 @@ type OutboxReactorDefinition<Event, FoldState> = {
 
 **Folder layout** (framework code; domain code stays adjacent to other reactors):
 
-```
+```text
 src/server/event-sourcing/
   outbox/                              -- framework primitive
     outbox.types.ts                   -- OutboxReactorDefinition, OutboxEntry, DispatchError
