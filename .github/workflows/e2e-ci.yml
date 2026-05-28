@@ -162,9 +162,35 @@ jobs:
         working-directory: agentic-e2e-tests
         run: pnpm install --frozen-lockfile --ignore-workspace
 
+      # Cache Chromium so repeat runs (and rerun-after-Playwright-install-hang
+      # incidents) skip the heavy apt-get / Chromium download. Keyed by the
+      # @playwright/test version pinned in the lockfile so a Playwright bump
+      # invalidates the cache automatically.
+      - name: Resolve Playwright version
+        id: pw-version
+        working-directory: agentic-e2e-tests
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}-chromium
+
+      # `--with-deps` triggers apt-get OS dep install which has hung repeatedly
+      # in this workflow (May 2026). 10-minute timeout fails fast on the hang
+      # so the run errors loudly instead of stalling for the job's full budget.
+      # On cache hit, only the OS deps need installing — skip the browser dl.
       - name: Install Playwright browsers
         working-directory: agentic-e2e-tests
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            pnpm exec playwright install-deps chromium
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
 
       - name: Prepare files
         working-directory: langwatch
