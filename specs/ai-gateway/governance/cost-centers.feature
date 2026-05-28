@@ -150,14 +150,14 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
   # SCIM auto-assignment (enterprise standard)
   # ---------------------------------------------------------------------------
 
-  @bdd @cost-centers @scim @integration @unimplemented
+  @bdd @cost-centers @scim @integration
   Scenario: A SCIM-provisioned user is assigned from the enterprise costCenter attribute
     Given acme-corp provisions users through SCIM
     And a cost center "Engineering" exists in acme-corp
     When the IdP provisions a user whose enterprise costCenter is "Engineering"
     Then that user's membership carries cost center "Engineering"
 
-  @bdd @cost-centers @scim @integration @unimplemented
+  @bdd @cost-centers @scim @integration
   Scenario: An unrecognized SCIM costCenter creates the cost center on first use
     Given acme-corp provisions users through SCIM
     And no cost center named "Research" exists yet
@@ -165,14 +165,14 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     Then a cost center "Research" is created in acme-corp
     And that user is assigned to it
 
-  @bdd @cost-centers @scim @integration @unimplemented
+  @bdd @cost-centers @scim @integration
   Scenario: Updating the SCIM costCenter reassigns the user
     Given a SCIM-provisioned user currently assigned to "Engineering"
     When the IdP updates that user's enterprise costCenter to "Marketing"
     Then the user's membership carries cost center "Marketing", replacing the
       prior assignment
 
-  @bdd @cost-centers @scim @integration @unimplemented
+  @bdd @cost-centers @scim @integration
   Scenario: Clearing the SCIM costCenter unassigns the user
     Given a SCIM-provisioned user currently assigned to "Engineering"
     When the IdP removes that user's enterprise costCenter attribute

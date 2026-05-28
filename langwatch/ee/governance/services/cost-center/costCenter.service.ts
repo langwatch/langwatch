@@ -141,6 +141,27 @@ export class CostCenterService {
     return toRow(row);
   }
 
+  /**
+   * Find an active cost center by name in the org, creating it if none
+   * exists. Used by SCIM provisioning so an IdP can drive cost-center
+   * membership by name without the admin pre-creating every center. Matches
+   * an existing active center exactly by name; an archived center of the
+   * same name does not block a fresh create.
+   */
+  async resolveByNameOrCreate({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<CostCenterRow> {
+    const existing = await this.prisma.costCenter.findFirst({
+      where: { organizationId, name, archivedAt: null },
+    });
+    if (existing) return toRow(existing);
+    return this.create({ organizationId, name });
+  }
+
   async rename({
     id,
     organizationId,
