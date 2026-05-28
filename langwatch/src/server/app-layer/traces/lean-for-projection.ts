@@ -1,3 +1,4 @@
+// ADR-022: lean transform — see ../lean-for-projection.ts header below.
 /**
  * ADR-022: Single source of truth for the lean shape used by the projection queue.
  *
