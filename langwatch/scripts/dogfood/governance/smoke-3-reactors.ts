@@ -353,7 +353,6 @@ async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<s
                     "langwatch.ingestion_source.source_type",
                     "http_polling",
                   ),
-                  attrStr("langwatch.governance.retention_class", "audit"),
                   attrStr("gen_ai.system", "openai"),
                   attrStr("gen_ai.request.model", "gpt-4o-mini"),
                   attrInt("gen_ai.usage.input_tokens", 25),

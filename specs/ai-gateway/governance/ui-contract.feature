@@ -168,28 +168,13 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             selection field
     When the admin opens the "Create ingestion source" composer at
       "/settings/governance/ingestion-sources/new"
-    Then the composer asks for: name, source type, per-platform config,
-      retention class
+    Then the composer asks for: name, source type, per-platform config
     And the composer does NOT ask the admin to select or assign a
       Project (the hidden Governance Project routing is done by the
       backend; it is never a user-facing field)
     And the composer does NOT mention "Governance Project" or
       "internal_governance" in any user-visible label, helper text,
       or tooltip
-
-  @bdd @ui @ui-contract @composer @retention
-  Scenario: The IngestionSource composer offers a retention class dropdown
-    When the admin opens the "Create ingestion source" composer
-    Then the composer renders a "Retention class" dropdown with options:
-      | option label                                          | value      |
-      | Operational (30 days)                                 | 30d        |
-      | Compliance (1 year)                                   | 1y         |
-      | Long-term audit (7 years, SOC2 / HIPAA / regulated)   | 7y         |
-    And the dropdown ceiling is enforced by the org's plan tier
-      (e.g. Free tier sees only "Operational"; Enterprise sees all three)
-    And the default selection is "Operational (30 days)"
-    And helper text reads "Determines how long events from this source
-      are retained on the LangWatch unified observability store."
 
   # ---------------------------------------------------------------------------
   # Reserved namespace — langwatch.governance.* is system-derived

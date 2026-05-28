@@ -141,12 +141,6 @@ Feature: SIEM export — OCSF read projection over the unified governance store
     And rebuilding the OCSF fold from event_log produces an identical row set
     And no API endpoint writes to governance_ocsf_events directly (read-only projection)
 
-  Scenario: Export honours per-origin retention class
-    Given an event is tagged with retention_class "operational" (30d)
-    When 31 days pass and the underlying recorded_spans row is TTL-pruned
-    Then the corresponding governance_ocsf_events row is also pruned by the same TTL policy
-    And api.governance.exportOcsf no longer returns the row (consistent with retention contract)
-
   # ─────────────────────────────────────────────────────────────────────
   # Documentation surface — customer-facing scope
   # ─────────────────────────────────────────────────────────────────────

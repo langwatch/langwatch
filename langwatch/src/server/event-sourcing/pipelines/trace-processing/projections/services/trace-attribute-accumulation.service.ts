@@ -37,7 +37,6 @@ export const SPAN_ATTR_MAPPINGS = [
   ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
   ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
   ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
-  ["langwatch.governance.retention_class", "langwatch.governance.retention_class"],
 ] as const;
 
 /**

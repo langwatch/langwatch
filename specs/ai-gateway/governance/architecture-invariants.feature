@@ -336,7 +336,6 @@ Feature: AI Gateway Governance — Architecture Invariants
     Then this PR ships:
       | invariant                                            |
       | Append-only event_log (durability)                   |
-      | Per-origin retention class (configurable per source) |
       | RBAC via hidden Governance Project membership         |
       | Origin metadata + reserved namespaces                |
       | OCSF read projection (SIEM forwarding via API)       |

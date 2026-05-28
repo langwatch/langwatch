@@ -37,22 +37,6 @@ Feature: Governance compliance baseline — append-only event log + retention + 
     And cryptographic tamper-evidence is filed as a follow-up hardening layer
 
   # ─────────────────────────────────────────────────────────────────────
-  # Per-origin retention class — see retention.feature for mechanics
-  # ─────────────────────────────────────────────────────────────────────
-  #
-  # The retention-class mechanics (per-IngestionSource config, langwatch.
-  # governance.retention_class attribute stamping, CH TTL enforcement,
-  # org-plan ceiling, default class) are the source of truth in
-  # retention.feature. This compliance baseline references that contract
-  # and asserts only the COMPLIANCE GUARANTEES it underwrites:
-
-  Scenario: Retention class implementation underwrites the SOC2/HIPAA/EU-AI-Act audit windows
-    Given retention.feature defines operational (30d) / compliance (1y) / archive (7y) classes with org-plan ceiling
-    When a customer asks "can your retention meet our SOC2 / HIPAA / EU AI Act window?"
-    Then the answer maps to the class their plan permits per retention.feature
-    And no governance event survives past the plan ceiling regardless of source request
-
-  # ─────────────────────────────────────────────────────────────────────
   # Hidden Governance Project — see architecture-invariants.feature + ui-contract.feature
   # ─────────────────────────────────────────────────────────────────────
   #

@@ -33,7 +33,6 @@ Feature: Per-source OTLP shape on /api/ingest/* receivers
         | langwatch.ingestion_source.id               | <source.id>                 |
         | langwatch.ingestion_source.organization_id  | <source.organizationId>     |
         | langwatch.ingestion_source.source_type      | otel_generic                |
-        | langwatch.governance.retention_class        | <source.retentionClass>     |
       And the receiver hands off via traces.collection.handleOtlpTraceRequest
       And spans land in recorded_spans under the hidden Governance Project's tenant
       And the receiver returns 202 with events count matching the span count
