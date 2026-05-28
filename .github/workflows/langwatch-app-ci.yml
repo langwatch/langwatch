@@ -386,12 +386,11 @@ jobs:
       # A successful `vite build` only proves the bundle compiles, not that it
       # boots. Serve the built output and load it in a headless browser to
       # catch runtime boot failures (white screens from chunk-init errors).
-      - name: Install Playwright Chromium
-        working-directory: langwatch
-        run: pnpm exec playwright install --with-deps chromium
-
+      # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
         working-directory: langwatch
+        env:
+          SMOKE_BROWSER_CHANNEL: chrome
         run: |
           pnpm exec vite preview --port 4173 --outDir dist/client &
           PREVIEW_PID=$!

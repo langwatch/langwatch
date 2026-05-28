@@ -11,7 +11,11 @@ import { chromium } from "playwright";
 const url = process.env.SMOKE_URL ?? "http://localhost:4173/";
 const FATAL = /is not a function|Cannot access .* before initialization|is not defined/;
 
-const browser = await chromium.launch();
+// In CI we point at the runner's preinstalled Google Chrome
+// (SMOKE_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
+// Locally it falls back to Playwright's bundled Chromium.
+const channel = process.env.SMOKE_BROWSER_CHANNEL || undefined;
+const browser = await chromium.launch(channel ? { channel } : {});
 const page = await (await browser.newContext()).newPage();
 
 const fatal = [];
