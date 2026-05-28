@@ -374,8 +374,9 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when ingested via TraceRequestCollectionService", () => {
-    /** @scenario An over-threshold field is offloaded once with preview inline and ref recorded */
-    /** @scenario Offloaded blob round-trips with byte integrity */
+    // Spec bindings removed during ADR-022 transition — this test exercises
+    // the ADR-021 S3-permanent-offload behaviour and will be rewritten in
+    // Step 4 of the TDD plan to bind to ADR-022 scenarios.
     it("BlobStore.put is called once with fields containing langwatch.output → keyed trace-blobs/{projectId}/{traceId}/{spanId}", () => {
       expect(putSpy).toHaveBeenCalledOnce();
       const callArg = putSpy.mock.calls[0]![0];
@@ -423,8 +424,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when read back via the resolution pipeline (simulating TraceService.getTracesWithSpans)", () => {
-    /** @scenario Trace-detail read returns input and output byte-identical to ingestion */
-    /** @scenario Trace-detail resolves refs to full IO while list and search use the preview */
+    // Spec bindings removed during ADR-022 transition — see note above.
     it("the returned span's langwatch.output is the full value byte-identical to the input", async () => {
       const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });

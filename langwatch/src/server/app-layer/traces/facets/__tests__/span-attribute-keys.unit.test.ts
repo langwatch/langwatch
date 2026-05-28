@@ -121,6 +121,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
   });
 
   describe("excludes reserved namespace keys from user-visible facet results", () => {
+    /** @scenario Reserved namespace is excluded from user-visible facet enumeration */
     it("filters out keys starting with 'langwatch.reserved.' in the outer WHERE", () => {
       // Reserved keys (e.g. langwatch.reserved.blobref.langwatch.output) are
       // server-internal plumbing that should never appear in the Traces UI
