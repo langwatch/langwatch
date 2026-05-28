@@ -235,7 +235,6 @@ export const modelProviderRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().min(1),
-        organizationId: z.string().min(1),
         rateLimitRpm: z.number().int().min(0).nullable().optional(),
         rateLimitTpm: z.number().int().min(0).nullable().optional(),
         rateLimitRpd: z.number().int().min(0).nullable().optional(),
@@ -244,45 +243,12 @@ export const modelProviderRouter = createTRPCRouter({
         providerConfig: z.object({}).passthrough().nullable().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const { id, ...rest } = input;
-      return await ctx.prisma.modelProvider.update({
-        where: { id },
-        data: {
-          ...(rest.rateLimitRpm !== undefined && {
-            rateLimitRpm: rest.rateLimitRpm,
-          }),
-          ...(rest.rateLimitTpm !== undefined && {
-            rateLimitTpm: rest.rateLimitTpm,
-          }),
-          ...(rest.rateLimitRpd !== undefined && {
-            rateLimitRpd: rest.rateLimitRpd,
-          }),
-          ...(rest.fallbackPriorityGlobal !== undefined && {
-            fallbackPriorityGlobal: rest.fallbackPriorityGlobal,
-          }),
-          ...(rest.rotationPolicy !== undefined && {
-            rotationPolicy: rest.rotationPolicy,
-          }),
-          ...(rest.providerConfig !== undefined && {
-            providerConfig: rest.providerConfig ?? undefined,
-          }),
-        },
-        select: {
-          id: true,
-          rateLimitRpm: true,
-          rateLimitTpm: true,
-          rateLimitRpd: true,
-          fallbackPriorityGlobal: true,
-          rotationPolicy: true,
-          providerConfig: true,
-          healthStatus: true,
-          circuitOpenedAt: true,
-          lastHealthCheckAt: true,
-          disabledAt: true,
-        },
-      });
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.updateAdvancedSettings(
+        { prisma: ctx.prisma, session: ctx.session },
+        input,
+      );
     }),
 
   /**

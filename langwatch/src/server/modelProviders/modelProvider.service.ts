@@ -89,6 +89,82 @@ export class ModelProviderService {
   }
 
   /**
+   * Advanced gateway settings (rate limits, fallback priority, rotation
+   * policy, provider config) for a single ModelProvider.
+   *
+   * Authorizes by the provider's own scope set, not a caller-supplied
+   * organization id: a provider id alone is not proof of ownership.
+   * Unreadable rows surface as NOT_FOUND so ids can't be enumerated
+   * across tenants; the write then requires manage on every scope the
+   * provider is attached to (fail-closed, same contract as create/update).
+   */
+  async updateAdvancedSettings(
+    ctx: AuthzContext,
+    input: {
+      id: string;
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      rotationPolicy?: "MANUAL";
+      providerConfig?: Record<string, unknown> | null;
+    },
+  ) {
+    const provider = await this.prisma.modelProvider.findUnique({
+      where: { id: input.id },
+      select: { id: true, scopes: { select: { scopeType: true, scopeId: true } } },
+    });
+    const scopes = (provider?.scopes ?? []) as {
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    }[];
+    if (!provider || !(await canReadAnyScope(ctx, scopes))) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found.",
+      });
+    }
+    await assertCanManageAllScopes(ctx, scopes);
+
+    return this.prisma.modelProvider.update({
+      where: { id: input.id },
+      data: {
+        ...(input.rateLimitRpm !== undefined && {
+          rateLimitRpm: input.rateLimitRpm,
+        }),
+        ...(input.rateLimitTpm !== undefined && {
+          rateLimitTpm: input.rateLimitTpm,
+        }),
+        ...(input.rateLimitRpd !== undefined && {
+          rateLimitRpd: input.rateLimitRpd,
+        }),
+        ...(input.fallbackPriorityGlobal !== undefined && {
+          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+        }),
+        ...(input.rotationPolicy !== undefined && {
+          rotationPolicy: input.rotationPolicy,
+        }),
+        ...(input.providerConfig !== undefined && {
+          providerConfig: input.providerConfig ?? undefined,
+        }),
+      },
+      select: {
+        id: true,
+        rateLimitRpm: true,
+        rateLimitTpm: true,
+        rateLimitRpd: true,
+        fallbackPriorityGlobal: true,
+        rotationPolicy: true,
+        providerConfig: true,
+        healthStatus: true,
+        circuitOpenedAt: true,
+        lastHealthCheckAt: true,
+        disabledAt: true,
+      },
+    });
+  }
+
+  /**
    * Gets all model providers for a project, merging defaults with stored configurations.
    *
    * Business rules:
