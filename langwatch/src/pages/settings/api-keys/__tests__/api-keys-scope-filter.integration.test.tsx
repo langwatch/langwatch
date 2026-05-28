@@ -232,6 +232,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given the default view", () => {
     describe("when navigating to Settings > API Keys", () => {
+      /** @scenario Filter defaults to "All you can see" */
       it("renders the scope filter control in the header reading 'All you can see'", () => {
         renderSection();
         const filter = screen.getByTestId("scope-filter");
@@ -239,6 +240,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         expect(filter).toHaveTextContent("All you can see");
       });
 
+      /** @scenario Filter defaults to "All you can see" */
       it("renders every API key in the table", () => {
         renderSection();
         expect(screen.getByText("Org-Level Key")).toBeInTheDocument();
@@ -249,6 +251,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         expect(screen.getByText("Multi-Binding Key")).toBeInTheDocument();
       });
 
+      /** @scenario Filter defaults to "All you can see" */
       it("positions the scope filter in the header row before the Create button", () => {
         renderSection();
         const filter = screen.getByTestId("scope-filter");
@@ -263,16 +266,19 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given keys at all scope levels", () => {
     describe("when the filter is 'All you can see'", () => {
+      /** @scenario Selecting "All you can see" shows every visible key regardless of scope */
       it("shows keys with org-scoped bindings", () => {
         renderSection();
         expect(screen.getByText("Org-Level Key")).toBeInTheDocument();
       });
 
+      /** @scenario Selecting "All you can see" shows every visible key regardless of scope */
       it("shows keys with team-scoped bindings", () => {
         renderSection();
         expect(screen.getByText("Team Red Key")).toBeInTheDocument();
       });
 
+      /** @scenario Selecting "All you can see" shows every visible key regardless of scope */
       it("shows keys with project-scoped bindings", () => {
         renderSection();
         expect(screen.getByText("Project Alpha Key")).toBeInTheDocument();
@@ -282,6 +288,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given the filter dropdown is opened", () => {
     describe("when checking dropdown options", () => {
+      /** @scenario Scope filter dropdown offers the same options as the model-providers page */
       it("offers 'All you can see', 'This Team', 'This Project', and 'More Scopes'", async () => {
         renderSection();
         const trigger = screen.getByTestId("scope-filter");
@@ -298,6 +305,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given keys with bindings at all scope levels", () => {
     describe("when picking the organization scope", () => {
+      /** @scenario Picking the organization keeps every key bound anywhere in that org */
       it("keeps keys with organization-scoped bindings", async () => {
         const user = userEvent.setup();
         renderSection();
@@ -328,6 +336,7 @@ describe("<ApiKeysSection /> scope filter", () => {
     });
 
     describe("when picking a specific team scope", () => {
+      /** @scenario Picking a team keeps org-scoped parents, the team itself, and its child projects */
       it("keeps org parent keys, the team key, and child project keys — hides sibling team/project keys", async () => {
         const user = userEvent.setup();
         renderSection();
@@ -359,6 +368,7 @@ describe("<ApiKeysSection /> scope filter", () => {
     });
 
     describe("when picking a specific project scope", () => {
+      /** @scenario Picking a project keeps org-scoped grand-parents, the project's parent team, and the project itself */
       it("keeps org grandparent, parent team key, and the project key — hides sibling project and other team keys", async () => {
         const user = userEvent.setup();
         renderSection();
@@ -397,6 +407,7 @@ describe("<ApiKeysSection /> scope filter", () => {
     });
 
     describe("when a key has multiple bindings", () => {
+      /** @scenario A key with multiple bindings is visible if any binding matches the cascade */
       it("keeps the key visible if any binding matches the cascade", async () => {
         // MULTI_BINDING_KEY has org + proj-2 bindings
         // When filtering to team-1 (which has proj-1, not proj-2):
@@ -426,6 +437,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given no keys exist for the filtered scope", () => {
     describe("when the filter narrows everything away", () => {
+      /** @scenario Filter with zero matches shows a plain empty state */
       it("shows a plain empty state message without a reset link", async () => {
         // Use a key that only has proj-1 binding, then filter to proj-2
         // proj-2 is under team-2; proj-1's binding does NOT cascade to proj-2
@@ -469,6 +481,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given the URL has a scope query param", () => {
     describe("when navigating to API Keys with ?scope=TEAM:team-1", () => {
+      /** @scenario Filter selection survives reload via the URL, not localStorage */
       it("reapplies the team-scoped filter from URL on mount", async () => {
         mockRouterQuery.scope = "TEAM:team-1";
 

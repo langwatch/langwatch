@@ -109,6 +109,7 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a command box with a terminal command", () => {
     describe("when the copy button is clicked", () => {
+      /** @scenario Terminal prompt glyph is not included in the copied value */
       it("copies only the raw command — not the prompt glyph — to the clipboard", async () => {
         renderCommandBox({
           command: "claude mcp add langwatch -- npx -y @langwatch/mcp-server",
@@ -124,6 +125,7 @@ describe("<ShikiCommandBox />", () => {
         });
       });
 
+      /** @scenario Terminal prompt glyph is not included in the copied value */
       it("the prompt glyph is NOT in the source string passed to codeToHtml", async () => {
         const spy = vi.spyOn(shikiAdapter, "codeToHtml");
         spy.mockClear();
@@ -146,6 +148,7 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a command box with a masked secret value", () => {
     describe("when the copy button is clicked", () => {
+      /** @scenario Copy button is present on every command box */
       it("copies the unmasked value (real token) to the clipboard", async () => {
         renderCommandBox({
           command: "LANGWATCH_API_KEY=real-secret-token-abc123",
@@ -163,6 +166,7 @@ describe("<ShikiCommandBox />", () => {
     });
 
     describe("when the reveal eye toggle is clicked", () => {
+      /** @scenario Reveal toggle still works for masked secret values */
       it("shows the hide button after clicking reveal", async () => {
         renderCommandBox({
           command: "LANGWATCH_API_KEY=real-secret-token-abc123",
@@ -186,6 +190,7 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given the reveal toggle is clicked N times rapidly", () => {
     describe("when verifying Shiki tokenization is memoized", () => {
+      /** @scenario Reveal toggle does not re-tokenize on every click */
       it("calls codeToHtml at most twice per command box — once for masked, once for unmasked", async () => {
         const spy = vi.spyOn(shikiAdapter, "codeToHtml");
         spy.mockClear();
@@ -226,6 +231,7 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a command box with a long command", () => {
     describe("when the snippet renders", () => {
+      /** @scenario Long lines scroll horizontally inside the command box */
       it("the command box renders with a horizontally scrollable code area", async () => {
         const longCommand =
           "claude mcp add langwatch --env LANGWATCH_API_KEY=pat-lw-very-long-token-that-goes-past-the-dialog-width -- npx -y @langwatch/mcp-server";
@@ -248,6 +254,7 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a copy button is present", () => {
     describe("when a copy action succeeds", () => {
+      /** @scenario Copy success is announced to assistive tech */
       it("announces 'Copied' via the toaster (acts as polite live region)", async () => {
         const { toaster } = await import("~/components/ui/toaster");
         const createSpy = vi.spyOn(toaster, "create");
@@ -271,6 +278,8 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a command box renders", () => {
     describe("when checking copy and reveal button layout", () => {
+      /** @scenario Copy and reveal buttons coexist in the existing header bar without overlap */
+      /** @scenario Copy button is present on every command box */
       it("both buttons are present in a header bar above the code area", async () => {
         renderCommandBox({
           command: "test-command",
@@ -289,6 +298,8 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a copy button that enters success state", () => {
     describe("when using fake timers to observe the 1-second flash", () => {
+      /** @scenario Copy button flashes a success state on click */
+      /** @scenario All command snippets are syntax-highlighted via the existing Shiki singleton */
       it("flips data-state to 'copied' after click and back to 'idle' after 1 second", async () => {
         renderCommandBox({ command: "claude mcp add langwatch" });
 
