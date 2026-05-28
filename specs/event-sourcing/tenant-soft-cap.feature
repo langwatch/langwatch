@@ -189,7 +189,8 @@ Feature: Per-tenant soft cap on in-flight dispatch
   @integration @tenant-cap @self-heal
   Scenario: A tenant's in-flight slots self-heal after an ungraceful worker death
     Given a tenant at cap with several in-flight groups
-    And the workers holding those groups die without completing (no COMPLETE, no drain)
+    And the same tenant has additional groups parked over its cap
+    And the workers holding the in-flight groups die without completing (no COMPLETE, no drain)
     When the in-flight slots' liveness lapses past the active TTL
     Then those slots stop counting against the tenant cap
     And the tenant's parked groups are dispatched again without an operator reset

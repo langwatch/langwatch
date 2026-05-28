@@ -2481,7 +2481,10 @@ describe("GroupStagingScripts", () => {
     // Live in-flight count for a tenant = ZSET members whose expiry score is
     // still in the future relative to nowMs (lapsed members no longer count).
     async function tenantLiveCount(tenantId: string, nowMs: number) {
-      return redis.zcount(tenantActiveZKey(tenantId), `(${nowMs}`, "+inf");
+      // Inclusive lower bound to mirror the Lua live-count contract: the script
+      // GCs only scores STRICTLY below nowMs (ZREMRANGEBYSCORE "-inf" "(nowMs")
+      // then ZCARDs, so a slot scored exactly nowMs is still live.
+      return redis.zcount(tenantActiveZKey(tenantId), `${nowMs}`, "+inf");
     }
 
     async function stageOne({
