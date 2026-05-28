@@ -68,6 +68,7 @@ import { getWorkerMetricsPort } from "./server/background/config";
 import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
+import { captureException } from "./utils/posthogErrorCapture";
 import { createLogger } from "./utils/logger/server";
 
 // Hono — unified API router
@@ -353,7 +354,14 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");
-    server.close(() => process.exit(1));
+    captureException(err, {
+      level: "error",
+      tags: { source: "uncaughtException", process: "server" },
+    });
+    // Flush the buffered $exception before exiting — posthog-node batches
+    // events, so without this the event dies with the process. The 1s abort
+    // below is the hard backstop if the flush hangs.
+    void shutdownPostHog().finally(() => server.close(() => process.exit(1)));
     setTimeout(() => process.abort(), 1000).unref();
   });
 
@@ -362,6 +370,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
       "unhandled rejection detected"
     );
+    captureException(reason, {
+      level: "error",
+      tags: { source: "unhandledRejection", process: "server" },
+    });
   });
 };
 

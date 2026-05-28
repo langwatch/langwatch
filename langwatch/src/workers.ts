@@ -2,6 +2,8 @@ import "dotenv/config";
 import { setEnvironment } from "@langwatch/ksuid";
 import { WorkersRestart } from "./server/background/errors";
 import { verifyRedisReady } from "./server/redis";
+import { shutdownPostHog } from "./server/posthog";
+import { captureException } from "./utils/posthogErrorCapture";
 import { createLogger } from "./utils/logger/server";
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
@@ -47,11 +49,17 @@ void verifyRedisReady().then(() => {
 // Global error handlers for uncaught exceptions and unhandled promise rejections
 process.on("uncaughtException", (err) => {
   logger.fatal({ error: err }, "uncaught exception detected");
+  captureException(err, {
+    level: "error",
+    tags: { source: "uncaughtException", process: "worker" },
+  });
 
-  // Attempt graceful shutdown, abort if it takes too long
+  // Attempt graceful shutdown, abort if it takes too long. shutdownPostHog
+  // flushes the buffered $exception above — posthog-node batches events, so
+  // it would otherwise die with the process. Both run inside the 3s race.
   const { gracefulShutdown } = require("./server/background/worker");
   Promise.race([
-    gracefulShutdown(),
+    Promise.all([gracefulShutdown(), shutdownPostHog()]),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 3000)),
   ])
     .catch(() => process.abort())
@@ -63,4 +71,8 @@ process.on("unhandledRejection", (reason, promise) => {
     { reason: reason instanceof Error ? reason : { value: reason }, promise },
     "unhandled rejection detected",
   );
+  captureException(reason, {
+    level: "error",
+    tags: { source: "unhandledRejection", process: "worker" },
+  });
 });
