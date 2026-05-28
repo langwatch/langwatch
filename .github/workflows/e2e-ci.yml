@@ -52,6 +52,12 @@ jobs:
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      # AI Gateway data-plane secrets (shared by control plane + Go gateway).
+      # The gateway validates these as required; without them `make service
+      # svc=aigateway` crash-loops. Test-only values, 32+ chars.
+      LW_GATEWAY_INTERNAL_SECRET: "e2e-gateway-internal-secret-000000000000000000000000000000000000"
+      LW_GATEWAY_JWT_SECRET: "e2e-gateway-jwt-secret-00000000000000000000000000000000000000000"
+      LW_VIRTUAL_KEY_PEPPER: "e2e-virtual-key-pepper-00000000000000000000000000000000000000000"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       NODE_ENV: "development"

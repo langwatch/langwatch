@@ -83,9 +83,10 @@ setup-hooks:
 DEV_ENV_FILE ?= langwatch/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
 	@_snap=$$(export -p) && \
-		set -a && . $(DEV_ENV_FILE) && set +a && \
+		{ test -f $(DEV_ENV_FILE) \
+			&& set -a && . $(DEV_ENV_FILE) && set +a \
+			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
