@@ -24,13 +24,22 @@ Crucially, the fold's **decision** never needs the IO *text*: `accumulateIO` (`t
 The keystone is **edge offload** (#4215 Track 2): over-threshold field values are replaced with `{preview + ref}` at ingestion, *before* queue staging. By the time the fold runs, span IO is already small, so:
 
 1. The fold's `computedInput`/`computedOutput` are **pick-winning** (one span's value, never concatenated — `shouldOverrideOutput` *overrides*), so post-offload they hold a **preview**, bounded by a single span ≤ threshold. The fold cache and the `trace_summaries` row are therefore **naturally lean** — no `accumulateIO` refactor, no IO-split table, no projection version bump for IO.
-2. The fold additionally records the **winning span's blob ref** so trace-level full IO resolves on read.
+2. The fold is **unchanged** — it has no awareness of refs. Refs travel as reserved span attributes (`langwatch.reserved.blobref.*`) that the fold ignores; they survive into `stored_spans` because the spans projection writes the full attribute map.
 3. `RedisCachedFoldStore.toCacheable` (additive, already landed) stays as a **secondary defence** to strip the still-growing small collections (`events[]`, `spanCosts`, accumulated `attributes`) for pathological many-span traces. It is not the primary mechanism.
-4. Reads (`trace_summaries` list + `getTracesWithSpans` detail/eval) resolve refs → full IO; list/search use the inline preview. **Returned bytes are unchanged.**
+4. Reads (`getTracesWithSpans` detail/eval) extract reserved blob-refs from each span, resolve them through `BlobStore.get`, and then **re-run `TraceIOExtractionService` against the resolved spans** to recompute trace-level `input`/`output` as full values. List / search use the inline preview from `trace_summaries.computedInput/Output` (no S3 fetch). **Returned bytes from the detail read are unchanged from the pre-feature shape.**
 
 ## Superseded approach (rejected)
 
 An earlier draft of this ADR proposed refactoring `accumulateIO` onto presence-flags and splitting `computedInput/Output` into their own ReplacingMergeTree row written on winner-change. **Rejected** — edge offload makes the fold state lean for free, so that hot-path refactor (high blast radius on a versioned, replay-coordinated projection) is unnecessary. The clog is the *large single value*, which offload removes upstream; `computedOutput` never grew with span count (pick-winning), so there was never an O(N²)-in-IO problem to solve inside the fold.
+
+### Trace-level read resolution: read-time recompute (chosen) over fold-carries-ref (rejected)
+
+A second forking point arose during implementation: how does the detail/eval read get the **full** trace-level `input`/`output` when `trace_summaries.computedInput/Output` is now a preview (because the winning span was offloaded at the edge before the fold ran)?
+
+- **(A) Fold-carries-ref** — the fold writes the winning span's blob ref into a new column on `trace_summaries`; read resolves trace IO via that column. **Rejected**: requires a fold change *and* a `trace_summaries` schema migration, reintroducing exactly the hot-path/replay blast radius this ADR otherwise avoids.
+- **(B) Read-time recompute** — chosen. On read, after fetching the trace + its spans from CH, extract reserved blob-refs from each span, resolve them through `BlobStore.get`, then re-run `TraceIOExtractionService` against the resolved spans to recompute trace-level `input`/`output`. The same service that computes IO during the fold is **reused** from a second call site; the fold remains untouched; no schema change.
+
+The trade-off is read-time cost: a per-trace recompute on detail/eval reads that touch offloaded data. Cheap relative to the S3 GETs and bounded by the span count of the trace being read. The reversibility wins: choice B is one PR's worth of code in the read path, with no schema or fold migration to roll back. Full decision record: `~/.claude/wisdom/2026-05-28-trace-blob-offload-read-resolution.md`.
 
 ## Consequences
 
