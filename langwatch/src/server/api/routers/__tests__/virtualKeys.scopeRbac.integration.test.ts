@@ -94,6 +94,38 @@ describe("virtualKeys — scope-aware RBAC", () => {
     );
   }
 
+  /**
+   * Seed an org MEMBER whose visibility comes purely from membership rows
+   * (OrganizationUser + TeamUser), with NO RoleBinding and NO
+   * virtualKeys:view grant. Proves list visibility is membership-based,
+   * not permission-based.
+   */
+  async function seedTeamMember(teamIds: string[]): Promise<Caller> {
+    const uid = `usr-mem-${ns}-${seq++}`;
+    const email = `${uid}@example.com`;
+    await prisma.user.create({ data: { id: uid, email, name: uid } });
+    await prisma.organizationUser.create({
+      data: {
+        organizationId: ORG_ID,
+        userId: uid,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    for (const teamId of teamIds) {
+      await prisma.teamUser.create({
+        data: { userId: uid, teamId, role: TeamUserRole.MEMBER },
+      });
+    }
+    return appRouter.createCaller(
+      createInnerTRPCContext({
+        session: {
+          user: { id: uid, email, name: uid },
+          expires: new Date(Date.now() + 3_600_000).toISOString(),
+        } as any,
+      }),
+    );
+  }
+
   async function seedVk(
     name: string,
     scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
@@ -153,6 +185,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.teamUser.deleteMany({ where: { team: { organizationId: ORG_ID } } });
     await prisma.project.deleteMany({ where: { team: { organizationId: ORG_ID } } });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
@@ -335,6 +368,38 @@ describe("virtualKeys — scope-aware RBAC", () => {
       await expect(
         karen.virtualKeys.revoke({ organizationId: ORG_ID, id: vkId }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+  });
+
+  describe("given list visibility intersects the caller's membership set", () => {
+    /** @scenario A user sees VKs whose scopes intersect their membership set */
+    it("includes org + own-team VKs and excludes a sibling team's VK", async () => {
+      const vkOrg = await seedVk("list-org", [
+        { scopeType: "ORGANIZATION", scopeId: ORG_ID },
+      ]);
+      const vkPlatform = await seedVk("list-platform", [
+        { scopeType: "TEAM", scopeId: TEAM_PLATFORM },
+      ]);
+      const vkDataSci = await seedVk("list-datasci", [
+        { scopeType: "TEAM", scopeId: TEAM_DATA_SCI },
+      ]);
+      const olive = await seedTeamMember([TEAM_PLATFORM]);
+      const ids = (await olive.virtualKeys.list({ organizationId: ORG_ID })).map(
+        (vk) => vk.id,
+      );
+      expect(ids).toContain(vkOrg);
+      expect(ids).toContain(vkPlatform);
+      expect(ids).not.toContain(vkDataSci);
+    });
+
+    it("returns NOT_FOUND on get for a key outside the caller's membership", async () => {
+      const vkDataSci = await seedVk("get-datasci", [
+        { scopeType: "TEAM", scopeId: TEAM_DATA_SCI },
+      ]);
+      const olive = await seedTeamMember([TEAM_PLATFORM]);
+      await expect(
+        olive.virtualKeys.get({ organizationId: ORG_ID, id: vkDataSci }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
 

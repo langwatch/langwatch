@@ -1,3 +1,4 @@
+@bdd @gateway @virtual-keys @rbac @integration
 Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
 
   Locks the permission contract for VirtualKey CRUD across the new

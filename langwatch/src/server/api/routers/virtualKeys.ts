@@ -28,15 +28,13 @@ import {
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
 
-import {
-  authorizeInResolver,
-  checkOrganizationPermission,
-  hasProjectPermission,
-} from "../rbac";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
+  isVisibleToMembership,
+  loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
 
 const scopeInputSchema = z.object({
@@ -133,22 +131,45 @@ async function assertGuardrailAttachmentsAllowed(
 }
 
 export const virtualKeysRouter = createTRPCRouter({
+  // Visibility is membership-based, not permission-based: a caller sees a
+  // VK when one of its scopes intersects their membership set (org member
+  // sees org-scoped keys, team member sees that team's keys). The
+  // data-dependent membership filter runs in the resolver, so the builder's
+  // fail-closed gate is satisfied by authorizeInResolver rather than a
+  // coarse org-wide virtualKeys:view check that a plain member lacks.
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
       const service = VirtualKeyService.create(ctx.prisma);
       const keys = await service.getAll(input.organizationId);
-      return keys.map(toVirtualKeyCamelDto);
+      return keys
+        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
+        .map(toVirtualKeyCamelDto);
     }),
 
   get: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const vk = await service.getById(input.id, input.organizationId);
+      // A key the caller can't see is indistinguishable from one that
+      // doesn't exist — same NOT_FOUND, no existence leak.
       if (!vk) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      if (!isVisibleToMembership(membership, vk.scopes)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       return toVirtualKeyCamelDto(vk);

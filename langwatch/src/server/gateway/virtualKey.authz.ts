@@ -110,3 +110,62 @@ export async function assertCanOperateOnAnyScope(
     message: `permission_denied: ${permission} at one of the virtual key's scopes`,
   });
 }
+
+/**
+ * The set of scopes a user can reach by *membership* within one org:
+ *   - `isOrgMember`  — has an OrganizationUser row for the org.
+ *   - `teamIds`      — teams in the org the user belongs to (TeamUser).
+ *   - `projectIds`   — projects living in any of those teams.
+ *
+ * List/read visibility is membership-based, not permission-based: a VK is
+ * visible when one of its scopes intersects this set (vk-scope-rbac.feature
+ * "A user sees VKs whose scopes intersect their membership set"). A plain
+ * org member with no `virtualKeys:view` grant still sees org-scoped keys,
+ * and a team member sees that team's keys — but not a sibling team's.
+ */
+export type MembershipSet = {
+  isOrgMember: boolean;
+  teamIds: Set<string>;
+  projectIds: Set<string>;
+};
+
+export async function loadMembershipSet(
+  prisma: PrismaClient,
+  organizationId: string,
+  userId: string,
+): Promise<MembershipSet> {
+  const [orgMembership, teamMemberships] = await Promise.all([
+    prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { userId: true },
+    }),
+    prisma.teamUser.findMany({
+      where: { userId, team: { organizationId } },
+      select: { teamId: true },
+    }),
+  ]);
+  const teamIds = new Set(teamMemberships.map((t) => t.teamId));
+  const projects =
+    teamIds.size > 0
+      ? await prisma.project.findMany({
+          where: { teamId: { in: [...teamIds] } },
+          select: { id: true },
+        })
+      : [];
+  return {
+    isOrgMember: orgMembership !== null,
+    teamIds,
+    projectIds: new Set(projects.map((p) => p.id)),
+  };
+}
+
+export function isVisibleToMembership(
+  membership: MembershipSet,
+  scopes: Scope[],
+): boolean {
+  return scopes.some((scope) => {
+    if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
+    if (scope.scopeType === "TEAM") return membership.teamIds.has(scope.scopeId);
+    return membership.projectIds.has(scope.scopeId);
+  });
+}
