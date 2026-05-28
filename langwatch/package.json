@@ -105,7 +105,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.75.0",
     "@opentelemetry/core": "2.7.1",
     "@opentelemetry/exporter-logs-otlp-proto": "^0.217.0",
-    "@opentelemetry/exporter-trace-otlp-grpc": "0.217.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.218.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.217.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.217.0",
     "@opentelemetry/otlp-transformer": "0.55.0",
