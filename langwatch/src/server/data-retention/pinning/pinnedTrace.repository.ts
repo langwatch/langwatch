@@ -1,6 +1,6 @@
-import type { PrismaClient, PinnedTrace } from "@prisma/client";
+import { PinSource, type PrismaClient, type PinnedTrace } from "@prisma/client";
 
-export type PinSource = "manual" | "share";
+export { PinSource };
 
 interface CreatePinnedTraceParams {
   projectId: string;
@@ -56,9 +56,10 @@ export class PinnedTraceRepository {
         },
       },
       update:
-        params.source === "manual"
+        params.source === PinSource.manual
           ? {
               ...(params.userId !== undefined ? { userId: params.userId } : {}),
+              source: PinSource.manual,
               reason: params.reason ?? null,
             }
           : {},
@@ -66,9 +67,8 @@ export class PinnedTraceRepository {
         projectId: params.projectId,
         traceId: params.traceId,
         userId: params.userId ?? null,
-        reason: params.source === "share"
-          ? "__auto_share"
-          : (params.reason ?? null),
+        source: params.source,
+        reason: params.reason ?? null,
       },
     });
   }
@@ -93,7 +93,7 @@ export class PinnedTraceRepository {
     traceId: string;
   }): Promise<boolean> {
     const pin = await this.findByProjectAndTrace({ projectId, traceId });
-    return pin?.reason === "__auto_share";
+    return pin?.source === PinSource.share;
   }
 
   async hasManualPin({
@@ -104,6 +104,6 @@ export class PinnedTraceRepository {
     traceId: string;
   }): Promise<boolean> {
     const pin = await this.findByProjectAndTrace({ projectId, traceId });
-    return pin != null && pin.reason !== "__auto_share";
+    return pin != null && pin.source === PinSource.manual;
   }
 }

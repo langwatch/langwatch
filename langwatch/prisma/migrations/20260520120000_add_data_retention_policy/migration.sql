@@ -10,6 +10,7 @@ CREATE TABLE "PinnedTrace" (
     "projectId" TEXT NOT NULL,
     "traceId" TEXT NOT NULL,
     "userId" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'manual',
     "reason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
