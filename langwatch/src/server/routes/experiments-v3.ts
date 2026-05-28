@@ -308,6 +308,16 @@ app.post("/abort", async (c) => {
     );
   }
 
+  // Ownership check: holding evaluations:manage on `projectId` does NOT grant
+  // the right to abort a run that belongs to a different project. The runId is
+  // attacker-controlled, so verify the run is owned by the authenticated
+  // project before signaling an abort (mirrors GET /runs/:runId). Without this,
+  // a user could abort another tenant's experiment run by guessing its runId.
+  const runState = await runStateManager.getRunState(runId);
+  if (!runState || runState.projectId !== projectId) {
+    return c.json({ error: "Run not found" }, { status: 404 });
+  }
+
   logger.info({ projectId, runId }, "Requesting abort");
   await requestAbort(runId);
   // Also signal via abortManager (the standalone abort route used this)

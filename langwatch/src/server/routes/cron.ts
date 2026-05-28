@@ -12,6 +12,7 @@
 import type { Prisma, Project, Trigger } from "@prisma/client";
 import { Hono } from "hono";
 import { env } from "~/env.mjs";
+import { validateInternalSecret } from "./_lib/internal-secret";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
@@ -36,13 +37,11 @@ const logger = createLogger("langwatch:cron");
 
 export const app = new Hono().basePath("/api");
 
-/** Extracts and validates the cron API key from the Authorization header. */
-function validateCronKey(c: { req: { header: (name: string) => string | undefined } }): boolean {
-  let cronApiKey = c.req.header("authorization");
-  cronApiKey = cronApiKey?.startsWith("Bearer ")
-    ? cronApiKey.slice(7)
-    : cronApiKey;
-  return cronApiKey === process.env.CRON_API_KEY;
+/** Validates the cron shared secret. See validateInternalSecret (fail-closed + constant-time). */
+function validateCronKey(c: {
+  req: { header: (name: string) => string | undefined };
+}): boolean {
+  return validateInternalSecret(c);
 }
 
 // ---------- GET /api/cron/old_lambdas_cleanup ----------

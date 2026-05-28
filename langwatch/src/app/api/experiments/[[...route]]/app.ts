@@ -13,29 +13,20 @@
  * includes a run count and latest run timestamp without loading run history.
  */
 import type { Experiment } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import { createProjectApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:experiments");
-
-type Variables = AuthMiddlewareVariables;
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
@@ -97,31 +88,31 @@ const toExperimentSummary = ({
   lastRunAt: lastRunAt ? new Date(lastRunAt).toISOString() : null,
 });
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/experiments")
-  .use(tracerMiddleware({ name: "experiments" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({
+  basePath: "/api/experiments",
+  family: "experiments",
+});
 
-  .get(
-    "/",
-    describeRoute({
-      description:
-        "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(experimentsListResponseSchema),
-            },
+// Listing experiments is an evaluations read — mirror the evaluations:view
+// ceiling the sibling run-inspection routes (GET /runs, /runs/:runId) enforce.
+secured.access(requires("evaluations:view")).get(
+  "/",
+  describeRoute({
+    description:
+      "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(experimentsListResponseSchema),
           },
         },
       },
-    }),
-    async (c) => {
+    },
+  }),
+  async (c) => {
       const project = c.get("project");
       const page = parsePositiveInt({
         value: c.req.query("page"),
@@ -178,4 +169,6 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
     },
-  );
+);
+
+export const app = secured.hono;

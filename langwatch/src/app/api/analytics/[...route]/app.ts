@@ -1,20 +1,17 @@
-import { Hono } from "hono";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { authMiddleware, handleError } from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
-import { app as appV1 } from "./app.v1";
+import { createProjectApp } from "~/server/api/security";
+import { registerAnalyticsRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
-// Define the Hono app
-export const app = new Hono().basePath("/api/analytics");
+// Project-scoped secured app. Every route must declare an access policy via
+// `.access(...)` before it can be registered — the type-safe replacement for
+// the old optional `requirePermission` middleware.
+const secured = createProjectApp({
+  basePath: "/api/analytics",
+  family: "analytics",
+});
 
-// Middleware
-app.use(tracerMiddleware({ name: "analytics" }));
-app.use(loggerMiddleware());
-app.use(authMiddleware);
-// https://hono.dev/docs/api/hono#error-handling
-app.onError(handleError);
+registerAnalyticsRoutes(secured);
 
-app.route("/", appV1);
+export const app = secured.hono;

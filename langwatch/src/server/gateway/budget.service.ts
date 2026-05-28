@@ -427,6 +427,42 @@ export class GatewayBudgetService {
       }
     }
 
+    // Cross-org guard for TEAM / PROJECT budgets: the scoped team/project must
+    // belong to the budget's organization. organizationId is derived from the
+    // authenticated caller's project, but the scope id is request-supplied — a
+    // caller could otherwise create a budget targeting another tenant's team or
+    // project. The FK to Team/Project alone does not prevent this since it is
+    // org-agnostic. Mirrors the PRINCIPAL guard above.
+    if (input.scope.kind === "TEAM") {
+      const team = await this.prisma.team.findFirst({
+        where: { id: input.scope.teamId, organizationId: input.organizationId },
+        select: { id: true },
+      });
+      if (!team) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "teamId does not belong to this organization — TEAM budgets must scope a team inside the budget's org.",
+        });
+      }
+    }
+    if (input.scope.kind === "PROJECT") {
+      const proj = await this.prisma.project.findFirst({
+        where: {
+          id: input.scope.projectId,
+          team: { organizationId: input.organizationId },
+        },
+        select: { id: true },
+      });
+      if (!proj) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "projectId does not belong to this organization — PROJECT budgets must scope a project inside the budget's org.",
+        });
+      }
+    }
+
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);
 

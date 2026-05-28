@@ -26,6 +26,7 @@ import { randomUUID, createHash } from "node:crypto";
 import crypto from "crypto";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { validateInternalSecret } from "./_lib/internal-secret";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { TRPCError } from "@trpc/server";
@@ -605,6 +606,9 @@ app.post(
 // GET /api/rerun_checks
 // =============================================
 app.all("/rerun_checks", async (c) => {
+  if (!validateInternalSecret(c)) {
+    return c.body(null, 401);
+  }
   try {
     const checkId = c.req.query("checkId") as string;
     const projectId = c.req.query("projectId") as string;
@@ -630,6 +634,9 @@ app.all("/rerun_checks", async (c) => {
 const MAX_WORKER_DURATION = 300;
 
 app.all("/start_workers", async (c) => {
+  if (!validateInternalSecret(c)) {
+    return c.body(null, 401);
+  }
   try {
     const maxRuntimeMs = (MAX_WORKER_DURATION - 60) * 1000;
     await start(undefined, maxRuntimeMs);
