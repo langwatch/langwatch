@@ -23,6 +23,7 @@ import type {
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
   TraceNameChangedEvent,
+  TraceMetadataChangedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -34,6 +35,7 @@ import {
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  traceMetadataChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -178,6 +180,7 @@ const traceSummaryEvents = [
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  traceMetadataChangedEventSchema,
 ] as const;
 
 /**
@@ -241,6 +244,7 @@ export class TraceSummaryFoldProjection
       traceName: "",
       rootSpanStartTimeMs: undefined,
       traceNameUserOverridden: false,
+      labelsUserOverridden: false,
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
@@ -455,6 +459,64 @@ export class TraceSummaryFoldProjection
       // came before is no longer a "fallback" guess that should be
       // displaced by a later real-root span.
       traceNameFromFallback: false,
+    };
+  }
+
+  handleTraceTraceMetadataChanged(
+    event: TraceMetadataChangedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const mergedAttributes = { ...state.attributes };
+    let labelsUserOverridden = state.labelsUserOverridden ?? false;
+
+    for (const [key, value] of Object.entries(event.data.metadata)) {
+      if (key === "user_id") {
+        mergedAttributes["langwatch.user_id"] = String(value);
+      } else if (key === "customer_id") {
+        mergedAttributes["langwatch.customer_id"] = String(value);
+      } else if (key === "thread_id") {
+        mergedAttributes["gen_ai.conversation.id"] = String(value);
+      } else if (key === "labels") {
+        mergedAttributes["langwatch.labels"] = JSON.stringify(value);
+        labelsUserOverridden = true;
+      } else {
+        const attrKey = key.startsWith("metadata.") ? key : `metadata.${key}`;
+        const existing = mergedAttributes[attrKey];
+        if (
+          existing &&
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          try {
+            const prevObj: unknown = JSON.parse(existing);
+            if (
+              typeof prevObj === "object" &&
+              prevObj &&
+              !Array.isArray(prevObj)
+            ) {
+              mergedAttributes[attrKey] = JSON.stringify({
+                ...prevObj,
+                ...(value as Record<string, unknown>),
+              });
+              continue;
+            }
+          } catch {
+            // not JSON — fall through to overwrite
+          }
+        }
+        mergedAttributes[attrKey] =
+          typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value);
+      }
+    }
+
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      attributes: mergedAttributes,
+      labelsUserOverridden,
     };
   }
 }

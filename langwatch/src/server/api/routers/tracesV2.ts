@@ -602,6 +602,49 @@ export const tracesV2Router = createTRPCRouter({
       return { traceId: input.traceId, newName: parsed.data.newName };
     }),
 
+  changeMetadata: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        metadata: z.record(
+          z.union([
+            z.string().max(4096),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.record(z.unknown()),
+          ]),
+        ).refine((obj) => Object.keys(obj).length > 0, {
+          message: "metadata must contain at least one key",
+        }).refine(
+          (obj) => JSON.stringify(obj).length <= 32768,
+          { message: "total metadata payload must not exceed 32KB" },
+        ),
+      }),
+    )
+    .use(checkProjectPermission("traces:update"))
+    .mutation(async ({ input, ctx }) => {
+      const app = getApp();
+      const summary = await app.traces.summary.getByTraceId(
+        input.projectId,
+        input.traceId,
+      );
+      if (!summary) {
+        throw new TraceNotFoundError(input.traceId);
+      }
+
+      await app.traces.changeTraceMetadata({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        metadata: input.metadata,
+        changedByUserId: ctx.session.user.id,
+        occurredAt: Date.now(),
+      });
+
+      return { traceId: input.traceId };
+    }),
+
   spansPaginated: protectedProcedure
     .input(
       z.object({
