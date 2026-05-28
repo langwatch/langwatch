@@ -30,8 +30,6 @@ import {
 import {
   generateTestTenantId,
   generateTestAggregateId,
-  createTestPipeline,
-  closePipelineGracefully,
 } from "../../__tests__/integration/testHelpers";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";

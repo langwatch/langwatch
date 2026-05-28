@@ -14,7 +14,7 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTenantId, type Command } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import {
