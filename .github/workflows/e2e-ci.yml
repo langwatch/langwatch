@@ -162,8 +162,13 @@ jobs:
         working-directory: agentic-e2e-tests
         run: pnpm install --frozen-lockfile --ignore-workspace
 
-      # No Playwright browser download: the tests launch the runner's
+      # Skip the ~170 MB Chromium download: the tests launch the runner's
       # preinstalled Google Chrome via channel (see E2E_BROWSER_CHANNEL below).
+      # Still install ffmpeg (~few MB) since Playwright needs it to record the
+      # retain-on-failure video; without it browserContext.newPage throws.
+      - name: Install Playwright ffmpeg
+        working-directory: agentic-e2e-tests
+        run: pnpm exec playwright install ffmpeg
 
       - name: Prepare files
         working-directory: langwatch
