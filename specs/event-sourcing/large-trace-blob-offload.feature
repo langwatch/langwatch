@@ -78,15 +78,23 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
     And the evaluation is scheduled exactly as it is without the lean cache
 
   @unit @track1 @unimplemented
-  # Property of accumulateIO (pick-winning, never concatenated) — held by
-  # existing fold logic, unmodified in this PR. ADR-021 §"Decision" §1.
-  # Bind once a regression-style test exercises a non-winner upsert.
-  Scenario: A non-winning span upsert does not carry IO text into the hot summary row
+  # Pick-winning property of `accumulateIO` — non-winning span upserts do
+  # not change `computedInput`/`computedOutput` on the trace summary. Held
+  # by the existing fold logic (unmodified in this PR). ADR-021 §"Decision"
+  # §1 ("`computedInput`/`computedOutput` are pick-winning"). Bind once a
+  # regression-style test exercises a non-winner upsert against the fold.
+  # NOTE (revised): an earlier draft of this scenario said "the heavy IO
+  # is written to its own traceId-keyed row only on winner change" — that
+  # described the REJECTED IO-split-table design (ADR-021 §"Superseded").
+  # The chosen design keeps `computedInput`/`computedOutput` inline in
+  # `trace_summaries` (as a preview after edge offload); there is no
+  # separate IO row. Scenario rewritten to validate the chosen design.
+  Scenario: A non-winning span upsert does not change the trace summary's computed IO
     Given a prior winning span already established the trace's computed output
     And a later non-winning span is folded
     When the durable trace-summary row is upserted
-    Then the hot summary upsert carries no input or output text
-    And the heavy IO is written to its own traceId-keyed row only on winner change
+    Then `computedInput` and `computedOutput` on the trace summary are unchanged
+    And the previously-recorded preview + reserved blob-ref are preserved as-is
 
   # ===========================================================================
   # Track 2 — edge offload, SDK/gateway defaults, server-side read resolution
@@ -158,11 +166,11 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
   # projectId is encoded in the key prefix. The current unit test covers
   # the per-org-bucket case only; a shared-bucket test that proves
   # API-boundary denial is the follow-up that binds this scenario.
-  Scenario: A cross-tenant blob fetch is denied
-    Given a blob stored under organization A's key "{orgA}/{traceId}/{spanId}/{attr}"
-    When organization B attempts to fetch that key
+  Scenario: A cross-project blob fetch is denied
+    Given a blob stored under project A's key "trace-blobs/{projectA}/{traceId}/{spanId}/{attr}"
+    When project B attempts to fetch that key
     Then the fetch is denied
-    And no bytes from organization A are returned
+    And no bytes from project A are returned
 
   # ===========================================================================
   # Cross-cutting — feature flag
