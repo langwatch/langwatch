@@ -139,7 +139,6 @@ const useAutosaveWizard = () => {
             meta: {
               closable: true,
             },
-            error: error,
           });
           captureException(error, {
             extra: {
