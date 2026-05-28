@@ -61,15 +61,20 @@ export function createEvaluationTriggerReactor(
       // eval dispatch (lighter processing). The span itself is still stored and
       // the trace stays fully queryable: we drop the WORK, never the DATA.
       if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
-        logger.warn(
-          {
-            tenantId,
-            observedTraceId: traceId,
-            spanCount: foldState.spanCount,
-            cap: MAX_PROCESSED_SPANS,
-          },
-          "Skipping evaluation dispatch — trace exceeds the processing cap (span still stored)",
-        );
+        // Log once, on the first crossing only. This is a per-span hot path: a
+        // runaway trace would otherwise emit thousands of identical warns — the
+        // very per-span amplification we are skipping the eval to avoid.
+        if (foldState.spanCount === MAX_PROCESSED_SPANS) {
+          logger.warn(
+            {
+              tenantId,
+              observedTraceId: traceId,
+              spanCount: foldState.spanCount,
+              cap: MAX_PROCESSED_SPANS,
+            },
+            "Skipping evaluation dispatch — trace reached the processing cap (spans still stored)",
+          );
+        }
         return;
       }
 
