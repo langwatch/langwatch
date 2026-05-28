@@ -93,6 +93,26 @@ export default function ModelsPage() {
   });
   const router = useRouter();
 
+  // Persist scope filter changes to URL — mirrors the api-keys page so that
+  // reloading /settings/model-providers restores the active filter.
+  const handleScopeFilterChange = (next: PageScopeFilter) => {
+    setScopeFilter(next);
+    if (next.kind === "all") {
+      const { scope: _scope, ...rest } = router.query as Record<string, string>;
+      void router.replace({ query: rest });
+    } else if (next.kind === "team-current" && team?.id) {
+      void router.replace({ query: { ...router.query, scope: `TEAM:${team.id}` } });
+    } else if (next.kind === "project-current" && project?.id) {
+      void router.replace({
+        query: { ...router.query, scope: `PROJECT:${project.id}` },
+      });
+    } else if (next.kind === "specific") {
+      void router.replace({
+        query: { ...router.query, scope: `${next.scopeType}:${next.scopeId}` },
+      });
+    }
+  };
+
   // Build the `available` payload the filter dropdown needs (org / teams /
   // projects). Pulled from the current organization graph so the page
   // doesn't have to wait on the default-models query before the header
@@ -220,7 +240,7 @@ export default function ModelsPage() {
               "More Scopes" submenu (see scope-filter.feature). */}
           <ScopeFilterComponent
             value={scopeFilter}
-            onChange={setScopeFilter}
+            onChange={handleScopeFilterChange}
             available={filterAvailable}
             currentTeamId={team?.id}
             currentProjectId={project?.id}

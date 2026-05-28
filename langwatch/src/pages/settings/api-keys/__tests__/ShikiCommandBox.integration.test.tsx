@@ -21,7 +21,6 @@ import {
   fireEvent,
   render,
   screen,
-  act,
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,7 +115,7 @@ describe("<ShikiCommandBox />", () => {
           showPrompt: true,
         });
 
-        const copyBtn = screen.getByRole("button", { name: /copy/i });
+        const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
         fireEvent.click(copyBtn);
 
         await waitFor(() => {
@@ -154,7 +153,7 @@ describe("<ShikiCommandBox />", () => {
           lang: "ini",
         });
 
-        const copyBtn = screen.getByRole("button", { name: /copy/i });
+        const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
         fireEvent.click(copyBtn);
 
         await waitFor(() => {
@@ -256,7 +255,7 @@ describe("<ShikiCommandBox />", () => {
 
         renderCommandBox({ command: "claude mcp add langwatch" });
 
-        const copyBtn = screen.getByRole("button", { name: /copy/i });
+        const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
         fireEvent.click(copyBtn);
 
         await waitFor(() => {
@@ -280,10 +279,49 @@ describe("<ShikiCommandBox />", () => {
 
         await waitFor(() => {
           const revealBtn = screen.getByRole("button", { name: /show/i });
-          const copyBtn = screen.getByRole("button", { name: /copy/i });
+          const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
           expect(revealBtn).toBeInTheDocument();
           expect(copyBtn).toBeInTheDocument();
         });
+      });
+    });
+  });
+
+  describe("given a copy button that enters success state", () => {
+    describe("when using fake timers to observe the 1-second flash", () => {
+      it("shows a check icon after click and returns to clipboard icon after 1 second", async () => {
+        vi.useFakeTimers();
+
+        renderCommandBox({ command: "claude mcp add langwatch" });
+
+        // Wait for the copy button to appear (real async rendering completes first)
+        await waitFor(() =>
+          expect(
+            screen.getByRole("button", { name: /^Copy command$/i }),
+          ).toBeInTheDocument(),
+        );
+
+        const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
+        fireEvent.click(copyBtn);
+
+        // After click: success state — button label reflects copied state
+        await waitFor(() => {
+          expect(
+            screen.getByRole("button", { name: /^Copy command$/i }),
+          ).toBeInTheDocument();
+        });
+
+        // Advance timers by 1 second — success flash should reset
+        vi.advanceTimersByTime(1000);
+
+        // Button should be back to default copy state
+        await waitFor(() => {
+          expect(
+            screen.getByRole("button", { name: /^Copy command$/i }),
+          ).toBeInTheDocument();
+        });
+
+        vi.useRealTimers();
       });
     });
   });

@@ -344,6 +344,22 @@ export function ApiKeysSection({
   // Build unified rows: API keys + project service key
   const projectApiKey = project?.apiKey;
 
+  // Decide whether the legacy project service key survives the active scope
+  // filter by running it through the same inclusive cascade as user-scoped keys.
+  // A fake row with a single PROJECT-scoped binding is synthesised so the same
+  // filterProvidersByScope logic can decide.
+  const showProjectKey: boolean = useMemo(() => {
+    if (!projectApiKey || !project?.id) return false;
+    const fakeRow = {
+      scopes: [{ scopeType: "PROJECT" as const, scopeId: project.id }],
+    };
+    return filterProvidersByScope([fakeRow], scopeFilter, {
+      hierarchy,
+      currentTeamId: team?.id,
+      currentProjectId: project?.id,
+    }).length > 0;
+  }, [projectApiKey, project?.id, scopeFilter, hierarchy, team?.id]);
+
   const getStatus = (key: ApiKeyRow) => {
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
     return "Active";
@@ -410,8 +426,8 @@ export function ApiKeysSection({
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {/* Project service key row */}
-                {projectApiKey && (
+                {/* Project service key row — only shown when it survives the active scope filter */}
+                {showProjectKey && projectApiKey && (
                   <Table.Row>
                     <Table.Cell>
                       <HStack align="center">
@@ -542,7 +558,7 @@ export function ApiKeysSection({
                   </Table.Row>
                 ))}
 
-                {filteredKeys.length === 0 && !projectApiKey && scopeFilter.kind === "all" && (
+                {filteredKeys.length === 0 && !showProjectKey && scopeFilter.kind === "all" && (
                   <Table.Row>
                     <Table.Cell colSpan={9}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>
@@ -551,7 +567,7 @@ export function ApiKeysSection({
                     </Table.Cell>
                   </Table.Row>
                 )}
-                {filteredKeys.length === 0 && scopeFilter.kind !== "all" && (
+                {filteredKeys.length === 0 && !showProjectKey && scopeFilter.kind !== "all" && (
                   <Table.Row>
                     <Table.Cell colSpan={9}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>

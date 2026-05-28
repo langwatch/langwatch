@@ -42,14 +42,13 @@ describe("given the token-created-snippets feature is implemented", () => {
       expect(dialog).not.toContain("function QuickCommand(");
     });
 
-    it("accentCredentialSegments is not re-implemented inside TokenCreatedDialog", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+    it("ShikiCommandBox does not export accentCredentialSegments (decoration handled by Shiki grammar)", () => {
+      const commandBox = readFile(
+        "src/components/code/ShikiCommandBox.tsx",
       );
-      // The regex must NOT be re-defined in the dialog
-      expect(dialog).not.toContain(
-        "function accentCredentialSegments(",
-      );
+      // Visual distinction is achieved by Shiki's bash tokenization, not a regex pass
+      expect(commandBox).not.toContain("function accentCredentialSegments(");
+      expect(commandBox).not.toContain("CREDENTIAL_RE");
     });
 
     it("JsonHighlight is still used in TokenCreatedDialog for the config block", () => {

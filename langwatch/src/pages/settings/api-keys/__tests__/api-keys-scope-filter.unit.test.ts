@@ -56,7 +56,6 @@ describe("given the scope-filter feature is implemented", () => {
         "src/pages/settings/api-keys/ApiKeysSection.tsx",
       );
       expect(apiKeysSection).toContain("filterProvidersByScope");
-      expect(apiKeysSection).toContain("filterProvidersByScope");
     });
 
     it("no filterKeysByScope wrapper file exists", () => {

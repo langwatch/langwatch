@@ -63,7 +63,7 @@ export function ScopeFilter({
         <Button
           size="sm"
           variant="outline"
-          data-testid="default-models-scope-filter"
+          data-testid="scope-filter"
         >
           <HStack gap={1}>
             <Text>{label}</Text>

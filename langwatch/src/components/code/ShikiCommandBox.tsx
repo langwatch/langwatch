@@ -5,14 +5,16 @@
  * inside `TokenCreatedDialog` with one unified surface:
  *
  *  - Syntax-highlighted via the shared Shiki singleton (github-light theme).
- *  - Memoises token streams for both the masked and unmasked form at mount
- *    so toggling reveal never re-tokenises.
+ *  - Memoises token streams for both the masked and unmasked form; re-tokenises
+ *    only when `command`, `maskedCommand`, or `lang` changes.
  *  - Masked/unmasked reveal toggle (eye icon).
  *  - Copy button with 1s success-flash and a "Copied" toaster announcement.
  *  - Optional `>_` terminal prompt glyph rendered via a CSS pseudo-element
  *    overlay — NOT part of the source string passed to Shiki or the clipboard.
  *  - Horizontal scroll; never wraps or truncates.
- *  - `accentCredentialSegments` decoration pass for credential highlights.
+ *  - Visual distinction of credential tokens is provided by Shiki's bash
+ *    tokenization: the `--api-key` flag and its value render as visually
+ *    distinct tokens via the github-light theme. No regex decoration pass.
  *
  * @see specs/api-keys/token-created-snippets.feature
  */
@@ -21,43 +23,8 @@ import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { Check, Clipboard, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
-import { toaster } from "~/components/ui/toaster";
+import { copyToClipboard } from "~/features/onboarding/components/sections/shared/copy-to-clipboard";
 import { codeToHtml } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
-
-// ---------------------------------------------------------------------------
-// accentCredentialSegments
-//
-// Decorates a command string with visually distinct spans for secret
-// values (--api-key <value> and LANGWATCH_*=<value>). Extracted from the
-// original TokenCreatedDialog so both the dialog and this component share
-// the same regex — not re-implemented.
-// ---------------------------------------------------------------------------
-
-const CREDENTIAL_RE =
-  /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
-
-/**
- * Splits `command` into React nodes where credential segments are wrapped
- * in a styled `<span>` for the orange accent overlay.
- *
- * Used here purely as a fallback when Shiki HTML is not yet available —
- * once Shiki renders the HTML, the credential decoration is applied via
- * the same CSS that powers the existing onboarding screens.
- */
-export function accentCredentialSegments(command: string): React.ReactNode[] {
-  return command.split(CREDENTIAL_RE).map((part, i) =>
-    i % 2 === 1 ? (
-      <span
-        key={i}
-        style={{ color: "var(--chakra-colors-orange-fg)", fontWeight: 600 }}
-      >
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Component props
@@ -133,9 +100,15 @@ export function ShikiCommandBox({
   const unmaskedHtmlRef = useRef<string | null>(null);
   const [htmlReady, setHtmlReady] = useState(false);
 
-  // Tokenise both forms at mount — at most 2 codeToHtml calls total per box.
+  // Ref for the reset-copied timer — cleared on unmount to avoid state
+  // updates on an unmounted component.
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Tokenise both forms whenever command/maskedCommand/lang changes.
+  // At most 2 codeToHtml calls per stable input triple.
   useEffect(() => {
     let cancelled = false;
+    setHtmlReady(false);
 
     async function tokenise(): Promise<void> {
       const [unmasked, masked] = await Promise.all([
@@ -155,8 +128,16 @@ export function ShikiCommandBox({
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Intentionally no deps — we pre-compute once on mount only
+  }, [command, maskedCommand, lang]); // Re-tokenise only when inputs change
+
+  // Clear the copied-reset timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current !== null) {
+        clearTimeout(copiedTimerRef.current);
+      }
+    };
+  }, []);
 
   // The HTML string to render now.
   const activeHtml: string | null = useMemo(() => {
@@ -167,15 +148,17 @@ export function ShikiCommandBox({
 
   // Copy the REAL (unmasked) command — never the prompt glyph.
   const handleCopy = (): void => {
-    void navigator.clipboard.writeText(command).then(() => {
-      toaster.create({
-        title: "Copied",
-        description: `${copyLabel} copied to clipboard`,
-        type: "success",
-        meta: { closable: true },
-      });
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1000);
+    void copyToClipboard({
+      text: command,
+      successMessage: `${copyLabel} copied to clipboard`,
+    }).then((success) => {
+      if (success) {
+        setCopied(true);
+        if (copiedTimerRef.current !== null) {
+          clearTimeout(copiedTimerRef.current);
+        }
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 1000);
+      }
     });
   };
 

@@ -234,7 +234,7 @@ describe("<ApiKeysSection /> scope filter", () => {
     describe("when navigating to Settings > API Keys", () => {
       it("renders the scope filter control in the header reading 'All you can see'", () => {
         renderSection();
-        const filter = screen.getByTestId("default-models-scope-filter");
+        const filter = screen.getByTestId("scope-filter");
         expect(filter).toBeInTheDocument();
         expect(filter).toHaveTextContent("All you can see");
       });
@@ -251,7 +251,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
       it("positions the scope filter in the header row before the Create button", () => {
         renderSection();
-        const filter = screen.getByTestId("default-models-scope-filter");
+        const filter = screen.getByTestId("scope-filter");
         const createBtn = screen.getByText(/Create new secret key/i);
         // Both are in the DOM; filter appears before create in document order
         const position = filter.compareDocumentPosition(createBtn);
@@ -284,7 +284,7 @@ describe("<ApiKeysSection /> scope filter", () => {
     describe("when checking dropdown options", () => {
       it("offers 'All you can see', 'This Team', 'This Project', and 'More Scopes'", async () => {
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         fireEvent.click(trigger);
         await waitFor(() => {
           expect(screen.getByTestId("filter-all")).toBeInTheDocument();
@@ -301,7 +301,7 @@ describe("<ApiKeysSection /> scope filter", () => {
       it("keeps keys with organization-scoped bindings", async () => {
         const user = userEvent.setup();
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
@@ -331,7 +331,7 @@ describe("<ApiKeysSection /> scope filter", () => {
       it("keeps org parent keys, the team key, and child project keys — hides sibling team/project keys", async () => {
         const user = userEvent.setup();
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
@@ -362,7 +362,7 @@ describe("<ApiKeysSection /> scope filter", () => {
       it("keeps org grandparent, parent team key, and the project key — hides sibling project and other team keys", async () => {
         const user = userEvent.setup();
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
@@ -403,7 +403,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         //   - org binding matches => key should be visible
         const user = userEvent.setup();
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
@@ -436,7 +436,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
         const user = userEvent.setup();
         renderSection();
-        const trigger = screen.getByTestId("default-models-scope-filter");
+        const trigger = screen.getByTestId("scope-filter");
         await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
@@ -475,7 +475,7 @@ describe("<ApiKeysSection /> scope filter", () => {
         renderSection();
 
         await waitFor(() => {
-          const filter = screen.getByTestId("default-models-scope-filter");
+          const filter = screen.getByTestId("scope-filter");
           expect(filter).toHaveTextContent("Team:");
         });
       });

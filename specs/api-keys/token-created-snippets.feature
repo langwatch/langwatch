@@ -68,7 +68,7 @@ Feature: Token Created modal command snippets
     And the language passed to shikiAdapter is `bash`
     And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (rendered as a CSS pseudo-element or sibling overlay — NOT part of the source string)
     And the executable name "claude" is visually distinct from its flags and arguments via bash tokenization
-    And the masked api-key argument is visually distinct from the rest of the line via a regex-driven decoration pass layered on TOP of the Shiki output (matches the existing `accentCredentialSegments` approach in QuickCommand)
+    And the api-key argument is visually distinct from the rest of the line via Shiki's bash tokenization (the `--api-key` flag and its value token render as visually distinct tokens via the github-light theme)
 
   @integration
   Scenario: Codex tab shows a PostHog-style terminal command snippet
@@ -171,7 +171,7 @@ Feature: Token Created modal command snippets
     Then TokenCreatedDialog imports ONE shared command-box component and uses it for every snippet block (.env / Bearer / Basic Auth / Claude Code / Codex)
     And TokenCreatedDialog does not directly import CodeBlock or QuickCommand for snippet rendering
     And the JSON config block continues to be rendered by JsonHighlight (which is itself Shiki-backed)
-    And the existing QuickCommand `accentCredentialSegments` utility is imported from its current location inside the new shared component, not re-implemented
+    And credential token visual distinction is achieved by Shiki's bash tokenization (the `--api-key` flag and its value render as distinct tokens via the github-light theme) — no regex decoration pass
 
   # ============================================================================
   # Bundle cost — lazy-load Shiki so the settings page stays light
