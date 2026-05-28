@@ -8,7 +8,8 @@ import {
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
 import { ReplayService } from "../replayService";
-import type { RegisteredMapProjection } from "../types";
+import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types";
+import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX } from "../replayConstants";
 import { aggregateKey } from "../replayMarkers";
@@ -349,6 +350,211 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       const completedLeft = await redis.exists(`${COMPLETED_KEY_PREFIX}${projectionName}`);
       expect(cutoffLeft).toBe(0);
       expect(completedLeft).toBe(0);
+    });
+
+    it("runs both fold and map projections in the same replay, isolating pause-set entries", async () => {
+      const redis = getTestRedisConnection()!;
+      const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const foldName = `mixedFold_${suffix}`;
+      const mapName = `mixedMap_${suffix}`;
+      const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+      const foldPauseKey = `test_pipeline/projection/${foldName}`;
+      const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+      // Capture the pause-set membership of each projection at WRITE time. The
+      // map's `bulkAppend` runs inside `replayMapBatch.write`, which fires only
+      // after the fold loop has finished and unpaused itself; so the fold should
+      // already be back in the live set by then. The fold's `store.store` runs
+      // inside its own batch's WRITE phase, while it's still paused.
+      let foldPausedAtWrite: number | null = null;
+      let mapPausedAtFoldWrite: number | null = null;
+      let mapPausedAtBulkAppend: number | null = null;
+      let foldPausedAtBulkAppend: number | null = null;
+
+      const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
+        foldPausedAtWrite = await redis.sismember(pausedSetKey, foldPauseKey);
+        mapPausedAtFoldWrite = await redis.sismember(pausedSetKey, mapPauseKey);
+      });
+
+      const foldDefinition: FoldProjectionDefinition<{ count: number }, any> = {
+        name: foldName,
+        version: "v1",
+        eventTypes: ["trace.upserted"],
+        LastEventOccurredAtKey: "LastEventOccurredAt",
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store: {
+          store: foldStore,
+          get: vi.fn().mockResolvedValue(null),
+        },
+      };
+      const foldProjection: RegisteredFoldProjection = {
+        projectionName: foldName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: foldPauseKey,
+        kind: "fold",
+        definition: foldDefinition,
+      };
+
+      const bulkAppend = vi.fn(async (_records: { src: string }[], _ctx: any) => {
+        mapPausedAtBulkAppend = await redis.sismember(pausedSetKey, mapPauseKey);
+        foldPausedAtBulkAppend = await redis.sismember(pausedSetKey, foldPauseKey);
+      });
+      const mapDefinition: MapProjectionDefinition<{ src: string }, any> = {
+        name: mapName,
+        eventTypes: ["trace.upserted"],
+        map: (event: any) => ({ src: event.aggregateId }),
+        store: {
+          append: async () => undefined,
+          bulkAppend,
+        },
+      };
+      const mapProjection: RegisteredMapProjection = {
+        projectionName: mapName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: mapPauseKey,
+        kind: "map",
+        definition: mapDefinition,
+      };
+
+      const service = createServiceWithResolver();
+
+      const result = await service.replay({
+        projections: [foldProjection],
+        mapProjections: [mapProjection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      expect(result.batchErrors).toBe(0);
+      // 2 aggregates × 2 projections.
+      expect(result.aggregatesReplayed).toBe(4);
+      // 2 events folded + 2 events mapped.
+      expect(result.totalEvents).toBe(4);
+
+      // Fold persisted both aggregate states.
+      expect(foldStore).toHaveBeenCalledTimes(2);
+      const foldedAggregates = foldStore.mock.calls
+        .map((c) => (c[1] as any).aggregateId)
+        .sort();
+      expect(foldedAggregates).toEqual(["trace-a1", "trace-a2"]);
+
+      // Map bulk-appended both aggregates, grouped per aggregate (preserving
+      // per-aggregate context is the bugfix this PR introduced — see
+      // 44d05f65f "preserve per-aggregate context on map projection bulkAppend").
+      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
+        expect(ctx.tenantId).toBe(tenantA);
+        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
+      }
+
+      // Fold projection was paused while its own WRITE phase ran. The map's
+      // pauseKey is independent — `replay()` pauses each projection only for
+      // its own batch, not for the whole replay session.
+      expect(foldPausedAtWrite).toBe(1);
+      // While the fold was writing, the map projection had not been paused yet.
+      expect(mapPausedAtFoldWrite).toBe(0);
+
+      // When the map's bulkAppend fires, the fold loop is long done and
+      // unpaused; only the map should be in the pause set.
+      expect(mapPausedAtBulkAppend).toBe(1);
+      expect(foldPausedAtBulkAppend).toBe(0);
+
+      // Both projections unpaused on success.
+      expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
+      expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+
+      // Markers cleaned for both projections.
+      for (const name of [foldName, mapName]) {
+        expect(await redis.exists(`${CUTOFF_KEY_PREFIX}${name}`)).toBe(0);
+        expect(await redis.exists(`${COMPLETED_KEY_PREFIX}${name}`)).toBe(0);
+      }
+    });
+
+    it("skips the map projection when an earlier fold projection batch fails", async () => {
+      const redis = getTestRedisConnection()!;
+      const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const foldName = `failingFold_${suffix}`;
+      const mapName = `unrunMap_${suffix}`;
+      const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+      const foldPauseKey = `test_pipeline/projection/${foldName}`;
+      const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+      const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
+        throw new Error("fold store boom");
+      });
+
+      const foldDefinition: FoldProjectionDefinition<{ count: number }, any> = {
+        name: foldName,
+        version: "v1",
+        eventTypes: ["trace.upserted"],
+        LastEventOccurredAtKey: "LastEventOccurredAt",
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store: {
+          store: foldStore,
+          get: vi.fn().mockResolvedValue(null),
+        },
+      };
+      const foldProjection: RegisteredFoldProjection = {
+        projectionName: foldName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: foldPauseKey,
+        kind: "fold",
+        definition: foldDefinition,
+      };
+
+      const bulkAppend = vi.fn().mockResolvedValue(undefined);
+      const mapDefinition: MapProjectionDefinition<{ src: string }, any> = {
+        name: mapName,
+        eventTypes: ["trace.upserted"],
+        map: (event: any) => ({ src: event.aggregateId }),
+        store: {
+          append: async () => undefined,
+          bulkAppend,
+        },
+      };
+      const mapProjection: RegisteredMapProjection = {
+        projectionName: mapName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: mapPauseKey,
+        kind: "map",
+        definition: mapDefinition,
+      };
+
+      const service = createServiceWithResolver();
+
+      const result = await service.replay({
+        projections: [foldProjection],
+        mapProjections: [mapProjection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      // Fold batch surfaced an error and the outer loop short-circuited.
+      expect(result.batchErrors).toBeGreaterThan(0);
+      expect(result.firstError).toMatch(/fold store boom/);
+
+      // The map projection must NOT have run — `replay()` guards the map loop
+      // behind `if (totalBatchErrors === 0)`. Without this guard, a partial
+      // fold write would be followed by map writes that assume the fold
+      // succeeded.
+      expect(bulkAppend).not.toHaveBeenCalled();
+
+      // Map's pause key was never added to the pause set (it never got far
+      // enough to be paused).
+      expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+
+      // Fold projection was unpaused by the error path in `replayProjection`.
+      expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
     });
 
     it("skips aggregates already in the completed set on resume", async () => {
