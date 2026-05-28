@@ -17,8 +17,8 @@ type configWire struct {
 	Guardrails           []guardrailWire           `json:"guardrails"`
 	GuardrailAttachments []guardrailAttachmentWire `json:"guardrail_attachments"`
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
-	Budgets          []budgetWire       `json:"budgets"`
-	CacheRules       []cacheRuleWire    `json:"cache_rules"`
+	Budgets              []budgetWire              `json:"budgets"`
+	CacheRules           []cacheRuleWire           `json:"cache_rules"`
 }
 
 type providerSlotWire struct {

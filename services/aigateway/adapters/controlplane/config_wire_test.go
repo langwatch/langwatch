@@ -16,8 +16,9 @@ import (
 // and dangling-id handling all need explicit coverage.
 //
 // Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
-//       (@bundle — "Bundle materialiser ships project guardrails flat with
-//        VK attachments referencing them").
+//
+//	(@bundle — "Bundle materialiser ships project guardrails flat with
+//	 VK attachments referencing them").
 func TestBuildGuardrails(t *testing.T) {
 	t.Run("no catalog and no attachments yields an empty config", func(t *testing.T) {
 		got := buildGuardrails(nil, nil)

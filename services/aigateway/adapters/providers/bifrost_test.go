@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -214,7 +215,7 @@ func TestErrFromBifrost_TerminalStatusForwardsVerbatim(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *domain.UpstreamError, got %T", err)
 	}
-	if ue.StatusCode != 400 {
+	if ue.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status: want 400, got %d", ue.StatusCode)
 	}
 	if !bytes.Equal(ue.Body, rawBody) {
@@ -244,7 +245,7 @@ func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *domain.UpstreamError, got %T", err)
 	}
-	if ue.StatusCode != 402 {
+	if ue.StatusCode != http.StatusPaymentRequired {
 		t.Fatalf("status: want 402, got %d", ue.StatusCode)
 	}
 	if len(ue.Body) != 0 {

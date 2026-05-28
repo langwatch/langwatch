@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/tidwall/gjson"
@@ -52,7 +54,7 @@ func TestRewriteErrorMessage(t *testing.T) {
 	}
 
 	noMsg := []byte(`{"detail":"something else"}`)
-	if got := rewriteErrorMessage(noMsg, "x"); string(got) != string(noMsg) {
+	if got := rewriteErrorMessage(noMsg, "x"); !bytes.Equal(got, noMsg) {
 		t.Fatalf("body without error.message must be unchanged, got %q", got)
 	}
 }
@@ -71,7 +73,7 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	if m := gjson.GetBytes(got.Body, "error.message").String(); m != accountExhaustionMessage {
 		t.Fatalf("body message not rewritten: %q", m)
 	}
-	if got.StatusCode != 400 {
+	if got.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status must be preserved: %d", got.StatusCode)
 	}
 
@@ -81,7 +83,7 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	if m := gjson.GetBytes(gotResp.Body, "error.message").String(); m != accountExhaustionMessage {
 		t.Fatalf("response body message not rewritten: %q", m)
 	}
-	if gotResp.StatusCode != 400 {
+	if gotResp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("response status must be preserved: %d", gotResp.StatusCode)
 	}
 }
