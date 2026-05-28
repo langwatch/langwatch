@@ -1,4 +1,5 @@
-import { makeRequest } from "../langwatch-api.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
+import { deriveRunStatus } from "./experiment-run-status.js";
 
 interface EvaluationRunResponse {
   runId: string;
@@ -45,13 +46,100 @@ export async function handleRunExperiment(params: {
   return lines.join("\n");
 }
 
+interface ResultsForStatus {
+  progress?: number | null;
+  total?: number | null;
+  dataset?: unknown[];
+  timestamps: {
+    createdAt?: number | null;
+    updatedAt?: number | null;
+    finishedAt?: number | null;
+    stoppedAt?: number | null;
+  };
+}
+
+// SDK-logged runs (langwatch.experiment + evaluation.log) never populate the
+// Redis run-state that GET /runs/:runId reads, so that endpoint 404s for them.
+// Their data lives only in ClickHouse, reachable through the results endpoint,
+// so we derive the status from there as a fallback. experimentSlug is required
+// because runId is not unique across experiments once the Redis state expires.
+async function statusFromResults(params: {
+  runId: string;
+  experimentSlug?: string;
+}): Promise<string | null> {
+  const search = new URLSearchParams();
+  if (params.experimentSlug) search.set("experimentSlug", params.experimentSlug);
+  const qs = search.toString() ? `?${search.toString()}` : "";
+
+  let results: ResultsForStatus;
+  try {
+    results = (await makeRequest(
+      "GET",
+      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+    )) as ResultsForStatus;
+  } catch {
+    return null;
+  }
+
+  const status = deriveRunStatus(results.timestamps);
+  const total = results.total ?? results.dataset?.length ?? 0;
+  const progress = results.progress ?? results.dataset?.length ?? 0;
+
+  const lines: string[] = [];
+  lines.push(`# Evaluation Run ${params.runId}\n`);
+  lines.push(`**Status**: ${status}`);
+  lines.push(`**Progress**: ${progress}/${total} cells`);
+  if (results.timestamps.createdAt) {
+    lines.push(
+      `**Started**: ${new Date(results.timestamps.createdAt).toISOString()}`,
+    );
+  }
+  if (results.timestamps.finishedAt) {
+    lines.push(
+      `**Finished**: ${new Date(results.timestamps.finishedAt).toISOString()}`,
+    );
+  }
+  if (results.timestamps.stoppedAt) {
+    lines.push(
+      `**Stopped**: ${new Date(results.timestamps.stoppedAt).toISOString()}`,
+    );
+  }
+  lines.push("");
+  lines.push(
+    "> Use `platform_experiment_results` to fetch the per-row scores (partial results are available even while running).",
+  );
+  return lines.join("\n");
+}
+
 export async function handleExperimentStatus(params: {
   runId: string;
+  experimentSlug?: string;
 }): Promise<string> {
-  const status = (await makeRequest(
-    "GET",
-    `/api/experiments/runs/${encodeURIComponent(params.runId)}`,
-  )) as EvaluationStatusResponse;
+  let status: EvaluationStatusResponse;
+  try {
+    status = (await makeRequest(
+      "GET",
+      `/api/experiments/runs/${encodeURIComponent(params.runId)}`,
+    )) as EvaluationStatusResponse;
+  } catch (error) {
+    const code =
+      error instanceof LangWatchApiError ? error.status : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    if (code === 404 || /404|not found/i.test(message)) {
+      const fallback = await statusFromResults(params);
+      if (fallback) return fallback;
+      return [
+        `# Evaluation Run ${params.runId}`,
+        "",
+        "**Status**: not found",
+        "",
+        `Could not find run \`${params.runId}\`. SDK-logged runs and runs older than 24h are not in the live run-state and must be resolved by experiment slug.`,
+        "",
+        "> Pass `experimentSlug` (find it with `platform_experiment_list_runs`), or fetch the rows directly with `platform_experiment_results`.",
+      ].join("\n");
+    }
+    throw error;
+  }
 
   const lines: string[] = [];
   lines.push(`# Evaluation Run ${status.runId}\n`);

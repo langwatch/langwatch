@@ -1,4 +1,5 @@
 import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
+import { deriveRunStatus, isTerminalStatus } from "./experiment-run-status.js";
 
 interface DatasetEntry {
   index: number;
@@ -110,25 +111,33 @@ export async function handleExperimentResults(params: {
         "",
         "**Status**: not found",
         "",
-        `Could not load results for run \`${params.runId}\`. The run may still be in progress, or the id may be incorrect.`,
+        `Could not load results for run \`${params.runId}\`. The run id may be incorrect, or its run state may have expired (Redis keeps it for 24h).`,
         "",
-        "> Try \`platform_experiment_status\` first to confirm the run id and that it is completed.",
+        "> Pass `experimentSlug` to load results for runs older than 24h. Use `platform_experiment_list_runs` to find the slug and run id.",
       ].join("\n");
     }
     throw error;
   }
 
-  if (!results || (results.timestamps.finishedAt == null && results.timestamps.stoppedAt == null)) {
+  if (!results) {
     return [
       `# Evaluation Results: ${params.runId}`,
       "",
-      "**Status**: results are not yet available",
+      "**Status**: not found",
       "",
-      `Results for run \`${params.runId}\` are not ready yet.`,
+      `Could not load results for run \`${params.runId}\`.`,
       "",
-      "> Try `platform_experiment_status` first to confirm the run id and that it is completed.",
+      "> Pass `experimentSlug` if the run is older than 24h, or use `platform_experiment_list_runs` to confirm the run id.",
     ].join("\n");
   }
+
+  // Partial results are served even while the run is still in progress —
+  // rows land in ClickHouse incrementally, so a "running" or "interrupted"
+  // run can still expose every row recorded so far. A run only fails to set
+  // finished_at/stopped_at when the SDK process dies before flushing, but the
+  // rows it did log are still useful, so we never gate on a terminal status.
+  const runStatus = deriveRunStatus(results.timestamps);
+  const partial = !isTerminalStatus(runStatus);
 
   // Group evaluations by target-scoped row key, applying evaluator filter.
   const evaluationsByRow = new Map<string, EvaluationItem[]>();
@@ -196,6 +205,12 @@ export async function handleExperimentResults(params: {
   lines.push(`# Evaluation Results: ${results.runId}`);
   lines.push("");
   lines.push(`**Experiment**: ${results.experimentId}`);
+  lines.push(`**Status**: ${runStatus}`);
+  if (typeof results.total === "number" && results.total > 0) {
+    lines.push(
+      `**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`,
+    );
+  }
   lines.push(`**Total rows**: ${results.dataset.length}`);
   lines.push(`**Total evaluations**: ${results.evaluations.length}`);
   if (filter === "failed") {
@@ -203,6 +218,14 @@ export async function handleExperimentResults(params: {
   }
   if (evaluatorFilter) {
     lines.push(`**Evaluator filter**: ${evaluatorFilter}`);
+  }
+  if (partial) {
+    lines.push("");
+    lines.push(
+      runStatus === "interrupted"
+        ? "> These are partial results. The run never sent a finished/stopped marker and has had no updates recently, so it likely was interrupted before completing. The rows below are everything recorded so far."
+        : "> These are partial results. The run is still in progress, so more rows may appear on a later call.",
+    );
   }
   lines.push("");
 
@@ -222,7 +245,15 @@ export async function handleExperimentResults(params: {
   }
 
   if (rows.length === 0) {
-    lines.push("_No rows matched the filter._");
+    if (filter === "failed") {
+      lines.push("_No rows matched the filter._");
+    } else if (partial) {
+      lines.push(
+        "_No rows recorded yet — the run is still in progress. Call again shortly._",
+      );
+    } else {
+      lines.push("_No rows recorded for this run._");
+    }
     return lines.join("\n");
   }
 

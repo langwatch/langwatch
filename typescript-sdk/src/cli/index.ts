@@ -925,7 +925,8 @@ experimentCmd
   .command("status <runId>")
   .description("Check the status of an experiment run")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (runId: string, options: { format?: string }) => {
+  .option("--experiment <slug>", "Experiment slug — required for SDK-logged runs and runs older than 24h")
+  .action(async (runId: string, options: { format?: string; experiment?: string }) => {
     const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
     await impl(runId, options);
   });

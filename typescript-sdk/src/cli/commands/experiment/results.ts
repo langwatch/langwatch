@@ -6,6 +6,10 @@ import {
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
+import {
+  deriveRunStatus,
+  isTerminalStatus,
+} from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
@@ -90,9 +94,20 @@ export const experimentResultsCommand = async ({
       runId,
       experimentSlug,
     });
+    const runStatus = deriveRunStatus(results.timestamps);
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
+
+    if (!isTerminalStatus(runStatus) && format !== "json") {
+      console.log(
+        chalk.yellow(
+          runStatus === "interrupted"
+            ? `Run status: interrupted — these are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
+            : `Run status: running — these are partial results, more rows may appear later.`,
+        ),
+      );
+    }
 
     // Group evaluations by target-scoped row key.
     const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
