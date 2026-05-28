@@ -42,7 +42,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     drawerContentRef,
   } = useTraceDrawerScaffold();
 
-  useTrackTraceOpened(traceId, "v2");
+  // Only count a view once the trace has actually loaded — firing on the
+  // raw traceId would also count failed/empty fetches as `trace_opened`.
+  useTrackTraceOpened(trace ? trace.traceId : undefined, "v2");
 
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
