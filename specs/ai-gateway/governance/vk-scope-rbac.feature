@@ -194,3 +194,21 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then the response includes "vk_org" (org membership)
     And the response includes "vk_team_platform"
     And the response does NOT include "vk_team_data_sci"
+
+  # ============================================================================
+  # Scope ownership — every scope must belong to the key's own organization
+  # ============================================================================
+
+  Scenario: A create cannot bind a scope from a different org than its organizationId
+    Given user "mallory@acme.test" has `virtualKeys:manage` at TEAM "platform" in organization "acme"
+    When "mallory@acme.test" calls `api.virtualKeys.create` for organization "evilcorp" with a scope referencing TEAM "platform" (which belongs to "acme")
+    Then the call is rejected with a validation error
+    And no virtual key is created under "evilcorp"
+    # The per-scope manage check passes (mallory does control TEAM "platform"),
+    # so org ownership is the only thing standing between this and a
+    # cross-org virtual key row.
+
+  Scenario: An ORGANIZATION scope must equal the organizationId
+    Given user "mallory@acme.test" has `virtualKeys:manage` at ORGANIZATION "acme"
+    When "mallory@acme.test" calls `api.virtualKeys.create` for organization "evilcorp" with an ORGANIZATION scope of "acme"
+    Then the call is rejected with a validation error

@@ -335,18 +335,22 @@ export const virtualKeysRouter = createTRPCRouter({
         input.id,
         input.scopes,
       );
-      // Revalidate the EFFECTIVE post-update attachments, not just the
-      // ones in this request. A scope change can move the VK to a new
-      // project, leaving previously-stored attachments pointing at the old
-      // project's guardrails; when config isn't re-sent, fall back to the
-      // existing attachments so they're rechecked against the new project.
-      const effectiveAttachments =
+      // Newly-submitted attachments are always validated. When the caller
+      // is ALSO changing scopes (a possible project move) but did not
+      // re-send config, revalidate the existing attachments against the
+      // new project so a stale cross-project attachment can't survive the
+      // move. A plain metadata update (no scope change, no new
+      // attachments) must not re-touch existing attachments — otherwise
+      // renaming a VK would demand gatewayGuardrails:attach.
+      const attachmentsToCheck =
         input.config?.guardrailAttachments ??
-        parseVirtualKeyConfig(existing.config).guardrailAttachments;
+        (input.scopes !== undefined
+          ? parseVirtualKeyConfig(existing.config).guardrailAttachments
+          : undefined);
       await assertGuardrailAttachmentsAllowed(
         ctx,
         vkProjectId,
-        effectiveAttachments,
+        attachmentsToCheck,
       );
       const updated = await service.update({
         id: input.id,
