@@ -27,14 +27,12 @@ import {
   type GuardrailAttachment,
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 
 import { checkOrganizationPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-const scopeInputSchema = z.object({
-  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-  scopeId: z.string().min(1),
-});
+const scopeInputSchema = scopeAssignmentSchema;
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 

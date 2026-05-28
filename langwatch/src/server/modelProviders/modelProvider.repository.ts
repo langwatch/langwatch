@@ -2,6 +2,7 @@ import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@p
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
+import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
 
 /**
@@ -104,11 +105,11 @@ export class ModelProviderRepository {
       where: {
         scopes: {
           some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: projectId },
-              { scopeType: "TEAM", scopeId: project.teamId },
-              { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-            ],
+            OR: resolveScopeChain({
+              organizationId: project.team.organizationId,
+              teamId: project.teamId,
+              projectId,
+            }),
           },
         },
       },
