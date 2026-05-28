@@ -12,6 +12,8 @@ import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
+import { getApp } from "~/server/app-layer/app";
+import { traceMetadataInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { createLogger } from "~/utils/logger/server";
 import { type SecuredApp, requires } from "~/server/api/security";
 import type { AuthMiddlewareVariables } from "../../middleware";
