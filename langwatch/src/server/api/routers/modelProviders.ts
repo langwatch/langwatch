@@ -20,6 +20,7 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
+  authorizeInResolver,
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
@@ -243,6 +244,10 @@ export const modelProviderRouter = createTRPCRouter({
         providerConfig: z.object({}).passthrough().nullable().optional(),
       }),
     )
+    // Scope authz is data-dependent (the provider's own scope set), so it
+    // runs inside updateAdvancedSettings; this satisfies the builder's
+    // fail-closed permission gate while keeping audit + domain-error.
+    .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       return await service.updateAdvancedSettings(

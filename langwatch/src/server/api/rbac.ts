@@ -1337,6 +1337,23 @@ export const skipPermissionCheckProjectCreation = ({
   return next();
 };
 
+/**
+ * For procedures that authorize against data-dependent scopes resolved at
+ * runtime (e.g. a row's own scope set, loaded by id) rather than a fixed
+ * input scope a `checkXxxPermission` could read. It satisfies the builder's
+ * fail-closed `enforcePermissionCheck` while keeping `protectedProcedure`'s
+ * auth + audit + domain-error handling. The resolver/service MUST perform
+ * the real authorization — this only defers WHERE the check happens, never
+ * whether it happens.
+ */
+export const authorizeInResolver = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
+};
+
 // ============================================================================
 // PUBLIC SHARE HANDLING
 // ============================================================================
