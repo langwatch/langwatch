@@ -1,4 +1,4 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import type { Prisma, PrismaClient, Project } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -145,7 +145,9 @@ export class ModelProviderService {
           rotationPolicy: input.rotationPolicy,
         }),
         ...(input.providerConfig !== undefined && {
-          providerConfig: input.providerConfig ?? undefined,
+          providerConfig: (input.providerConfig ?? undefined) as
+            | Prisma.InputJsonValue
+            | undefined,
         }),
       },
       select: {
