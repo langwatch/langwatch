@@ -176,7 +176,7 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.routingPolicy.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.modelProviderScope.deleteMany({
-      where: { modelProvider: { id: MODEL_PROVIDER_ID } },
+      where: { modelProviderId: MODEL_PROVIDER_ID },
     });
     await prisma.modelProvider.deleteMany({ where: { id: MODEL_PROVIDER_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
