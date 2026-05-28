@@ -31062,6 +31062,7 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
 |--------|------|-------------|
 | `POST` | `/api/traces/search` | Search traces with filters and pagination |
 | `GET` | `/api/traces/{traceId}` | Get full trace details by ID |
+| `PATCH` | `/api/traces/{traceId}/metadata` | Update trace metadata after creation |
 | `GET` | `/api/thread/{id}` | Get all traces in a thread |
 | `POST` | `/api/trace/{id}/share` | Create a public share link |
 | `POST` | `/api/trace/{id}/unshare` | Remove a public share link |
@@ -31078,6 +31079,151 @@ The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
 ---
+
+---
+
+# FILE: ./api-reference/traces/update-metadata.mdx
+
+---
+title: 'Update trace metadata'
+description: 'Update metadata on an existing trace by trace ID. Supports deep merge for labels, user identity, and custom metadata fields.'
+---
+
+## `PATCH /api/traces/{traceId}/metadata`
+
+Update metadata on a trace after it has been created. This is useful for attaching labels, user identity, or custom metadata from backend processes that resolve after trace ingestion.
+
+### Authentication
+
+Pass your LangWatch API key in the `X-Auth-Token` header.
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `traceId` | string | Yes | The trace ID to update |
+
+### Request Body
+
+```json
+{
+  "metadata": {
+    "user_id": "user-123",
+    "customer_id": "cust-456",
+    "thread_id": "thread-789",
+    "labels": ["production", "reviewed"],
+    "custom_key": "custom_value",
+    "config": { "retries": 3, "timeout": 30 }
+  }
+}
+```
+
+### Metadata Fields
+
+#### Reserved Fields
+
+| Field | Type | Stored As | Description |
+|-------|------|-----------|-------------|
+| `user_id` | string | `langwatch.user_id` | User identity for analytics |
+| `customer_id` | string | `langwatch.customer_id` | Customer identity for analytics |
+| `thread_id` | string | `gen_ai.conversation.id` | Thread/conversation grouping |
+| `labels` | string[] | `langwatch.labels` | Trace labels for filtering |
+
+#### Custom Fields
+
+Any key not in the reserved list is stored as `metadata.{key}` in trace attributes. Custom fields support strings, numbers, booleans, string arrays, and JSON objects.
+
+### Merge Semantics
+
+- **Deep merge**: new keys are added, existing keys are updated, keys not in the request are preserved
+- **Labels**: the labels array **replaces** the existing labels entirely (it does not union-merge). Once set via this API, labels are protected from being overwritten by late-arriving spans
+- **JSON objects**: custom metadata values that are JSON objects are shallow-merged with existing values (`{...existing, ...new}`)
+
+### Size Limits
+
+| Limit | Value |
+|-------|-------|
+| Individual metadata value | 4 KB |
+| Total metadata payload | 32 KB |
+
+### Permissions
+
+Requires `traces:update` permission on the project.
+
+### Response
+
+```json
+{
+  "traceId": "trace-abc-123"
+}
+```
+
+### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 400 | Empty metadata object, oversized payload, or invalid field values |
+| 404 | Trace not found |
+| 403 | Missing `traces:update` permission |
+
+### Example
+
+<CodeGroup>
+
+```bash cURL
+curl -X PATCH https://app.langwatch.ai/api/traces/trace-abc-123/metadata \
+  -H "X-Auth-Token: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "user_id": "user-456",
+      "labels": ["reviewed", "production"],
+      "environment": "staging"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.patch(
+    "https://app.langwatch.ai/api/traces/trace-abc-123/metadata",
+    headers={"X-Auth-Token": "your-api-key"},
+    json={
+        "metadata": {
+            "user_id": "user-456",
+            "labels": ["reviewed", "production"],
+            "environment": "staging",
+        }
+    },
+)
+```
+
+```typescript TypeScript
+const response = await fetch(
+  "https://app.langwatch.ai/api/traces/trace-abc-123/metadata",
+  {
+    method: "PATCH",
+    headers: {
+      "X-Auth-Token": "your-api-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      metadata: {
+        user_id: "user-456",
+        labels: ["reviewed", "production"],
+        environment: "staging",
+      },
+    }),
+  }
+);
+```
+
+</CodeGroup>
+
+<Note>
+Custom metadata keys share the same namespace as metadata set via the SDK during trace ingestion. If both the SDK and this API set the same key, the last write wins.
+</Note>
 
 ---
 
