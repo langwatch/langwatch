@@ -1,11 +1,20 @@
 import { type Page } from "@playwright/test";
 
+// Top-level route segments in langwatch/src/routes.tsx that are not a project
+// slug. Anything else as the first path segment is treated as the slug.
 const NON_PROJECT_SEGMENTS = new Set([
-  "me",
-  "auth",
-  "settings",
-  "onboarding",
   "admin",
+  "auth",
+  "authorize",
+  "cli",
+  "governance",
+  "invite",
+  "mcp",
+  "me",
+  "onboarding",
+  "ops",
+  "settings",
+  "share",
 ]);
 
 /**
