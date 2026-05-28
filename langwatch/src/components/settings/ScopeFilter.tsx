@@ -185,7 +185,7 @@ function ScopeOptionItem({
     <Menu.Item
       value={`${hint}:${label}`}
       onClick={onClick}
-      data-testid={`filter-scope-${hint.toLowerCase()}-${label}`}
+      data-testid={`filter-scope-${hint.toLowerCase()}-${label.toLowerCase()}`}
     >
       <HStack gap={2}>
         {icon}

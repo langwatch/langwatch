@@ -16,6 +16,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
 
@@ -298,19 +299,20 @@ describe("<ApiKeysSection /> scope filter", () => {
   describe("given keys with bindings at all scope levels", () => {
     describe("when picking the organization scope", () => {
       it("keeps keys with organization-scoped bindings", async () => {
+        const user = userEvent.setup();
         renderSection();
         const trigger = screen.getByTestId("default-models-scope-filter");
-        fireEvent.click(trigger);
+        await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-more-scopes"));
+        await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
           expect(
             screen.getByTestId("filter-scope-organization-acme corp"),
           ).toBeInTheDocument(),
         );
-        fireEvent.click(
+        await user.click(
           screen.getByTestId("filter-scope-organization-acme corp"),
         );
 
@@ -327,19 +329,20 @@ describe("<ApiKeysSection /> scope filter", () => {
 
     describe("when picking a specific team scope", () => {
       it("keeps org parent keys, the team key, and child project keys — hides sibling team/project keys", async () => {
+        const user = userEvent.setup();
         renderSection();
         const trigger = screen.getByTestId("default-models-scope-filter");
-        fireEvent.click(trigger);
+        await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-more-scopes"));
+        await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
           expect(
             screen.getByTestId("filter-scope-team-team red"),
           ).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-scope-team-team red"));
+        await user.click(screen.getByTestId("filter-scope-team-team red"));
 
         await waitFor(() => {
           // org parent stays
@@ -357,19 +360,20 @@ describe("<ApiKeysSection /> scope filter", () => {
 
     describe("when picking a specific project scope", () => {
       it("keeps org grandparent, parent team key, and the project key — hides sibling project and other team keys", async () => {
+        const user = userEvent.setup();
         renderSection();
         const trigger = screen.getByTestId("default-models-scope-filter");
-        fireEvent.click(trigger);
+        await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-more-scopes"));
+        await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
           expect(
             screen.getByTestId("filter-scope-project-project alpha"),
           ).toBeInTheDocument(),
         );
-        fireEvent.click(
+        await user.click(
           screen.getByTestId("filter-scope-project-project alpha"),
         );
 
@@ -397,19 +401,20 @@ describe("<ApiKeysSection /> scope filter", () => {
         // MULTI_BINDING_KEY has org + proj-2 bindings
         // When filtering to team-1 (which has proj-1, not proj-2):
         //   - org binding matches => key should be visible
+        const user = userEvent.setup();
         renderSection();
         const trigger = screen.getByTestId("default-models-scope-filter");
-        fireEvent.click(trigger);
+        await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-more-scopes"));
+        await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
           expect(
             screen.getByTestId("filter-scope-team-team red"),
           ).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-scope-team-team red"));
+        await user.click(screen.getByTestId("filter-scope-team-team red"));
 
         await waitFor(() => {
           // Multi-binding key has org binding which matches team-red cascade
@@ -429,19 +434,20 @@ describe("<ApiKeysSection /> scope filter", () => {
           isLoading: false,
         });
 
+        const user = userEvent.setup();
         renderSection();
         const trigger = screen.getByTestId("default-models-scope-filter");
-        fireEvent.click(trigger);
+        await user.click(trigger);
         await waitFor(() =>
           expect(screen.getByTestId("filter-more-scopes")).toBeInTheDocument(),
         );
-        fireEvent.click(screen.getByTestId("filter-more-scopes"));
+        await user.click(screen.getByTestId("filter-more-scopes"));
         await waitFor(() =>
           expect(
             screen.getByTestId("filter-scope-project-project beta"),
           ).toBeInTheDocument(),
         );
-        fireEvent.click(
+        await user.click(
           screen.getByTestId("filter-scope-project-project beta"),
         );
 

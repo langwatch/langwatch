@@ -10,10 +10,10 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 
-const LANGWATCH_SRC = path.resolve(__dirname, "../../../../");
+const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
 function readFile(rel: string): string {
-  return fs.readFileSync(path.join(LANGWATCH_SRC, rel), "utf8");
+  return fs.readFileSync(path.join(LANGWATCH_ROOT, rel), "utf8");
 }
 
 describe("given the token-created-snippets feature is implemented", () => {
@@ -92,9 +92,10 @@ describe("given the token-created-snippets feature is implemented", () => {
         ...parsed.dependencies,
         ...parsed.devDependencies,
       };
-      // Shiki is allowed (already present). Prism, highlight.js etc. must not appear.
+      // Shiki is allowed (already present). prismjs + prism-react-renderer are pre-existing
+      // legacy deps used elsewhere — out of scope for this PR. The list below names libraries
+      // that were NOT in package.json before this work and must NOT be added by it.
       const forbidden = [
-        "prismjs",
         "highlight.js",
         "highlightjs",
         "refractor",

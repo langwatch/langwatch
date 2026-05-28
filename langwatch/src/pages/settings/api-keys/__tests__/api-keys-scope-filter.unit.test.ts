@@ -9,10 +9,10 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 
-const LANGWATCH_SRC = path.resolve(__dirname, "../../../../");
+const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
 function readFile(rel: string): string {
-  return fs.readFileSync(path.join(LANGWATCH_SRC, rel), "utf8");
+  return fs.readFileSync(path.join(LANGWATCH_ROOT, rel), "utf8");
 }
 
 describe("given the scope-filter feature is implemented", () => {
@@ -39,7 +39,7 @@ describe("given the scope-filter feature is implemented", () => {
     });
 
     it("no second scope-filter component file exists alongside ScopeFilter.tsx", () => {
-      const settingsDir = path.join(LANGWATCH_SRC, "src/components/settings");
+      const settingsDir = path.join(LANGWATCH_ROOT, "src/components/settings");
       const files = fs.readdirSync(settingsDir);
       const scopeFilterFiles = files.filter(
         (f) =>
@@ -60,14 +60,14 @@ describe("given the scope-filter feature is implemented", () => {
     });
 
     it("no filterKeysByScope wrapper file exists", () => {
-      const utilsDir = path.join(LANGWATCH_SRC, "src/utils");
+      const utilsDir = path.join(LANGWATCH_ROOT, "src/utils");
       const filterFilePath = path.join(utilsDir, "filterKeysByScope.ts");
       expect(fs.existsSync(filterFilePath)).toBe(false);
     });
 
     it("no filterKeysByScope function is defined anywhere in api-keys pages", () => {
       const apiKeysDir = path.join(
-        LANGWATCH_SRC,
+        LANGWATCH_ROOT,
         "src/pages/settings/api-keys",
       );
       const allFiles = fs
