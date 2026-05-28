@@ -30,6 +30,7 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { encryptParserConfigCredentials } from "./ingestionCredentials";
 
 /**
  * Non-enterprise plans can create up to this many active IngestionSources
@@ -250,10 +251,10 @@ export class IngestionSourceService {
     // change. `parserConfig` wins on key conflicts (it's the
     // canonical input for push-mode sources); `pullConfig` data
     // fills in for pull-mode adapters.
-    const mergedParserConfig: Record<string, unknown> = {
+    const mergedParserConfig = encryptParserConfigCredentials({
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
-    };
+    })!;
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -285,7 +286,9 @@ export class IngestionSourceService {
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
-      data.parserConfig = input.parserConfig as Prisma.InputJsonValue;
+      data.parserConfig = encryptParserConfigCredentials(
+        input.parserConfig,
+      ) as Prisma.InputJsonValue;
     }
     if (input.retentionClass !== undefined) {
       if (!SUPPORTED_RETENTION_CLASSES.includes(input.retentionClass)) {
@@ -323,13 +326,13 @@ export class IngestionSourceService {
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
     const priorParser = (existing.parserConfig as Record<string, unknown>) ?? {};
-    const merged = {
+    const merged = encryptParserConfigCredentials({
       ...priorParser,
       _rotation: {
         priorHash: existing.ingestSecretHash,
         expiresAt: Date.now() + ROTATION_GRACE_MS,
       },
-    };
+    })!;
     const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data: {
