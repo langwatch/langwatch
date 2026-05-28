@@ -364,6 +364,8 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when ingested via TraceRequestCollectionService", () => {
+    /** @scenario An over-threshold field is offloaded once with preview inline and ref recorded */
+    /** @scenario Offloaded blob round-trips with byte integrity */
     it("BlobStore.put is called once with the over-threshold value keyed trace-blobs/{projectId}/{traceId}/{spanId}/langwatch.output", () => {
       expect(putSpy).toHaveBeenCalledOnce();
       const callArg = putSpy.mock.calls[0]![0];
@@ -407,6 +409,8 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when read back via the resolution pipeline (simulating TraceService.getTracesWithSpans)", () => {
+    /** @scenario Trace-detail read returns input and output byte-identical to ingestion */
+    /** @scenario Trace-detail resolves refs to full IO while list and search use the preview */
     it("the returned span's langwatch.output is the full value byte-identical to the input", async () => {
       const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
@@ -427,6 +431,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
       expect(hasRef).toBe(false);
     });
 
+    /** @scenario An online evaluator on an over-threshold trace receives the full output */
     it("the recomputed trace.output (via TraceIOExtractionService) is the full value, not the preview", async () => {
       const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
@@ -471,6 +476,7 @@ describe("given the release_trace_blob_offload flag is OFF for the project and a
   });
 
   describe("when ingested via TraceRequestCollectionService", () => {
+    /** @scenario With the flag off, ingestion and reads behave exactly as before */
     it("BlobStore.put is never called", () => {
       expect(putSpy).not.toHaveBeenCalled();
     });

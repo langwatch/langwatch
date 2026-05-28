@@ -35,7 +35,11 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
   # Track 1 — lean fold cache (Redis / event-loop relief)
   # ===========================================================================
 
-  @e2e @track1
+  @e2e @track1 @unimplemented
+  # Bound implicitly: edge offload (#4215 Track 2) bounds the winning span's
+  # IO to a ≤32KB preview before the fold runs, so the fold cache is lean by
+  # construction. Add a direct cache-size measurement test under
+  # langwatch/src/server/event-sourcing/projections/__tests__/ to bind this.
   Scenario: Folding a trace with a 1 MB output keeps the Redis cache entry lean
     Given a trace whose span carries a 1 MB output value
     When all spans of the trace are folded into the trace summary
@@ -52,7 +56,10 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
     Then the returned input is byte-identical to the ingested input
     And the returned output is byte-identical to the ingested output
 
-  @integration @track1
+  @integration @track1 @unimplemented
+  # Covered by existing fold-projection tests (unchanged by this PR's design:
+  # the fold's `apply` and `accumulateIO` were not modified). Add an explicit
+  # bound test under event-sourcing/__tests__ for the offloaded-payload path.
   Scenario: Out-of-order refold converges on the same state as in-order folding
     Given the span events of a trace arrive out of their occurrence order
     When the trace is folded
@@ -60,14 +67,20 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
         same events in occurrence order
     And the winning input, output, and root span pointers are unchanged
 
-  @integration @track1
+  @integration @track1 @unimplemented
+  # Covered by existing EvaluationTrigger reactor tests; reactor inputs are
+  # unchanged by this PR (the fold state shape is unchanged). Bind explicitly
+  # once an integration test exercises trigger firing on offloaded traces.
   Scenario: EvaluationTrigger reactor fires correctly off the lean cached state
     Given a trace folds to a state that satisfies an evaluation trigger
     When the lean fold state is committed
     Then the EvaluationTrigger reactor observes the trigger condition
     And the evaluation is scheduled exactly as it is without the lean cache
 
-  @unit @track1
+  @unit @track1 @unimplemented
+  # Property of accumulateIO (pick-winning, never concatenated) — held by
+  # existing fold logic, unmodified in this PR. ADR-021 §"Decision" §1.
+  # Bind once a regression-style test exercises a non-winner upsert.
   Scenario: A non-winning span upsert does not carry IO text into the hot summary row
     Given a prior winning span already established the trace's computed output
     And a later non-winning span is folded
@@ -79,7 +92,11 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
   # Track 2 — edge offload, SDK/gateway defaults, server-side read resolution
   # ===========================================================================
 
-  @e2e @track2
+  @e2e @track2 @unimplemented
+  # Python SDK default raised to 32KB (constructor + public factory:
+  # python-sdk/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
+  # transport-layer cap (grep confirms only CLI display helpers). Bind once
+  # an end-to-end SDK→server test exercises the 50KB path.
   Scenario Outline: SDK transmits a 50 KB output in full without client-side truncation
     Given a <sdk> instrumented span produces a 50 KB output
     When the span is exported to LangWatch
@@ -91,7 +108,11 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
       | Python SDK |
       | TypeScript SDK |
 
-  @integration @track2
+  @integration @track2 @unimplemented
+  # Go AI Gateway (services/aigateway/) has no sdktrace.WithSpanLimits and
+  # no manual truncation in customertracebridge/emitter.go; OTel Go SDK
+  # v1.43.0 defaults to unlimited attribute value length. No code change
+  # in this PR. Bind once a Go-side test pins the absence of a cap.
   Scenario: Gateway forwards a payload larger than 32 KB without flagging truncation
     Given the AI gateway receives a request whose captured payload exceeds 32 KB
     When the gateway records the payload for the trace
@@ -130,7 +151,13 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
     And no S3 fetch occurs on the list or search path
     And the API response shape is unchanged from before the feature, requiring no frontend change
 
-  @integration @track2
+  @integration @track2 @unimplemented
+  # Per-org BYOC bucket: resolver returns the caller's org bucket, so a
+  # cross-org key resolves NoSuchKey. Shared-bucket mode (BYOC not
+  # configured) relies on API-enforced auth: the caller's authenticated
+  # projectId is encoded in the key prefix. The current unit test covers
+  # the per-org-bucket case only; a shared-bucket test that proves
+  # API-boundary denial is the follow-up that binds this scenario.
   Scenario: A cross-tenant blob fetch is denied
     Given a blob stored under organization A's key "{orgA}/{traceId}/{spanId}/{attr}"
     When organization B attempts to fetch that key
