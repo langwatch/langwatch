@@ -196,6 +196,7 @@ export function ShikiCommandBox({
         )}
         <IconButton
           aria-label={`Copy ${copyLabel.toLowerCase()}`}
+          data-state={copied ? "copied" : "idle"}
           size="xs"
           variant="ghost"
           colorPalette={copied ? "green" : "gray"}

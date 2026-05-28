@@ -289,39 +289,37 @@ describe("<ShikiCommandBox />", () => {
 
   describe("given a copy button that enters success state", () => {
     describe("when using fake timers to observe the 1-second flash", () => {
-      it("shows a check icon after click and returns to clipboard icon after 1 second", async () => {
-        vi.useFakeTimers();
-
+      it("flips data-state to 'copied' after click and back to 'idle' after 1 second", async () => {
         renderCommandBox({ command: "claude mcp add langwatch" });
 
-        // Wait for the copy button to appear (real async rendering completes first)
+        // Wait for the copy button to render under REAL timers — the initial
+        // Shiki tokenization depends on real microtasks. Switch to fake timers
+        // only after the button is visible.
         await waitFor(() =>
           expect(
             screen.getByRole("button", { name: /^Copy command$/i }),
-          ).toBeInTheDocument(),
+          ).toHaveAttribute("data-state", "idle"),
         );
 
-        const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
-        fireEvent.click(copyBtn);
+        vi.useFakeTimers();
+        try {
+          const copyBtn = screen.getByRole("button", { name: /^Copy command$/i });
+          fireEvent.click(copyBtn);
 
-        // After click: success state — button label reflects copied state
-        await waitFor(() => {
-          expect(
-            screen.getByRole("button", { name: /^Copy command$/i }),
-          ).toBeInTheDocument();
-        });
+          // After click: button flips to copied (success-flash) state.
+          await vi.waitFor(() =>
+            expect(copyBtn).toHaveAttribute("data-state", "copied"),
+          );
 
-        // Advance timers by 1 second — success flash should reset
-        vi.advanceTimersByTime(1000);
+          // Advance timers by 1 second — success flash should reset.
+          vi.advanceTimersByTime(1000);
 
-        // Button should be back to default copy state
-        await waitFor(() => {
-          expect(
-            screen.getByRole("button", { name: /^Copy command$/i }),
-          ).toBeInTheDocument();
-        });
-
-        vi.useRealTimers();
+          await vi.waitFor(() =>
+            expect(copyBtn).toHaveAttribute("data-state", "idle"),
+          );
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
   });
