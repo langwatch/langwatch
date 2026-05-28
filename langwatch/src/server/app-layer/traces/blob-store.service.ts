@@ -213,8 +213,6 @@ export class BlobStore {
    * @throws {BlobFieldNotFoundError} When the EventPayload parses successfully but the
    *   requested field is absent.
    * @throws {Error} When EventPayload JSON is corrupt.
-   *
-   * @throws {Error} "not implemented — ADR-022 step 5" until production logic is filled in.
    */
   async getFromEventLog({
     eventId,
@@ -229,9 +227,66 @@ export class BlobStore {
     aggregateType: string;
     aggregateId: string;
   }): Promise<string> {
-    throw new Error("not implemented — ADR-022 step 5 (getFromEventLog)");
-    // Suppress unused variable errors until implemented
-    void eventId; void field; void tenantId; void aggregateType; void aggregateId;
+    if (!this.clickHouseClient) {
+      throw new Error(
+        "ClickHouseClient not configured — cannot read from event_log (ADR-022)",
+      );
+    }
+
+    // TenantId MUST be the first predicate in the WHERE clause (ADR-022 cross-tenant denial).
+    const result = await this.clickHouseClient.query({
+      query: `
+        SELECT EventPayload
+        FROM event_log
+        WHERE TenantId = {tenantId:String}
+          AND AggregateType = {aggregateType:String}
+          AND AggregateId = {aggregateId:String}
+          AND EventId = {eventId:String}
+        LIMIT 1
+      `,
+      query_params: { tenantId, aggregateType, aggregateId, eventId },
+    });
+
+    const response = await result.json<{ EventPayload: string }>();
+    const rows = response.data;
+
+    if (!rows || rows.length === 0) {
+      throw new BlobNotFoundError(eventId, field, tenantId);
+    }
+
+    const row = rows[0]!;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.EventPayload);
+    } catch (e) {
+      throw new Error(
+        `Failed to parse EventPayload for eventId=${eventId}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+
+    // Extract span attribute by field name from the parsed EventPayload.
+    // ADR-022: EventPayload contains the full event as stored by the command worker.
+    const spanAttributes = (
+      parsed as {
+        data?: {
+          span?: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+        };
+      }
+    )?.data?.span?.attributes;
+
+    if (!Array.isArray(spanAttributes)) {
+      throw new BlobFieldNotFoundError(eventId, field);
+    }
+
+    const attr = spanAttributes.find(
+      (a: { key: string }) => a.key === field,
+    );
+
+    if (!attr || typeof (attr as { value?: { stringValue?: string } }).value?.stringValue !== "string") {
+      throw new BlobFieldNotFoundError(eventId, field);
+    }
+
+    return (attr as { value: { stringValue: string } }).value.stringValue;
   }
 
   /**
@@ -289,12 +344,24 @@ export class BlobStore {
    * Fetches the full span body from a transient S3 spool object.
    * Called by the command worker when a command carries a `spoolRef`.
    *
-   * @param spoolRef - The spool reference string (S3 key) carried in the command.
+   * The spool key is the raw S3 object key (no bucket prefix). The S3 bucket
+   * is resolved via the spool key's project segment. For the transient spool shape
+   * (`trace-blobs/spool/{projectId}/{traceId}/{spanId}`), the projectId is at
+   * index 2 of the key split by "/".
+   *
+   * @param spoolRef - The spool reference string (S3 key) returned by `putSpool`.
    * @returns The raw body buffer as stored by `putSpool`.
    * @throws The underlying S3 error if the object does not exist or access fails.
    */
-  async getSpool(_spoolRef: string): Promise<Buffer> {
-    throw new Error("not implemented — ADR-022 step 5 (getSpool)");
+  async getSpool(spoolRef: string): Promise<Buffer> {
+    // Extract projectId from the spool key: trace-blobs/spool/{projectId}/...
+    const projectId = spoolRef.split("/")[2] ?? "";
+    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+    const { Body } = await s3Client.send(
+      new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
+    );
+    const bytes = await Body?.transformToByteArray();
+    return Buffer.from(bytes ?? []);
   }
 
   /**
@@ -304,8 +371,6 @@ export class BlobStore {
    * Key shape: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient,
    * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 24h
    * lifecycle policy as a safety net for orphans.
-   *
-   * @throws {Error} "not implemented — ADR-022 step 5" until production logic is filled in.
    */
   async putSpool({
     projectId,
@@ -318,9 +383,17 @@ export class BlobStore {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
-    throw new Error("not implemented — ADR-022 step 5 (putSpool)");
-    // Suppress unused variable errors until implemented
-    void projectId; void traceId; void spanId; void body;
+    const key = `trace-blobs/spool/${projectId}/${traceId}/${spanId}`;
+    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: s3Bucket,
+        Key: key,
+        Body: body,
+        ContentType: "application/octet-stream",
+      }),
+    );
+    return key;
   }
 
   /**
@@ -331,7 +404,15 @@ export class BlobStore {
    * @param spoolRef - The spool reference string returned by `putSpool`.
    * @throws Never — all errors are swallowed internally.
    */
-  async deleteSpool(_spoolRef: string): Promise<void> {
-    throw new Error("not implemented — ADR-022 step 5 (deleteSpool)");
+  async deleteSpool(spoolRef: string): Promise<void> {
+    try {
+      const projectId = spoolRef.split("/")[2] ?? "";
+      const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+      await s3Client.send(
+        new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
+      );
+    } catch {
+      // Best-effort — swallow all errors; lifecycle policy is the safety net.
+    }
   }
 }

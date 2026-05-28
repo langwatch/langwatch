@@ -7,12 +7,9 @@
  *   - payload ≤ COMMAND_INLINE_THRESHOLD → returns a regular RecordSpanCommandData (no change)
  *   - payload > COMMAND_INLINE_THRESHOLD:
  *       - try S3 PUT (spool object, transient)
- *           - success → returns oversized command with `{spoolRef}` only; original payload NOT in command
+ *           - success → returns oversized command with `{spoolRef}` only; span attributes cleared
  *           - failure → fail-open: returns regular command with full inline payload;
  *                       logs warn "oversize protection skipped; queue carries full payload"
- *
- * Not yet implemented — stub exported so tests can import and assert the correct thrown
- * error message. Step 5 of the TDD plan replaces this with the real implementation.
  */
 
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
@@ -31,8 +28,6 @@ export interface SpoolLogger {
  * If so, attempts to spool the full payload to S3 and returns an oversized command
  * carrying only `{spoolRef}`. If the S3 spool PUT fails, fails open (returns the
  * regular command with full inline payload) and logs at `warn`.
- *
- * @throws {Error} "not implemented — ADR-022 step 5" until production logic is filled in.
  */
 export async function maybeSpool({
   data,
@@ -43,7 +38,41 @@ export async function maybeSpool({
   blobStore: BlobStore;
   logger: SpoolLogger;
 }): Promise<RecordSpanCommandData> {
-  throw new Error("not implemented — ADR-022 step 5 (maybeSpool)");
-  // Suppress unused variable errors until implemented
-  void data; void blobStore; void logger;
+  const serialized = JSON.stringify(data);
+  const byteLength = Buffer.byteLength(serialized, "utf-8");
+
+  if (byteLength <= COMMAND_INLINE_THRESHOLD) {
+    // Payload fits inline — no S3 PUT needed
+    return data;
+  }
+
+  // Payload exceeds threshold — attempt to spool to S3
+  const { tenantId: projectId, span } = data;
+  const traceId = span.traceId as string;
+  const spanId = span.spanId as string;
+  const spoolBody = Buffer.from(
+    JSON.stringify({ span, resource: data.resource, instrumentationScope: data.instrumentationScope }),
+    "utf-8",
+  );
+
+  try {
+    const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body: spoolBody });
+
+    // Return oversized command: spoolRef set, span attributes cleared (only id fields remain)
+    return {
+      ...data,
+      spoolRef,
+      span: {
+        ...span,
+        attributes: [],
+      },
+    };
+  } catch {
+    // Fail-open: S3 PUT failed — send full inline payload, log warn
+    logger.warn(
+      "oversize protection skipped; queue carries full payload",
+      { traceId, spanId, byteLength },
+    );
+    return data;
+  }
 }

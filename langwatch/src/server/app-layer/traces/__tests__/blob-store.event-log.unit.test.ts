@@ -52,8 +52,11 @@ function makeMockChClient({
   const client = {
     query: vi.fn().mockImplementation(async ({ query }: { query: string }) => {
       sqlCaptures.push(query);
+      // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
+      // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
+      // production code's `response.data` access works.
       return {
-        json: async () => rows,
+        json: async () => ({ data: rows, meta: [], rows: rows.length }),
       };
     }),
   };

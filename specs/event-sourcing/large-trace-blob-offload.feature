@@ -132,7 +132,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Then the full payload is captured
     And the span is not annotated with "langwatch.input_truncated"
 
-  @integration @track2 @unimplemented
+  @integration @track2
   # Bound by recordSpanCommand.oversized.unit.test.ts + edge-offload.unit.test.ts
   # written in Step 4 of the TDD plan. Will lose @unimplemented when those land.
   Scenario: An over-threshold command is spooled to S3 transiently and reconstituted
@@ -156,7 +156,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And it logs a warning "oversize protection skipped; queue carries full payload"
     And ingestion is not blocked
 
-  @integration @track2 @unimplemented
+  @integration @track2
   # Bound by the rewritten integration test + interposition.unit.test.ts in Step 4.
   Scenario: event_log carries the full event content; projection queue carries the lean shape
     Given a span field value exceeds the offload threshold
@@ -166,7 +166,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the projection-queue event carries a reserved attribute "langwatch.reserved.eventref.{attrKey}"
     And the queue-side payload contains no full field content
 
-  @e2e @track2 @unimplemented
+  @e2e @track2
   # Bound by blob-store.event-log.unit.test.ts (resolution mechanism) + the
   # rewritten integration test (end-to-end eval path) in Step 4.
   Scenario: An online evaluator on an over-threshold trace receives the full output
@@ -176,7 +176,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
         (resolved via the event_log JOIN read path)
     And the evaluator's captured input does not contain the preview
 
-  @e2e @track2 @unimplemented
+  @e2e @track2
   # Bound by blob-store.event-log.unit.test.ts + the rewritten integration test
   # in Step 4.
   Scenario: Trace-detail collapsed uses preview; "show full" JOINs event_log

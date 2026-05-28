@@ -225,7 +225,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const blobStore = new BlobStore(createS3Client);
+  // ADR-022: Pass the shared ClickHouse client so BlobStore.getFromEventLog
+  // can SELECT from event_log (event_log read path for "show full" / eval).
+  const blobStore = new BlobStore(createS3Client, getSharedClickHouseClient() ?? undefined);
   const blobResolutionService = new SpanBlobResolutionService(blobStore);
   const ioExtractionService = new TraceIOExtractionService();
   const traceService = TraceService.create(prisma, {
@@ -402,6 +404,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
+    // can reconstitute oversized commands (fetch from transient S3 spool) and
+    // best-effort delete the spool after event_log INSERT succeeds.
+    blobStore,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;

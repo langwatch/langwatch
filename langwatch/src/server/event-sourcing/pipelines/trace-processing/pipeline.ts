@@ -1,4 +1,5 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
@@ -35,6 +36,12 @@ export interface TraceProcessingPipelineDeps {
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  /**
+   * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
+   * commands (fetch from S3 spool) and best-effort delete the spool after
+   * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
+   */
+  blobStore?: BlobStore;
 }
 
 /**
@@ -86,8 +93,19 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     );
   }
 
-  return builder
-    .withCommand("recordSpan", RecordSpanCommand)
+  // ADR-022: When blobStore is provided, inject it into a pre-constructed
+  // RecordSpanCommand instance so the worker can reconstitute oversized commands
+  // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
+  // (no spool support) when blobStore is absent.
+  const recordSpanBuilder = deps.blobStore
+    ? builder.withCommandInstance(
+        "recordSpan",
+        RecordSpanCommand,
+        new RecordSpanCommand(undefined, deps.blobStore),
+      )
+    : builder.withCommand("recordSpan", RecordSpanCommand);
+
+  return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)

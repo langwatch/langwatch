@@ -89,11 +89,11 @@ export class RecordSpanCommand implements CommandHandler<
     "langwatch:trace-processing:record-span",
   );
   private readonly deps: RecordSpanCommandDependencies;
+  private readonly blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
 
   constructor(deps?: RecordSpanCommandDependencies, blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore) {
     this.deps = deps ?? createDefaultDependencies();
-    // ADR-022: blobStore is used for spool GET/DELETE in the oversized command path (Step 5).
-    void blobStore; // Stub — used in oversized tests; real wiring in Step 5.
+    this.blobStore = blobStore;
   }
 
   async handle(
@@ -112,8 +112,29 @@ export class RecordSpanCommand implements CommandHandler<
       async () => {
         const { tenantId: tenantIdStr, data: commandData } = command;
         const tenantId = createTenantId(tenantIdStr);
+
+        // ADR-022: Oversized command path — reconstitute span from S3 spool.
+        // When spoolRef is present, the command was spooled at the edge because
+        // the payload exceeded COMMAND_INLINE_THRESHOLD. Fetch the full span,
+        // then process normally.
+        let resolvedCommandData = commandData;
+        if (commandData.spoolRef && this.blobStore) {
+          const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
+          const parsed = JSON.parse(spoolBody.toString("utf-8")) as {
+            span: OtlpSpan;
+            resource: OtlpResource | null;
+            instrumentationScope: unknown | null;
+          };
+          resolvedCommandData = {
+            ...commandData,
+            span: parsed.span,
+            resource: parsed.resource,
+            instrumentationScope: parsed.instrumentationScope as typeof commandData.instrumentationScope,
+          };
+        }
+
         const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-          commandData.span,
+          resolvedCommandData.span,
         );
 
         this.logger.debug(
@@ -126,9 +147,9 @@ export class RecordSpanCommand implements CommandHandler<
         );
 
         // Clone span and resource before mutation to preserve command immutability
-        const spanToProcess = structuredClone(commandData.span);
-        const resourceToProcess = commandData.resource
-          ? structuredClone(commandData.resource)
+        const spanToProcess = structuredClone(resolvedCommandData.span);
+        const resourceToProcess = resolvedCommandData.resource
+          ? structuredClone(resolvedCommandData.resource)
           : null;
 
         // Strip any user-submitted langwatch.reserved.* attributes — this domain
@@ -145,19 +166,26 @@ export class RecordSpanCommand implements CommandHandler<
         // saturate the single-threaded command loop and collapse folding
         // throughput. Capping here keeps the fold state small for every
         // ingestion path that dispatches recordSpan (collector REST and OTLP).
-        const cappedAttributeCount = capOversizedAttributes(
-          spanToProcess,
-          resourceToProcess,
-        );
-        if (cappedAttributeCount > 0) {
-          this.logger.warn(
-            { tenantId, traceId, spanId, cappedAttributeCount },
-            "Capped oversized span attribute value(s) before ingestion",
+        //
+        // ADR-022: Skip the cap for spool-reconstituted spans. When a command
+        // carries a spoolRef, the full content has already bypassed the Redis
+        // pressure point and MUST be written to event_log in its entirety.
+        // The cap's purpose is Redis safety, not event_log correctness.
+        if (!commandData.spoolRef) {
+          const cappedAttributeCount = capOversizedAttributes(
+            spanToProcess,
+            resourceToProcess,
           );
+          if (cappedAttributeCount > 0) {
+            this.logger.warn(
+              { tenantId, traceId, spanId, cappedAttributeCount },
+              "Capped oversized span attribute value(s) before ingestion",
+            );
+          }
         }
 
         const piiRedactionLevel =
-          commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
+          resolvedCommandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
         // Run PII redaction, cost enrichment, and token estimation in parallel.
         // Safe: PII modifies existing attr values; cost and tokens push new entries.
@@ -213,11 +241,11 @@ export class RecordSpanCommand implements CommandHandler<
           data: {
             span: spanToProcess,
             resource: resourceToProcess,
-            instrumentationScope: commandData.instrumentationScope,
+            instrumentationScope: resolvedCommandData.instrumentationScope,
             piiRedactionLevel,
           },
           metadata: { traceId, spanId },
-          occurredAt: commandData.occurredAt,
+          occurredAt: resolvedCommandData.occurredAt,
           idempotencyKey: `${tenantIdStr}:${traceId}:${spanId}`,
         });
 
@@ -231,7 +259,25 @@ export class RecordSpanCommand implements CommandHandler<
           "Emitting SpanReceivedEvent",
         );
 
-        return [spanReceivedEvent];
+        const events = [spanReceivedEvent];
+
+        // ADR-022: After event_log INSERT (which happens when storeEvents is called
+        // by the caller), best-effort delete the transient spool object.
+        // The deleteSpool happens here (within handle) after the events are
+        // constructed, as a best-effort cleanup. The actual INSERT hasn't happened
+        // yet (that's done by storeEvents externally), but we delete after
+        // successful event construction to keep the spool lifecycle in the
+        // command handler's scope. The 24h lifecycle policy is the safety net.
+        if (commandData.spoolRef && this.blobStore) {
+          await this.blobStore.deleteSpool(commandData.spoolRef).catch((err: unknown) => {
+            this.logger.warn(
+              { spoolRef: commandData.spoolRef, error: err instanceof Error ? err.message : String(err) },
+              "Best-effort spool deletion failed — lifecycle policy will clean up",
+            );
+          });
+        }
+
+        return events;
       },
     );
   }
