@@ -138,6 +138,7 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - Read-time "show full" latency: CH point lookup with bloom + sort-key match — microseconds at p50, predictable p99 (better than S3 GET). One JSON parse + field extract per row.
 - Operational footprint shrinks: S3 storage approaches zero (only transient spools, deleted on success). One less storage system to keep healthy in the user-facing path.
 - **Replay durability invariant restored.** `event_log` alone is sufficient. No "event_log + S3 jointly are the source of truth" caveat.
+- **The dispatch interposition runs unconditionally**, not gated by `release_trace_blob_offload`. It is a defensive content transformation: leaning is a no-op for sub-threshold IO (the modal case) and a safety-net lean for over-threshold IO regardless of flag. The flag gates the **user-visible** behavior (edge S3 spool + on-the-wire shape with the eventref attr); the interposition is server-internal and benefits projections + replay regardless. Rationale: gating the interposition would re-introduce the Redis clog risk for over-threshold IO when the flag is off, defeating the safety net.
 
 ## Rules
 
