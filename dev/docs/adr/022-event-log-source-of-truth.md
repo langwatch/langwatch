@@ -149,3 +149,5 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - On edge S3 PUT failure (oversize protection unavailable): **fail open** — send the regular RecordSpan command with full inline payload, log at `warn`. Ingestion is never blocked by oversize protection.
 - Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-021.)
 - `event_log` retention drives the durability ceiling for "show full" reads. There is no longer a separate S3 retention to coordinate.
+
+<!-- ci-trigger: force workflows to fire on this head -->
