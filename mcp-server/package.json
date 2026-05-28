@@ -52,7 +52,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20250911.1",
     "ai": "^6.0.161",
-    "dotenv": "^17.2.2",
+    "dotenv": "^17.4.2",
     "esbuild": "^0.25.0",
     "eslint": "^10.2.1",
     "tsup": "^8.1.0",
