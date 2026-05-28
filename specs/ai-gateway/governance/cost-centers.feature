@@ -7,10 +7,20 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
   accounting.
 
   A cost center is a single-valued accounting dimension, separate from
-  RBAC. An org admin names cost centers (Engineering, Marketing, ...) and
-  assigns them to people, teams, and projects. Spend rolls up by the cost
-  center resolved from each trace, so personal usage and the autonomous
-  agents a team builds can land in the same cost center.
+  RBAC. An org admin names cost centers (Engineering, Marketing, ...) on a
+  dedicated cost-centers page, but assigns them where the org chart already
+  lives: per row on the members and teams pages, and on project settings.
+  The cost-centers page itself only creates and manages the centers and
+  links out to those surfaces, so it never becomes an unscrollable list of
+  every person in a large org. Spend rolls up by the cost center resolved
+  from each trace, so personal usage and the autonomous agents a team
+  builds can land in the same cost center.
+
+  For organizations that provision identities through SCIM, assignment is
+  automatic: the SCIM 2.0 Enterprise User extension carries a standard
+  "costCenter" attribute, so an IdP (Okta, Entra ID, ...) can drive cost
+  center membership the same way it drives department or division. Manual
+  per-row assignment is the fallback for orgs without SCIM.
 
   Cost centers are pure accounting. They never grant or restrict access.
 
@@ -23,6 +33,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     - langwatch/ee/governance/services/cost-center/                 (attribution + service)
     - langwatch/ee/governance/routers/costCenters.ts                (tRPC)
     - langwatch/ee/governance/services/activity-monitor/            (bird-eye rollup)
+    - langwatch/src/server/scim/scim.service.ts                     (SCIM auto-assignment)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -98,6 +109,75 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     Then it no longer appears in the assignment picker
     And spend previously attributed to it rolls up under "Unassigned"
       rather than disappearing
+
+  # ---------------------------------------------------------------------------
+  # Where assignment happens (UI surface — the redesign)
+  # An org can have tens of thousands of members, so assignment lives on the
+  # pages that already paginate the org chart, not as one flat list.
+  # ---------------------------------------------------------------------------
+
+  @bdd @cost-centers @ui @unimplemented
+  Scenario: The cost-centers page manages centers and links out to assign them
+    Given the admin opens the cost-centers page
+    Then the page lets the admin create, rename, and archive cost centers
+    And it does not render a per-person assignment list
+    And it links to the members and teams pages where people and teams are
+      assigned
+
+  @bdd @cost-centers @ui @unimplemented
+  Scenario: A member is assigned to a cost center from the members page
+    Given a cost center "Marketing" exists in acme-corp
+    When the admin sets "robin" to "Marketing" from the members page row
+    Then robin's membership carries cost center "Marketing"
+    And the change is visible without leaving the members page
+
+  @bdd @cost-centers @ui @unimplemented
+  Scenario: A team is assigned to a cost center from the teams page
+    Given a cost center "Engineering" exists in acme-corp
+    When the admin sets the team "platform" to "Engineering" from the teams
+      page row
+    Then the team carries cost center "Engineering"
+
+  @bdd @cost-centers @ui @unimplemented
+  Scenario: The cost-center control appears only once cost centers are configured
+    Given the governance preview flag is enabled for acme-corp
+    But no cost centers exist yet in acme-corp
+    Then the members and teams pages show no cost-center column
+    When the admin creates the first cost center
+    Then the cost-center column appears on the members and teams pages
+
+  # ---------------------------------------------------------------------------
+  # SCIM auto-assignment (enterprise standard)
+  # ---------------------------------------------------------------------------
+
+  @bdd @cost-centers @scim @integration @unimplemented
+  Scenario: A SCIM-provisioned user is assigned from the enterprise costCenter attribute
+    Given acme-corp provisions users through SCIM
+    And a cost center "Engineering" exists in acme-corp
+    When the IdP provisions a user whose enterprise costCenter is "Engineering"
+    Then that user's membership carries cost center "Engineering"
+
+  @bdd @cost-centers @scim @integration @unimplemented
+  Scenario: An unrecognized SCIM costCenter creates the cost center on first use
+    Given acme-corp provisions users through SCIM
+    And no cost center named "Research" exists yet
+    When the IdP provisions a user whose enterprise costCenter is "Research"
+    Then a cost center "Research" is created in acme-corp
+    And that user is assigned to it
+
+  @bdd @cost-centers @scim @integration @unimplemented
+  Scenario: Updating the SCIM costCenter reassigns the user
+    Given a SCIM-provisioned user currently assigned to "Engineering"
+    When the IdP updates that user's enterprise costCenter to "Marketing"
+    Then the user's membership carries cost center "Marketing", replacing the
+      prior assignment
+
+  @bdd @cost-centers @scim @integration @unimplemented
+  Scenario: Clearing the SCIM costCenter unassigns the user
+    Given a SCIM-provisioned user currently assigned to "Engineering"
+    When the IdP removes that user's enterprise costCenter attribute
+    Then the user's membership carries no cost center
+    And their spend rolls up under "Unassigned"
 
   # ---------------------------------------------------------------------------
   # Bird's-eye spend by cost center (the #5 fix: aggregate across all org projects)
