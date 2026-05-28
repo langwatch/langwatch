@@ -2438,18 +2438,21 @@ describe("GroupStagingScripts", () => {
   });
 
   /**
-   * Post-2026-05-11 tenant soft-cap integration coverage.
+   * Tenant soft-cap integration coverage.
    *
-   * These tests drive the new Lua paths against a real Redis (via
+   * These tests drive the Lua paths against a real Redis (via
    * testcontainers) and prove:
-   *   - the `tenant_active:<tenantId>` counter stays consistent across
-   *     DISPATCH (INCR) → COMPLETE / RESTAGE_AND_BLOCK (DECR/DEL) and
-   *     REFRESH / RETRY_RESTAGE (TTL renewal)
+   *   - the per-tenant in-flight ZSET `tenant_active_z:<tenantId>` stays
+   *     consistent across DISPATCH (ZADD), COMPLETE / RESTAGE_AND_BLOCK (ZREM)
+   *     and REFRESH / RETRY_RESTAGE (score renewal)
+   *   - a slot whose worker dies ungracefully lapses out of the live count once
+   *     its expiry score falls into the past, so the cap self-heals with no
+   *     operator reset
    *   - cap enforcement at the scheduler level
    *   - widened scan budget keeps cross-tenant fairness when an
    *     over-cap tenant dominates the head of the ready zset
-   *   - cap=0 (kill switch) leaves the counter machinery completely
-   *     inert — no `tenant_active:*` keys ever appear
+   *   - cap=0 (kill switch) leaves the ZSET machinery completely
+   *     inert: no `tenant_active_z:*` keys ever appear
    *
    * All scenarios mutate `LANGWATCH_DISPATCH_TENANT_CAP` per test
    * (readTenantCap reads process.env at call time on purpose) and
@@ -2471,8 +2474,14 @@ describe("GroupStagingScripts", () => {
       }
     });
 
-    function tenantCounterKey(tenantId: string) {
-      return `${keyPrefix()}tenant_active:${tenantId}`;
+    function tenantActiveZKey(tenantId: string) {
+      return `${keyPrefix()}tenant_active_z:${tenantId}`;
+    }
+
+    // Live in-flight count for a tenant = ZSET members whose expiry score is
+    // still in the future relative to nowMs (lapsed members no longer count).
+    async function tenantLiveCount(tenantId: string, nowMs: number) {
+      return redis.zcount(tenantActiveZKey(tenantId), `(${nowMs}`, "+inf");
     }
 
     async function stageOne({
@@ -2494,7 +2503,7 @@ describe("GroupStagingScripts", () => {
     }
 
     /** @scenario Counter increments on dispatch, decrements on completion */
-    it("INCRs the tenant counter on dispatch and DELs it on completion", async () => {
+    it("adds the group to the tenant ZSET on dispatch and removes it on completion", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
         tenantId: "proj_acme",
@@ -2508,24 +2517,22 @@ describe("GroupStagingScripts", () => {
       });
       expect(dispatched?.groupId).toBe(groupId);
 
-      // Counter at 1 after first dispatch
-      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
-      // TTL is in lockstep with activeKey
-      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
-      const activeTtl = await redis.ttl(
-        `${keyPrefix()}group:${groupId}:active`,
-      );
-      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+      // One live slot after first dispatch, scored at the slot's expiry
+      // (nowMs + activeTtlSec*1000 = 2000 + 60000 = 62000).
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(1);
+      expect(await redis.zscore(tenantActiveZKey("proj_acme"), groupId)).toBe("62000");
 
-      // Completing the only in-flight group DELs the counter (n was 1)
+      // Completing the only in-flight group removes its slot, leaving the ZSET
+      // empty (Redis drops a ZSET key once its last member is removed).
       await scripts.complete({
         groupId,
         stagedJobId: dispatched!.stagedJobId,
       });
-      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(0);
+      expect(await redis.exists(tenantActiveZKey("proj_acme"))).toBe(0);
     });
 
-    it("DECRs (does not DEL) when there are other in-flight groups for the same tenant", async () => {
+    it("removes only the completed group's slot when other groups are in flight for the same tenant", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       await stageOne({
         tenantId: "proj_acme",
@@ -2538,22 +2545,30 @@ describe("GroupStagingScripts", () => {
         stagedJobId: "j2",
       });
 
-      const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
-      const d2 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      // Dispatch with a real wall-clock nowMs so the in-flight slot scores
+      // (nowMs + activeTtlSec*1000) are genuinely in the future when COMPLETE
+      // runs its lapsed-slot GC against Date.now(). A synthetic small nowMs
+      // would make every slot look already-expired and get GC'd at completion.
+      const now = Date.now();
+      const d1 = await scripts.dispatch({ nowMs: now, activeTtlSec: 60 });
+      const d2 = await scripts.dispatch({ nowMs: now, activeTtlSec: 60 });
       expect(d1).not.toBeNull();
       expect(d2).not.toBeNull();
-      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("2");
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(2);
 
       // Complete only one
       await scripts.complete({
         groupId: d1!.groupId,
         stagedJobId: d1!.stagedJobId,
       });
-      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(1);
+      // The remaining slot belongs to the still-active group.
+      expect(await redis.zscore(tenantActiveZKey("proj_acme"), d2!.groupId)).not.toBeNull();
+      expect(await redis.zscore(tenantActiveZKey("proj_acme"), d1!.groupId)).toBeNull();
     });
 
     /** @scenario RESTAGE_AND_BLOCK decrements the counter on exhausted retries */
-    it("RESTAGE_AND_BLOCK_LUA decrements the tenant counter (preventing slot leak on terminal failures)", async () => {
+    it("RESTAGE_AND_BLOCK_LUA removes the tenant slot (preventing slot leak on terminal failures)", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
         tenantId: "proj_acme",
@@ -2561,7 +2576,7 @@ describe("GroupStagingScripts", () => {
         stagedJobId: "j1",
       });
       await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
-      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(1);
 
       await scripts.restageAndBlock({
         groupId,
@@ -2570,11 +2585,11 @@ describe("GroupStagingScripts", () => {
         jobDataJson: JSON.stringify({ hello: "world" }),
         errorMessage: "max retries",
       });
-      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+      expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(0);
     });
 
     /** @scenario REFRESH keeps the tenant counter TTL aligned with activeKey */
-    it("REFRESH_LUA renews the tenant counter TTL in lockstep with activeKey", async () => {
+    it("REFRESH_LUA bumps the tenant slot's expiry score in lockstep with activeKey", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
         tenantId: "proj_acme",
@@ -2586,27 +2601,48 @@ describe("GroupStagingScripts", () => {
         activeTtlSec: 60,
       });
 
-      // Force the counter into a low-TTL state to prove EXPIRE renewal works
-      await redis.expire(tenantCounterKey("proj_acme"), 5);
-      const beforeRefresh = await redis.ttl(tenantCounterKey("proj_acme"));
-      expect(beforeRefresh).toBeLessThanOrEqual(5);
+      // Initial slot score = dispatch nowMs (2000) + 60000 = 62000.
+      expect(await redis.zscore(tenantActiveZKey("proj_acme"), groupId)).toBe("62000");
 
+      // refreshActiveKey uses Date.now() internally, so the bumped score is a
+      // real wall-clock expiry far past the initial 62000 placeholder.
       await scripts.refreshActiveKey({
         groupId,
         stagedJobId: dispatched!.stagedJobId,
         activeTtlSec: 60,
       });
 
-      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
-      const activeTtl = await redis.ttl(
-        `${keyPrefix()}group:${groupId}:active`,
-      );
-      expect(counterTtl).toBeGreaterThan(beforeRefresh);
-      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+      const score = Number(await redis.zscore(tenantActiveZKey("proj_acme"), groupId));
+      const expectedExpiry = Date.now() + 60 * 1000;
+      expect(score).toBeGreaterThan(62000);
+      // Slot expiry tracks the activeKey heartbeat (Date.now() + ttl), within a
+      // generous skew for test execution time.
+      expect(Math.abs(score - expectedExpiry)).toBeLessThanOrEqual(2000);
+    });
+
+    it("REFRESH_LUA does not re-create a slot that was already freed (XX semantics)", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+
+      // Free the slot out from under an in-flight heartbeat (as COMPLETE would).
+      await redis.zrem(tenantActiveZKey("proj_acme"), groupId);
+
+      // A racing refresh must NOT re-insert the freed slot (ZADD XX).
+      await scripts.refreshActiveKey({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+        activeTtlSec: 60,
+      });
+      expect(await redis.zscore(tenantActiveZKey("proj_acme"), groupId)).toBeNull();
     });
 
     /** @scenario RETRY_RESTAGE keeps the tenant counter TTL aligned through backoff */
-    it("RETRY_RESTAGE_LUA aligns the tenant counter TTL with the retry TTL", async () => {
+    it("RETRY_RESTAGE_LUA bumps the tenant slot's expiry score to the retry window", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
         tenantId: "proj_acme",
@@ -2627,13 +2663,12 @@ describe("GroupStagingScripts", () => {
         backoffMs: 30_000,
       });
 
-      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
-      const activeTtl = await redis.ttl(
-        `${keyPrefix()}group:${groupId}:active`,
-      );
-      // retryRestage sets activeKey TTL to ceil(backoffMs/1000)+2 = 32s
-      expect(counterTtl).toBeGreaterThan(0);
-      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(2);
+      // retryRestage sets the slot expiry to Date.now() + retryTtlSec*1000,
+      // retryTtlSec = ceil(backoffMs/1000)+2 = 32s.
+      const score = Number(await redis.zscore(tenantActiveZKey("proj_acme"), groupId));
+      const expectedExpiry = Date.now() + 32 * 1000;
+      expect(score).toBeGreaterThan(0);
+      expect(Math.abs(score - expectedExpiry)).toBeLessThanOrEqual(2000);
     });
 
     /** @scenario DISPATCH_LUA refuses to dispatch when tenant is at cap */
@@ -2659,13 +2694,13 @@ describe("GroupStagingScripts", () => {
       // First two dispatches OK
       expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
       expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
-      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+      expect(await redis.zcard(tenantActiveZKey("proj_noisy"))).toBe(2);
 
-      // Third dispatch must be refused — tenant is at cap=2
+      // Third dispatch must be refused: tenant is at cap=2
       const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(third).toBeNull();
-      // Counter unchanged — over-cap groups don't INCR
-      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+      // Live count unchanged: over-cap groups don't add a slot
+      expect(await redis.zcard(tenantActiveZKey("proj_noisy"))).toBe(2);
       // g3 was parked OUT of the ready scan (not left at the head to be
       // re-walked on every poll) and registered for reconcile.
       const ready = await inspectReadySet();
@@ -2698,17 +2733,17 @@ describe("GroupStagingScripts", () => {
         dispatchAfterMs: 1001,
       });
 
-      // First dispatch: proj_noisy/g0 wins (counter goes 0→1)
+      // First dispatch: proj_noisy/g0 wins (live count goes 0->1)
       const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(first?.groupId).toMatch(/^proj_noisy\//);
-      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("1");
+      expect(await redis.zcard(tenantActiveZKey("proj_noisy"))).toBe(1);
 
       // Second dispatch: proj_noisy is at cap, scheduler MUST walk past
       // its remaining 49 over-cap groups and find proj_quiet's one group.
       const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(second).not.toBeNull();
       expect(second!.groupId).toBe("proj_quiet/only");
-      expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
+      expect(await redis.zcard(tenantActiveZKey("proj_quiet"))).toBe(1);
     });
 
     /** @scenario Over-cap groups are parked out of ready so they don't starve other tenants on repeated polls */
@@ -2796,7 +2831,7 @@ describe("GroupStagingScripts", () => {
     });
 
     /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
-    it("when cap=0 (kill switch), no tenant_active:* keys are ever created", async () => {
+    it("when cap=0 (kill switch), no tenant_active_z:* keys are ever created", async () => {
       process.env[TENANT_CAP_ENV] = "0";
 
       const groupId = await stageOne({
@@ -2810,22 +2845,22 @@ describe("GroupStagingScripts", () => {
       });
       expect(dispatched).not.toBeNull();
 
-      // Scan for any tenant_active:* keys — must be none.
-      const keysAfterDispatch = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      // Scan for any tenant_active_z:* keys: must be none.
+      const keysAfterDispatch = await redis.keys(`${keyPrefix()}tenant_active_z:*`);
       expect(keysAfterDispatch).toEqual([]);
 
       // Round-trip a full lifecycle to confirm no key is created at any
-      // step (COMPLETE attempts the DEL branch even with cap=0; that
+      // step (COMPLETE attempts the free branch even with cap=0; that
       // branch must not silently create keys).
       await scripts.complete({
         groupId,
         stagedJobId: dispatched!.stagedJobId,
       });
-      const keysAfterComplete = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      const keysAfterComplete = await redis.keys(`${keyPrefix()}tenant_active_z:*`);
       expect(keysAfterComplete).toEqual([]);
 
-      // restageAndBlock path too — re-stage a fresh group and walk the
-      // failure path. Counter must still not appear.
+      // restageAndBlock path too: re-stage a fresh group and walk the
+      // failure path. No ZSET must appear.
       await stageOne({
         tenantId: "proj_acme",
         groupSuffix: "g2",
@@ -2840,7 +2875,7 @@ describe("GroupStagingScripts", () => {
         errorMessage: "boom",
       });
       const keysAfterRestage = await redis.keys(
-        `${keyPrefix()}tenant_active:*`,
+        `${keyPrefix()}tenant_active_z:*`,
       );
       expect(keysAfterRestage).toEqual([]);
 
@@ -2904,7 +2939,7 @@ describe("GroupStagingScripts", () => {
       });
 
       /** @scenario A crashed tenant's parked groups are restored once its in-flight count expires */
-      it("reconciles parked groups back to ready when the tenant counter expires (orphan recovery)", async () => {
+      it("reconciles parked groups back to ready when the tenant's in-flight slots lapse (orphan recovery)", async () => {
         process.env[TENANT_CAP_ENV] = "1";
         await stageOne({
           tenantId: "proj_crash",
@@ -2919,22 +2954,28 @@ describe("GroupStagingScripts", () => {
           dispatchAfterMs: 1001,
         });
 
-        const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
-        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // parks g2
+        // Dispatch g1 with a short active TTL so its in-flight slot lapses
+        // quickly; its slot score = 2000 + 5*1000 = 7000.
+        const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 5 });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 5 }); // parks g2
         expect(await redis.zcard(parkedKey("proj_crash"))).toBe(1);
+        expect(await redis.zscore(tenantActiveZKey("proj_crash"), d1!.groupId)).toBe("7000");
 
-        // Simulate the worker crashing: the active job never completes and both
-        // the active key and the tenant_active counter TTL-expire. No COMPLETE
-        // fires, so without the dispatch reconcile g2 would strand forever.
-        await redis.del(`${keyPrefix()}tenant_active:proj_crash`);
+        // Simulate the worker dying ungracefully: no COMPLETE, no heartbeat. The
+        // active key expires on its own; we drop it here to mirror that. The
+        // tenant's in-flight slot keeps its now-stale score (7000) because
+        // nothing refreshes it. No COMPLETE fires, so without self-healing g2
+        // would strand forever.
         await redis.del(`${keyPrefix()}group:${d1!.groupId}:active`);
 
-        // A later poll past the reconcile interval reads the missing counter as
-        // 0 (under cap) and restores g2 — even though dispatch was never idle in
-        // the way the return-nil path needs.
-        const recovered = await scripts.dispatch({ nowMs: 5000, activeTtlSec: 60 });
+        // A later poll whose nowMs (8000) is past the lapsed slot score (7000):
+        // tenantActiveCount GCs the stale member, reads 0 (under cap), and the
+        // reconcile restores g2 with NO manual counter reset.
+        const recovered = await scripts.dispatch({ nowMs: 8000, activeTtlSec: 5 });
         expect(recovered!.groupId).toBe("proj_crash/g2");
         expect(await redis.zcard(parkedKey("proj_crash"))).toBe(0);
+        // The lapsed slot was garbage-collected out of the ZSET.
+        expect(await redis.zscore(tenantActiveZKey("proj_crash"), d1!.groupId)).toBeNull();
       });
 
       /** @scenario Disabling the cap restores all parked groups */
@@ -3005,17 +3046,22 @@ describe("GroupStagingScripts", () => {
             dispatchAfterMs: 1000 + i,
           });
         }
-        const d1 = await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
-        await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
-        expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("2");
+        // Real wall-clock nowMs so the active slots' expiry scores stay in the
+        // future when COMPLETE runs its lapsed-slot GC against Date.now();
+        // otherwise both slots would be GC'd and one completion would over-unpark.
+        const now = Date.now();
+        const d1 = await scripts.dispatch({ nowMs: now, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: now, activeTtlSec: 60 });
+        expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(2);
         // Next poll parks the remaining 3 (tenant at cap=2).
-        expect(await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 })).toBeNull();
+        expect(await scripts.dispatch({ nowMs: now, activeTtlSec: 60 })).toBeNull();
         expect(await redis.zcard(parkedKey("proj_acme"))).toBe(3);
 
         // Completing ONE frees exactly one slot → exactly ONE group unparks.
         await scripts.complete({ groupId: d1!.groupId, stagedJobId: d1!.stagedJobId });
         expect(await redis.zcard(parkedKey("proj_acme"))).toBe(2);
-        // The single restored group is the only one due in ready.
+        // The single restored group is the only one due in ready (its preserved
+        // score is the small staged dispatchAfter, well under the active scores).
         expect(await redis.zcount(`${keyPrefix()}ready`, "-inf", "3000")).toBe(1);
       });
 
@@ -3108,6 +3154,61 @@ describe("GroupStagingScripts", () => {
 
         expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBeNull();
         expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
+      });
+
+      /** @scenario A tenant's in-flight slots self-heal after an ungraceful worker death */
+      it("self-heals the tenant cap after an ungraceful mass worker death without an operator reset", async () => {
+        process.env[TENANT_CAP_ENV] = "3";
+
+        // A tenant fills its cap with several in-flight groups, plus an extra
+        // group that will be parked over-cap.
+        for (let i = 1; i <= 4; i++) {
+          await stageOne({
+            tenantId: "proj_dead",
+            groupSuffix: `g${i}`,
+            stagedJobId: `j${i}`,
+            dispatchAfterMs: 1000 + i,
+          });
+        }
+
+        // Dispatch fills cap (3 slots) with a short active TTL; each slot's
+        // expiry score = 2000 + 5*1000 = 7000. The 4th group is parked.
+        const dispatched: DispatchResult[] = [];
+        for (let i = 0; i < 4; i++) {
+          const d = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 5 });
+          if (d) dispatched.push(d);
+        }
+        expect(dispatched).toHaveLength(3);
+        expect(await tenantLiveCount("proj_dead", 2000)).toBe(3);
+        expect(await redis.zcard(parkedKey("proj_dead"))).toBe(1);
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_dead"),
+        ).toBe(1);
+
+        // Workers die ungracefully: no COMPLETE, no drain, no heartbeat. The
+        // active keys expire on their own; we delete them to mirror that. The
+        // in-flight slots keep their now-stale scores (7000) because nothing
+        // refreshes them. A scalar counter would stay pinned at 3 forever here.
+        for (const d of dispatched) {
+          await redis.del(`${keyPrefix()}group:${d.groupId}:active`);
+        }
+        // Slots are still physically present, just stale.
+        expect(await redis.zcard(tenantActiveZKey("proj_dead"))).toBe(3);
+
+        // Liveness lapses past the active TTL: at nowMs=8000 every slot score
+        // (7000) is in the past, so the live count is 0 with no operator action.
+        expect(await tenantLiveCount("proj_dead", 8000)).toBe(0);
+
+        // A poll past the lapsed scores GCs the dead slots, reads the tenant as
+        // under cap, and the reconcile restores the parked group: dispatch
+        // resumes for the live tenant with NO manual counter reset.
+        const recovered = await scripts.dispatch({ nowMs: 8000, activeTtlSec: 5 });
+        expect(recovered).not.toBeNull();
+        expect(recovered!.groupId).toBe("proj_dead/g4");
+        expect(await redis.zcard(parkedKey("proj_dead"))).toBe(0);
+        // The stale dead-worker slots were garbage-collected; only the freshly
+        // dispatched group counts now.
+        expect(await tenantLiveCount("proj_dead", 8000)).toBe(1);
       });
     });
   });

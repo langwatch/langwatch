@@ -174,3 +174,22 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given a tenant over cap with a parked group
     When a new job is staged for that parked group
     Then the group stays in the parked set and does not reappear in ready
+
+  # In-flight count must survive an UNGRACEFUL worker death — incident 2026-05-28
+  #
+  # An ElastiCache node replacement dropped every worker's Redis connection mid-job,
+  # bypassing the graceful drain that runs COMPLETE. The in-flight slots were never
+  # released, so the tenant read as permanently at-cap and every one of its groups
+  # was parked out of the dispatch scan: a live tenant stalled with thousands of
+  # groups stranded while the workers sat ~90% idle. A scalar counter cannot tell a
+  # live slot from one stranded by a dead worker. The in-flight slot is therefore
+  # tied to the same liveness as the activeKey heartbeat: a slot whose heartbeat
+  # lapsed stops counting against the cap, so an ungraceful mass death self-heals
+  # within the active TTL instead of stranding the tenant forever.
+  @integration @tenant-cap @self-heal
+  Scenario: A tenant's in-flight slots self-heal after an ungraceful worker death
+    Given a tenant at cap with several in-flight groups
+    And the workers holding those groups die without completing (no COMPLETE, no drain)
+    When the in-flight slots' liveness lapses past the active TTL
+    Then those slots stop counting against the tenant cap
+    And the tenant's parked groups are dispatched again without an operator reset
