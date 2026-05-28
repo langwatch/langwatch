@@ -12,10 +12,12 @@ export interface OutboxEnqueueRequest {
    * Stable identity of the match. (reactorName, dedupKey) is the
    * claim primitive — collisions deduplicate. See ADR-022.
    *
-   * Convention (subject-namespaced so a future trigger type cannot
-   * collide):
-   *   - Trace/evaluation triggers: `${triggerId}:trace:${traceId}`
-   *   - Custom-graph alerts:       `${triggerId}:graph:${customGraphId}`
+   * Convention (mirrors `groupKey` shape with a `${projectId}/`
+   * prefix so dedup/group identifiers stay self-describing for
+   * operator scans; `:trace:` / `:graph:` discriminator namespaces
+   * subject types):
+   *   - Trace/evaluation triggers: `${projectId}/${triggerId}:trace:${traceId}`
+   *   - Custom-graph alerts:       `${projectId}/${triggerId}:graph:${customGraphId}`
    */
   dedupKey: string;
   /**

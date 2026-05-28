@@ -47,7 +47,7 @@ describe("PrismaOutboxRepository", () => {
         const inserted = await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "trigger-A:trace-1",
+          dedupKey: `${projectId}/trigger-A:trace:trace-1`,
           groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { triggerId: "trigger-A" },
         });
@@ -66,14 +66,14 @@ describe("PrismaOutboxRepository", () => {
         await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "trigger-A:trace-1",
+          dedupKey: `${projectId}/trigger-A:trace:trace-1`,
           groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { v: 1 },
         });
         const second = await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "trigger-A:trace-1",
+          dedupKey: `${projectId}/trigger-A:trace:trace-1`,
           groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { v: 2 },
         });

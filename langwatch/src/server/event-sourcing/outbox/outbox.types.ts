@@ -19,10 +19,17 @@ export interface EnqueueOutboxParams {
    * are the claim primitive that makes pipeline replays safe — see
    * ADR-022.
    *
-   * Convention (subject-namespaced so a future trigger type cannot
-   * collide):
-   *   - Trace/evaluation triggers: `${triggerId}:trace:${traceId}`
-   *   - Custom-graph alerts:       `${triggerId}:graph:${customGraphId}`
+   * Convention (per-trigger subject scoping; the `${projectId}/` prefix
+   * mirrors the `groupKey` shape so every dedup/group identifier in the
+   * outbox layer is self-describing for an operator scanning rows; the
+   * `:trace:` / `:graph:` discriminator namespaces subject types):
+   *   - Trace/evaluation triggers: `${projectId}/${triggerId}:trace:${traceId}`
+   *   - Custom-graph alerts:       `${projectId}/${triggerId}:graph:${customGraphId}`
+   *
+   * Aggregate-driven triggers (window-bucketed, no per-occurrence
+   * subject row) are a separate future namespace —
+   * `${projectId}/${triggerId}:${groupByLabelsHash}:${windowBucket}` —
+   * not a per-subject key.
    */
   dedupKey: string;
   /**

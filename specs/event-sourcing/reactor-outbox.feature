@@ -19,6 +19,7 @@ Feature: Reactor Outbox for stake-sensitive dispatch
     When the reactor's handler decides a match dispatches
     Then a ReactorOutbox row is created with status "queued"
     And the row carries reactorName, projectId, dedupKey, and payload
+    And the dedupKey begins with "${projectId}/" so it is self-describing for operator scans
     And no side effect (email, Slack, dataset write) has fired yet
 
   Scenario: Duplicate matches are claimed once
@@ -99,6 +100,14 @@ Feature: Reactor Outbox for stake-sensitive dispatch
     When the reactor re-evaluates the same matches
     Then no new rows are created (dedupKey collision)
     And no additional side effects fire
+
+  Scenario: Replay short-circuits .withOutbox match after row retention has elapsed
+    Given an event is being replayed (ReactorContext.isReplay is true)
+    And the original ReactorOutbox row has aged out of retention
+    When the .withOutbox framework wrapper inspects the context
+    Then the reactor's match phase is skipped before any row is inserted
+    And no wakeup is scheduled
+    And no customer-visible side effect fires
 
   # Operator surface
 

@@ -44,7 +44,7 @@ function makeRow(overrides: Partial<OutboxRow> = {}): OutboxRow {
     id: "row-1",
     projectId: "proj1",
     reactorName: "alertDispatch",
-    dedupKey: "trigger1:trace:trace1",
+    dedupKey: "proj1/trigger1:trace:trace1",
     groupKey: "proj1/alertDispatch:trigger1",
     payload: {},
     status: "dispatching",
