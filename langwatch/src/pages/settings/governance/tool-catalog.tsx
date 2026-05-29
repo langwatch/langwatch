@@ -10,12 +10,11 @@ import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { AiToolEntry } from "~/components/me/tiles/types";
@@ -31,14 +30,10 @@ import type { AiToolEntry } from "~/components/me/tiles/types";
  *     transparency. No edit/disable/fork v1; admin authoring lands v2.
  */
 function ToolCatalogPage() {
-  const { project, organization } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-    });
 
   const [drawerState, setDrawerState] = useState<
     | { mode: "create"; type: AiToolEntry["type"] }
@@ -46,11 +41,8 @@ function ToolCatalogPage() {
     | null
   >(null);
 
-  if (ffLoading || !organization) {
+  if (!organization) {
     return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
   }
 
   return (
@@ -111,6 +103,10 @@ function ToolCatalogPage() {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(ToolCatalogPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(ToolCatalogPage),
+);

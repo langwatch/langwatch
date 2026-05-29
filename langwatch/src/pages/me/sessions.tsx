@@ -12,14 +12,11 @@ import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 const fmtRelative = (ms: number | null | undefined): string => {
@@ -49,15 +46,7 @@ const platformIcon = (platform: string | null) => {
   return Server;
 };
 
-export default function MySessionsPage() {
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-    });
+function MySessionsPage() {
   const ctx = usePersonalContext();
   const [pendingRevokeId, setPendingRevokeId] = useState<number | null>(null);
   const [pendingRevokeAll, setPendingRevokeAll] = useState(false);
@@ -109,9 +98,6 @@ export default function MySessionsPage() {
       });
     },
   });
-
-  if (ffLoading) return <LoadingScreen />;
-  if (!governancePreviewEnabled) return <NotFoundScene />;
 
   const sessions = sessionsQuery.data ?? [];
 
@@ -346,3 +332,7 @@ function SessionRow({
     </VStack>
   );
 }
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(MySessionsPage);

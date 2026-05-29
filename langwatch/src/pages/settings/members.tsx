@@ -18,6 +18,8 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { AddMembersForm } from "../../components/AddMembersForm";
+import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
+import { useCostCenterColumn } from "../../components/settings/useCostCenterColumn";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
 import { CopyInput } from "../../components/CopyInput";
 import { InvitesTable } from "../../components/members/InvitesTable";
@@ -91,6 +93,9 @@ function MembersList({
   const { hasPermission } = useOrganizationTeamProject();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
+
+  const costCenter = useCostCenterColumn(organization.id);
+  const showCostCenter = costCenter.show && hasOrganizationManagePermission;
 
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -291,6 +296,9 @@ function MembersList({
                   {hasOrganizationManagePermission && (
                     <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   )}
+                  {showCostCenter && (
+                    <Table.ColumnHeader>Cost center</Table.ColumnHeader>
+                  )}
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -342,6 +350,18 @@ function MembersList({
                           <MemberAccessDisplay
                             bindings={bindingsByUser.get(member.userId) ?? []}
                             isLoading={isBindingsLoading || isBindingsError}
+                          />
+                        </Table.Cell>
+                      )}
+                      {showCostCenter && (
+                        <Table.Cell>
+                          <CostCenterPicker
+                            organizationId={organization.id}
+                            kind="user"
+                            entityId={member.userId}
+                            value={costCenter.byUser.get(member.userId) ?? null}
+                            costCenters={costCenter.costCenters}
+                            onAssigned={costCenter.refetch}
                           />
                         </Table.Cell>
                       )}

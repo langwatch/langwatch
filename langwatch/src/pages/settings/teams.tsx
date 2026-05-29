@@ -20,6 +20,8 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
+import { useCostCenterColumn } from "../../components/settings/useCostCenterColumn";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -619,6 +621,7 @@ function TeamCard({
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
+  const costCenter = useCostCenterColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -663,6 +666,18 @@ function TeamCard({
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
+          {costCenter.show && canManage && (
+            <Box onClick={(e) => e.stopPropagation()}>
+              <CostCenterPicker
+                organizationId={organizationId}
+                kind="team"
+                entityId={team.id}
+                value={costCenter.byTeam.get(team.id) ?? null}
+                costCenters={costCenter.costCenters}
+                onAssigned={costCenter.refetch}
+              />
+            </Box>
+          )}
           {canManage && (
             <Link
               href={`/settings/teams/${team.slug}`}

@@ -19,8 +19,7 @@ import {
 import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import MyLayout from "~/components/me/MyLayout";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
@@ -29,8 +28,6 @@ import {
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 const fmtRelative = (iso: string | null): string => {
@@ -52,18 +49,7 @@ const fmtUsd = (amount: number): string =>
     ? "$0.00"
     : `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function MySettingsPage() {
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  // /me/configure is the persona-1 (org-less CLI/IDE dev) home — must
-  // resolve the FF without project context. See sibling /me/index for
-  // the same fix.
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-    });
+function MySettingsPage() {
   const ctx = usePersonalContext();
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -198,13 +184,6 @@ export default function MySettingsPage() {
     if (!ctx.organizationId) return;
     revokeMutation.mutate({ organizationId: ctx.organizationId, id });
   };
-
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
 
   return (
     <MyLayout>
@@ -642,3 +621,7 @@ function RevealedSecretBanner({
     </Box>
   );
 }
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(MySettingsPage);

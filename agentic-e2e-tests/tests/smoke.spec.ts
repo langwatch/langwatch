@@ -10,13 +10,15 @@ import { getProjectSlug } from "./helpers";
  */
 
 test("app loads after authentication", async ({ page }) => {
-  await page.goto("/");
+  // Derive a real project deterministically, independent of persona-based root
+  // routing (a personal-persona user lands on /me, not a project route).
+  const slug = await getProjectSlug(page);
 
-  // Verify we're not redirected to login
+  await page.goto(`/${slug}/messages`);
+
+  // Verify we're not bounced to login and the authenticated shell renders.
   await expect(page).not.toHaveURL(/\/auth\/signin/);
-
-  // The app is functional if it redirects to a project route (the personal
-  // portal landing) rather than bouncing to login. getProjectSlug throws if
-  // it never reaches one.
-  await getProjectSlug(page);
+  await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+    timeout: 30000,
+  });
 });

@@ -1,43 +1,43 @@
 import { type Page } from "@playwright/test";
 
-// Top-level route segments in langwatch/src/routes.tsx that are not a project
-// slug. Anything else as the first path segment is treated as the slug.
-const NON_PROJECT_SEGMENTS = new Set([
-  "admin",
-  "auth",
-  "authorize",
-  "cli",
-  "governance",
-  "invite",
-  "mcp",
-  "me",
-  "onboarding",
-  "ops",
-  "settings",
-  "share",
-]);
+type GetAllResponse = {
+  "0"?: {
+    result?: {
+      data?: {
+        json?: Array<{
+          teams?: Array<{ projects?: Array<{ slug?: string }> }>;
+        }>;
+      };
+    };
+  };
+};
 
 /**
- * Derives the active project slug from the authenticated landing URL.
+ * Derives a project slug for the authenticated test user.
  *
- * The app root redirects to the signed-in landing (the personal portal's
- * project messages page), so the first path segment is the project slug. This
- * replaces reading the old sidebar "Home" link, which the personal portal
- * removed. Using the URL (set by the client router) rather than a sidebar link
- * keeps this independent of the trace backend that the landing page queries.
+ * Reads it from organization.getAll (the same API auth.setup uses to provision
+ * the org and project) rather than from the app-root redirect. The root landing
+ * is persona-dependent: a user whose persona resolves to personal lands on /me,
+ * not a project route, so deriving the slug from the URL was non-deterministic
+ * across runs (and 404s when the governance flag gating /me is off). The API is
+ * authoritative regardless of persona.
  */
 export async function getProjectSlug(page: Page): Promise<string> {
-  await page.goto("/");
-  await page.waitForURL(
-    (url) => {
-      const segment = url.pathname.split("/").filter(Boolean)[0];
-      return !!segment && !NON_PROJECT_SEGMENTS.has(segment);
-    },
-    { timeout: 30000 },
+  const response = await page.request.get(
+    "/api/trpc/organization.getAll?batch=1&input=" +
+      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
   );
-  const slug = new URL(page.url()).pathname.split("/").filter(Boolean)[0] ?? "";
-  if (!slug) {
-    throw new Error(`Could not derive project slug from URL: ${page.url()}`);
+  const data = (await response.json().catch(() => null)) as GetAllResponse | null;
+  const orgs = data?.["0"]?.result?.data?.json ?? [];
+  for (const org of orgs) {
+    for (const team of org.teams ?? []) {
+      const slug = (team.projects ?? [])[0]?.slug;
+      if (slug) {
+        return slug;
+      }
+    }
   }
-  return slug;
+  throw new Error(
+    `Could not derive a project slug from organization.getAll (status ${response.status()})`,
+  );
 }
