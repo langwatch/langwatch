@@ -1,4 +1,4 @@
-import { AlertType, type PrismaClient, TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction } from "@prisma/client";
 import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
 import { generate as ksuid } from "@langwatch/ksuid";
@@ -7,11 +7,12 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import {
+  InvalidEmailRecipientError,
   MissingAnnotatorError,
   MissingSlackWebhookError,
   ProjectNotFoundError,
-  RecipientNotInTeamError,
 } from "~/server/app-layer/triggers/errors";
+import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import {
   type DraftProject,
   validateTemplateDraft,
@@ -106,33 +107,17 @@ async function resolveProjectIdentity(projectId: string): Promise<DraftProject> 
 
 /**
  * Mirrors the team-membership check the create procedure already does: every
- * `SEND_EMAIL` recipient must be a team member, otherwise the operator could
- * send a banner-marked notification to an arbitrary address via the test fire
- * endpoint or the upsert path.
+ * Recipients are validated by RFC shape only — external addresses are
+ * intentionally allowed (Slack's "email to a channel" pattern). The UI
+ * surfaces an "External" warning badge for non-team addresses.
+ *
+ * A future per-project "strict mode" flag will re-enable team-membership
+ * enforcement via `RecipientNotInTeamError`; that gate is not in this PR.
  */
-async function ensureEmailRecipientsInTeam(
-  ctx: { prisma: PrismaClient },
-  projectId: string,
-  recipients: string[],
-): Promise<void> {
-  if (recipients.length === 0) return;
-  const project = await ctx.prisma.project.findUnique({
-    where: { id: projectId },
-    select: { teamId: true, team: { select: { organizationId: true } } },
-  });
-  if (!project) throw new ProjectNotFoundError(projectId);
-  const roleService = new RoleService(ctx.prisma);
-  const teamBindings = await roleService.getTeamMembersWithUsers({
-    organizationId: project.team.organizationId,
-    teamId: project.teamId,
-  });
-  const teamEmails = teamBindings.flatMap((b) =>
-    b.user ? [b.user.email] : [],
-  );
-  const teamEmailSet = new Set(teamEmails);
+function validateEmailRecipientFormats(recipients: string[]): void {
   for (const email of recipients) {
-    if (!teamEmailSet.has(email)) {
-      throw new RecipientNotInTeamError(email, teamEmails);
+    if (!EMAIL_RX.test(email)) {
+      throw new InvalidEmailRecipientError(email);
     }
   }
 }
@@ -456,11 +441,7 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         if (input.channel === "email") {
-          await ensureEmailRecipientsInTeam(
-            ctx,
-            input.projectId,
-            input.recipients,
-          );
+          validateEmailRecipientFormats(input.recipients);
         }
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
@@ -499,11 +480,7 @@ export const automationRouter = createTRPCRouter({
           input.actionParams.members &&
           input.actionParams.members.length > 0
         ) {
-          await ensureEmailRecipientsInTeam(
-            ctx,
-            input.projectId,
-            input.actionParams.members,
-          );
+          validateEmailRecipientFormats(input.actionParams.members);
         }
         if (
           input.action === TriggerAction.SEND_SLACK_MESSAGE &&

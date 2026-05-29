@@ -1,154 +1,166 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import {
   type AutomationDraft,
-  EMPTY_FIELD,
   INITIAL_DRAFT,
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
+  filtersAreSet,
+  isNotifyAction,
   notifyChannel,
   reducer,
-  summariseConditions,
   templatesFromDraft,
 } from "../draftReducer";
+
+const emailWith = (members: string[]) => ({
+  ...CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice(),
+  members,
+});
 
 const SAMPLE: AutomationDraft = {
   ...INITIAL_DRAFT,
   name: "High latency",
   action: TriggerAction.SEND_EMAIL,
   alertType: AlertType.WARNING,
-  members: ["a@acme.test"],
   filters: { "trace.tags": ["urgent"] as never },
+  slices: { ...INITIAL_DRAFT.slices, [TriggerAction.SEND_EMAIL]: emailWith(["a@acme.test"]) },
 };
 
 describe("draftReducer", () => {
   describe("SET_ACTION", () => {
-    it("clears destination-specific config so type-switching does not leak", () => {
+    it("changes the action but preserves every provider's slice", () => {
       const next = reducer(SAMPLE, {
         type: "SET_ACTION",
         value: TriggerAction.SEND_SLACK_MESSAGE,
       });
       expect(next.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
-      expect(next.members).toEqual([]);
-      expect(next.name).toBe("High latency"); // identity preserved
+      // The email slice we set is still intact — switching type doesn't wipe it.
+      expect(
+        (next.slices[TriggerAction.SEND_EMAIL] as { members: string[] }).members,
+      ).toEqual(["a@acme.test"]);
+      expect(next.name).toBe("High latency");
+    });
+  });
+
+  describe("SET_SLICE", () => {
+    it("updates exactly the provider's slice", () => {
+      const slack = {
+        webhook: "https://hooks.slack.com/services/T/B/X",
+        templateType: "string" as const,
+        template: { value: "", usingDefault: true },
+      };
+      const next = reducer(SAMPLE, {
+        type: "SET_SLICE",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        slice: slack,
+      });
+      expect(next.slices[TriggerAction.SEND_SLACK_MESSAGE]).toEqual(slack);
+      // The email slice is untouched.
+      expect(next.slices[TriggerAction.SEND_EMAIL]).toEqual(
+        SAMPLE.slices[TriggerAction.SEND_EMAIL],
+      );
     });
   });
 
   describe("SET_SOURCE", () => {
-    describe("when switching to custom graph", () => {
-      it("clears the trace filters", () => {
-        const next = reducer(SAMPLE, { type: "SET_SOURCE", value: "customGraph" });
-        expect(next.source).toBe("customGraph");
-        expect(next.filters).toEqual({});
-      });
+    it("clears trace filters when switching to customGraph", () => {
+      const next = reducer(SAMPLE, { type: "SET_SOURCE", value: "customGraph" });
+      expect(next.source).toBe("customGraph");
+      expect(next.filters).toEqual({});
     });
-    describe("when switching back to trace", () => {
-      it("clears the customGraphId", () => {
-        const withGraph: AutomationDraft = {
-          ...SAMPLE,
-          source: "customGraph",
-          customGraphId: "graph_1",
-        };
-        const next = reducer(withGraph, { type: "SET_SOURCE", value: "trace" });
-        expect(next.source).toBe("trace");
-        expect(next.customGraphId).toBeNull();
-      });
-    });
-  });
-
-  describe("SET_SLACK_TYPE", () => {
-    it("resets the slack template to the default so the right default renders", () => {
-      const dirty: AutomationDraft = {
+    it("clears the customGraphId when switching back to trace", () => {
+      const withGraph: AutomationDraft = {
         ...SAMPLE,
-        slackTemplate: { value: "[1,2,3]", usingDefault: false },
+        source: "customGraph",
+        customGraphId: "graph_1",
       };
-      const next = reducer(dirty, { type: "SET_SOURCE", value: "trace" });
-      expect(next.slackTemplate).not.toEqual(EMPTY_FIELD);
-      const swapped = reducer(dirty, {
-        type: "SET_SLACK_TYPE",
-        value: "block_kit",
-      });
-      expect(swapped.slackTemplateType).toBe("block_kit");
-      expect(swapped.slackTemplate).toEqual(EMPTY_FIELD);
+      const next = reducer(withGraph, { type: "SET_SOURCE", value: "trace" });
+      expect(next.source).toBe("trace");
+      expect(next.customGraphId).toBeNull();
     });
   });
 });
 
-describe("conditionsAreSet", () => {
-  describe("when the source is trace", () => {
-    it("is true when any filter has a value", () => {
-      expect(conditionsAreSet(SAMPLE)).toBe(true);
-    });
-    it("is false when filters are empty", () => {
-      expect(conditionsAreSet({ ...SAMPLE, filters: {} })).toBe(false);
-    });
+describe("filtersAreSet", () => {
+  it("is true when any filter has a value", () => {
+    expect(filtersAreSet(SAMPLE.filters)).toBe(true);
   });
+  it("is false when filters are empty", () => {
+    expect(filtersAreSet({})).toBe(false);
+  });
+});
+
+describe("conditionsAreSet", () => {
   describe("when the source is customGraph", () => {
     it("is true only when a graph id is set", () => {
-      const a: AutomationDraft = {
-        ...SAMPLE,
-        source: "customGraph",
-        filters: {},
-      };
+      const a: AutomationDraft = { ...SAMPLE, source: "customGraph", filters: {} };
       expect(conditionsAreSet({ ...a, customGraphId: null })).toBe(false);
       expect(conditionsAreSet({ ...a, customGraphId: "g_1" })).toBe(true);
     });
   });
 });
 
-describe("configIsComplete", () => {
-  it("requires a name and the type-specific destination", () => {
+describe("configIsComplete delegates to the provider", () => {
+  it("is false without a name", () => {
     expect(configIsComplete({ ...SAMPLE, name: "" })).toBe(false);
-    expect(configIsComplete({ ...SAMPLE, members: [] })).toBe(false);
+  });
+  it("matches the provider's isComplete output", () => {
     expect(configIsComplete(SAMPLE)).toBe(true);
+    const noRecipients: AutomationDraft = {
+      ...SAMPLE,
+      slices: { ...SAMPLE.slices, [TriggerAction.SEND_EMAIL]: emailWith([]) },
+    };
+    expect(configIsComplete(noRecipients)).toBe(false);
   });
 });
 
 describe("templatesFromDraft", () => {
-  it("uses null when a field is using the default", () => {
-    const out = templatesFromDraft(SAMPLE);
-    expect(out.emailSubjectTemplate).toBeNull();
-    expect(out.emailBodyTemplate).toBeNull();
-  });
-  it("uses the custom value when the field is dirty", () => {
-    const dirty: AutomationDraft = {
+  it("returns nulls when the active action is not a notify provider", () => {
+    const dataset: AutomationDraft = {
       ...SAMPLE,
-      emailSubject: { value: "Hi {{ trigger.name }}", usingDefault: false },
+      action: TriggerAction.ADD_TO_DATASET,
     };
-    expect(templatesFromDraft(dirty).emailSubjectTemplate).toBe(
-      "Hi {{ trigger.name }}",
-    );
+    expect(templatesFromDraft(dataset)).toEqual({
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+      slackTemplate: null,
+      slackTemplateType: null,
+    });
+  });
+  it("delegates to the notify provider's templatesFromSlice", () => {
+    const draft: AutomationDraft = {
+      ...SAMPLE,
+      slices: {
+        ...SAMPLE.slices,
+        [TriggerAction.SEND_EMAIL]: {
+          ...emailWith(["a@acme.test"]),
+          subject: { value: "Hi", usingDefault: false },
+        },
+      },
+    };
+    expect(templatesFromDraft(draft).emailSubjectTemplate).toBe("Hi");
   });
 });
 
-describe("notifyChannel", () => {
-  it("returns email / slack / null for the relevant actions", () => {
+describe("notifyChannel + isNotifyAction", () => {
+  it("returns the channel for notify providers and null otherwise", () => {
     expect(notifyChannel(SAMPLE)).toBe("email");
     expect(
       notifyChannel({ ...SAMPLE, action: TriggerAction.SEND_SLACK_MESSAGE }),
     ).toBe("slack");
     expect(notifyChannel({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBeNull();
   });
-});
-
-describe("summariseConditions", () => {
-  it("describes trace filters by count and field names", () => {
-    expect(summariseConditions(SAMPLE)).toMatch(/condition/);
-  });
-  it("describes a custom graph trigger", () => {
-    expect(
-      summariseConditions({
-        ...SAMPLE,
-        source: "customGraph",
-        customGraphId: "graph_abc123def456",
-      }),
-    ).toMatch(/Custom graph/);
+  it("isNotifyAction agrees", () => {
+    expect(isNotifyAction(SAMPLE)).toBe(true);
+    expect(isNotifyAction({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBe(false);
+    expect(isNotifyAction({ ...SAMPLE, action: null })).toBe(false);
   });
 });
 
-describe("configurationSummary", () => {
-  it("includes the destination kind", () => {
+describe("configurationSummary delegates to the provider", () => {
+  it("uses the provider's summary for the active action", () => {
     expect(configurationSummary(SAMPLE)).toMatch(/email to 1 recipient/);
   });
 });

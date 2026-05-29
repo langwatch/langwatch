@@ -56,6 +56,12 @@ Feature: Staged automation authoring
       Given the user is configuring an email notification
       Then the user sets the recipients, the subject template, and the body template
 
+    Scenario: Email recipients outside the team are allowed but marked
+      Given the user is configuring an email notification
+      When the user adds "alerts@partner.com" as a recipient
+      Then the recipient is accepted
+      And it is shown with an "External" warning badge
+
     Scenario: A Slack notification configures a webhook and a message template
       Given the user is configuring a Slack notification
       Then the user sets the webhook and the message template

@@ -46,11 +46,15 @@ export class TestFireUnavailableError extends DomainError {
   }
 }
 
+/**
+ * Held in reserve for a future "strict mode" on the project — when an
+ * admin disables external recipients for compliance, this is the error
+ * raised by the validation pass. The active route no longer throws it
+ * by default; external emails are allowed everywhere with a UI badge.
+ */
 export class RecipientNotInTeamError extends DomainError {
   constructor(
     public readonly recipient: string,
-    /** The team emails the caller could have picked instead — handy for the
-     *  UI to surface a "pick one of these" hint. */
     public readonly teamEmails: string[],
   ) {
     super(
@@ -62,6 +66,24 @@ export class RecipientNotInTeamError extends DomainError {
       },
     );
     this.name = "RecipientNotInTeamError";
+  }
+}
+
+/**
+ * An email address failed RFC-shape validation. Carries the offending
+ * recipient so the UI can highlight the chip that needs fixing.
+ */
+export class InvalidEmailRecipientError extends DomainError {
+  constructor(public readonly recipient: string) {
+    super(
+      "invalid_email_recipient",
+      `"${recipient}" is not a valid email address.`,
+      {
+        meta: { recipient },
+        httpStatus: 422,
+      },
+    );
+    this.name = "InvalidEmailRecipientError";
   }
 }
 
