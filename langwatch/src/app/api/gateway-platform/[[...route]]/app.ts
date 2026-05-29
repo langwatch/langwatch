@@ -13,7 +13,6 @@
  * service-to-service write path can drop the synthetic id entirely; until
  * then this preserves a stable per-project actor for forensic queries.
  */
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -35,13 +34,7 @@ import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
 import { createLogger } from "~/utils/logger/server";
 
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp, anyAuthenticated } from "~/server/api/security";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 
 // PAT permission ceilings for every gateway-platform route. Legacy project
@@ -200,8 +193,6 @@ const errorSchema = z.object({
   }),
 });
 
-type Variables = AuthMiddlewareVariables;
-
 /**
  * Best-effort organization lookup for the project behind the API key.
  * Cached off the project row we already fetched in `authMiddleware`.
@@ -266,16 +257,11 @@ const createBudgetSchema = z.object({
 
 const toVkDto = toVirtualKeySnakeDto;
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/gateway/v1")
-  .use(tracerMiddleware({ name: "gateway-platform" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/gateway/v1" });
 
-  // ── Virtual keys ────────────────────────────────────────────────────────
+// ── Virtual keys ────────────────────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/virtual-keys",
     describeRoute({
       summary: "List virtual keys",
@@ -305,7 +291,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/virtual-keys",
     describeRoute({
       summary: "Create virtual key",
@@ -371,7 +357,7 @@ export const app = new Hono<{ Variables: Variables }>()
     );
   })
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/virtual-keys/:id",
     describeRoute({
       summary: "Get virtual key",
@@ -411,7 +397,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .patch(
+secured.access(anyAuthenticated()).patch(
     "/virtual-keys/:id",
     describeRoute({
       summary: "Update virtual key",
@@ -460,7 +446,7 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ virtual_key: toVkDto(updated) });
   })
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/virtual-keys/:id/rotate",
     describeRoute({
       summary: "Rotate virtual key secret",
@@ -498,7 +484,7 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ virtual_key: toVkDto(virtualKey), secret });
   })
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/virtual-keys/:id/revoke",
     describeRoute({
       summary: "Revoke virtual key",
@@ -531,9 +517,9 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ virtual_key: toVkDto(updated) });
   })
 
-  // ── Gateway provider bindings ───────────────────────────────────────────
+// ── Gateway provider bindings ───────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/providers",
     describeRoute({
       summary: "List provider bindings",
@@ -583,7 +569,7 @@ export const app = new Hono<{ Variables: Variables }>()
     );
   })
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/providers",
     describeRoute({
       summary: "Bind a model provider to the gateway",
@@ -618,9 +604,9 @@ export const app = new Hono<{ Variables: Variables }>()
     );
   })
 
-  // ── Budgets ─────────────────────────────────────────────────────────────
+// ── Budgets ─────────────────────────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/budgets",
     describeRoute({
       summary: "List budgets applicable to the project",
@@ -662,7 +648,7 @@ export const app = new Hono<{ Variables: Variables }>()
     });
   })
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/budgets",
     describeRoute({
       summary: "Create budget",
@@ -713,7 +699,7 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ budget: toBudgetDto(row) }, 201);
   })
 
-  .patch(
+secured.access(anyAuthenticated()).patch(
     "/budgets/:id",
     describeRoute({
       summary: "Update budget",
@@ -758,7 +744,7 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ budget: toBudgetDto(row) });
   })
 
-  .delete(
+secured.access(anyAuthenticated()).delete(
     "/budgets/:id",
     describeRoute({
       summary: "Archive budget",
@@ -793,7 +779,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Provider credentials — update + disable ────────────────────────────
 
-  .patch(
+secured.access(anyAuthenticated()).patch(
     "/providers/:id",
     describeRoute({
       summary: "Update provider binding",
@@ -828,7 +814,7 @@ export const app = new Hono<{ Variables: Variables }>()
     );
   })
 
-  .delete(
+secured.access(anyAuthenticated()).delete(
     "/providers/:id",
     describeRoute({
       summary: "Disable provider binding",
@@ -868,7 +854,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Cache-control rules ────────────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/cache-rules",
     describeRoute({
       summary: "List cache-control rules",
@@ -899,7 +885,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/cache-rules/:id",
     describeRoute({
       summary: "Get a cache rule",
@@ -942,7 +928,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/cache-rules",
     describeRoute({
       summary: "Create a cache rule",
@@ -1001,7 +987,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .patch(
+secured.access(anyAuthenticated()).patch(
     "/cache-rules/:id",
     describeRoute({
       summary: "Update a cache rule",
@@ -1056,7 +1042,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .delete(
+secured.access(anyAuthenticated()).delete(
     "/cache-rules/:id",
     describeRoute({
       summary: "Archive a cache rule",
@@ -1160,3 +1146,5 @@ function scopeFromWire(
 function machineActorForProject(projectId: string): string {
   return `svc_${projectId}`;
 }
+
+export const app = secured.hono;

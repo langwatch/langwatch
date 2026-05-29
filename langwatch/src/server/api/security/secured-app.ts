@@ -59,7 +59,13 @@ function familyFromBasePath(basePath: string): string {
  * natively. The builder only controls HOW you reach these methods — you must
  * first call `.access(policy)`.
  */
-export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb>;
+export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
+  /**
+   * Register a HEAD route. Hono exposes no `.head` shortcut, so this routes
+   * through `app.on("HEAD", ...)`; the call signature mirrors `.get`.
+   */
+  head: Hono<E>["get"];
+};
 
 /**
  * A Hono application whose routes cannot be registered without first declaring
@@ -98,21 +104,30 @@ export class SecuredApp<E extends Env> {
   access(policy: AccessPolicy): SecuredVerbs<E> {
     const chain = policy.kind === "public" ? [] : this.strategy.chainFor(policy);
 
-    const bind = (method: HttpVerb) => {
-      const verb = this.hono[method] as unknown as (
-        path: string,
-        ...handlers: MiddlewareHandler[]
-      ) => unknown;
+    const bind = (method: HttpVerb | "head") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
         registerRoutePolicy({
-          method,
+          method: method.toUpperCase(),
           path: mergePath(this.basePath, path),
           policy,
           family: this.family,
         });
         // Prepend the enforcement chain, then the caller's handlers. The
         // verb method's STATIC type is Hono's own, so validator + context
-        // inference is unaffected by this runtime prepend.
+        // inference is unaffected by this runtime prepend. HEAD has no Hono
+        // shortcut, so it routes through `.on("HEAD", ...)`.
+        if (method === "head") {
+          const on = this.hono.on as unknown as (
+            method: string,
+            path: string,
+            ...handlers: MiddlewareHandler[]
+          ) => unknown;
+          return on.call(this.hono, "HEAD", path, ...chain, ...handlers);
+        }
+        const verb = this.hono[method] as unknown as (
+          path: string,
+          ...handlers: MiddlewareHandler[]
+        ) => unknown;
         return verb.call(this.hono, path, ...chain, ...handlers);
       }) as SecuredVerbs<E>[HttpVerb];
     };
@@ -123,6 +138,7 @@ export class SecuredApp<E extends Env> {
       put: bind("put"),
       patch: bind("patch"),
       delete: bind("delete"),
+      head: bind("head"),
     };
   }
 

@@ -1,5 +1,4 @@
 import { Readable } from "node:stream";
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
@@ -11,21 +10,18 @@ import {
 } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
-import {
-  handleError,
-  loggerMiddleware,
-  tracerMiddleware,
-} from "../../middleware";
 import { dualAuth } from "../../middleware/dual-auth";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
+import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 
-type Variables = DualAuthVariables;
-
-export const app = new Hono<{ Variables: Variables }>().basePath("/api/files");
-
-app.use(tracerMiddleware({ name: "files" }));
-app.use(loggerMiddleware());
-app.onError(handleError);
+// File reads authenticate via dualAuth (project API key OR user session) and
+// authorize per-object in the handler (authorizeFileRead checks the caller's
+// project against the object owner). The policy is anyAuthenticated() with
+// dualAuth as the verifier; cross-tenant access is denied in-handler.
+const secured = createServiceApp<{ Variables: DualAuthVariables }>({
+  basePath: "/api/files",
+  verifySecret: dualAuth,
+});
 
 /**
  * Resolves the Content-Type header for a stored-object response.
@@ -178,7 +174,7 @@ function streamFileResponse({
  * for a full body download).
  */
 async function handleFileRead(
-  c: Parameters<MiddlewareHandler<{ Variables: Variables }>>[0],
+  c: Parameters<MiddlewareHandler<{ Variables: DualAuthVariables }>>[0],
   options: { method: "GET" | "HEAD" },
 ): Promise<Response> {
   const id = c.req.param("id");
@@ -274,9 +270,12 @@ async function handleFileRead(
   });
 }
 
-app.get("/:id", dualAuth, (c) => handleFileRead(c, { method: "GET" }));
-app.on("HEAD", "/:id", dualAuth, (c) =>
+secured.access(anyAuthenticated()).get("/:id", (c) =>
+  handleFileRead(c, { method: "GET" }),
+);
+secured.access(anyAuthenticated()).head("/:id", (c) =>
   handleFileRead(c, { method: "HEAD" }),
 );
 
+export const app = secured.hono;
 export type FilesAppType = typeof app;

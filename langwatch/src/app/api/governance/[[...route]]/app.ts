@@ -20,7 +20,6 @@
  *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
-import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
@@ -46,13 +45,8 @@ import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp, anyAuthenticated } from "~/server/api/security";
+import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
@@ -371,16 +365,11 @@ function resolveSurfaceFromRequest(
 
 // ── App ─────────────────────────────────────────────────────────────────────
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/governance")
-  .use(tracerMiddleware({ name: "governance" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/governance" });
 
-  // ── Ingestion Templates ───────────────────────────────────────────────
+// ── Ingestion Templates ───────────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/ingestion-templates",
     describeRoute({
       summary: "List ingestion templates",
@@ -409,9 +398,9 @@ export const app = new Hono<{ Variables: Variables }>()
       const rows = await service.listForUser({ organizationId });
       return c.json({ data: rows.map(toTemplateDto) });
     },
-  )
+  );
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/ingestion-templates/admin",
     describeRoute({
       summary: "List ingestion templates (admin shape, includes OTTL)",
@@ -441,9 +430,9 @@ export const app = new Hono<{ Variables: Variables }>()
       const rows = await service.listForOrgAdmin({ organizationId });
       return c.json({ data: rows.map(toTemplateDto) });
     },
-  )
+  );
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/ingestion-templates/:id",
     describeRoute({
       summary: "Get ingestion template",
@@ -491,9 +480,9 @@ export const app = new Hono<{ Variables: Variables }>()
       }
       return c.json({ ingestion_template: toTemplateDto(row) });
     },
-  )
+  );
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/ingestion-templates",
     describeRoute({
       summary: "Create org-authored ingestion template",
@@ -569,7 +558,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .patch(
+secured.access(anyAuthenticated()).patch(
     "/ingestion-templates/:id/ottl-rules",
     describeRoute({
       summary: "Replace ottl_rules on an org-authored template",
@@ -639,7 +628,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .delete(
+secured.access(anyAuthenticated()).delete(
     "/ingestion-templates/:id",
     describeRoute({
       summary: "Soft-archive an org-authored template",
@@ -693,7 +682,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/ingestion-templates/clone",
     describeRoute({
       summary: "Clone a platform-published template into the caller's org",
@@ -759,7 +748,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── User Ingestion Bindings ───────────────────────────────────────────
 
-  .get(
+secured.access(anyAuthenticated()).get(
     "/user-ingestion-bindings",
     describeRoute({
       summary: "List the caller's bindings",
@@ -809,7 +798,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/user-ingestion-bindings",
     describeRoute({
       summary: "Install a binding for the caller",
@@ -908,7 +897,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .delete(
+secured.access(anyAuthenticated()).delete(
     "/user-ingestion-bindings/:id",
     describeRoute({
       summary: "Uninstall (soft-archive) a binding",
@@ -967,7 +956,7 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  .post(
+secured.access(anyAuthenticated()).post(
     "/user-ingestion-bindings/:id/rotate",
     describeRoute({
       summary: "Rotate the binding access token (hard-cut v1)",
@@ -1033,3 +1022,5 @@ export const app = new Hono<{ Variables: Variables }>()
       }
     },
   );
+
+export const app = secured.hono;
