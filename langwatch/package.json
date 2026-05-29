@@ -350,7 +350,8 @@
       "thread-stream": "^4.0.0",
       "kysely": "0.28.17",
       "@opentelemetry/exporter-prometheus": ">=0.217.0",
-      "@opentelemetry/sdk-node": ">=0.217.0"
+      "@opentelemetry/sdk-node": ">=0.217.0",
+      "tmp": ">=0.2.6"
     }
   },
   "ct3aMetadata": {
