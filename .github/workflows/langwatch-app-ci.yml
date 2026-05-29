@@ -227,7 +227,7 @@ jobs:
         id: integration-tests
         working-directory: langwatch
         # Integration files run sequentially in a single long-lived fork
-        # worker (fileParallelism:false, for Redis/BullMQ contention). Under
+        # worker (fileParallelism:false, for Redis contention). Under
         # --coverage the v8 coverage data accumulates in that worker across
         # every file in the shard until it crosses Node's ~4GB default heap,
         # then GC-thrashes for hours and OOMs ("FATAL: JS heap out of memory",
