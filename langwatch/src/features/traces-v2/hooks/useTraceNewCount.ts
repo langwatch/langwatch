@@ -105,6 +105,10 @@ export function useTraceNewCount(): TraceNewCountResult {
       // pings they explicitly turned off.
       enabled: !!project?.id && liveUpdatesMode !== "paused",
       staleTime: 0,
+      // A failing poll is almost always ClickHouse easing us off under
+      // concurrent load. One client-side retry is enough; the refetch
+      // interval (backed off in onError) will try again shortly.
+      retry: 1,
       refetchInterval: isVisible && !sseConnected ? intervalMs : false,
       onSuccess: (data) => {
         if (data.count === 0) {
@@ -116,6 +120,13 @@ export function useTraceNewCount(): TraceNewCountResult {
           consecutiveZerosRef.current = 0;
           setIntervalMs(FAST_MS);
         }
+      },
+      onError: () => {
+        // Ease off when the count query fails (typically ClickHouse
+        // "Too many simultaneous queries" under load) so the client does
+        // not amplify the storm with fast polling. Recovers to the fast
+        // cadence on the next successful poll or SSE fast-poll signal.
+        setIntervalMs(SLOW_MS);
       },
     },
   );
