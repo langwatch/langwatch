@@ -12,6 +12,7 @@
  * Spec: specs/ai-gateway/governance/cost-centers.feature
  */
 import type { PrismaClient } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 import { CostCenterRepository } from "../../repositories/costCenter.repository";
 
@@ -159,7 +160,20 @@ export class CostCenterService {
       where: { organizationId, name, archivedAt: null },
     });
     if (existing) return toRow(existing);
-    return this.create({ organizationId, name });
+    try {
+      return await this.create({ organizationId, name });
+    } catch (e) {
+      // A concurrent provision of the same name may have won the race. The
+      // partial unique index on (organizationId, name) WHERE archivedAt IS NULL
+      // rejects the duplicate with P2002, so re-fetch the active row that won.
+      if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
+        const winner = await this.prisma.costCenter.findFirst({
+          where: { organizationId, name, archivedAt: null },
+        });
+        if (winner) return toRow(winner);
+      }
+      throw e;
+    }
   }
 
   async rename({
