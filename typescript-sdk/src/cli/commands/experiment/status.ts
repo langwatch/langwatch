@@ -4,6 +4,7 @@ import { ExperimentsApiService } from "@/client-sdk/services/experiments/experim
 import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { resolveRunId } from "./resolve-run";
 
 const statusColor = (status: string) =>
   status === "completed"
@@ -59,16 +60,21 @@ const statusFromResults = async ({
 };
 
 export const experimentStatusCommand = async (
-  runId: string,
-  options?: { format?: string; experiment?: string },
+  experimentSlug: string,
+  options?: { format?: string; runId?: string },
 ): Promise<void> => {
   checkApiKey();
 
   const service = new ExperimentsApiService();
-  const experimentSlug = options?.experiment?.trim();
-  const spinner = ora(`Checking run status "${runId}"...`).start();
+  const spinner = ora(`Checking status for "${experimentSlug}"...`).start();
 
   try {
+    const runId = await resolveRunId({
+      service,
+      experimentSlug,
+      runId: options?.runId,
+    });
+
     let status: {
       runId?: string;
       status: string;
@@ -88,9 +94,11 @@ export const experimentStatusCommand = async (
     try {
       status = await service.getRunStatus(runId);
     } catch (error) {
-      const fallback = experimentSlug
-        ? await statusFromResults({ service, runId, experimentSlug })
-        : null;
+      const fallback = await statusFromResults({
+        service,
+        runId,
+        experimentSlug,
+      });
       if (!fallback) throw error;
       status = fallback;
     }

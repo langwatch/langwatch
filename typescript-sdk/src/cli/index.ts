@@ -922,53 +922,54 @@ experimentCmd
   });
 
 experimentCmd
-  .command("status <runId>")
-  .description("Check the status of an experiment run")
+  .command("status <experiment>")
+  .description("Check the status of an experiment run (defaults to the latest run)")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .option("--experiment <slug>", "Experiment slug — required for SDK-logged runs and runs older than 24h")
-  .action(async (runId: string, options: { format?: string; experiment?: string }) => {
+  .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+  .action(async (experiment: string, options: { format?: string; runId?: string }) => {
     const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
-    await impl(runId, options);
+    await impl(experiment, options);
   });
 
 experimentCmd
-  .command("list-runs")
+  .command("list-runs <experiment>")
   .description("List experiment runs for an experiment by slug")
-  .requiredOption("--experiment <slug>", "Experiment slug to list runs for")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50")
   .action(
-    async (options: {
-      experiment?: string;
-      format?: string;
-      limit?: string;
-    }) => {
-      await experimentListRunsCommand(options);
+    async (
+      experiment: string,
+      options: {
+        format?: string;
+        limit?: string;
+      },
+    ) => {
+      await experimentListRunsCommand({ experiment, ...options });
     },
   );
 
 experimentCmd
-  .command("results <runId>")
+  .command("results <experiment>")
   .description(
-    "Fetch per-row results for a completed experiment run (debug evaluator scores and missed rows)",
+    "Fetch per-row results for an experiment run, defaulting to the latest run (debug evaluator scores and missed rows)",
   )
+  .option("--run-id <id>", "Specific run id to fetch (defaults to the latest run)")
   .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
   .option("--evaluator <name>", "Show only this evaluator's column")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20")
-  .option("--experiment <slug>", "Experiment slug — required for runs older than 24h")
   .action(
     async (
-      runId: string,
+      experiment: string,
       options: {
+        runId?: string;
         filter?: string;
         evaluator?: string;
         format?: string;
         limit?: string;
-        experiment?: string;
       },
     ) => {
-      await experimentResultsCommand({ runId, options });
+      await experimentResultsCommand({ experimentSlug: experiment, options });
     },
   );
 
