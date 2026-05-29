@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MAX_STORED_PAYLOAD_BYTES,
   capStoredJson,
-  capStoredText,
   utf8ByteLength,
 } from "../capStoredPayload";
 
@@ -80,46 +79,8 @@ describe("capStoredJson", () => {
   });
 });
 
-describe("capStoredText", () => {
-  describe("given a null or undefined value", () => {
-    it("returns it unchanged", () => {
-      expect(capStoredText(null)).toBeNull();
-      expect(capStoredText(undefined)).toBeUndefined();
-    });
-  });
-
-  describe("given text within the cap", () => {
-    it("returns it unchanged", () => {
-      const text = "a normal short trace output";
-      expect(capStoredText(text)).toBe(text);
-    });
-  });
-
-  describe("given text over the cap", () => {
-    const text = "y".repeat(2 * 1024 * 1024);
-    const capped = capStoredText(text, 32 * 1024);
-
-    it("stays at or under the byte cap", () => {
-      expect(utf8ByteLength(capped)).toBeLessThanOrEqual(32 * 1024);
-    });
-
-    it("appends a marker naming the original size", () => {
-      expect(capped.endsWith(`bytes total]`)).toBe(true);
-      expect(capped).toContain(String(utf8ByteLength(text)));
-    });
-  });
-
-  describe("given multibyte text right at the boundary", () => {
-    it("never throws and stays within the cap", () => {
-      const emoji = "😀".repeat(20 * 1024); // 4 bytes each
-      const capped = capStoredText(emoji, 1024);
-      expect(utf8ByteLength(capped)).toBeLessThanOrEqual(1024);
-    });
-  });
-
-  describe("default cap", () => {
-    it("is 32KB", () => {
-      expect(DEFAULT_MAX_STORED_PAYLOAD_BYTES).toBe(32 * 1024);
-    });
+describe("default cap", () => {
+  it("is 32KB", () => {
+    expect(DEFAULT_MAX_STORED_PAYLOAD_BYTES).toBe(32 * 1024);
   });
 });

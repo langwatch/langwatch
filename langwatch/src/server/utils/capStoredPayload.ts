@@ -1,7 +1,6 @@
 /**
- * capStoredPayload — bounds the byte-size of large text/JSON values before they
- * are written into the hot ClickHouse path (evaluation_runs.Inputs and the
- * trace-summary computedInput/Output).
+ * capStoredJson — bounds the byte-size of a large serialized-JSON value before
+ * it is written into the hot ClickHouse path (evaluation_runs.Inputs).
  *
  * Why this exists
  * ---------------
@@ -13,18 +12,11 @@
  * part-storm. Normal inputs are a couple KB; only the pathological tail is a
  * problem, so we cap by size at the write site.
  *
- * Two shapes, two helpers
- * -----------------------
- * - `capStoredJson` is for columns persisted as serialized JSON and JSON-parsed
- *   on read (evaluation_runs.Inputs). A mid-string truncation would break
- *   `JSON.parse`, so an oversized value is replaced with a small, still-valid
- *   JSON placeholder that carries the original size and a preview.
- * - `capStoredText` is for columns stored and rendered as free text
- *   (trace-summary computedInput/Output). An oversized value is truncated on a
- *   UTF-8 boundary with a human-readable marker appended.
- *
- * Both are allocation-light, never throw, and leave normal-sized values
- * byte-for-byte unchanged.
+ * The column is JSON-parsed on read, so a mid-string truncation would break
+ * `JSON.parse`. An oversized value is therefore replaced with a small,
+ * still-valid JSON placeholder that carries the original size and a preview.
+ * Allocation-light, never throws, leaves normal-sized values byte-for-byte
+ * unchanged.
  */
 
 const KB = 1024;
@@ -101,23 +93,4 @@ export function capStoredJson(
     _maxBytes: maxBytes,
     _preview: "",
   });
-}
-
-/**
- * Caps a free-text value to `maxBytes`. Returns the value unchanged when it is
- * null/undefined or within the cap; otherwise truncates on a UTF-8 boundary and
- * appends a marker naming the original size. The marker is included in the
- * budget so the result stays at or under `maxBytes`.
- */
-export function capStoredText<T extends string | null | undefined>(
-  value: T,
-  maxBytes: number = DEFAULT_MAX_STORED_PAYLOAD_BYTES,
-): T {
-  if (typeof value !== "string") return value;
-  const bytes = utf8ByteLength(value);
-  if (bytes <= maxBytes) return value;
-
-  const marker = `…[truncated: ${bytes} bytes total]`;
-  const room = Math.max(0, maxBytes - utf8ByteLength(marker));
-  return (truncateUtf8(value, room) + marker) as T;
 }
