@@ -107,8 +107,6 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: (c) => typeof c?.lookupId === "string",
   },
   RoutingPolicy: {},
-  AnomalyRule: {},
-  AnomalyAlert: {},
   AiToolEntry: {},
   GatewayBudget: {},
 };
@@ -141,6 +139,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // is deferred to a dedicated audit rather than turned on opportunistically.
   "AuditLog",
   "GatewayChangeEvent",
+  // Evaluated by cross-tenant background jobs: the spend-spike anomaly
+  // evaluator scans every org's rules by ruleType (no organizationId filter)
+  // and counts open alerts by ruleId, so a mandatory-organizationId guard
+  // cannot apply. Service-layer queries that ARE org-scoped still pass their
+  // organizationId; the evaluator's sweep is the constraint.
+  "AnomalyRule",
+  "AnomalyAlert",
   // Org-scoped but not yet audited for every query shape. Listed explicitly so
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.

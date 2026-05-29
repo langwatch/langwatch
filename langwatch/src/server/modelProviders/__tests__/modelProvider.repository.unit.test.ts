@@ -97,6 +97,7 @@ function createModelProvider(
     disabledAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    organizationId: null,
     scopes: scopes ?? [createScope("PROJECT", seedProjectId, id)],
     ...rest,
   };
