@@ -27,6 +27,8 @@ import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.cl
 import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { PrismaClient } from "@prisma/client";
 
 /**
  * Dependencies for RecordSpanCommand that can be injected for testing.
@@ -55,13 +57,13 @@ export interface RecordSpanCommandDependencies {
    * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
    * and post-store spool deletion. When absent, spoolRef commands are rejected.
    */
-  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  blobStore?: BlobStore;
 }
 
 function createDefaultDependencies(): RecordSpanCommandDependencies {
   // Lazily require prisma only when defaults are needed (i.e. production path).
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { prisma } = require("~/server/db") as { prisma: import("@prisma/client").PrismaClient };
+  const { prisma } = require("~/server/db") as { prisma: PrismaClient };
   return {
     piiRedactionService: new OtlpSpanPiiRedactionService(),
     costEnrichmentService: new OtlpSpanCostEnrichmentService(
@@ -94,7 +96,7 @@ export class RecordSpanCommand implements CommandHandler<
     "langwatch:trace-processing:record-span",
   );
   private readonly deps: RecordSpanCommandDependencies;
-  private readonly blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  private readonly blobStore?: BlobStore;
 
   /**
    * @param deps - Optional partial of injectable dependencies. Any omitted

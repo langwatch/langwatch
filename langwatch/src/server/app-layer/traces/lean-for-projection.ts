@@ -18,8 +18,9 @@ import {
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  hasOversizedAttribute,
 } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
-import type { OtlpSpan, OtlpResource, OtlpAnyValue } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan, OtlpResource } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -52,46 +53,6 @@ export const IO_ATTR_KEYS = new Set([
  * the `langwatch.reserved.*` namespace are stripped at command-worker ingestion.
  */
 export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
-
-/**
- * Read-only probe: returns true iff some stringValue or bytesValue (recursing into
- * arrayValue/kvlistValue) exceeds maxBytes. Allocates nothing. Mirrors the traversal
- * shape of `capAnyValue` in capOversizedAttributes.ts — changes there must be reflected here.
- *
- * Short-circuits on the first over-limit value found. Never throws.
- */
-function attrValueExceeds(
-  value: OtlpAnyValue | null | undefined,
-  maxBytes: number,
-): boolean {
-  if (value == null || typeof value !== "object") return false;
-
-  if (typeof value.stringValue === "string") {
-    if (Buffer.byteLength(value.stringValue, "utf8") > maxBytes) return true;
-  }
-
-  if (value.bytesValue != null) {
-    const byteSize =
-      value.bytesValue instanceof Uint8Array
-        ? value.bytesValue.byteLength
-        : Buffer.byteLength(String(value.bytesValue), "utf8");
-    if (byteSize > maxBytes) return true;
-  }
-
-  if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
-    for (const item of value.arrayValue.values) {
-      if (attrValueExceeds(item as Parameters<typeof attrValueExceeds>[0], maxBytes)) return true;
-    }
-  }
-
-  if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
-    for (const entry of value.kvlistValue.values as Array<{ value?: Parameters<typeof attrValueExceeds>[0] }>) {
-      if (entry?.value && attrValueExceeds(entry.value, maxBytes)) return true;
-    }
-  }
-
-  return false;
-}
 
 /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
 function utf8Preview(value: string, maxBytes: number): string {
@@ -173,18 +134,11 @@ function leanSpanReceivedEvent(event: Event): Event {
     }
   }
 
-  // Step 2 (scan only): check whether any non-IO attr might need the 256 KB cap.
-  // Uses attrValueExceeds for a precise recursive probe — a small structured attr
-  // (arrayValue/kvlistValue) no longer trips the heavy path unless a nested value
-  // actually exceeds DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES.
-  let needsNonIoCap = false;
-  for (const attr of originalAttributes) {
-    if (IO_ATTR_KEYS.has(attr.key)) continue; // IO attrs are handled separately
-    if (attrValueExceeds(attr.value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)) {
-      needsNonIoCap = true;
-      break;
-    }
-  }
+  // Step 2 (scan only): check whether any surface that capOversizedAttributes walks
+  // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
+  // might need the 256 KB cap. Uses hasOversizedAttribute — the read-only counterpart
+  // colocated with capOversizedAttributes — so the gate covers EVERY surface the action covers.
+  const needsNonIoCap = hasOversizedAttribute(data.span, data.resource ?? null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
 
   if (!hasLargeIoAttr && !needsNonIoCap) {
     // Sub-threshold event — return original, no allocations.

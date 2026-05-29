@@ -554,6 +554,211 @@ describe("given a SpanReceived event where all attributes are under both thresho
   });
 });
 
+// ---------------------------------------------------------------------------
+// Helpers for event/link/resource attribute tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds a SpanReceived event with no span-top-level oversized attributes but
+ * with a >256KB value in `span.events[0].attributes[0]`. No IO attrs involved.
+ */
+function makeSpanReceivedEventWithOversizedEventAttr(): Event {
+  const oversizedValue = "e".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
+  return {
+    ...BASE_EVENT_FIELDS,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+    data: {
+      span: {
+        traceId: "aaaaaaaaaaaaaaaa",
+        spanId: "bbbbbbbbbbbbbbbb",
+        name: "test-span",
+        kind: 1,
+        startTimeUnixNano: "1700000000000000000",
+        endTimeUnixNano: "1700000001000000000",
+        // No oversized value at span top-level — only inside an event attribute
+        attributes: [
+          { key: "custom.small", value: { stringValue: "normal" } },
+        ],
+        events: [
+          {
+            timeUnixNano: "1700000000500000000",
+            name: "exception",
+            attributes: [
+              { key: "exception.message", value: { stringValue: oversizedValue } },
+            ],
+          },
+        ],
+        links: [],
+        status: { code: 1, message: null },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      },
+      resource: null,
+      instrumentationScope: null,
+      piiRedactionLevel: "DISABLED",
+    },
+    metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
+  } as unknown as Event;
+}
+
+/**
+ * Builds a SpanReceived event with no span-top-level or event/link oversized
+ * attributes but with a >256KB value in the resource attributes. No IO attrs.
+ */
+function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
+  const oversizedValue = "r".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
+  return {
+    ...BASE_EVENT_FIELDS,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+    data: {
+      span: {
+        traceId: "aaaaaaaaaaaaaaaa",
+        spanId: "bbbbbbbbbbbbbbbb",
+        name: "test-span",
+        kind: 1,
+        startTimeUnixNano: "1700000000000000000",
+        endTimeUnixNano: "1700000001000000000",
+        // No oversized value at span top-level
+        attributes: [
+          { key: "custom.small", value: { stringValue: "normal" } },
+        ],
+        events: [],
+        links: [],
+        status: { code: 1, message: null },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      },
+      // Oversized value lives ONLY in resource attributes
+      resource: {
+        attributes: [
+          { key: "service.name", value: { stringValue: oversizedValue } },
+        ],
+      },
+      instrumentationScope: null,
+      piiRedactionLevel: "DISABLED",
+    },
+    metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
+  } as unknown as Event;
+}
+
+// ---------------------------------------------------------------------------
+// Regression: event/resource attribute overflow gate was missing (bug fix)
+// ---------------------------------------------------------------------------
+
+/**
+ * @scenario REGRESSION — >256KB value ONLY in span.events[].attributes, nothing oversized at
+ *   span top-level, no large IO attr. Before the fix the Step-2 gate only scanned
+ *   span.attributes, so this span returned the original event un-cloned and the cap
+ *   never fired, letting the oversized blob flow into the projection queue.
+ */
+describe("given a SpanReceived event with a >256KB value only in span.events[0].attributes (not at span top-level, not IO)", () => {
+  describe("when leanForProjection is applied", () => {
+    it("caps the event-attribute value in the lean output (returns a capped placeholder)", () => {
+      const event = makeSpanReceivedEventWithOversizedEventAttr();
+
+      const leaned = leanForProjection(event);
+
+      const leanedData = leaned.data as {
+        span: {
+          events: Array<{
+            attributes: Array<{ key: string; value: { stringValue?: string } }>;
+          }>;
+        };
+      };
+      const leanedEventAttr = leanedData.span.events[0]?.attributes.find(
+        (a) => a.key === "exception.message",
+      );
+
+      expect(leanedEventAttr?.value.stringValue).toMatch(/\[truncated:/);
+    });
+
+    it("leaves the original input event's event-attribute value unchanged (clone safety)", () => {
+      const event = makeSpanReceivedEventWithOversizedEventAttr();
+      const originalData = event.data as {
+        span: {
+          events: Array<{
+            attributes: Array<{ key: string; value: { stringValue?: string } }>;
+          }>;
+        };
+      };
+      const originalValue = originalData.span.events[0]?.attributes.find(
+        (a) => a.key === "exception.message",
+      )?.value.stringValue;
+
+      leanForProjection(event);
+
+      const valueAfter = originalData.span.events[0]?.attributes.find(
+        (a) => a.key === "exception.message",
+      )?.value.stringValue;
+      expect(valueAfter).toBe(originalValue);
+      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+    });
+
+    it("does not attach an eventref for the event attribute (cap, not IO preview)", () => {
+      const event = makeSpanReceivedEventWithOversizedEventAttr();
+
+      const leaned = leanForProjection(event);
+      const leanedData = leaned.data as {
+        span: { attributes: Array<{ key: string; value: { stringValue?: string } }> };
+      };
+      const eventrefKeys = leanedData.span.attributes.filter((a) =>
+        a.key.startsWith(EVENTREF_ATTR_PREFIX),
+      );
+
+      expect(eventrefKeys).toHaveLength(0);
+    });
+  });
+});
+
+/**
+ * @scenario REGRESSION sibling — >256KB value ONLY in resource.attributes, nothing oversized
+ *   at span top-level, no large IO attr.
+ */
+describe("given a SpanReceived event with a >256KB value only in resource.attributes (not at span top-level, not IO)", () => {
+  describe("when leanForProjection is applied", () => {
+    it("caps the resource-attribute value in the lean output (returns a capped placeholder)", () => {
+      const event = makeSpanReceivedEventWithOversizedResourceAttr();
+
+      const leaned = leanForProjection(event);
+
+      const leanedData = leaned.data as {
+        resource: {
+          attributes: Array<{ key: string; value: { stringValue?: string } }>;
+        };
+      };
+      const leanedResourceAttr = leanedData.resource?.attributes.find(
+        (a) => a.key === "service.name",
+      );
+
+      expect(leanedResourceAttr?.value.stringValue).toMatch(/\[truncated:/);
+    });
+
+    it("leaves the original input event's resource-attribute value unchanged (clone safety)", () => {
+      const event = makeSpanReceivedEventWithOversizedResourceAttr();
+      const originalData = event.data as {
+        resource: {
+          attributes: Array<{ key: string; value: { stringValue?: string } }>;
+        };
+      };
+      const originalValue = originalData.resource?.attributes.find(
+        (a) => a.key === "service.name",
+      )?.value.stringValue;
+
+      leanForProjection(event);
+
+      const valueAfter = originalData.resource?.attributes.find(
+        (a) => a.key === "service.name",
+      )?.value.stringValue;
+      expect(valueAfter).toBe(originalValue);
+      expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+    });
+  });
+});
+
 /**
  * @scenario small structured non-IO attr — must not trigger clone (hot-path guard)
  *

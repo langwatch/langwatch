@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../schemas/otlp";
+import type { OtlpResource, OtlpSpan } from "../../schemas/otlp";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  hasOversizedAttribute,
+  valueExceeds,
 } from "../capOversizedAttributes";
 
 function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
@@ -152,5 +154,261 @@ describe("capOversizedAttributes", () => {
     ]);
 
     expect(() => capOversizedAttributes(span, null)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// valueExceeds
+// ---------------------------------------------------------------------------
+
+describe("valueExceeds", () => {
+  describe("given a stringValue", () => {
+    describe("when the string exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = { stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+      });
+    });
+
+    describe("when the string is exactly at the limit", () => {
+      it("returns false", () => {
+        const value = { stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES) };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      });
+    });
+
+    describe("when the string is small", () => {
+      it("returns false", () => {
+        const value = { stringValue: "hello" };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      });
+    });
+  });
+
+  describe("given a bytesValue", () => {
+    describe("when the Uint8Array exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = { bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+      });
+    });
+
+    describe("when the Uint8Array is exactly at the limit", () => {
+      it("returns false", () => {
+        const value = { bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES) };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      });
+    });
+  });
+
+  describe("given a value nested inside arrayValue", () => {
+    describe("when a nested stringValue exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          arrayValue: {
+            values: [
+              { stringValue: "small" },
+              { stringValue: "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) },
+            ],
+          },
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+      });
+    });
+
+    describe("when all nested stringValues are small", () => {
+      it("returns false", () => {
+        const value = {
+          arrayValue: {
+            values: [
+              { stringValue: "a" },
+              { stringValue: "b" },
+            ],
+          },
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      });
+    });
+  });
+
+  describe("given a value nested inside kvlistValue", () => {
+    describe("when a nested entry value exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          kvlistValue: {
+            values: [
+              { key: "small", value: { stringValue: "ok" } },
+              { key: "big", value: { stringValue: "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1) } },
+            ],
+          },
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+      });
+    });
+
+    describe("when all nested entry values are small", () => {
+      it("returns false", () => {
+        const value = {
+          kvlistValue: {
+            values: [
+              { key: "a", value: { stringValue: "alpha" } },
+              { key: "b", value: { stringValue: "beta" } },
+            ],
+          },
+        };
+        expect(valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      });
+    });
+  });
+
+  describe("given null or undefined", () => {
+    it("returns false for null", () => {
+      expect(valueExceeds(null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+    });
+
+    it("returns false for undefined", () => {
+      expect(valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasOversizedAttribute
+// ---------------------------------------------------------------------------
+
+describe("hasOversizedAttribute", () => {
+  const big = "b".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+  const small = "small";
+
+  describe("given a span with all small attributes and no resource", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns false", () => {
+        const span = makeSpan([
+          { key: "custom.attr", value: { stringValue: small } },
+        ]);
+        expect(hasOversizedAttribute(span, null)).toBe(false);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value in span.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([
+          { key: "custom.attr", value: { stringValue: big } },
+        ]);
+        expect(hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value only in span.events[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.events = [
+          {
+            timeUnixNano: { low: 0, high: 0 },
+            name: "evt",
+            attributes: [{ key: "event.attr", value: { stringValue: big } }],
+          },
+        ] as unknown as OtlpSpan["events"];
+
+        expect(hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value only in span.links[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.links = [
+          {
+            traceId: "t",
+            spanId: "s",
+            attributes: [{ key: "link.attr", value: { stringValue: big } }],
+            droppedAttributesCount: 0,
+          },
+        ] as unknown as OtlpSpan["links"];
+
+        expect(hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with all small span attributes but an oversized value in resource.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([
+          { key: "custom.small", value: { stringValue: small } },
+        ]);
+        const resource: OtlpResource = {
+          attributes: [{ key: "service.name", value: { stringValue: big } }],
+        } as unknown as OtlpResource;
+
+        expect(hasOversizedAttribute(span, resource)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value nested inside an arrayValue in span.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([
+          {
+            key: "nested.attr",
+            value: {
+              arrayValue: {
+                values: [
+                  { stringValue: "small" },
+                  { stringValue: big },
+                ],
+              },
+            },
+          },
+        ]);
+
+        expect(hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value nested inside a kvlistValue in span.events[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.events = [
+          {
+            timeUnixNano: { low: 0, high: 0 },
+            name: "evt",
+            attributes: [
+              {
+                key: "nested.kv",
+                value: {
+                  kvlistValue: {
+                    values: [
+                      { key: "inner", value: { stringValue: big } },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ] as unknown as OtlpSpan["events"];
+
+        expect(hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given null as resource", () => {
+    describe("when hasOversizedAttribute is called with all-small span", () => {
+      it("returns false without throwing", () => {
+        const span = makeSpan([{ key: "a", value: { stringValue: "x" } }]);
+        expect(() => hasOversizedAttribute(span, null)).not.toThrow();
+        expect(hasOversizedAttribute(span, null)).toBe(false);
+      });
+    });
   });
 });

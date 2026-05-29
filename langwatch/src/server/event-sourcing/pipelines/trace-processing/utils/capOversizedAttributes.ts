@@ -140,6 +140,102 @@ function capAttributeList(attributes: AttributeList, maxBytes: number): number {
   return count;
 }
 
+// ---------------------------------------------------------------------------
+// Read-only probe pair
+// ---------------------------------------------------------------------------
+// NOTE: `valueExceeds` and `hasOversizedAttribute` below form a read-only
+// probe pair whose traversal MUST stay identical to `capAnyValue` /
+// `capOversizedAttributes` above. Colocating them here makes that trivially
+// enforceable — any change to the mutating pair should be mirrored in the
+// probe pair, and vice versa.
+
+/**
+ * Read-only recursive size probe. Returns true iff any `stringValue` or
+ * `bytesValue` in `value` (or nested inside `arrayValue`/`kvlistValue`)
+ * exceeds `maxBytes`. Allocates nothing, never throws, short-circuits on the
+ * first over-limit value.
+ *
+ * Mirrors the traversal shape of `capAnyValue` exactly.
+ */
+export function valueExceeds(
+  value: OtlpAnyValue | null | undefined,
+  maxBytes: number,
+): boolean {
+  if (value == null || typeof value !== "object") return false;
+
+  if (typeof value.stringValue === "string") {
+    if (Buffer.byteLength(value.stringValue, "utf8") > maxBytes) return true;
+  }
+
+  if (value.bytesValue != null) {
+    const byteSize =
+      value.bytesValue instanceof Uint8Array
+        ? value.bytesValue.byteLength
+        : Buffer.byteLength(String(value.bytesValue), "utf8");
+    if (byteSize > maxBytes) return true;
+  }
+
+  if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
+    for (const item of value.arrayValue.values) {
+      if (valueExceeds(item, maxBytes)) return true;
+    }
+  }
+
+  if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
+    for (const entry of value.kvlistValue.values) {
+      if (entry?.value && valueExceeds(entry.value, maxBytes)) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Returns true iff any attribute value exceeds `maxBytes` across the SAME
+ * surfaces that `capOversizedAttributes` walks: `span.attributes`,
+ * `span.events[].attributes`, `span.links[].attributes`, and
+ * `resource?.attributes`.
+ *
+ * Use as the gate before a structuredClone / `capOversizedAttributes` call.
+ * Never throws (mirrors `capOversizedAttributes`' defensive try/catch).
+ * Short-circuits on the first over-limit value.
+ */
+export function hasOversizedAttribute(
+  span: OtlpSpan,
+  resource: OtlpResource | null,
+  maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+): boolean {
+  try {
+    if (Array.isArray(span.attributes)) {
+      for (const attr of span.attributes) {
+        if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
+      }
+    }
+    for (const event of span.events ?? []) {
+      if (Array.isArray(event.attributes)) {
+        for (const attr of event.attributes) {
+          if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
+        }
+      }
+    }
+    for (const link of span.links ?? []) {
+      if (Array.isArray(link.attributes)) {
+        for (const attr of link.attributes) {
+          if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
+        }
+      }
+    }
+    if (resource && Array.isArray(resource.attributes)) {
+      for (const attr of resource.attributes) {
+        if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /**
  * Walks a span (and its events, links, and the shared resource) and replaces
  * any attribute value over `maxBytes` with a short placeholder, in place.
