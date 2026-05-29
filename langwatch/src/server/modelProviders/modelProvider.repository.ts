@@ -2,6 +2,7 @@ import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@p
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
+import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
 
@@ -186,12 +187,20 @@ export class ModelProviderRepository {
         ? data.scopes
         : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
 
+    // Single-organization anchor (ADR-021): every scope resolves to the same
+    // org, so the page-context project's org is authoritative.
+    const organizationId = await resolveOrganizationForScope(client, {
+      scopeType: "PROJECT",
+      scopeId: data.projectId,
+    });
+
     return client.modelProvider.create({
       data: {
         id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
+        organizationId: organizationId ?? undefined,
         customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
         customModels: data.customModels as Prisma.InputJsonValue | undefined,
         customEmbeddingsModels: data.customEmbeddingsModels as

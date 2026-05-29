@@ -300,15 +300,18 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires a row id or scope predicate in the where clause";
+        return "requires a row id, organizationId, or scope predicate in the where clause";
       }
       const ok = validateRecursive(
         where,
-        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires a row id or scope predicate in the where clause";
+        : "requires a row id, organizationId, or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -456,12 +459,17 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id or scope predicate";
+      if (!where) return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
-        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
-      return ok ? null : "requires a row id or scope predicate";
+      return ok
+        ? null
+        : "requires a row id, organizationId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];

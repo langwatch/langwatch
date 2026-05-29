@@ -845,8 +845,15 @@ model ModelProvider {
   updatedAt              DateTime @default(now()) @updatedAt
   scopes                 ModelProviderScope[]
 
+  // Single-organization tenancy anchor (ADR-021). Every scope of a given
+  // provider resolves to the same organization, so this column is that org.
+  // Nullable for one release while the production backfill is verified; set
+  // NOT NULL in a follow-up migration.
+  organizationId         String?
+
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
+  @@index([organizationId])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -918,6 +925,13 @@ model ModelDefaultConfig {
     createdAt DateTime                  @default(now())
     updatedAt DateTime                  @updatedAt
     scopes    ModelDefaultConfigScope[]
+
+    // Single-organization tenancy anchor (ADR-021). Every scope a config
+    // attaches to resolves to the same organization. Nullable for one release
+    // while the production backfill is verified; set NOT NULL in a follow-up.
+    organizationId String?
+
+    @@index([organizationId])
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).

@@ -5,6 +5,7 @@ import safe from "safe-regex2";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
+import { resolveOrganizationForScope as resolveOrganizationForScopeOrNull } from "~/server/scopes/resolveOrganizationForScope";
 import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
@@ -22,34 +23,17 @@ async function resolveOrganizationForScope(
   scopeType: ScopeTier,
   scopeId: string,
 ): Promise<string> {
-  if (scopeType === "ORGANIZATION") {
-    const org = await client.organization.findUnique({
-      where: { id: scopeId },
-      select: { id: true },
-    });
-    if (!org) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found." });
-    }
-    return org.id;
-  }
-  if (scopeType === "TEAM") {
-    const team = await client.team.findUnique({
-      where: { id: scopeId },
-      select: { organizationId: true },
-    });
-    if (!team) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
-    }
-    return team.organizationId;
-  }
-  const project = await client.project.findUnique({
-    where: { id: scopeId },
-    select: { team: { select: { organizationId: true } } },
+  const organizationId = await resolveOrganizationForScopeOrNull(client, {
+    scopeType,
+    scopeId,
   });
-  if (!project) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Scope target not found.",
+    });
   }
-  return project.team.organizationId;
+  return organizationId;
 }
 
 export const llmModelCostsRouter = createTRPCRouter({

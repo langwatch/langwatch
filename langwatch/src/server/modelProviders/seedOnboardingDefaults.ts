@@ -1,5 +1,6 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
+import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
 import { llmModels } from "./loadModelCatalog";
 
 interface RegistryEntry {
@@ -131,10 +132,18 @@ export async function seedOnboardingDefaultsForProvider(params: {
   });
   if (existing) return;
 
+  // Single-organization anchor (ADR-021): resolve the org the seeded scope
+  // belongs to so the row is tenancy-anchored from creation.
+  const organizationId = await resolveOrganizationForScope(prisma, {
+    scopeType,
+    scopeId,
+  });
+
   await prisma.modelDefaultConfig.create({
     data: {
       config,
       authorId: authorId ?? null,
+      organizationId: organizationId ?? undefined,
       scopes: {
         create: [{ scopeType, scopeId }],
       },

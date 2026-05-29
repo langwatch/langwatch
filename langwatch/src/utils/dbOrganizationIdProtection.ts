@@ -123,9 +123,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
 export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // Governed by guardProjectId's SCOPED_MODELS instead: these are accessed by
   // (scopeType, scopeId) / hashedSecret / projectId predicates the org guard
-  // would reject. Their tenancy is enforced one layer up.
+  // would reject. They carry an organizationId anchor (the single-org backstop
+  // and a valid bound for direct admin queries), but their primary access path
+  // is the scope predicate, so tenancy is enforced one layer up.
   "VirtualKey",
   "CustomLLMModelCost",
+  "ModelProvider",
+  "ModelDefaultConfig",
   // organizationId is NULLABLE here (NULL = platform-published default), so a
   // mandatory-organizationId guard cannot apply.
   "IngestionTemplate",
