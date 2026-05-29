@@ -35,7 +35,7 @@ export type WorkspaceSwitcherEntry =
       subtitle?: string;
       /**
        * Whether the current user may create a project in this team (org or
-       * team admin). Drives the per-team "+ New project" affordance — viewers
+       * team admin). Drives the per-team "Create project" affordance — viewers
        * never see it. Defaults to false when omitted.
        */
       canCreateProject?: boolean;
@@ -82,7 +82,7 @@ export type WorkspaceSwitcherProps = {
    */
   current?: WorkspaceSwitcherCurrent;
   /**
-   * Invoked when the user clicks a team row's "+ New project" button. The
+   * Invoked when the user clicks a team row's "Create project" button. The
    * consumer opens the create-project drawer scoped to that team. The button
    * only renders for teams whose `canCreateProject` is true and only when
    * this callback is provided.
@@ -303,9 +303,9 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                             }}
                           />
                           {team.canCreateProject && onCreateProjectForTeam && (
-                            <Tooltip content="New project in this team">
+                            <Tooltip content="Create project">
                               <IconButton
-                                aria-label={`New project in ${team.label}`}
+                                aria-label={`Create project in ${team.label}`}
                                 size="xs"
                                 variant="ghost"
                                 position="absolute"

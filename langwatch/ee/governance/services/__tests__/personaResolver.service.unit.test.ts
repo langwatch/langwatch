@@ -26,6 +26,10 @@ const baseInput: PersonaResolverInput = {
   hasApplicationTraces: false,
   hasOrganizationManagePermission: false,
   isEnterprise: false,
+  // The persona 1/2/4 destinations (/me, /governance) only exist for orgs
+  // with the governance UI flag; default the fixture to enabled so those
+  // matrices read cleanly. The gate is exercised explicitly below.
+  hasGovernanceUi: true,
   firstProjectSlug: null,
 };
 
@@ -141,6 +145,49 @@ describe("resolvePersonaHome", () => {
       expect(result.isOverride).toBe(true);
       // Persona is still detected even when overridden
       expect(result.persona).toBe("mixed");
+    });
+  });
+
+  describe("when the org does not have the governance UI flag", () => {
+    it("routes a personal-VK customer to the project home instead of /me", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      // Persona is still detected (mixed: personal VK + project), but /me is
+      // flag-gated and 404s, so the destination falls back to the project
+      // home — this is the impersonated-customer case.
+      expect(result.persona).toBe("mixed");
+      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.governanceUiEnabled).toBe(false);
+    });
+
+    it("does NOT route a would-be governance admin to /governance", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        hasOrganizationManagePermission: true,
+        isEnterprise: true,
+        setupState: { ...baseInput.setupState, hasIngestionSources: true },
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).not.toBe("/governance");
+    });
+
+    it("still honors an explicit user pin even when the flag is off", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        userLastHomePath: "/me",
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      // A pin can only have been set while the surface was reachable; keep it.
+      expect(result.destination).toBe("/me");
+      expect(result.isOverride).toBe(true);
     });
   });
 

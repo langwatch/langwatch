@@ -148,7 +148,7 @@ describe("WorkspaceSwitcher", () => {
   });
 
   describe("given a team the user can create projects in", () => {
-    /** @scenario The dropdown shows a per-team "+ New project" button (admin-only) */
+    /** @scenario The dropdown shows a per-team "Create project" button (admin-only) */
     it("renders a + button that opens the create-project drawer scoped to that team", async () => {
       const user = userEvent.setup();
       const onCreateProjectForTeam = vi.fn();
@@ -164,7 +164,7 @@ describe("WorkspaceSwitcher", () => {
         screen.getByRole("button", { name: /switch workspace/i }),
       );
       const addButton = await screen.findByRole("button", {
-        name: /new project in acme engineering/i,
+        name: /create project in acme engineering/i,
       });
       await user.click(addButton);
 
@@ -174,7 +174,7 @@ describe("WorkspaceSwitcher", () => {
       });
     });
 
-    /** @scenario The "+ New project" button is suppressed for non-admin members */
+    /** @scenario The "Create project" button is suppressed for non-admin members */
     it("hides the + button when the user cannot create projects in the team", async () => {
       const user = userEvent.setup();
       renderSwitcher({
@@ -190,7 +190,7 @@ describe("WorkspaceSwitcher", () => {
       );
       expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /new project in/i }),
+        screen.queryByRole("button", { name: /create project in/i }),
       ).not.toBeInTheDocument();
     });
   });

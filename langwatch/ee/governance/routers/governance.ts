@@ -23,6 +23,7 @@ import {
   type PersonaResolution,
 } from "@ee/governance/services/personaResolver.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
@@ -89,35 +90,51 @@ export const governanceRouter = createTRPCRouter({
       const setupService = GovernanceSetupStateService.create(ctx.prisma);
       const usageService = UsageStatsService.create(ctx.prisma);
 
-      const [setupState, firstProject, isEnterprise, hasManage, userPin] =
-        await Promise.all([
-          // hasApplicationTraces is part of setupState as of 9d2688c84.
-          setupService.resolve(input.organizationId),
-          ctx.prisma.project.findFirst({
-            where: {
-              team: {
-                organizationId: input.organizationId,
-                members: { some: { userId } },
-              },
-              archivedAt: null,
+      const [
+        setupState,
+        firstProject,
+        isEnterprise,
+        hasManage,
+        userPin,
+        hasGovernanceUi,
+      ] = await Promise.all([
+        // hasApplicationTraces is part of setupState as of 9d2688c84.
+        setupService.resolve(input.organizationId),
+        ctx.prisma.project.findFirst({
+          where: {
+            team: {
+              organizationId: input.organizationId,
+              members: { some: { userId } },
             },
-            orderBy: { createdAt: "asc" },
-            select: { slug: true },
-          }),
-          usageService
-            .getUsageStats(input.organizationId, ctx.session.user)
-            .then((u) => u?.activePlan?.type === "ENTERPRISE")
-            .catch(() => false),
-          hasOrganizationPermission(
-            ctx,
-            input.organizationId,
-            "organization:manage",
-          ),
-          ctx.prisma.user.findUnique({
-            where: { id: userId },
-            select: { lastHomePath: true },
-          }),
-        ]);
+            archivedAt: null,
+          },
+          orderBy: { createdAt: "asc" },
+          select: { slug: true },
+        }),
+        usageService
+          .getUsageStats(input.organizationId, ctx.session.user)
+          .then((u) => u?.activePlan?.type === "ENTERPRISE")
+          .catch(() => false),
+        hasOrganizationPermission(
+          ctx,
+          input.organizationId,
+          "organization:manage",
+        ),
+        ctx.prisma.user.findUnique({
+          where: { id: userId },
+          select: { lastHomePath: true },
+        }),
+        // `/me` and `/governance` are gated behind this flag; without it both
+        // 404. Gate the auto-detected destination on it so a non-governance
+        // org (e.g. a customer being impersonated) never lands on /me.
+        featureFlagService
+          .isEnabled("release_ui_ai_governance_enabled", {
+            distinctId: userId,
+            defaultValue: false,
+            organizationId: input.organizationId,
+          })
+          .catch(() => false),
+      ]);
 
       return resolvePersonaHomeSafe({
         userLastHomePath: userPin?.lastHomePath ?? null,
@@ -129,6 +146,7 @@ export const governanceRouter = createTRPCRouter({
         hasApplicationTraces: setupState.hasApplicationTraces,
         hasOrganizationManagePermission: hasManage,
         isEnterprise,
+        hasGovernanceUi,
         firstProjectSlug: firstProject?.slug ?? null,
       });
     }),

@@ -13,7 +13,7 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, UserCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
@@ -224,6 +224,7 @@ export function ImpersonateDialog({
 }) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+  const reasonRef = useRef<HTMLInputElement>(null);
 
   // Re-seed the reason on every new target user — prevents leaking one
   // reason across multiple impersonation attempts.
@@ -266,6 +267,7 @@ export function ImpersonateDialog({
   return (
     <Dialog.Root
       open={!!user}
+      initialFocusEl={() => reasonRef.current}
       onOpenChange={({ open }) => {
         if (!open && !loading) onClose();
       }}
@@ -287,6 +289,7 @@ export function ImpersonateDialog({
             <Field.Root required>
               <Field.Label>Reason</Field.Label>
               <Input
+                ref={reasonRef}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 onKeyDown={(e) => {

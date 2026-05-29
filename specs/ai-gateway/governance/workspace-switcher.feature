@@ -262,20 +262,20 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
         own redirect logic)
 
   @bdd @ui @workspace-switcher @add-project @stage-2c @integration
-  Scenario: The dropdown shows a per-team "+ New project" button (admin-only)
+  Scenario: The dropdown shows a per-team "Create project" button (admin-only)
     Given the user is an organization admin OR a team admin on team T
     When the user opens the switcher
-    Then within team T's "Projects" group there is a "+ New project" entry
+    Then within team T's "Projects" group there is a "Create project" entry
     And clicking it opens the existing CreateProject drawer
         (`useDrawer().openDrawer("createProject", ...)`)
     And the user's org-membership / team-membership filters apply (a
-        viewer-only member on team T sees no "+ New project" entry there)
+        viewer-only member on team T sees no "Create project" entry there)
 
   @bdd @ui @workspace-switcher @add-project @stage-2c @integration
-  Scenario: The "+ New project" button is suppressed for non-admin members
+  Scenario: The "Create project" button is suppressed for non-admin members
     Given the user is a regular member (not admin) on team T
     When the user opens the switcher
-    Then no "+ New project" entry is rendered in team T's group
+    Then no "Create project" entry is rendered in team T's group
         (non-admins cannot create projects from this UI)
 
   @bdd @ui @workspace-switcher @persistence @stage-2c
