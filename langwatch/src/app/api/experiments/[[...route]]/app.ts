@@ -93,9 +93,12 @@ const secured = createProjectApp({
   family: "experiments",
 });
 
-// Listing experiments is an evaluations read — mirror the evaluations:view
-// ceiling the sibling run-inspection routes (GET /runs, /runs/:runId) enforce.
-secured.access(requires("evaluations:view")).get(
+// Mirror the canonical experiments-list permission: the tRPC procedures that
+// return this same project-scoped experiment list (experimentRouter
+// getAllByProjectId / getAllForEvaluationsList) both gate on workflows:view.
+// Using a different permission here would 403 a role that can already read the
+// same list through the canonical path.
+secured.access(requires("workflows:view")).get(
   "/",
   describeRoute({
     description:

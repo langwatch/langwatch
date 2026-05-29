@@ -42,6 +42,7 @@ let orgB: Organization;
 let projectB1: Project;
 let adminTokenA: string;
 let readOnlyTokenA: string; // CUSTOM role, only traces:view
+let workflowsViewerTokenA: string; // CUSTOM role, only workflows:view
 let adminTokenB: string;
 
 async function makeOrgWithProject(label: string) {
@@ -133,6 +134,19 @@ beforeAll(async () => {
   });
   readOnlyTokenA = readOnly.token;
 
+  const workflowsViewer = await apiKeyService.create({
+    name: `workflows-viewer-${ns}`,
+    userId: userA.id,
+    createdByUserId: userA.id,
+    organizationId: orgA.id,
+    permissionMode: "restricted",
+    permissions: ["workflows:view"], // can view experiments list, but NOT evaluations:view
+    bindings: [
+      { role: TeamUserRole.CUSTOM, scopeType: "PROJECT", scopeId: projectA1.id },
+    ],
+  });
+  workflowsViewerTokenA = workflowsViewer.token;
+
   const adminB = await apiKeyService.create({
     name: `adminB-${ns}`,
     userId: userB.id,
@@ -186,7 +200,7 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
       expect(res.status).toBe(403);
     });
 
-    it("forbids GET /api/experiments (requires evaluations:view)", async () => {
+    it("forbids GET /api/experiments (requires workflows:view)", async () => {
       const res = await experimentsApp.request("/api/experiments", {
         headers: headers(readOnlyTokenA, projectA1.id),
       });
@@ -238,6 +252,18 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
     it("passes the gate on GET /api/model-defaults (not 401/403)", async () => {
       const res = await modelDefaultsApp.request("/api/model-defaults", {
         headers: headers(adminTokenA, projectA1.id),
+      });
+      expect(res.status).not.toBe(401);
+      expect(res.status).not.toBe(403);
+    });
+
+    // Guards against a permission regression: GET /api/experiments mirrors the
+    // canonical tRPC experiments-list procedures (workflows:view). A key that
+    // can view workflows but lacks evaluations:view must still list experiments
+    // — gating on the wrong permission would 403 it.
+    it("lets a workflows:view-only key list experiments (not 403)", async () => {
+      const res = await experimentsApp.request("/api/experiments", {
+        headers: headers(workflowsViewerTokenA, projectA1.id),
       });
       expect(res.status).not.toBe(401);
       expect(res.status).not.toBe(403);

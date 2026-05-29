@@ -63,7 +63,7 @@ makes the permission a mandatory, compile-time-checked argument:
 | `GET /api/model-providers` | `project:view` |
 | `PUT /api/model-providers/:provider` | `project:update` |
 | `POST /api/analytics/timeseries` | `analytics:view` |
-| `GET /api/experiments` | `evaluations:view` |
+| `GET /api/experiments` | `workflows:view` |
 | `GET /api/model-defaults` | `project:view` |
 | `POST /api/copilotkit` | `prompts:view` |
 
