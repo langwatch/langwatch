@@ -80,6 +80,65 @@ function buildPrismaMock({
   return { prisma, updatedConfigs };
 }
 
+/**
+ * Builds a DSL where the entry node has a real `data.outputs` declaration, and
+ * only the identifiers listed in `wiredIdentifiers` have downstream edges.
+ * Any identifier declared in `entryOutputs` but absent from `wiredIdentifiers`
+ * is "unwired" — it is a declared output with no edge, which is the scenario
+ * that triggers bug #3362.
+ */
+function buildUnwiredDSL({
+  entryOutputs,
+  wiredIdentifiers,
+  output,
+}: {
+  entryOutputs: Array<{ identifier: string; type: "str" }>;
+  wiredIdentifiers: string[];
+  output: string;
+}) {
+  const wiredSet = new Set(wiredIdentifiers);
+
+  const edges = entryOutputs
+    .filter((o) => wiredSet.has(o.identifier))
+    .map((o, i) => ({
+      id: `e-entry-${i}`,
+      source: "entry",
+      sourceHandle: `outputs.${o.identifier}`,
+      target: "llm_call",
+      targetHandle: `inputs.${o.identifier}`,
+      type: "default",
+    }));
+
+  const nodes = [
+    {
+      id: "entry",
+      type: "entry",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Entry",
+        outputs: entryOutputs,
+      },
+    },
+    {
+      id: "llm_call",
+      type: "llm",
+      position: { x: 400, y: 0 },
+      data: { name: "LLM Call" },
+    },
+    {
+      id: "end",
+      type: "end",
+      position: { x: 800, y: 0 },
+      data: {
+        name: "End",
+        inputs: [{ identifier: output, type: "str" }],
+      },
+    },
+  ];
+
+  return { nodes, edges };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -471,6 +530,63 @@ describe("autoComputeAgentMappings", () => {
           dsl,
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the entry node declares a field with no downstream edge (unwired)", () => {
+    /** @scenario Auto-compute on workflow save includes an unwired entry field in scenarioMappings */
+    it("includes the unwired field in the auto-computed scenarioMappings", async () => {
+      // Entry node declares "new_field" but no downstream edge exists for it.
+      const dsl = buildUnwiredDSL({
+        entryOutputs: [{ identifier: "new_field", type: "str" }],
+        wiredIdentifiers: [],
+        output: "response",
+      });
+      const { prisma, updatedConfigs } = buildPrismaMock({
+        agents: [{ id: "agent-1", config: { type: "workflow" } }],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      const config = updatedConfigs["agent-1"];
+      expect(config).toBeDefined();
+      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      // Bug #3362: unwired entry outputs are dropped from auto-computed mappings.
+      // After the fix, "new_field" must appear with a best-match default.
+      expect(mappings["new_field"]).toBeDefined();
+    });
+  });
+
+  describe("when the entry node declares a wired field (regression baseline)", () => {
+    /** @scenario Wired entry field still appears in auto-computed scenarioMappings */
+    it("includes the wired field in the auto-computed scenarioMappings", async () => {
+      // Entry node declares "query" and it IS wired to an LLM node downstream.
+      const dsl = buildUnwiredDSL({
+        entryOutputs: [{ identifier: "query", type: "str" }],
+        wiredIdentifiers: ["query"],
+        output: "response",
+      });
+      const { prisma, updatedConfigs } = buildPrismaMock({
+        agents: [{ id: "agent-1", config: { type: "workflow" } }],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      const config = updatedConfigs["agent-1"];
+      expect(config).toBeDefined();
+      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      // Regression: wired entry fields must always appear in scenarioMappings.
+      expect(mappings["query"]).toBeDefined();
     });
   });
 });
