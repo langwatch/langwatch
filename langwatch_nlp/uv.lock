@@ -1814,7 +1814,7 @@ dev = [{ name = "ipykernel", specifier = ">=6.29.4" }]
 
 [[package]]
 name = "langwatch"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -1874,7 +1874,7 @@ provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 [package.metadata.requires-dev]
 dev = [{ name = "black", specifier = ">=26.3.1" }]
 examples = [
-    { name = "anthropic", specifier = ">=0.36.0,<0.37.0" },
+    { name = "anthropic", specifier = ">=0.105.2,<0.106.0" },
     { name = "chainlit", specifier = ">=2.11.1,<3" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "dspy-ai", specifier = ">=3.0.3,<4" },
@@ -1898,7 +1898,7 @@ examples = [
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.62b1" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.0" },
