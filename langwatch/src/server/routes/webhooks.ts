@@ -18,7 +18,7 @@ import {
 
 const secured = createServiceApp({ basePath: "/api/webhooks" });
 
-secured.access(internalSecret("auth0 SCIM webhook signature verified in-handler")).post("/auth0-scim", async (c) => {
+secured.access(internalSecret("auth0 SCIM webhook shared secret compared against the Authorization header in-handler")).post("/auth0-scim", async (c) => {
   const secret = env.AUTH0_SCIM_WEBHOOK_SECRET;
   if (!secret) {
     return c.json({ error: "Webhook not configured" }, { status: 404 });

@@ -65,6 +65,12 @@ export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
    * through `app.on("HEAD", ...)`; the call signature mirrors `.get`.
    */
   head: Hono<E>["get"];
+  /**
+   * Register an any-method route (Hono `app.all`), recorded in the registry
+   * with method "ALL". Reserve for genuine multi-method endpoints such as
+   * URL-rewrite shims; prefer a specific verb otherwise.
+   */
+  all: Hono<E>["all"];
 };
 
 /**
@@ -109,7 +115,7 @@ export class SecuredApp<E extends Env> {
         ? []
         : this.strategy.chainFor(policy);
 
-    const bind = (method: HttpVerb | "head") => {
+    const bind = (method: HttpVerb | "head" | "all") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
         registerRoutePolicy({
           method: method.toUpperCase(),
@@ -144,6 +150,7 @@ export class SecuredApp<E extends Env> {
       patch: bind("patch"),
       delete: bind("delete"),
       head: bind("head"),
+      all: bind("all"),
     };
   }
 

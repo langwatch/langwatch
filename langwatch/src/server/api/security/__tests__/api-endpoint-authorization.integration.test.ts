@@ -18,17 +18,22 @@ import { describe, expect, it } from "vitest";
 import { allRegisteredRoutes } from "../route-registry";
 
 /**
- * Concrete HTTP-method endpoints mounted in the composed router. Method "ALL"
- * entries are app-level middleware (`.use`) and sub-app mounts (`.route`) and
- * the two legacy OAuth-callback rewrite shims — not data endpoints — so they
- * are excluded from the per-route policy guarantee by construction.
+ * Endpoints mounted in the composed router. The only entries excluded are
+ * method-"ALL" routes whose path is a wildcard: those are app-level middleware
+ * (`.use`, registered at `/base/*`) and sub-app mounts / `.all("/*")` shims —
+ * not addressable endpoints. Everything else is audited, INCLUDING:
+ *   - concrete-path `app.all(...)` routes (Hono registers these with method
+ *     "ALL"; they are real, reachable, any-method endpoints), and
+ *   - specific-method wildcard catch-alls (e.g. GET /api/sse/*, /api/trpc/*),
+ * so neither a `.all()` data route nor a catch-all can slip past the guarantee.
  */
 const liveEndpoints = async (): Promise<Set<string>> => {
   const { createApiRouter } = await import("~/server/api-router");
   const router = createApiRouter();
   const set = new Set<string>();
   for (const r of (router as unknown as { routes: { method: string; path: string }[] }).routes) {
-    if (r.method.toUpperCase() === "ALL") continue;
+    const isMiddlewareOrMount = r.method.toUpperCase() === "ALL" && r.path.includes("*");
+    if (isMiddlewareOrMount) continue;
     set.add(`${r.method.toUpperCase()} ${r.path}`);
   }
   return set;

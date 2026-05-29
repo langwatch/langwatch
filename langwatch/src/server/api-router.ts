@@ -2,7 +2,9 @@
  * Unified Hono API router — all /api/* routes mounted here.
  * Each sub-app sets its own basePath (e.g. "/api/traces").
  */
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+
+import { createServiceApp, publicEndpoint } from "~/server/api/security";
 
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
@@ -60,17 +62,33 @@ import { app as trpcApp } from "./routes/trpc";
 export function createApiRouter() {
   const api = new Hono();
 
-  // Legacy OAuth callback rewrites — customer IdPs registered with old URLs
-  api.all("/api/auth/callback/auth0", (c) => {
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/oauth2/callback/auth0";
-    return api.fetch(new Request(url.toString(), c.req.raw));
+  // Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
+  // These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
+  // (handled by authApp), so they carry a public policy and are registered
+  // through the builder rather than raw Hono.
+  const legacyOAuthCallbacks = createServiceApp({
+    basePath: "/api/auth/callback",
   });
-  api.all("/api/auth/callback/okta", (c) => {
+  const rewriteCallback = (provider: string) => (c: Context) => {
     const url = new URL(c.req.url);
-    url.pathname = "/api/auth/oauth2/callback/okta";
+    url.pathname = `/api/auth/oauth2/callback/${provider}`;
     return api.fetch(new Request(url.toString(), c.req.raw));
-  });
+  };
+  legacyOAuthCallbacks
+    .access(
+      publicEndpoint(
+        "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
+      ),
+    )
+    .all("/auth0", rewriteCallback("auth0"));
+  legacyOAuthCallbacks
+    .access(
+      publicEndpoint(
+        "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
+      ),
+    )
+    .all("/okta", rewriteCallback("okta"));
+  api.route("/", legacyOAuthCallbacks.hono);
 
   // ORDERING: specific paths before catch-all siblings with same basePath
   api.route("/", datasetGenerateApp);    // /api/dataset/generate (before datasetApp's /:slugOrId)
