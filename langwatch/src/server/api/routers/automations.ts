@@ -1,13 +1,15 @@
-import { AlertType, TriggerAction } from "@prisma/client";
+import { AlertType, type PrismaClient, TriggerAction } from "@prisma/client";
 import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
+import { generate as ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
 import {
+  type DraftProject,
   TemplateValidationError,
   TestFireUnavailableError,
-  TriggerNotFoundError,
+  validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
@@ -19,18 +21,34 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
-const templatePatchSchema = z.object({
+const templateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),
   slackTemplate: z.string().nullable().optional(),
   emailSubjectTemplate: z.string().nullable().optional(),
   emailBodyTemplate: z.string().nullable().optional(),
 });
 
+const triggerIdentitySchema = z.object({
+  name: z.string(),
+  alertType: z.nativeEnum(AlertType).nullable().default(null),
+  message: z.string().nullable().default(null),
+});
+
+const actionParamsSchema = z.object({
+  createdByUserId: z.string().optional(),
+  members: z.string().array().optional(),
+  slackWebhook: z.string().optional(),
+  datasetId: z.string().optional(),
+  datasetMapping: z
+    .object({ mapping: z.any(), expansions: z.array(z.string()).optional() })
+    .optional(),
+  annotators: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .optional(),
+});
+
 function toTemplateTRPCError(err: unknown): TRPCError {
   if (err instanceof TRPCError) return err;
-  if (err instanceof TriggerNotFoundError) {
-    return new TRPCError({ code: "NOT_FOUND", message: err.message });
-  }
   if (
     err instanceof TemplateValidationError ||
     err instanceof TestFireUnavailableError
@@ -41,6 +59,51 @@ function toTemplateTRPCError(err: unknown): TRPCError {
     code: "INTERNAL_SERVER_ERROR",
     message: err instanceof Error ? err.message : "Unexpected error",
   });
+}
+
+async function resolveProjectIdentity(projectId: string): Promise<DraftProject> {
+  const project = await getApp().projects.getById(projectId);
+  if (!project) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+  }
+  return { name: project.name, slug: project.slug };
+}
+
+/**
+ * Mirrors the team-membership check the create procedure already does: every
+ * `SEND_EMAIL` recipient must be a team member, otherwise the operator could
+ * send a banner-marked notification to an arbitrary address via the test fire
+ * endpoint or the upsert path.
+ */
+async function ensureEmailRecipientsInTeam(
+  ctx: { prisma: PrismaClient },
+  projectId: string,
+  recipients: string[],
+): Promise<void> {
+  if (recipients.length === 0) return;
+  const project = await ctx.prisma.project.findUnique({
+    where: { id: projectId },
+    select: { teamId: true, team: { select: { organizationId: true } } },
+  });
+  if (!project) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+  }
+  const roleService = new RoleService(ctx.prisma);
+  const teamBindings = await roleService.getTeamMembersWithUsers({
+    organizationId: project.team.organizationId,
+    teamId: project.teamId,
+  });
+  const teamEmails = new Set(
+    teamBindings.flatMap((b) => (b.user ? [b.user.email] : [])),
+  );
+  for (const email of recipients) {
+    if (!teamEmails.has(email)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Recipient ${email} is not a member of this team`,
+      });
+    }
+  }
 }
 
 export const automationRouter = createTRPCRouter({
@@ -133,7 +196,7 @@ export const automationRouter = createTRPCRouter({
 
       const trigger = await ctx.prisma.trigger.create({
         data: {
-          id: nanoid(),
+          id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
           name: input.name,
           action: input.action,
           actionParams: input.actionParams,
@@ -317,56 +380,30 @@ export const automationRouter = createTRPCRouter({
 
       return trigger;
     }),
-  getTemplates: protectedProcedure
-    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+  getTemplateScaffold: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ input }) => {
-      try {
-        return await getApp().triggerTemplates.getTemplates(
-          input.triggerId,
-          input.projectId,
-        );
-      } catch (err) {
-        throw toTemplateTRPCError(err);
-      }
-    }),
-  saveTemplates: protectedProcedure
-    .input(
-      z.object({
-        triggerId: z.string(),
-        projectId: z.string(),
-        patch: templatePatchSchema,
-      }),
-    )
-    .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ input }) => {
-      try {
-        await getApp().triggerTemplates.saveTemplates({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
-          patch: input.patch,
-        });
-        return { success: true };
-      } catch (err) {
-        throw toTemplateTRPCError(err);
-      }
+      const project = await resolveProjectIdentity(input.projectId);
+      return getApp().triggerTemplates.getScaffold({ project });
     }),
   previewTemplate: protectedProcedure
     .input(
       z.object({
-        triggerId: z.string(),
         projectId: z.string(),
         channel: z.enum(["email", "slack"]),
-        draft: templatePatchSchema,
+        trigger: triggerIdentitySchema,
+        draft: templateDraftSchema,
       }),
     )
     .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
       try {
+        const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.renderPreview({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
           channel: input.channel,
+          trigger: input.trigger,
+          project,
           draft: input.draft,
         });
       } catch (err) {
@@ -374,16 +411,124 @@ export const automationRouter = createTRPCRouter({
       }
     }),
   testFireTemplate: protectedProcedure
-    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        channel: z.enum(["email", "slack"]),
+        trigger: triggerIdentitySchema,
+        draft: templateDraftSchema,
+        recipients: z.string().array().default([]),
+        webhook: z.string().nullable().default(null),
+      }),
+    )
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
+        if (input.channel === "email") {
+          await ensureEmailRecipientsInTeam(
+            ctx,
+            input.projectId,
+            input.recipients,
+          );
+        }
+        const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
+          channel: input.channel,
+          trigger: input.trigger,
+          project,
+          draft: input.draft,
+          recipients: input.recipients,
+          webhook: input.webhook,
         });
       } catch (err) {
         throw toTemplateTRPCError(err);
       }
+    }),
+  upsert: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string().optional(),
+        name: z.string().min(1),
+        action: z.nativeEnum(TriggerAction),
+        alertType: z.nativeEnum(AlertType).nullable().optional(),
+        message: z.string().nullable().optional(),
+        filters: triggerFiltersSchema,
+        actionParams: actionParamsSchema,
+        templates: templateDraftSchema,
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        validateTemplateDraft(input.templates);
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+
+      if (
+        input.action === TriggerAction.SEND_EMAIL &&
+        input.actionParams.members &&
+        input.actionParams.members.length > 0
+      ) {
+        await ensureEmailRecipientsInTeam(
+          ctx,
+          input.projectId,
+          input.actionParams.members,
+        );
+      }
+      if (
+        input.action === TriggerAction.SEND_SLACK_MESSAGE &&
+        !input.actionParams.slackWebhook
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A Slack webhook is required for Slack automations.",
+        });
+      }
+      if (
+        input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+        (!input.actionParams.annotators ||
+          input.actionParams.annotators.length === 0)
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "At least one annotator is required.",
+        });
+      }
+
+      const data = {
+        name: input.name,
+        action: input.action,
+        alertType: input.alertType ?? null,
+        message: input.message ?? null,
+        filters: JSON.stringify(input.filters),
+        actionParams: input.actionParams,
+        slackTemplateType: input.templates.slackTemplateType ?? null,
+        slackTemplate: input.templates.slackTemplate ?? null,
+        emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+        emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+      };
+
+      let trigger;
+      if (input.triggerId) {
+        trigger = await ctx.prisma.trigger.update({
+          where: { id: input.triggerId, projectId: input.projectId },
+          data,
+        });
+      } else {
+        await enforceLicenseLimit(ctx, input.projectId, "automations");
+        trigger = await ctx.prisma.trigger.create({
+          data: {
+            id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+            projectId: input.projectId,
+            lastRunAt: new Date().getTime(),
+            ...data,
+          },
+        });
+      }
+
+      await getApp().triggers.invalidate(input.projectId);
+      return trigger;
     }),
 });

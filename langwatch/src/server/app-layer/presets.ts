@@ -323,7 +323,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const triggerTemplates = new TriggerTemplateService({
-    repo: new PrismaTriggerRepository(prisma),
     baseHost: env.BASE_HOST,
     notifier: liveTriggerNotifier,
   });
@@ -630,7 +629,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
     triggerTemplates: new TriggerTemplateService({
-      repo: new NullTriggerRepository(),
       baseHost: env.BASE_HOST,
       notifier: {
         sendEmail: async () => {},

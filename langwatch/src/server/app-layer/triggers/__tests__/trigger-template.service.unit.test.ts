@@ -1,55 +1,27 @@
-import { TriggerAction } from "@prisma/client";
+import { AlertType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
 } from "~/server/event-sourcing/outbox/templating/banner";
-import type {
-  TriggerForTemplating,
-  TriggerRepository,
-} from "../repositories/trigger.repository";
 import {
+  type DraftIdentity,
+  type DraftProject,
   TemplateValidationError,
   TestFireUnavailableError,
   type TriggerNotifier,
-  TriggerNotFoundError,
   TriggerTemplateService,
+  validateTemplateDraft,
 } from "../trigger-template.service";
 
 const BASE_HOST = "https://app.langwatch.ai";
 
-function makeRow(
-  overrides: Partial<TriggerForTemplating> = {},
-): TriggerForTemplating {
-  return {
-    id: "tr_1",
-    name: "High latency",
-    message: null,
-    alertType: null,
-    action: TriggerAction.SEND_EMAIL,
-    emailRecipients: ["alerts@acme.test"],
-    slackWebhook: null,
-    slackTemplateType: null,
-    slackTemplate: null,
-    emailSubjectTemplate: null,
-    emailBodyTemplate: null,
-    projectName: "Acme",
-    projectSlug: "acme",
-    ...overrides,
-  };
-}
-
-function makeRepo(row: TriggerForTemplating | null) {
-  const updateTemplates = vi.fn(async () => {});
-  const repo: TriggerRepository = {
-    findActiveForProject: vi.fn(async () => []),
-    claimSend: vi.fn(async () => true),
-    updateLastRunAt: vi.fn(async () => {}),
-    findForTemplating: vi.fn(async () => row),
-    updateTemplates,
-  };
-  return { repo, updateTemplates };
-}
+const PROJECT: DraftProject = { name: "Acme", slug: "acme" };
+const TRIGGER: DraftIdentity = {
+  name: "High latency",
+  alertType: AlertType.WARNING,
+  message: "p95 over budget",
+};
 
 function makeNotifier() {
   const sentEmails: Array<{ to: string[]; subject: string; html: string }> = [];
@@ -65,120 +37,70 @@ function makeNotifier() {
   return { notifier, sentEmails, sentSlack };
 }
 
+function makeService(notifier: TriggerNotifier) {
+  return new TriggerTemplateService({ baseHost: BASE_HOST, notifier });
+}
+
+describe("validateTemplateDraft", () => {
+  describe("when a Liquid template has invalid syntax", () => {
+    it("throws a validation error", () => {
+      expect(() =>
+        validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
+      ).toThrowError(TemplateValidationError);
+    });
+  });
+
+  describe("when the Slack template type is not recognised", () => {
+    it("throws a validation error", () => {
+      expect(() =>
+        validateTemplateDraft({ slackTemplateType: "carousel" }),
+      ).toThrowError(TemplateValidationError);
+    });
+  });
+
+  describe("when every provided template is valid", () => {
+    it("passes silently", () => {
+      expect(() =>
+        validateTemplateDraft({
+          emailSubjectTemplate: "({{ trigger.alertType }}) {{ project.name }}",
+          emailBodyTemplate: "# {{ trigger.name }}",
+          slackTemplateType: "string",
+          slackTemplate: "Hi {{ project.name }}",
+        }),
+      ).not.toThrow();
+    });
+  });
+});
+
 describe("TriggerTemplateService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("saveTemplates", () => {
-    describe("when a template column has invalid Liquid syntax", () => {
-      it("rejects the save and persists nothing", async () => {
-        const { repo, updateTemplates } = makeRepo(makeRow());
-        const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+  describe("getScaffold", () => {
+    it("returns the defaults, the variable contract, and an example context", () => {
+      const { notifier } = makeNotifier();
+      const service = makeService(notifier);
 
-        await expect(
-          service.saveTemplates({
-            triggerId: "tr_1",
-            projectId: "proj_1",
-            patch: { emailBodyTemplate: "{{ trigger.name" },
-          }),
-        ).rejects.toBeInstanceOf(TemplateValidationError);
+      const scaffold = service.getScaffold({ project: PROJECT });
 
-        expect(updateTemplates).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the Slack template type is not recognised", () => {
-      it("rejects the save", async () => {
-        const { repo, updateTemplates } = makeRepo(makeRow());
-        const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
-
-        await expect(
-          service.saveTemplates({
-            triggerId: "tr_1",
-            projectId: "proj_1",
-            patch: { slackTemplateType: "carousel" },
-          }),
-        ).rejects.toBeInstanceOf(TemplateValidationError);
-
-        expect(updateTemplates).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when all provided templates are valid", () => {
-      it("persists the patch", async () => {
-        const { repo, updateTemplates } = makeRepo(makeRow());
-        const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
-
-        const patch = {
-          emailSubjectTemplate: "({{ trigger.alertType }}) {{ project.name }}",
-          emailBodyTemplate: "# {{ trigger.name }}",
-        };
-        await service.saveTemplates({
-          triggerId: "tr_1",
-          projectId: "proj_1",
-          patch,
-        });
-
-        expect(updateTemplates).toHaveBeenCalledWith({
-          triggerId: "tr_1",
-          projectId: "proj_1",
-          patch,
-        });
-      });
-    });
-
-    describe("when the trigger does not exist", () => {
-      it("throws a not-found error", async () => {
-        const { repo } = makeRepo(null);
-        const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
-
-        await expect(
-          service.saveTemplates({
-            triggerId: "missing",
-            projectId: "proj_1",
-            patch: { emailBodyTemplate: "# ok" },
-          }),
-        ).rejects.toBeInstanceOf(TriggerNotFoundError);
-      });
+      expect(scaffold.defaults.emailSubject).toMatch(/Trigger/);
+      expect(scaffold.variables).toContain("trigger.name");
+      expect(scaffold.example.project.slug).toBe("acme");
+      expect(scaffold.example.matches.length).toBeGreaterThan(0);
     });
   });
 
   describe("renderPreview", () => {
     describe("when an email body references a variable the context omits", () => {
       it("renders it empty and reports the missing variable", async () => {
-        const { repo } = makeRepo(makeRow());
         const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         const preview = await service.renderPreview({
-          triggerId: "tr_1",
-          projectId: "proj_1",
           channel: "email",
+          trigger: TRIGGER,
+          project: PROJECT,
           draft: { emailBodyTemplate: "Owner: {{ owner.name }}" },
         });
 
@@ -189,16 +111,9 @@ describe("TriggerTemplateService", () => {
     });
 
     describe("when a Block Kit template includes an interactive block", () => {
-      it("keeps the allowed blocks and drops the interactive one", async () => {
-        const { repo } = makeRepo(
-          makeRow({ action: TriggerAction.SEND_SLACK_MESSAGE }),
-        );
+      it("keeps allowed blocks and drops the interactive one", async () => {
         const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         const template = JSON.stringify([
           {
@@ -210,9 +125,9 @@ describe("TriggerTemplateService", () => {
         ]);
 
         const preview = await service.renderPreview({
-          triggerId: "tr_1",
-          projectId: "proj_1",
           channel: "slack",
+          trigger: TRIGGER,
+          project: PROJECT,
           draft: { slackTemplate: template, slackTemplateType: "block_kit" },
         });
 
@@ -220,27 +135,22 @@ describe("TriggerTemplateService", () => {
         if (!("blocks" in preview.payload)) {
           throw new Error("expected a blocks payload");
         }
-        const types = preview.payload.blocks.map((b) => b.type);
-        expect(types).toEqual(["header", "divider"]);
+        expect(preview.payload.blocks.map((b) => b.type)).toEqual([
+          "header",
+          "divider",
+        ]);
       });
     });
 
     describe("when a Block Kit template renders invalid JSON", () => {
       it("falls back to the default and reports the failure", async () => {
-        const { repo } = makeRepo(
-          makeRow({ action: TriggerAction.SEND_SLACK_MESSAGE }),
-        );
         const { notifier } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         const preview = await service.renderPreview({
-          triggerId: "tr_1",
-          projectId: "proj_1",
           channel: "slack",
+          trigger: TRIGGER,
+          project: PROJECT,
           draft: {
             slackTemplate: "not json at all",
             slackTemplateType: "block_kit",
@@ -256,24 +166,20 @@ describe("TriggerTemplateService", () => {
   });
 
   describe("testFire", () => {
-    describe("when the trigger emails recipients", () => {
-      it("sends a banner-marked email to the configured recipients", async () => {
-        const { repo } = makeRepo(
-          makeRow({ emailRecipients: ["a@acme.test", "b@acme.test"] }),
-        );
+    describe("when the channel is email and recipients are configured", () => {
+      it("sends a banner-marked email to the recipients", async () => {
         const { notifier, sentEmails } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         const result = await service.testFire({
-          triggerId: "tr_1",
-          projectId: "proj_1",
+          channel: "email",
+          trigger: TRIGGER,
+          project: PROJECT,
+          draft: {},
+          recipients: ["a@acme.test", "b@acme.test"],
+          webhook: null,
         });
 
-        expect(result.channel).toBe("email");
         expect(result.recipientCount).toBe(2);
         expect(sentEmails).toHaveLength(1);
         expect(sentEmails[0]!.to).toEqual(["a@acme.test", "b@acme.test"]);
@@ -282,44 +188,40 @@ describe("TriggerTemplateService", () => {
       });
     });
 
-    describe("when the email trigger has no recipients", () => {
+    describe("when the channel is email but no recipients are configured", () => {
       it("refuses to test-fire", async () => {
-        const { repo } = makeRepo(makeRow({ emailRecipients: [] }));
         const { notifier, sentEmails } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         await expect(
-          service.testFire({ triggerId: "tr_1", projectId: "proj_1" }),
+          service.testFire({
+            channel: "email",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: null,
+          }),
         ).rejects.toBeInstanceOf(TestFireUnavailableError);
         expect(sentEmails).toHaveLength(0);
       });
     });
 
-    describe("when the trigger posts to Slack", () => {
+    describe("when the channel is Slack and a webhook is configured", () => {
       it("posts a banner-marked message to the webhook", async () => {
-        const { repo } = makeRepo(
-          makeRow({
-            action: TriggerAction.SEND_SLACK_MESSAGE,
-            slackWebhook: "https://hooks.slack.com/services/T/B/X",
-          }),
-        );
         const { notifier, sentSlack } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         const result = await service.testFire({
-          triggerId: "tr_1",
-          projectId: "proj_1",
+          channel: "slack",
+          trigger: TRIGGER,
+          project: PROJECT,
+          draft: {},
+          recipients: [],
+          webhook: "https://hooks.slack.com/services/T/B/X",
         });
 
-        expect(result.channel).toBe("slack");
+        expect(result.recipientCount).toBe(1);
         expect(sentSlack).toHaveLength(1);
         expect(sentSlack[0]!.webhook).toBe(
           "https://hooks.slack.com/services/T/B/X",
@@ -330,20 +232,20 @@ describe("TriggerTemplateService", () => {
       });
     });
 
-    describe("when the Slack trigger has no webhook", () => {
+    describe("when the channel is Slack but no webhook is configured", () => {
       it("refuses to test-fire", async () => {
-        const { repo } = makeRepo(
-          makeRow({ action: TriggerAction.SEND_SLACK_MESSAGE }),
-        );
         const { notifier, sentSlack } = makeNotifier();
-        const service = new TriggerTemplateService({
-          repo,
-          baseHost: BASE_HOST,
-          notifier,
-        });
+        const service = makeService(notifier);
 
         await expect(
-          service.testFire({ triggerId: "tr_1", projectId: "proj_1" }),
+          service.testFire({
+            channel: "slack",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: null,
+          }),
         ).rejects.toBeInstanceOf(TestFireUnavailableError);
         expect(sentSlack).toHaveLength(0);
       });

@@ -1,10 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 import type {
-  TriggerForTemplating,
   TriggerRepository,
   TriggerSummary,
-  TriggerTemplatePatch,
 } from "./trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
@@ -61,79 +59,6 @@ export class PrismaTriggerRepository implements TriggerRepository {
       data: { lastRunAt: Date.now() },
     });
   }
-
-  async findForTemplating(
-    triggerId: string,
-    projectId: string,
-  ): Promise<TriggerForTemplating | null> {
-    const trigger = await this.prisma.trigger.findFirst({
-      where: { id: triggerId, projectId, deleted: false },
-      select: {
-        id: true,
-        name: true,
-        message: true,
-        alertType: true,
-        action: true,
-        actionParams: true,
-        slackTemplateType: true,
-        slackTemplate: true,
-        emailSubjectTemplate: true,
-        emailBodyTemplate: true,
-        project: { select: { name: true, slug: true } },
-      },
-    });
-
-    if (!trigger) return null;
-
-    const params = parseActionParams(trigger.actionParams);
-
-    return {
-      id: trigger.id,
-      name: trigger.name,
-      message: trigger.message,
-      alertType: trigger.alertType,
-      action: trigger.action,
-      emailRecipients: params.members,
-      slackWebhook: params.slackWebhook,
-      slackTemplateType: trigger.slackTemplateType,
-      slackTemplate: trigger.slackTemplate,
-      emailSubjectTemplate: trigger.emailSubjectTemplate,
-      emailBodyTemplate: trigger.emailBodyTemplate,
-      projectName: trigger.project.name,
-      projectSlug: trigger.project.slug,
-    };
-  }
-
-  async updateTemplates({
-    triggerId,
-    projectId,
-    patch,
-  }: {
-    triggerId: string;
-    projectId: string;
-    patch: TriggerTemplatePatch;
-  }): Promise<void> {
-    await this.prisma.trigger.update({
-      where: { id: triggerId, projectId },
-      data: patch,
-    });
-  }
-}
-
-function parseActionParams(raw: unknown): {
-  members: string[];
-  slackWebhook: string | null;
-} {
-  const params = (raw && typeof raw === "object" ? raw : {}) as {
-    members?: unknown;
-    slackWebhook?: unknown;
-  };
-  const members = Array.isArray(params.members)
-    ? params.members.filter((m): m is string => typeof m === "string")
-    : [];
-  const slackWebhook =
-    typeof params.slackWebhook === "string" ? params.slackWebhook : null;
-  return { members, slackWebhook };
 }
 
 function parseFilters(raw: unknown): TriggerFilters {

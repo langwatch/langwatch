@@ -50,4 +50,5 @@ export const KSUID_RESOURCES = {
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",
+  TRIGGER: "trigger",
 } as const;

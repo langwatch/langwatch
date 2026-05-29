@@ -1,9 +1,14 @@
-import { TriggerAction } from "@prisma/client";
+import type { AlertType } from "@prisma/client";
 import {
   DEFAULT_EMAIL_BODY_TEMPLATE,
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
+  DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_SLACK_TEMPLATE,
 } from "~/server/event-sourcing/outbox/templating/defaults";
+import {
+  EXAMPLE_MATCHES,
+  TEMPLATE_VARIABLE_PATHS,
+} from "~/server/event-sourcing/outbox/templating/exampleContext";
 import { renderTriggerEmail } from "~/server/event-sourcing/outbox/templating/renderEmail";
 import {
   type SlackPayload,
@@ -11,20 +16,10 @@ import {
   renderTriggerSlack,
 } from "~/server/event-sourcing/outbox/templating/renderSlack";
 import {
-  EXAMPLE_MATCHES,
-  TEMPLATE_VARIABLE_PATHS,
-} from "~/server/event-sourcing/outbox/templating/exampleContext";
-import {
   buildTemplateContext,
   type TemplateContext,
 } from "~/server/event-sourcing/outbox/templating/templateContext";
 import { validateLiquid } from "~/server/event-sourcing/outbox/templating/validate";
-import type {
-  TriggerForTemplating,
-  TriggerRepository,
-  TriggerTemplateColumns,
-  TriggerTemplatePatch,
-} from "./repositories/trigger.repository";
 
 export type TemplateChannel = "email" | "slack";
 
@@ -41,20 +36,40 @@ export interface TriggerNotifier {
   sendSlack(args: { webhook: string; payload: SlackPayload }): Promise<void>;
 }
 
-/** Raw Liquid sources for the framework defaults, shown as editor placeholders. */
+/** The four template columns, as edited in the drawer. Each may be null
+ *  ("use the framework default") or omitted. */
+export interface TemplateDraft {
+  slackTemplateType?: string | null;
+  slackTemplate?: string | null;
+  emailSubjectTemplate?: string | null;
+  emailBodyTemplate?: string | null;
+}
+
+/** The trigger identity a template renders against, supplied by the draft so
+ *  preview/test-fire work before the automation is saved. */
+export interface DraftIdentity {
+  name: string;
+  alertType: AlertType | null;
+  message: string | null;
+}
+
+export interface DraftProject {
+  name: string;
+  slug: string;
+}
+
 export interface TemplateDefaults {
   emailSubject: string;
   emailBody: string;
-  slack: string;
+  slackString: string;
+  slackBlockKit: string;
 }
 
-export interface TriggerTemplatesView {
-  action: TriggerAction;
-  current: TriggerTemplateColumns;
+export interface TemplateScaffold {
   defaults: TemplateDefaults;
   /** Dotted variable paths a template can reference (editor autocomplete). */
   variables: string[];
-  /** The example data the preview renders against, for the author to inspect. */
+  /** The example data preview renders against, for the author to inspect. */
   example: TemplateContext;
 }
 
@@ -85,18 +100,11 @@ export interface TestFireResult {
   errors: string[];
 }
 
-export class TriggerNotFoundError extends Error {
-  name = "TriggerNotFoundError" as const;
-  constructor(triggerId: string) {
-    super(`Trigger ${triggerId} not found`);
-  }
-}
-
-/** A template column failed `validateLiquid` (or an invalid Slack type) on save. */
+/** A template column failed `validateLiquid` (or an invalid Slack type). */
 export class TemplateValidationError extends Error {
   name = "TemplateValidationError" as const;
   constructor(
-    readonly field: keyof TriggerTemplateColumns,
+    readonly field: keyof TemplateDraft,
     message: string,
   ) {
     super(message);
@@ -115,117 +123,92 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "slackTemplate",
   "emailSubjectTemplate",
   "emailBodyTemplate",
-] as const satisfies readonly (keyof TriggerTemplateColumns)[];
+] as const satisfies readonly (keyof TemplateDraft)[];
 
-function normalizeSlackType(raw: string | null): SlackTemplateType | null {
+const PLACEHOLDER_IDENTITY: DraftIdentity = {
+  name: "Your automation",
+  alertType: null,
+  message: null,
+};
+
+function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
   if (raw === "block_kit") return "block_kit";
   if (raw === "string") return "string";
   return null;
 }
 
 /**
- * Drives the trigger template-authoring surface: reading and saving the
- * customer's Liquid templates (validated before persisting), rendering a live
- * preview from in-progress draft sources, and dispatching a banner-marked test
- * fire to the trigger's configured recipients. The rendering itself lives in
- * the `outbox/templating` module; this service supplies the trigger/project
- * context and the persistence + delivery around it.
+ * Validates a template draft before it is persisted: every non-empty Liquid
+ * column must parse, and `slackTemplateType` must be a recognised discriminator.
+ * Throws `TemplateValidationError` on the first problem. Pure, so the save path
+ * (route) and unit tests can both call it.
+ */
+export function validateTemplateDraft(draft: TemplateDraft): void {
+  if (
+    draft.slackTemplateType != null &&
+    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(draft.slackTemplateType)
+  ) {
+    throw new TemplateValidationError(
+      "slackTemplateType",
+      `Invalid Slack template type "${draft.slackTemplateType}"`,
+    );
+  }
+  for (const column of LIQUID_TEMPLATE_COLUMNS) {
+    const source = draft[column];
+    if (typeof source === "string" && source.trim() !== "") {
+      const result = validateLiquid(source);
+      if (!result.valid) {
+        throw new TemplateValidationError(
+          column,
+          result.error ?? "Invalid Liquid syntax",
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Renders trigger-notification templates for the authoring drawer. Operates
+ * purely on the draft payload — the trigger/project identity and template
+ * sources are supplied by the caller (see ADR-028), so preview and test fire
+ * work identically before a trigger is saved (create) and after (edit). The
+ * rendering itself lives in the `outbox/templating` module; this service builds
+ * the example context around it and dispatches a test fire via the notifier.
  */
 export class TriggerTemplateService {
-  private readonly repo: TriggerRepository;
   private readonly baseHost: string;
   private readonly notifier: TriggerNotifier;
 
-  constructor(deps: {
-    repo: TriggerRepository;
-    baseHost: string;
-    notifier: TriggerNotifier;
-  }) {
-    this.repo = deps.repo;
+  constructor(deps: { baseHost: string; notifier: TriggerNotifier }) {
     this.baseHost = deps.baseHost;
     this.notifier = deps.notifier;
   }
 
-  async getTemplates(
-    triggerId: string,
-    projectId: string,
-  ): Promise<TriggerTemplatesView> {
-    const trigger = await this.repo.findForTemplating(triggerId, projectId);
-    if (!trigger) throw new TriggerNotFoundError(triggerId);
-
+  getScaffold({ project }: { project: DraftProject }): TemplateScaffold {
     return {
-      action: trigger.action,
-      current: {
-        slackTemplateType: trigger.slackTemplateType,
-        slackTemplate: trigger.slackTemplate,
-        emailSubjectTemplate: trigger.emailSubjectTemplate,
-        emailBodyTemplate: trigger.emailBodyTemplate,
-      },
       defaults: {
         emailSubject: DEFAULT_EMAIL_SUBJECT_TEMPLATE,
         emailBody: DEFAULT_EMAIL_BODY_TEMPLATE,
-        slack: DEFAULT_SLACK_TEMPLATE,
+        slackString: DEFAULT_SLACK_TEMPLATE,
+        slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
       },
       variables: TEMPLATE_VARIABLE_PATHS,
-      example: this.sampleContext(trigger),
+      example: this.context(PLACEHOLDER_IDENTITY, project),
     };
   }
 
-  async saveTemplates({
-    triggerId,
-    projectId,
-    patch,
-  }: {
-    triggerId: string;
-    projectId: string;
-    patch: TriggerTemplatePatch;
-  }): Promise<void> {
-    if (
-      patch.slackTemplateType != null &&
-      !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(
-        patch.slackTemplateType,
-      )
-    ) {
-      throw new TemplateValidationError(
-        "slackTemplateType",
-        `Invalid Slack template type "${patch.slackTemplateType}"`,
-      );
-    }
-
-    for (const column of LIQUID_TEMPLATE_COLUMNS) {
-      const source = patch[column];
-      if (typeof source === "string" && source.trim() !== "") {
-        const result = validateLiquid(source);
-        if (!result.valid) {
-          throw new TemplateValidationError(
-            column,
-            result.error ?? "Invalid Liquid syntax",
-          );
-        }
-      }
-    }
-
-    const trigger = await this.repo.findForTemplating(triggerId, projectId);
-    if (!trigger) throw new TriggerNotFoundError(triggerId);
-
-    await this.repo.updateTemplates({ triggerId, projectId, patch });
-  }
-
   async renderPreview({
-    triggerId,
-    projectId,
     channel,
+    trigger,
+    project,
     draft,
   }: {
-    triggerId: string;
-    projectId: string;
     channel: TemplateChannel;
-    draft: TriggerTemplatePatch;
+    trigger: DraftIdentity;
+    project: DraftProject;
+    draft: TemplateDraft;
   }): Promise<TemplatePreview> {
-    const trigger = await this.repo.findForTemplating(triggerId, projectId);
-    if (!trigger) throw new TriggerNotFoundError(triggerId);
-
-    const context = this.sampleContext(trigger);
+    const context = this.context(trigger, project);
 
     if (channel === "email") {
       const rendered = await renderTriggerEmail({
@@ -244,7 +227,7 @@ export class TriggerTemplateService {
     }
 
     const rendered = await renderTriggerSlack({
-      templateType: normalizeSlackType(draft.slackTemplateType ?? null),
+      templateType: normalizeSlackType(draft.slackTemplateType),
       template: draft.slackTemplate ?? null,
       context,
     });
@@ -258,82 +241,81 @@ export class TriggerTemplateService {
   }
 
   async testFire({
-    triggerId,
-    projectId,
+    channel,
+    trigger,
+    project,
+    draft,
+    recipients,
+    webhook,
   }: {
-    triggerId: string;
-    projectId: string;
+    channel: TemplateChannel;
+    trigger: DraftIdentity;
+    project: DraftProject;
+    draft: TemplateDraft;
+    recipients: string[];
+    webhook: string | null;
   }): Promise<TestFireResult> {
-    const trigger = await this.repo.findForTemplating(triggerId, projectId);
-    if (!trigger) throw new TriggerNotFoundError(triggerId);
+    const context = this.context(trigger, project);
 
-    const context = this.sampleContext(trigger);
-
-    if (trigger.action === TriggerAction.SEND_EMAIL) {
-      if (trigger.emailRecipients.length === 0) {
+    if (channel === "email") {
+      if (recipients.length === 0) {
         throw new TestFireUnavailableError(
-          "This trigger has no email recipients to test-fire to.",
+          "This automation has no email recipients to test-fire to.",
         );
       }
       const rendered = await renderTriggerEmail({
-        subjectTemplate: trigger.emailSubjectTemplate,
-        bodyTemplate: trigger.emailBodyTemplate,
+        subjectTemplate: draft.emailSubjectTemplate ?? null,
+        bodyTemplate: draft.emailBodyTemplate ?? null,
         context,
         testFire: true,
       });
       await this.notifier.sendEmail({
-        to: trigger.emailRecipients,
+        to: recipients,
         subject: rendered.subject,
         html: rendered.html,
       });
       return {
         channel: "email",
-        recipientCount: trigger.emailRecipients.length,
+        recipientCount: recipients.length,
         usedDefault: rendered.usedDefault,
         missingVariables: rendered.missingVariables,
         errors: rendered.errors,
       };
     }
 
-    if (trigger.action === TriggerAction.SEND_SLACK_MESSAGE) {
-      if (!trigger.slackWebhook) {
-        throw new TestFireUnavailableError(
-          "This trigger has no Slack webhook to test-fire to.",
-        );
-      }
-      const rendered = await renderTriggerSlack({
-        templateType: normalizeSlackType(trigger.slackTemplateType),
-        template: trigger.slackTemplate,
-        context,
-        testFire: true,
-      });
-      await this.notifier.sendSlack({
-        webhook: trigger.slackWebhook,
-        payload: rendered.payload,
-      });
-      return {
-        channel: "slack",
-        recipientCount: 1,
-        usedDefault: rendered.usedDefault,
-        missingVariables: rendered.missingVariables,
-        errors: rendered.errors,
-      };
+    if (!webhook) {
+      throw new TestFireUnavailableError(
+        "This automation has no Slack webhook to test-fire to.",
+      );
     }
-
-    throw new TestFireUnavailableError(
-      "Only email and Slack triggers can be test-fired.",
-    );
+    const rendered = await renderTriggerSlack({
+      templateType: normalizeSlackType(draft.slackTemplateType),
+      template: draft.slackTemplate ?? null,
+      context,
+      testFire: true,
+    });
+    await this.notifier.sendSlack({ webhook, payload: rendered.payload });
+    return {
+      channel: "slack",
+      recipientCount: 1,
+      usedDefault: rendered.usedDefault,
+      missingVariables: rendered.missingVariables,
+      errors: rendered.errors,
+    };
   }
 
-  private sampleContext(trigger: TriggerForTemplating): TemplateContext {
+  private context(
+    identity: DraftIdentity,
+    project: DraftProject,
+  ): TemplateContext {
     return buildTemplateContext({
       trigger: {
-        id: trigger.id,
-        name: trigger.name,
-        message: trigger.message ?? "",
-        alertType: trigger.alertType,
+        id: "preview",
+        name: identity.name,
+        message: identity.message ?? "",
+        alertType: identity.alertType,
       },
-      project: { name: trigger.projectName, slug: trigger.projectSlug },
+      project,
       baseHost: this.baseHost,
       matches: EXAMPLE_MATCHES,
     });

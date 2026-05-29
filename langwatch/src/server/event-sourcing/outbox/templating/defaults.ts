@@ -26,3 +26,34 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}:info
 {% for m in matches %}
 <{{ m.trace.url }}|{% if m.trace.id %}{{ m.trace.id }}{% else %}View{% endif %}>
 {% endfor %}`;
+
+/**
+ * Block Kit starter — a valid Block Kit JSON document with Liquid variables
+ * inside string values. Authors edit this as JSON and Liquid renders before
+ * `JSON.parse` in `renderSlack`, so variables expand into the final blocks.
+ */
+export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "{% if trigger.alertType %}({{ trigger.alertType }}) {% endif %}{{ trigger.name }}"
+    }
+  },
+  {% if trigger.message %}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ trigger.message | json }} }
+  },
+  {
+    "type": "divider"
+  },
+  {% endif %}
+  {
+    "type": "section",
+    "text": {
+      "type": "mrkdwn",
+      "text": "{% for m in matches %}<{{ m.trace.url }}|{% if m.trace.id %}{{ m.trace.id }}{% else %}View{% endif %}>{% unless forloop.last %}\\n{% endunless %}{% endfor %}"
+    }
+  }
+]`;
