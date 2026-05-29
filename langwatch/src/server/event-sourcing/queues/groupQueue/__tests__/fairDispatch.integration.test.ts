@@ -107,18 +107,38 @@ beforeAll(async () => {
 
 const FLEET = 20;
 
+// Captured so afterEach restores the prior value instead of blindly deleting it,
+// in case the process started with a real budget set.
+let prevBudgetEnv: string | undefined;
+
+// Delete only this suite's namespaced keys rather than flushall(), so we never
+// wipe other integration suites sharing the test Redis container.
+async function flushSuiteKeys() {
+  let cursor = "0";
+  do {
+    const [next, keys] = await redis.scan(cursor, "MATCH", `${QUEUE_NAME}*`, "COUNT", 500);
+    cursor = next;
+    if (keys.length > 0) await redis.del(...keys);
+  } while (cursor !== "0");
+}
+
 beforeEach(async () => {
-  await redis.flushall();
+  await flushSuiteKeys();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
   inflight = [];
   // Enable the dynamic water-level cap with the global budget = fleet size, so a
   // lone tenant gets W=G=20 and two contenders converge to G/2=10. readGlobalBudget
   // reads process.env per dispatch, so setting it here takes effect immediately.
+  prevBudgetEnv = process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
   process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = String(FLEET);
 });
 
 afterEach(() => {
-  delete process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
+  if (prevBudgetEnv === undefined) {
+    delete process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
+  } else {
+    process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = prevBudgetEnv;
+  }
 });
 
 afterAll(async () => {
