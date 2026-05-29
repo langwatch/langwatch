@@ -78,16 +78,23 @@ export class ModelDefaultsRepository {
   }): Promise<{ id: string }> {
     const id = this.newConfigId();
     // Single-organization anchor (ADR-021): every scope a config attaches to
-    // resolves to the same org, so the first scope is authoritative.
-    const organizationId = params.scopes[0]
-      ? await resolveOrganizationForScope(this.prisma, params.scopes[0])
+    // resolves to the same org, so the first scope is authoritative. The
+    // column is NOT NULL, so an unresolvable scope is a hard error.
+    const firstScope = params.scopes[0];
+    const organizationId = firstScope
+      ? await resolveOrganizationForScope(this.prisma, firstScope)
       : null;
+    if (!organizationId) {
+      throw new Error(
+        "Cannot create model default config: scope does not resolve to an organization",
+      );
+    }
     await this.prisma.modelDefaultConfig.create({
       data: {
         id,
         config: params.config,
         authorId: params.authorId,
-        organizationId: organizationId ?? undefined,
+        organizationId,
         scopes: {
           create: params.scopes.map((s) => ({
             id: this.newScopeId(),

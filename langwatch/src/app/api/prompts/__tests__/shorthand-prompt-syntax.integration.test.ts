@@ -70,6 +70,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
         scopes: {
           create: [
             { scopeType: "ORGANIZATION", scopeId: testOrganization.id },

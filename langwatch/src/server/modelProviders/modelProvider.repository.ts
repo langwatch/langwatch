@@ -188,11 +188,17 @@ export class ModelProviderRepository {
         : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
 
     // Single-organization anchor (ADR-021): every scope resolves to the same
-    // org, so the page-context project's org is authoritative.
+    // org, so the page-context project's org is authoritative. The column is
+    // NOT NULL, so a project that can't resolve an org is a hard error.
     const organizationId = await resolveOrganizationForScope(client, {
       scopeType: "PROJECT",
       scopeId: data.projectId,
     });
+    if (!organizationId) {
+      throw new Error(
+        `Cannot create model provider: project ${data.projectId} does not resolve to an organization`,
+      );
+    }
 
     return client.modelProvider.create({
       data: {
@@ -200,7 +206,7 @@ export class ModelProviderRepository {
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
-        organizationId: organizationId ?? undefined,
+        organizationId,
         customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
         customModels: data.customModels as Prisma.InputJsonValue | undefined,
         customEmbeddingsModels: data.customEmbeddingsModels as

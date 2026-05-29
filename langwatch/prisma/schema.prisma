@@ -843,9 +843,7 @@ model ModelProvider {
 
   // Single-organization tenancy anchor (ADR-021). Every scope of a given
   // provider resolves to the same organization, so this column is that org.
-  // Nullable for one release while the production backfill is verified; set
-  // NOT NULL in a follow-up migration.
-  organizationId         String?
+  organizationId         String
 
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
@@ -923,9 +921,8 @@ model ModelDefaultConfig {
     scopes    ModelDefaultConfigScope[]
 
     // Single-organization tenancy anchor (ADR-021). Every scope a config
-    // attaches to resolves to the same organization. Nullable for one release
-    // while the production backfill is verified; set NOT NULL in a follow-up.
-    organizationId String?
+    // attaches to resolves to the same organization.
+    organizationId String
 
     @@index([organizationId])
 }

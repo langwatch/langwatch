@@ -78,6 +78,7 @@ describe("OnboardingChecksService Integration", () => {
           name: "OpenAI",
           provider: "openai",
           enabled: true,
+          organizationId,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: projectId }],
           },
@@ -99,6 +100,7 @@ describe("OnboardingChecksService Integration", () => {
           name: "Anthropic",
           provider: "anthropic",
           enabled: false,
+          organizationId,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: projectId }],
           },

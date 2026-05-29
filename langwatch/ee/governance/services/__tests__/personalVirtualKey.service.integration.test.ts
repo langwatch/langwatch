@@ -99,6 +99,7 @@ describe("PersonalVirtualKeyService (real DB)", () => {
         name: `pvk-mp-${suffix}`,
         provider: "openai",
         enabled: true,
+        organizationId: ORG_ID,
         scopes: {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         },

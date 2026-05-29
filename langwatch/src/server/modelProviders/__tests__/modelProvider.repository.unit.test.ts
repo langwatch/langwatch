@@ -97,7 +97,7 @@ function createModelProvider(
     disabledAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    organizationId: null,
+    organizationId: "org_test",
     scopes: scopes ?? [createScope("PROJECT", seedProjectId, id)],
     ...rest,
   };
@@ -479,6 +479,14 @@ describe("ModelProviderRepository", () => {
   });
 
   describe("create()", () => {
+    beforeEach(() => {
+      // create() resolves the org anchor from the project (ADR-021), so the
+      // project must resolve to an organization.
+      (prisma.project.findUnique as any).mockResolvedValue({
+        team: { organizationId: "org_test" },
+      });
+    });
+
     describe("when customKeys are provided", () => {
       it("encrypts customKeys before storing", async () => {
         const keys = { OPENAI_API_KEY: "sk-secret" };

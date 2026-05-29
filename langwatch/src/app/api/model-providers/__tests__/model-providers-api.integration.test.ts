@@ -115,6 +115,7 @@ describe("Model Providers API", () => {
             name: "OpenAI",
             provider: "openai",
             enabled: true,
+            organizationId: testOrganization.id,
             customKeys: { OPENAI_API_KEY: "sk-real-key-12345" },
             scopes: {
               create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
@@ -185,6 +186,7 @@ describe("Model Providers API", () => {
             name: "OpenAI",
             provider: "openai",
             enabled: true,
+            organizationId: testOrganization.id,
             customKeys: { OPENAI_API_KEY: "sk-original-key" },
             scopes: {
               create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
