@@ -1085,18 +1085,36 @@ model PublicShare {
   @@index([userId])
 }
 
+enum CustomLLMModelCostScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A custom model-cost override. Single-scope-per-row (ADR-021): the row
+// applies at exactly one scope, identified inline by (scopeType, scopeId),
+// and is anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> the static llmModels.json default, so
+// an org admin can set a cost once and have it apply to every project that
+// has no closer override. The legacy projectId column is kept (nullable)
+// for one release of read compatibility; new writes target the scope.
 model CustomLLMModelCost {
-  id                        String   @id @default(nanoid())
-  projectId                 String
+  id                        String                      @id @default(nanoid())
+  organizationId            String
+  scopeType                 CustomLLMModelCostScopeType @default(PROJECT)
+  scopeId                   String
+  projectId                 String?
   model                     String
   regex                     String
   inputCostPerToken         Float?
   outputCostPerToken        Float?
   cacheReadCostPerToken     Float?
   cacheCreationCostPerToken Float?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @default(now()) @updatedAt
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @default(now()) @updatedAt
 
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
   @@index([projectId])
 }
 

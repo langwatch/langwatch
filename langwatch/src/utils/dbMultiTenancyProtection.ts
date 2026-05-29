@@ -506,6 +506,39 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021). A query is bounded by a row id,
+  // the organizationId anchor, a (scopeType, scopeId) predicate, or the
+  // legacy projectId column (one-release read compat). Every new row must
+  // declare its owning organizationId.
+  CustomLLMModelCost: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires a row id, organizationId, scope predicate, or projectId in the where clause";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          typeof c.projectId === "string",
+      );
+      return ok
+        ? null
+        : "requires a row id, organizationId, scope predicate, or projectId in the where clause";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
