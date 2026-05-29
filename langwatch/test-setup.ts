@@ -2,7 +2,6 @@ import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
 import { afterAll, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
-import { shutdownPostHog } from "./src/server/posthog";
 dotenv.config({ path: ".env" });
 
 // Any test that evaluates a PostHog-backed PRODUCT flag (e.g. resolveHome ->
@@ -12,7 +11,14 @@ dotenv.config({ path: ".env" });
 // vitest awaits a graceful worker exit instead of force-killing the pool) the
 // shard hangs after every test has already passed. Shutting the client down
 // per file clears the interval; it no-ops when nothing constructed a client.
+//
+// The module is loaded lazily inside the hook, NOT via a top-level import: a
+// static import here would pull the real posthog module into every test
+// file's graph at setup time, before that file's own `vi.mock("posthog-node")`
+// hoist applies, breaking posthog.unit.test.ts. Loading it after the tests run
+// keeps each file's mocks intact.
 afterAll(async () => {
+  const { shutdownPostHog } = await import("./src/server/posthog");
   await shutdownPostHog();
 });
 
