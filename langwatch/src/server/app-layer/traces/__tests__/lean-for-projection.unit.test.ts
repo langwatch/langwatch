@@ -763,9 +763,9 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
  * @scenario small structured non-IO attr — must not trigger clone (hot-path guard)
  *
  * Before the fix, ANY non-IO arrayValue/kvlistValue with length > 0 forced a
- * structuredClone regardless of the actual content size. After the fix, the
- * attrValueExceeds probe recurses into the nested values — a small structured
- * attr is a no-op.
+ * structuredClone regardless of the actual content size. After the fix,
+ * hasOversizedAttribute / valueExceeds recurses into the nested values — a
+ * small structured attr is a no-op.
  */
 describe("given a span with a small structured non-IO attribute", () => {
   describe("when leanForProjection is applied to an event with a small kvlistValue non-IO attr", () => {
@@ -817,7 +817,7 @@ describe("given a span with a small structured non-IO attribute", () => {
   });
 
   describe("when leanForProjection is applied to an event with a nested >256KB value inside kvlistValue", () => {
-    it("caps the nested blob (attrValueExceeds still flags genuinely-oversized nested values)", () => {
+    it("caps the nested blob (hasOversizedAttribute flags the oversized nested value)", () => {
       const event = makeSpanReceivedEventWithRawAttrs({
         attributes: [
           {

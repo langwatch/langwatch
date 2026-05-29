@@ -164,7 +164,7 @@ export function valueExceeds(
   if (value == null || typeof value !== "object") return false;
 
   if (typeof value.stringValue === "string") {
-    if (Buffer.byteLength(value.stringValue, "utf8") > maxBytes) return true;
+    if (utf8ByteLength(value.stringValue) > maxBytes) return true;
   }
 
   if (value.bytesValue != null) {
