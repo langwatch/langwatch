@@ -258,19 +258,21 @@ export function ShikiCommandBox({
         )}
 
         {/* Shiki-highlighted code output or fallback pre.
-            When rainbowOn, we apply PostHog's `.rainbow-text` recipe verbatim
-            (frontend/src/styles/base.scss:2070-2110 in the posthog repo):
-            5-stop linear gradient blue→blue→red→orange→yellow→blue, applied
-            as `background-clip: text` on the wrapper with `color: transparent`,
-            and a 3s `background-position-x` scroll animation. We override
-            Shiki's inline token colors on every nested span with
-            `color: inherit !important` so the gradient flows through every
-            character. `@media (prefers-reduced-motion: reduce)` kills the
-            scroll. */}
+            Outer Box owns horizontal scroll (overflow-x: auto). The inner
+            `<pre>` keeps `white-space: pre` so the command doesn't wrap,
+            and does NOT set its own overflow (a nested scroll container
+            here would prevent the outer Box's scrollbar from triggering on
+            long commands).
+            When rainbowOn, PostHog's `.rainbow-text` recipe (verbatim from
+            posthog/frontend/src/styles/base.scss:2070-2110) is applied to
+            the wrapper: 5-stop gradient, background-clip: text,
+            color: transparent, 3s background-position-x scroll. Nested
+            `<pre>`/`<code>`/`<span>` inherit `color: transparent` so
+            Shiki's inline per-token colors don't paint over the gradient.
+            `@media (prefers-reduced-motion: reduce)` kills the animation. */}
         <Box
           flex={1}
           overflowX="auto"
-          position="relative"
           data-shiki-box
           data-rainbow={rainbowOn ? "on" : "off"}
           css={{
@@ -283,7 +285,20 @@ export function ShikiCommandBox({
               fontSize: "12.5px",
               lineHeight: "1.6",
               whiteSpace: "pre",
-              overflowX: "auto",
+              // Chakra's global preflight applies `overflow-wrap: break-word`
+              // to <pre>, which wraps the long install command mid-string
+              // (e.g. mid-API-key) regardless of `white-space: pre` — those
+              // are orthogonal CSS axes. Forcing both back to `normal` lets
+              // the pre's natural content width be the unbroken line length.
+              overflowWrap: "normal !important",
+              wordWrap: "normal !important",
+              // Size strictly to the natural content width. For the long
+              // Claude Code install command this is ~1500px; the wrapper's
+              // 820px-wide flex slot then sees a wider child and engages
+              // `overflow-x: auto`. `min-width: 100%` keeps the pre at least
+              // as wide as the wrapper for short commands.
+              width: "max-content",
+              minWidth: "100%",
             },
             "& code": {
               fontFamily: "inherit",
@@ -299,16 +314,13 @@ export function ShikiCommandBox({
               WebkitTextFillColor: "transparent",
               backgroundSize: "200% 100%",
               animation: `${lwRainbowScroll} 3s linear infinite`,
-              // Override Shiki's inline `color: <token-color>` on every nested
-              // span so the wrapper's gradient text-fill shows through every
-              // character. Shiki sets colors via inline style, so the spec's
-              // important-flag is required to win.
+              // Force nested elements to inherit the transparent text-fill
+              // so Shiki's inline per-token colours don't paint over the
+              // wrapper's gradient text-fill. `!important` is required to
+              // beat Shiki's inline `style="color:..."`.
               "& pre, & code, & span": {
                 color: "inherit !important",
                 WebkitTextFillColor: "inherit",
-                backgroundImage: "inherit",
-                backgroundClip: "inherit",
-                WebkitBackgroundClip: "inherit",
               },
               "@media (prefers-reduced-motion: reduce)": {
                 animation: "none",
@@ -317,8 +329,17 @@ export function ShikiCommandBox({
           }}
         >
           {activeHtml ? (
-            // Shiki HTML is ready — render it
-            <Box dangerouslySetInnerHTML={{ __html: activeHtml }} />
+            // Shiki HTML is ready — render it.
+            // `display: contents` makes this intermediate host div invisible
+            // to layout, so the wrapper Box sees the inner <pre> as its
+            // direct child. Without it, this div is `display: block,
+            // width: 100%`, hides the <pre>'s overflow from the wrapper,
+            // and the wrapper's overflow-x: auto never engages even though
+            // its scrollbar appears.
+            <Box
+              display="contents"
+              dangerouslySetInnerHTML={{ __html: activeHtml }}
+            />
           ) : (
             // Fallback while Shiki loads — monospace plain text
             <Box
