@@ -45,17 +45,25 @@ export function useUrlScopeFilter({
   // human-readable name from the org graph instead of an opaque id.
   useEffect(() => {
     const raw = router.query.scope;
-    if (typeof raw !== "string") return;
+    if (typeof raw !== "string") {
+      setScopeFilter({ kind: "all" });
+      return;
+    }
     const sepIdx = raw.indexOf(":");
-    if (sepIdx <= 0 || sepIdx === raw.length - 1) return;
+    if (sepIdx <= 0 || sepIdx === raw.length - 1) {
+      setScopeFilter({ kind: "all" });
+      return;
+    }
     const scopeType = raw.slice(0, sepIdx);
     const scopeId = raw.slice(sepIdx + 1);
     if (
       scopeType !== "ORGANIZATION" &&
       scopeType !== "TEAM" &&
       scopeType !== "PROJECT"
-    )
+    ) {
+      setScopeFilter({ kind: "all" });
       return;
+    }
     let name: string | undefined;
     if (scopeType === "ORGANIZATION") {
       name =
@@ -89,7 +97,9 @@ export function useUrlScopeFilter({
       const { scope: _scope, ...rest } = router.query as Record<string, string>;
       void router.replace({ query: rest });
     } else if (next.kind === "team-current" && teamId) {
-      void router.replace({ query: { ...router.query, scope: `TEAM:${teamId}` } });
+      void router.replace({
+        query: { ...router.query, scope: `TEAM:${teamId}` },
+      });
     } else if (next.kind === "project-current" && projectId) {
       void router.replace({
         query: { ...router.query, scope: `PROJECT:${projectId}` },
