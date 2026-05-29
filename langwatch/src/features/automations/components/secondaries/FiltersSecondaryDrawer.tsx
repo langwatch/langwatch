@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import dynamic from "~/utils/compat/next-dynamic";
 import { Switch } from "~/components/ui/switch";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import type { FilterField, FilterParam } from "~/hooks/useFilterParams";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
@@ -141,7 +140,7 @@ export function FiltersSecondaryDrawer({
   return (
     <SecondaryDrawerShell
       open={open}
-      title="Conditions"
+      title="When"
       onClose={onCancel}
       onDone={apply}
       headerRight={
@@ -251,16 +250,16 @@ export function FiltersSecondaryDrawer({
           ) : null}
         </VStack>
       ) : (
-        <HorizontalFormControl
-          label="Conditions"
-          helper="The automation fires when an incoming trace matches every condition."
-          minWidth="calc(50% - 16px)"
-        >
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="xs" color="fg.muted">
+            The automation fires when an incoming trace matches every
+            condition you set below.
+          </Text>
           <FieldsFilters
             filters={local as Record<FilterField, FilterParam>}
             setFilters={(next) => setLocal((prev) => ({ ...prev, ...next }))}
           />
-        </HorizontalFormControl>
+        </VStack>
       )}
     </SecondaryDrawerShell>
   );

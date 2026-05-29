@@ -123,6 +123,11 @@ export function LiquidEditor({
   const modelRef = useRef<MonacoTextModel | null>(null);
   const changeSubscription = useRef<{ dispose: () => void } | null>(null);
   const schemaSubscription = useRef<{ dispose: () => void } | null>(null);
+  // Track when the editor has mounted so the schema-setup useEffect below can
+  // react to prop changes (e.g. toggling the Slack template type to block_kit)
+  // even though `onMount` only fires once. Without this, the editor mounted in
+  // Plain-text mode never got its shadow model when the user switched.
+  const [mounted, setMounted] = React.useState(false);
 
   useEffect(
     () => () => {
@@ -135,24 +140,37 @@ export function LiquidEditor({
     [],
   );
 
+  useEffect(() => {
+    schemaSubscription.current?.dispose();
+    schemaSubscription.current = null;
+    const monaco = monacoRef.current;
+    const model = modelRef.current;
+    if (!mounted || !monaco || !model) return;
+    if (!jsonSchema || !jsonSchemaShadowUri) return;
+    schemaSubscription.current = setupLiquidJsonSchema({
+      monaco,
+      realModel: model,
+      schema: jsonSchema,
+      shadowUri: jsonSchemaShadowUri,
+    });
+    return () => {
+      schemaSubscription.current?.dispose();
+      schemaSubscription.current = null;
+    };
+  }, [mounted, jsonSchema, jsonSchemaShadowUri]);
+
   const onMount: OnMount = (editor, monaco) => {
     monacoRef.current = monaco;
     const model = editor.getModel();
     modelRef.current = model;
     if (isLiquid && model) validateLiquidModel(monaco, model, variables);
-    if (!isLiquid) return;
-    changeSubscription.current = editor.onDidChangeModelContent(() => {
-      const current = editor.getModel();
-      if (current) validateLiquidModel(monaco, current, variables);
-    });
-    if (jsonSchema && jsonSchemaShadowUri && model) {
-      schemaSubscription.current = setupLiquidJsonSchema({
-        monaco,
-        realModel: model,
-        schema: jsonSchema,
-        shadowUri: jsonSchemaShadowUri,
+    if (isLiquid) {
+      changeSubscription.current = editor.onDidChangeModelContent(() => {
+        const current = editor.getModel();
+        if (current) validateLiquidModel(monaco, current, variables);
       });
     }
+    setMounted(true);
   };
 
   return (

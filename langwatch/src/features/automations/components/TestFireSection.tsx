@@ -77,7 +77,7 @@ export function TestFireSection({
           variant="outline"
           size="sm"
         >
-          <Send size={14} /> Test fire
+          <Send size={14} /> Send test
         </Button>
       </HStack>
     </Box>
