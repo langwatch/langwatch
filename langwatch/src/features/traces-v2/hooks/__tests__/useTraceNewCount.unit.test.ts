@@ -77,8 +77,8 @@ describe("useTraceNewCount", () => {
     vi.clearAllMocks();
   });
 
-  /** @scenario Live polling eases off when ClickHouse is overloaded */
   describe("when a live poll fails because ClickHouse is overloaded", () => {
+    /** @scenario Live polling eases off when ClickHouse is overloaded */
     it("backs the poll cadence off to the slow interval", () => {
       renderHook(() => useTraceNewCount());
 
