@@ -78,6 +78,7 @@ describe("POST /api/experiments/abort cross-tenant isolation", () => {
 
       expect(res.status).toBe(404);
       expect(requestAbort).not.toHaveBeenCalled();
+      expect(managerAbort).not.toHaveBeenCalled();
     });
   });
 

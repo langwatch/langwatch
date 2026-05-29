@@ -53,7 +53,7 @@ adversarially re-verified against the actual code path.
 
 ### Authorization (missing RBAC gate)
 
-Five project-scoped endpoints authenticated the caller but enforced no
+Six project-scoped endpoints authenticated the caller but enforced no
 permission, so any valid project token reached the handler regardless of its
 role bindings. **Fixed** by migrating each to the `SecuredApp` builder, which
 makes the permission a mandatory, compile-time-checked argument:
