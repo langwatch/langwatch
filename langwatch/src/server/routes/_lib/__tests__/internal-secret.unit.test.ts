@@ -9,11 +9,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { validateInternalSecret } from "../internal-secret";
+import { isInternalSecretValid } from "../internal-secret";
 
-const ctx = (authorization?: string) => ({
-  req: { header: (name: string) => (name === "authorization" ? authorization : undefined) },
-});
+// Exercise the pure comparison seam directly: `validateInternalSecret(Context)`
+// is a one-line adapter over `isInternalSecretValid(authorizationHeader)`.
+const ctx = (authorization?: string) => authorization;
+const validateInternalSecret = (authorization: string | undefined) =>
+  isInternalSecretValid(authorization);
 
 describe("validateInternalSecret", () => {
   let original: string | undefined;

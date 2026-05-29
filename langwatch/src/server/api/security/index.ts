@@ -1,22 +1,23 @@
 export {
   type AccessPolicy,
-  requires,
   anyAuthenticated,
-  publicEndpoint,
-  internalSecret,
-  handlerManagedAuth,
   describeAccessPolicy,
+  handlerManagedAuth,
+  internalSecret,
+  patPermission,
+  publicEndpoint,
+  requires,
 } from "./access-policy";
 export {
-  SecuredApp,
-  type SecuredVerbs,
-  createProjectApp,
-  createOrgApp,
-  createServiceApp,
-} from "./secured-app";
-export {
+  allRegisteredRoutes,
+  getRoutePolicy,
   type RegisteredRoute,
   registerRoutePolicy,
-  getRoutePolicy,
-  allRegisteredRoutes,
 } from "./route-registry";
+export {
+  createOrgApp,
+  createProjectApp,
+  createServiceApp,
+  SecuredApp,
+  type SecuredVerbs,
+} from "./secured-app";

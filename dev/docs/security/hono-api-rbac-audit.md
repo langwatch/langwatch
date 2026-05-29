@@ -63,12 +63,34 @@ makes the permission a mandatory, compile-time-checked argument:
 | `GET /api/model-providers` | `project:view` |
 | `PUT /api/model-providers/:provider` | `project:update` |
 | `POST /api/analytics/timeseries` | `analytics:view` |
-| `GET /api/experiments` | `workflows:view` |
+| `GET /api/experiments` | `experiments:view` |
 | `GET /api/model-defaults` | `project:view` |
 | `POST /api/copilotkit` | `prompts:view` |
 
 Permissions mirror the equivalent tRPC procedure where one exists (the
 authoritative, type-checked surface) rather than a heuristic guess.
+
+Experiments previously inherited `workflows:view` (the experiment routes live
+under the optimization studio historically). They now have a dedicated
+`experiments:view` / `experiments:manage` permission so a role can read or run
+experiments on prompts and agents without holding any workflow permission. The
+tRPC experiment procedures, the REST list endpoint, and the DSPy / experiment
+bootstrap write routes all gate on the new permission. Built-in roles receive it
+in code; a data migration grants it to existing custom roles that already held
+the matching `workflows:*` permission, so no one loses access.
+
+### Public REST surface — declared permission vs. PAT ceiling
+
+The gateway-platform (`/api/gateway/v1/*`) and governance (`/api/governance/*`)
+families authenticate a project API key and enforce a permission through the
+**API-key ceiling**: legacy project keys keep full access, personal access
+tokens must hold the permission. These were registered as `anyAuthenticated()`
+with the real permission enforced by an inline `requireApiKeyPermission(...)`,
+so the route registry reported "any authenticated" for routes that actually
+require `gatewayBudgets:delete`, `aiTools:manage`, etc. **Fixed** with a
+`patPermission(permission)` policy kind: the project strategy translates it to
+the same ceiling check, and the registry now records the true permission, so the
+introspection audit reflects what each route really requires.
 
 ### Tenant isolation (cross-tenant)
 
@@ -105,8 +127,11 @@ Two layers prevent regression:
 1. **Type-level — `SecuredApp`** (`server/api/security/`). The builder's verb
    methods are only reachable through `.access(policy)`; the bare app exposes no
    `.get/.post/...`. Omitting the policy is a compile error. The policy is one of
-   `requires(permission)`, `anyAuthenticated()`, `publicEndpoint(reason)`,
-   `internalSecret(reason)`, or `handlerManagedAuth(reason)`. The last is for
+   `requires(permission)`, `patPermission(permission)`, `anyAuthenticated()`,
+   `publicEndpoint(reason)`, `internalSecret(reason)`, or
+   `handlerManagedAuth(reason)`. `patPermission` enforces a permission through
+   the API-key ceiling (legacy project keys bypass, PATs must hold it) for the
+   public REST surface. `handlerManagedAuth` is for
    legacy routes that authenticate inside their handler (in-handler API-key
    resolution, `getServerAuthSession`, signature checks, or a framework like
    tRPC/BetterAuth that runs its own per-request RBAC): the builder applies no

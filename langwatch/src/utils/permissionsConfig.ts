@@ -18,6 +18,7 @@ export const orderedResources: Resource[] = [
   Resources.DATASETS,
   Resources.TRIGGERS,
   Resources.WORKFLOWS,
+  Resources.EXPERIMENTS,
   Resources.PROMPTS,
   Resources.SECRETS,
   Resources.AUDIT_LOG,
@@ -43,7 +44,7 @@ export function getValidActionsForResource(resource: Resource): Action[] {
   if (resource === Resources.TRACES) {
     return [Actions.VIEW, Actions.SHARE];
   }
-  if (resource === Resources.SECRETS) {
+  if (resource === Resources.SECRETS || resource === Resources.EXPERIMENTS) {
     return [Actions.VIEW, Actions.MANAGE];
   }
   if (resource === Resources.SCENARIOS) {

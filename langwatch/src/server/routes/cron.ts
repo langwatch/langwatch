@@ -49,9 +49,7 @@ const cronPolicy = () =>
   );
 
 /** Validates the cron shared secret. See validateInternalSecret (fail-closed + constant-time). */
-function validateCronKey(c: {
-  req: { header: (name: string) => string | undefined };
-}): boolean {
+function validateCronKey(c: CronContext): boolean {
   return validateInternalSecret(c);
 }
 

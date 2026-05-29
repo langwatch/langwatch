@@ -95,12 +95,15 @@ const requireAnalyticsView = requireApiKeyPermission({
   prisma,
   permission: "analytics:view",
 });
-// TODO(pat): move DSPy steps under a dedicated experiments permission once
-// the RBAC catalog has one. `workflows:manage` is the closest existing
-// ceiling — VIEWER blocked, ADMIN/MEMBER allowed.
 const requireWorkflowsManage = requireApiKeyPermission({
   prisma,
   permission: "workflows:manage",
+});
+// DSPy step logging + experiment bootstrapping are experiment writes, gated on
+// the dedicated experiments permission rather than the workflow studio's.
+const requireExperimentsManage = requireApiKeyPermission({
+  prisma,
+  permission: "experiments:manage",
 });
 const requireTracesCreate = requireApiKeyPermission({
   prisma,
@@ -253,7 +256,7 @@ secured.access(inRouteAuth).post(
   "/dspy/log_steps",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   authMiddleware,
-  requireWorkflowsManage,
+  requireExperimentsManage,
   async (c) => {
     const project = c.get("project");
 
@@ -386,13 +389,10 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-// TODO(pat): introduce a dedicated `experiments:manage` permission once
-// the RBAC catalog grows beyond workflows. `workflows:manage` is the
-// closest existing ceiling — VIEWER blocked, ADMIN/MEMBER pass through.
 secured.access(inRouteAuth).post(
   "/experiment/init",
   authMiddleware,
-  requireWorkflowsManage,
+  requireExperimentsManage,
   async (c) => {
   const project = c.get("project");
 

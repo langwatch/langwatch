@@ -6,9 +6,14 @@
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { internalSecret, publicEndpoint } from "../access-policy";
+import {
+  describeAccessPolicy,
+  internalSecret,
+  patPermission,
+  publicEndpoint,
+} from "../access-policy";
 import { getRoutePolicy } from "../route-registry";
-import { createServiceApp } from "../secured-app";
+import { createProjectApp, createServiceApp } from "../secured-app";
 
 const noopSecret: MiddlewareHandler = async (_c, next) => next();
 
@@ -74,6 +79,60 @@ describe("SecuredApp", () => {
       const res = await app.hono.request("/api/__test_public/health");
       expect(res.status).toBe(200);
       expect(calls).toEqual(["handler"]); // secret middleware NOT run
+    });
+  });
+
+  describe("when a project route declares a patPermission policy", () => {
+    /** @scenario "A PAT-ceiling route records its real required permission" */
+    it("records the real permission in the registry (not 'any authenticated')", () => {
+      const app = createProjectApp({ basePath: "/api/__test_pat" });
+
+      app
+        .access(patPermission("virtualKeys:view"))
+        .get("/keys", (c) => c.text("ok"));
+
+      const recorded = getRoutePolicy("GET", "/api/__test_pat/keys");
+      expect(recorded?.policy).toEqual({
+        kind: "patPermission",
+        permission: "virtualKeys:view",
+      });
+      expect(describeAccessPolicy(recorded!.policy)).toContain(
+        "virtualKeys:view",
+      );
+    });
+  });
+
+  describe("when an any-method route is registered with .all()", () => {
+    /** @scenario "An any-method route enforces its policy on every method" */
+    it("records method ALL and runs the strategy chain before the handler", async () => {
+      const calls: string[] = [];
+      const secret: MiddlewareHandler = async (_c, next) => {
+        calls.push("secret");
+        await next();
+      };
+      const app = createServiceApp({
+        basePath: "/api/__test_all",
+        verifySecret: secret,
+      });
+      app.access(internalSecret("any-method shim")).all("/everything", (c) => {
+        calls.push("handler");
+        return c.text("ok");
+      });
+
+      const recorded = getRoutePolicy("ALL", "/api/__test_all/everything");
+      expect(recorded?.policy).toEqual({
+        kind: "internal",
+        reason: "any-method shim",
+      });
+
+      for (const method of ["GET", "POST", "DELETE"] as const) {
+        calls.length = 0;
+        const res = await app.hono.request("/api/__test_all/everything", {
+          method,
+        });
+        expect(res.status).toBe(200);
+        expect(calls).toEqual(["secret", "handler"]);
+      }
     });
   });
 

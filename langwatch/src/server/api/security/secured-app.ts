@@ -1,19 +1,21 @@
-import { Hono, type Env, type MiddlewareHandler } from "hono";
+import { type Env, Hono, type MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
 import {
+  type AuthMiddlewareVariables,
   authMiddleware,
   requirePermission,
-  type AuthMiddlewareVariables,
 } from "~/app/api/middleware/auth";
 import { handleError } from "~/app/api/middleware/error-handler";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import {
+  type OrgAuthMiddlewareVariables,
   orgAuthMiddleware,
   requireOrgPermission,
-  type OrgAuthMiddlewareVariables,
 } from "~/app/api/middleware/org-auth";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
+import { prisma } from "~/server/db";
 
 import type { AccessPolicy } from "./access-policy";
 import { registerRoutePolicy } from "./route-registry";
@@ -56,8 +58,16 @@ function familyFromBasePath(basePath: string): string {
  * The verb surface exposed by {@link SecuredApp.access}. Typed EXACTLY as the
  * underlying Hono instance's own verb methods, so validator inference
  * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved
- * natively. The builder only controls HOW you reach these methods — you must
- * first call `.access(policy)`.
+ * natively — that native inference is why the methods keep Hono's own return
+ * type (`Hono<E>`) rather than `void`: collapsing the overloaded verb
+ * signatures to strip the return would break `c.req.valid(...)`.
+ *
+ * The builder only controls HOW you reach these methods — you must first call
+ * `.access(policy)`. A verb returns the raw `Hono<E>`, so chaining a second
+ * verb onto it (`.access(p).get(...).post(...)`) would bypass the policy gate;
+ * the route-registry introspection test is the backstop that fails CI if any
+ * such unclassified route reaches the composed router. Always start each route
+ * with a fresh `.access(...)`.
  */
 export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
   /**
@@ -155,12 +165,14 @@ export class SecuredApp<E extends Env> {
   }
 
   /**
-   * Mount another secured app (or raw Hono) under this one. Use for composing
-   * versioned sub-apps. Routes mounted this way still carry their own declared
-   * policies (recorded when they were built).
+   * Mount another secured app under this one. Use for composing versioned
+   * sub-apps. Routes mounted this way still carry their own declared policies
+   * (recorded when they were built). Only a {@link SecuredApp} can be mounted —
+   * a raw Hono would smuggle in routes with no declared policy, so wrap one in
+   * a SecuredApp first if you must.
    */
-  route(path: string, app: SecuredApp<Env> | Hono<Env>): this {
-    this.hono.route(path, app instanceof SecuredApp ? app.hono : app);
+  route(path: string, app: SecuredApp<Env>): this {
+    this.hono.route(path, app.hono);
     return this;
   }
 
@@ -187,6 +199,14 @@ const projectStrategy: AuthStrategy = {
     switch (policy.kind) {
       case "permission":
         return [authMiddleware, requirePermission(policy.permission)];
+      case "patPermission":
+        // PAT ceiling: legacy project keys keep full access, personal access
+        // tokens must hold the permission. `requireApiKeyPermission` reads the
+        // resolved token `authMiddleware` set, so it runs after it.
+        return [
+          authMiddleware,
+          requireApiKeyPermission({ prisma, permission: policy.permission }),
+        ];
       case "anyAuthenticated":
         return [authMiddleware];
       default:
@@ -223,7 +243,9 @@ const orgStrategy: AuthStrategy = {
  * which set additional context (e.g. a service middleware that sets
  * `c.var.modelProviderService`), so handlers keep full `c.get(...)` typing.
  */
-export function createProjectApp<Extra extends object = Record<never, never>>(args: {
+export function createProjectApp<
+  Extra extends object = Record<never, never>,
+>(args: {
   basePath: string;
 }): SecuredApp<{ Variables: AuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: projectStrategy });
@@ -234,7 +256,9 @@ export function createProjectApp<Extra extends object = Record<never, never>>(ar
  * and authorizes `requires(...)` against org-scoped role bindings — the Hono
  * equivalent of tRPC's `checkOrganizationPermission`.
  */
-export function createOrgApp<Extra extends object = Record<never, never>>(args: {
+export function createOrgApp<
+  Extra extends object = Record<never, never>,
+>(args: {
   basePath: string;
 }): SecuredApp<{ Variables: OrgAuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: orgStrategy });

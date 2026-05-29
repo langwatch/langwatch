@@ -8,19 +8,13 @@
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
 import type { Context } from "hono";
+import { env } from "~/env.mjs";
+import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
-import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
-import { env } from "~/env.mjs";
-import {
-  createServiceApp,
-  publicEndpoint,
-} from "~/server/api/security";
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:auth");
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -143,9 +137,7 @@ const logoutHandler = async (c: Context) => {
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {
-      const returnTo = encodeURIComponent(
-        `${env.NEXTAUTH_URL}/auth/signin`,
-      );
+      const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
       const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
       return c.redirect(federatedLogoutUrl, 302);
     } else {
@@ -170,19 +162,19 @@ const betterAuthCatchAll = async (c: Context) => {
       baseUrl: env.NEXTAUTH_URL,
     })
   ) {
-    return c.json(
-      { message: "Invalid origin", code: "INVALID_ORIGIN" },
-      403,
-    );
+    return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 
   // BetterAuth's auth.handler is fetch-compatible (Request => Response)
   return auth.handler(c.req.raw);
 };
 
-for (const verb of ["get", "post", "put", "patch", "delete"] as const) {
-  secured.access(authPolicy())[verb]("/auth/*", betterAuthCatchAll);
-}
+// `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach
+// BetterAuth — it terminates the request itself. Registered with method
+// "ALL" + a wildcard path, this is intentionally outside the router
+// introspection cross-check (a wildcard mount can't be enumerated), but it
+// still carries a declared policy because it goes through `.access(...)`.
+secured.access(authPolicy()).all("/auth/*", betterAuthCatchAll);
 
 function extractCookie(cookieHeader: string, name: string): string | null {
   const match = cookieHeader

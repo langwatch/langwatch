@@ -26,7 +26,7 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     A route is registered through the secured app builder, whose verb methods are
     only reachable via `.access(policy)`. The policy is one of:
-      requires(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason) | handlerManagedAuth(reason)
+      requires(permission) | patPermission(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason) | handlerManagedAuth(reason)
     Omitting it is a TypeScript error. Bypassing the builder is caught by a CI test
     that introspects the fully composed router against the route registry. Every
     family is migrated, so there is no allowlist: every concrete endpoint must
@@ -50,6 +50,18 @@ Feature: Hono API endpoint authorization and tenant isolation
       Given the route registry
       When a route's policy is publicEndpoint, internalSecret, or handlerManagedAuth
       Then it carries a non-empty human-readable reason
+
+    @unit
+    Scenario: A PAT-ceiling route records its real required permission
+      Given a public REST route guarded by the API-key ceiling
+      When it is registered with patPermission instead of anyAuthenticated
+      Then the route registry records the real permission, not "any authenticated"
+
+    @unit
+    Scenario: An any-method route enforces its policy on every method
+      Given a route registered with .all and an internalSecret policy
+      When the route is called with GET, POST, or DELETE
+      Then the policy chain runs before the handler for each method
 
   # ============================================================================
   Rule: A caller without the route's permission is forbidden
@@ -122,3 +134,17 @@ Feature: Hono API endpoint authorization and tenant isolation
       Given a budget create request scoped to a team or project outside the caller's organization
       When the budget service processes it
       Then it rejects the request with a clear error and creates no budget
+
+  # ============================================================================
+  Rule: Experiments are authorized by their own permission, not workflows
+
+    Experiments historically inherited workflows:view because they lived under
+    the optimization studio. They now have a dedicated experiments:view /
+    experiments:manage permission so a role can read or run experiments on
+    prompts and agents without holding any workflow permission.
+
+    @unit
+    Scenario: Experiments use a dedicated permission decoupled from workflows
+      Given the built-in team roles
+      Then every role that can view workflows also has experiments:view
+      And only roles that can manage workflows have experiments:manage

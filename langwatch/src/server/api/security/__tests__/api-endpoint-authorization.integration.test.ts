@@ -18,22 +18,27 @@ import { describe, expect, it } from "vitest";
 import { allRegisteredRoutes } from "../route-registry";
 
 /**
- * Endpoints mounted in the composed router. The only entries excluded are
- * method-"ALL" routes whose path is a wildcard: those are app-level middleware
- * (`.use`, registered at `/base/*`) and sub-app mounts / `.all("/*")` shims —
- * not addressable endpoints. Everything else is audited, INCLUDING:
- *   - concrete-path `app.all(...)` routes (Hono registers these with method
- *     "ALL"; they are real, reachable, any-method endpoints), and
- *   - specific-method wildcard catch-alls (e.g. GET /api/sse/*, /api/trpc/*),
- * so neither a `.all()` data route nor a catch-all can slip past the guarantee.
+ * A method-"ALL" route on a wildcard path is either app-level middleware
+ * (`.use`, registered at `/base/*`), a sub-app mount, or a deliberate
+ * `.all("/auth/*")`-style catch-all that terminates the request inside its
+ * own framework (BetterAuth). None of these are enumerable concrete
+ * endpoints, so they are excluded from BOTH sides of the cross-check.
+ *
+ * Everything else is still audited, INCLUDING concrete-path `app.all(...)`
+ * routes (real any-method endpoints) and specific-method wildcard catch-alls
+ * (e.g. GET /api/sse/*, /api/trpc/*) — so neither can slip past the guarantee.
  */
+const isUnenumerableMount = (method: string, path: string): boolean =>
+  method.toUpperCase() === "ALL" && path.includes("*");
+
 const liveEndpoints = async (): Promise<Set<string>> => {
   const { createApiRouter } = await import("~/server/api-router");
   const router = createApiRouter();
   const set = new Set<string>();
-  for (const r of (router as unknown as { routes: { method: string; path: string }[] }).routes) {
-    const isMiddlewareOrMount = r.method.toUpperCase() === "ALL" && r.path.includes("*");
-    if (isMiddlewareOrMount) continue;
+  for (const r of (
+    router as unknown as { routes: { method: string; path: string }[] }
+  ).routes) {
+    if (isUnenumerableMount(r.method, r.path)) continue;
     set.add(`${r.method.toUpperCase()} ${r.path}`);
   }
   return set;
@@ -62,6 +67,7 @@ describe("API router endpoint authorization guarantee", () => {
     it("mounts every SecuredApp-registered route in the composed router", async () => {
       const live = await liveEndpoints();
       const missing = allRegisteredRoutes()
+        .filter((r) => !isUnenumerableMount(r.method, r.path))
         .map((r) => `${r.method} ${r.path}`)
         .filter((key) => !live.has(key));
       expect(

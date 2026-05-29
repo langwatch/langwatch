@@ -13,13 +13,13 @@ import {
   datasetServiceMiddleware,
 } from "../../middleware/dataset-service";
 import { baseResponses } from "../../shared/base-responses";
-import { platformUrl } from "../../shared/platform-url";
 import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
   UnprocessableEntityError,
 } from "../../shared/errors";
+import { platformUrl } from "../../shared/platform-url";
 import { errorSchema } from "../../shared/schemas";
 import { MAX_LIMIT_MB } from "./constants";
 import { handleDatasetError } from "./error-handler";
@@ -55,7 +55,10 @@ const updateRecordSchema = z.object({
 });
 
 const deleteRecordsSchema = z.object({
-  recordIds: z.array(z.string()).min(1, "recordIds is required").max(1000, "Maximum 1000 records per batch delete"),
+  recordIds: z
+    .array(z.string())
+    .min(1, "recordIds is required")
+    .max(1000, "Maximum 1000 records per batch delete"),
 });
 
 const batchCreateRecordsSchema = z.object({
@@ -70,7 +73,10 @@ const batchCreateRecordsSchema = z.object({
  * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
  */
 function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
+  result: {
+    success: boolean;
+    error?: { issues: Array<{ message?: string; path?: (string | number)[] }> };
+  },
   c: { json: (body: unknown, status: number) => Response },
 ): Response | undefined {
   if (!result.success) {
@@ -116,29 +122,29 @@ secured.access(requires("datasets:view")).get(
     description: "List all non-archived datasets for the project (paginated)",
   }),
   zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
-      const service = c.get("datasetService");
+  async (c) => {
+    const project = c.get("project");
+    const { page, limit } = c.req.valid("query");
+    const service = c.get("datasetService");
 
-      const result = await service.listDatasets({
-        projectId: project.id,
-        page,
-        limit,
-      });
+    const result = await service.listDatasets({
+      projectId: project.id,
+      page,
+      limit,
+    });
 
-      return c.json({
-        ...result,
-        data: result.data.map((d: { id: string; slug?: string }) => ({
-          ...d,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/datasets/${d.id}`,
-          }),
-        })),
-      });
-    },
-  );
+    return c.json({
+      ...result,
+      data: result.data.map((d: { id: string; slug?: string }) => ({
+        ...d,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/datasets/${d.id}`,
+        }),
+      })),
+    });
+  },
+);
 
 // ── Create Dataset ─────────────────────────────────────────────
 secured.access(requires("datasets:manage")).post(
@@ -149,47 +155,47 @@ secured.access(requires("datasets:manage")).post(
   }),
   resourceLimitMiddleware("datasets"),
   zValidator("json", createDatasetSchema, validationHook),
-    async (c) => {
-      const project = c.get("project");
-      const { name, columnTypes } = c.req.valid("json");
-      const service = c.get("datasetService");
+  async (c) => {
+    const project = c.get("project");
+    const { name, columnTypes } = c.req.valid("json");
+    const service = c.get("datasetService");
 
-      try {
-        const dataset = await service.upsertDataset({
-          projectId: project.id,
-          name,
-          columnTypes,
-        });
+    try {
+      const dataset = await service.upsertDataset({
+        projectId: project.id,
+        name,
+        columnTypes,
+      });
 
+      return c.json(
+        {
+          id: dataset.id,
+          name: dataset.name,
+          slug: dataset.slug,
+          columnTypes: dataset.columnTypes,
+          createdAt: dataset.createdAt,
+          updatedAt: dataset.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/datasets/${dataset.id}`,
+          }),
+        },
+        201,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.name === "DatasetConflictError") {
         return c.json(
           {
-            id: dataset.id,
-            name: dataset.name,
-            slug: dataset.slug,
-            columnTypes: dataset.columnTypes,
-            createdAt: dataset.createdAt,
-            updatedAt: dataset.updatedAt,
-            platformUrl: platformUrl({
-              projectSlug: project.slug,
-              path: `/datasets/${dataset.id}`,
-            }),
+            error: "Conflict",
+            message: "A dataset with this slug already exists",
           },
-          201,
+          409,
         );
-      } catch (error) {
-        if (error instanceof Error && error.name === "DatasetConflictError") {
-          return c.json(
-            {
-              error: "Conflict",
-              message: "A dataset with this slug already exists",
-            },
-            409,
-          );
-        }
-        throw error;
       }
-    },
-  );
+      throw error;
+    }
+  },
+);
 
 // ── Create + Upload Dataset from File ─────────────────────────
 // IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
@@ -198,61 +204,68 @@ secured.access(requires("datasets:manage")).post(
   "/upload",
   datasetServiceMiddleware,
   describeRoute({
-    description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+    description:
+      "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
   }),
   resourceLimitMiddleware("datasets"),
   async (c) => {
-      const project = c.get("project");
-      const service = c.get("datasetService");
+    const project = c.get("project");
+    const service = c.get("datasetService");
 
-      const body = await c.req.parseBody();
-      const file = body["file"];
-      const name = body["name"];
+    const body = await c.req.parseBody();
+    const file = body["file"];
+    const name = body["name"];
 
-      if (!name || typeof name !== "string" || name.trim() === "") {
-        throw new UnprocessableEntityError("name field is required");
-      }
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      throw new UnprocessableEntityError("name field is required");
+    }
 
-      if (!file || !(file instanceof File)) {
-        throw new UnprocessableEntityError("file field is required");
-      }
+    if (!file || !(file instanceof File)) {
+      throw new UnprocessableEntityError("file field is required");
+    }
 
-      const content = await file.text();
+    const content = await file.text();
 
-      try {
-        const result = await service.createDatasetFromUpload({
-          projectId: project.id,
-          name: name.trim(),
-          filename: file.name,
-          content,
-          fileSize: file.size,
-        });
+    try {
+      const result = await service.createDatasetFromUpload({
+        projectId: project.id,
+        name: name.trim(),
+        filename: file.name,
+        content,
+        fileSize: file.size,
+      });
 
-        return c.json(result, 201);
-      } catch (error) {
-        if (error instanceof UploadValidationError) {
-          if (error.kind === "file_too_large" || error.kind === "row_limit_exceeded") {
-            throw new BadRequestError(error.message);
-          }
-          throw new UnprocessableEntityError(error.message);
+      return c.json(result, 201);
+    } catch (error) {
+      if (error instanceof UploadValidationError) {
+        if (
+          error.kind === "file_too_large" ||
+          error.kind === "row_limit_exceeded"
+        ) {
+          throw new BadRequestError(error.message);
         }
-        if (error instanceof Error && error.name === "DatasetConflictError") {
-          return c.json(
-            {
-              error: "Conflict",
-              message: "A dataset with this slug already exists",
-            },
-            409,
-          );
-        }
-        // Unsupported format from detectFileFormat
-        if (error instanceof Error && error.message.includes("Unsupported file format")) {
-          throw new UnprocessableEntityError(error.message);
-        }
-        throw error;
+        throw new UnprocessableEntityError(error.message);
       }
-    },
-  );
+      if (error instanceof Error && error.name === "DatasetConflictError") {
+        return c.json(
+          {
+            error: "Conflict",
+            message: "A dataset with this slug already exists",
+          },
+          409,
+        );
+      }
+      // Unsupported format from detectFileFormat
+      if (
+        error instanceof Error &&
+        error.message.includes("Unsupported file format")
+      ) {
+        throw new UnprocessableEntityError(error.message);
+      }
+      throw error;
+    }
+  },
+);
 
 // ── Upload File to Existing Dataset ─────────────────────────────
 secured.access(requires("datasets:manage")).post(
@@ -262,397 +275,405 @@ secured.access(requires("datasets:manage")).post(
     description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
   }),
   async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("datasetService");
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("datasetService");
 
-      const body = await c.req.parseBody();
-      const file = body["file"];
+    const body = await c.req.parseBody();
+    const file = body["file"];
 
-      if (!file || !(file instanceof File)) {
-        throw new UnprocessableEntityError("file field is required");
-      }
+    if (!file || !(file instanceof File)) {
+      throw new UnprocessableEntityError("file field is required");
+    }
 
-      const content = await file.text();
+    const content = await file.text();
 
-      try {
-        const result = await service.uploadToExistingDataset({
-          slugOrId,
-          projectId: project.id,
-          filename: file.name,
-          content,
-          fileSize: file.size,
-        });
+    try {
+      const result = await service.uploadToExistingDataset({
+        slugOrId,
+        projectId: project.id,
+        filename: file.name,
+        content,
+        fileSize: file.size,
+      });
 
-        return c.json(result);
-      } catch (error) {
-        if (error instanceof UploadValidationError) {
-          if (error.kind === "file_too_large" || error.kind === "row_limit_exceeded" || error.kind === "column_mismatch") {
-            throw new BadRequestError(error.message);
-          }
-          if (error.kind === "empty_file" || error.kind === "unsupported_format") {
-            throw new UnprocessableEntityError(error.message);
-          }
-          throw new UnprocessableEntityError(error.message);
-        }
-        if (error instanceof Error && error.name === "DatasetNotFoundError") {
-          throw new NotFoundError("Dataset not found");
-        }
-        // Unsupported format from detectFileFormat
-        if (error instanceof Error && error.message.includes("Unsupported file format")) {
-          throw new UnprocessableEntityError(error.message);
-        }
-        throw error;
-      }
-    },
-  )
-
-  // ── Batch Create Records ──────────────────────────────────────
-secured.access(requires("datasets:manage")).post(
-    "/:slugOrId/records",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Create records in a dataset in batch",
-    }),
-    zValidator("json", batchCreateRecordsSchema, validationHook),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { entries } = c.req.valid("json");
-      const service = c.get("datasetService");
-
-      try {
-        const records = await service.batchCreateRecords({
-          slugOrId,
-          projectId: project.id,
-          entries,
-        });
-
-        return c.json({ data: records }, 201);
-      } catch (error) {
-        if (error instanceof Error && error.name === "InvalidColumnError") {
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof UploadValidationError) {
+        if (
+          error.kind === "file_too_large" ||
+          error.kind === "row_limit_exceeded" ||
+          error.kind === "column_mismatch"
+        ) {
           throw new BadRequestError(error.message);
         }
         if (
-          error instanceof Error &&
-          error.name === "MalformedColumnTypesError"
+          error.kind === "empty_file" ||
+          error.kind === "unsupported_format"
         ) {
-          throw new InternalServerError(error.message);
+          throw new UnprocessableEntityError(error.message);
         }
-        return mapDatasetNotFoundError(error);
+        throw new UnprocessableEntityError(error.message);
       }
-    },
-  )
+      if (error instanceof Error && error.name === "DatasetNotFoundError") {
+        throw new NotFoundError("Dataset not found");
+      }
+      // Unsupported format from detectFileFormat
+      if (
+        error instanceof Error &&
+        error.message.includes("Unsupported file format")
+      ) {
+        throw new UnprocessableEntityError(error.message);
+      }
+      throw error;
+    }
+  },
+);
 
-  // ── Legacy: Add Entries ────────────────────────────────────────
+// ── Batch Create Records ──────────────────────────────────────
 secured.access(requires("datasets:manage")).post(
-    "/:slug/entries",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Add entries to a dataset",
-    }),
-    zValidator(
-      "json",
-      z
-        .object({
-          entries: z
-            .array(z.record(z.string(), z.any()))
-            // @ts-ignore
-            .openapi({
-              example: [
-                {
-                  input: "hi",
-                  output: "Hello, how can I help you today?",
-                },
-              ],
-            }),
-        })
-        // @ts-ignore
-        .openapi({ ref: "DatasetPostEntries" }),
-    ),
-    async (c) => {
-      const { slug } = c.req.param();
-      const project = c.get("project");
-      const { entries } = c.req.valid("json");
-      const service = c.get("datasetService");
+  "/:slugOrId/records",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Create records in a dataset in batch",
+  }),
+  zValidator("json", batchCreateRecordsSchema, validationHook),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const { entries } = c.req.valid("json");
+    const service = c.get("datasetService");
 
-      let dataset;
-      try {
-        dataset = await service.getBySlugOrId({
-          slugOrId: slug,
-          projectId: project.id,
-        });
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
-
-      const columns = Object.fromEntries(
-        (dataset.columnTypes as DatasetColumns).map((column) => [
-          column.name,
-          column.type,
-        ]),
-      );
-      for (const entry of entries) {
-        for (const [key] of Object.entries(entry)) {
-          if (!columns[key]) {
-            throw new BadRequestError(
-              `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`,
-            );
-          }
-        }
-      }
-
-      const now = Date.now();
-
-      await createManyDatasetRecords({
-        datasetId: dataset.id,
+    try {
+      const records = await service.batchCreateRecords({
+        slugOrId,
         projectId: project.id,
-        datasetRecords: entries.map((entry, index) => ({
-          id: `${now}-${index}`,
-          ...entry,
-        })),
+        entries,
       });
 
-      return c.json({ success: true });
-    },
-  )
-
-  // ── Get Single Dataset ─────────────────────────────────────────
-secured.access(requires("datasets:view")).get(
-    "/:slugOrId",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Get a dataset by its slug or id.",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(datasetOutputSchema),
-        404: {
-          description: "Dataset not found",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      if (!slugOrId) {
-        throw new UnprocessableEntityError("Dataset slug or id is required");
+      return c.json({ data: records }, 201);
+    } catch (error) {
+      if (error instanceof Error && error.name === "InvalidColumnError") {
+        throw new BadRequestError(error.message);
       }
-
-      const project = c.get("project");
-      const service = c.get("datasetService");
-
-      let result;
-      try {
-        result = await service.getDatasetWithRecords({
-          slugOrId,
-          projectId: project.id,
-          limitMb: MAX_LIMIT_MB,
-        });
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
+      if (
+        error instanceof Error &&
+        error.name === "MalformedColumnTypesError"
+      ) {
+        throw new InternalServerError(error.message);
       }
+      return mapDatasetNotFoundError(error);
+    }
+  },
+);
 
-      const { dataset, records, truncated } = result;
-      if (truncated) {
-        throw new BadRequestError(
-          `Dataset size exceeds ${MAX_LIMIT_MB}MB limit`,
-        );
-      }
-
-      return c.json({
-        id: dataset.id,
-        name: dataset.name,
-        slug: dataset.slug,
-        columnTypes: dataset.columnTypes,
-        createdAt: dataset.createdAt,
-        updatedAt: dataset.updatedAt,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/datasets/${dataset.id}`,
-        }),
-        data: records,
-      });
-    },
-  )
-
-  // ── Update Dataset ─────────────────────────────────────────────
-secured.access(requires("datasets:manage")).patch(
-    "/:slugOrId",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Update a dataset by its slug or id",
-    }),
-    zValidator("json", updateDatasetSchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      const service = c.get("datasetService");
-
-      let dataset;
-      try {
-        dataset = await service.getBySlugOrId({
-          slugOrId,
-          projectId: project.id,
-        });
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
-
-      try {
-        const updated = await service.upsertDataset({
-          projectId: project.id,
-          datasetId: dataset.id,
-          name: body.name ?? dataset.name,
-          columnTypes:
-            (body.columnTypes as DatasetColumns) ??
-            (dataset.columnTypes as DatasetColumns),
-        });
-
-        return c.json({
-          id: updated.id,
-          name: updated.name,
-          slug: updated.slug,
-          columnTypes: updated.columnTypes,
-          createdAt: updated.createdAt,
-          updatedAt: updated.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/datasets/${updated.id}`,
+// ── Legacy: Add Entries ────────────────────────────────────────
+secured.access(requires("datasets:manage")).post(
+  "/:slug/entries",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Add entries to a dataset",
+  }),
+  zValidator(
+    "json",
+    z
+      .object({
+        entries: z
+          .array(z.record(z.string(), z.any()))
+          // @ts-ignore
+          .openapi({
+            example: [
+              {
+                input: "hi",
+                output: "Hello, how can I help you today?",
+              },
+            ],
           }),
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "DatasetConflictError") {
-          return c.json(
-            {
-              error: "Conflict",
-              message: "A dataset with this slug already exists",
-            },
-            409,
+      })
+      // @ts-ignore
+      .openapi({ ref: "DatasetPostEntries" }),
+  ),
+  async (c) => {
+    const { slug } = c.req.param();
+    const project = c.get("project");
+    const { entries } = c.req.valid("json");
+    const service = c.get("datasetService");
+
+    let dataset;
+    try {
+      dataset = await service.getBySlugOrId({
+        slugOrId: slug,
+        projectId: project.id,
+      });
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+
+    const columns = Object.fromEntries(
+      (dataset.columnTypes as DatasetColumns).map((column) => [
+        column.name,
+        column.type,
+      ]),
+    );
+    for (const entry of entries) {
+      for (const [key] of Object.entries(entry)) {
+        if (!columns[key]) {
+          throw new BadRequestError(
+            `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`,
           );
         }
-        if (error instanceof Error && error.name === "DatasetNotFoundError") {
-          throw new NotFoundError("Dataset not found");
-        }
-        throw error;
       }
-    },
-  )
+    }
 
-  // ── Delete (Archive) Dataset ───────────────────────────────────
-secured.access(requires("datasets:manage")).delete(
-    "/:slugOrId",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Archive a dataset (soft-delete)",
-    }),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("datasetService");
+    const now = Date.now();
 
-      try {
-        const result = await service.archiveDataset({
-          slugOrId,
-          projectId: project.id,
-        });
-        return c.json(result);
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
-    },
-  )
+    await createManyDatasetRecords({
+      datasetId: dataset.id,
+      projectId: project.id,
+      datasetRecords: entries.map((entry, index) => ({
+        id: `${now}-${index}`,
+        ...entry,
+      })),
+    });
 
-  // ── List Records (paginated) ───────────────────────────────────
+    return c.json({ success: true });
+  },
+);
+
+// ── Get Single Dataset ─────────────────────────────────────────
 secured.access(requires("datasets:view")).get(
-    "/:slugOrId/records",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "List records for a dataset (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
-      const service = c.get("datasetService");
-
-      try {
-        const result = await service.listRecords({
-          slugOrId,
-          projectId: project.id,
-          page,
-          limit,
-        });
-        return c.json(result);
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
+  "/:slugOrId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Get a dataset by its slug or id.",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(datasetOutputSchema),
+      404: {
+        description: "Dataset not found",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
     },
-  )
+  }),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    if (!slugOrId) {
+      throw new UnprocessableEntityError("Dataset slug or id is required");
+    }
 
-  // ── Update / Upsert Record ─────────────────────────────────────
+    const project = c.get("project");
+    const service = c.get("datasetService");
+
+    let result;
+    try {
+      result = await service.getDatasetWithRecords({
+        slugOrId,
+        projectId: project.id,
+        limitMb: MAX_LIMIT_MB,
+      });
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+
+    const { dataset, records, truncated } = result;
+    if (truncated) {
+      throw new BadRequestError(`Dataset size exceeds ${MAX_LIMIT_MB}MB limit`);
+    }
+
+    return c.json({
+      id: dataset.id,
+      name: dataset.name,
+      slug: dataset.slug,
+      columnTypes: dataset.columnTypes,
+      createdAt: dataset.createdAt,
+      updatedAt: dataset.updatedAt,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/datasets/${dataset.id}`,
+      }),
+      data: records,
+    });
+  },
+);
+
+// ── Update Dataset ─────────────────────────────────────────────
 secured.access(requires("datasets:manage")).patch(
-    "/:slugOrId/records/:recordId",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Update or create a record in a dataset",
-    }),
-    zValidator("json", updateRecordSchema),
-    async (c) => {
-      const { slugOrId, recordId } = c.req.param();
-      const project = c.get("project");
-      const { entry } = c.req.valid("json");
-      const service = c.get("datasetService");
+  "/:slugOrId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Update a dataset by its slug or id",
+  }),
+  zValidator("json", updateDatasetSchema),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const body = c.req.valid("json");
+    const service = c.get("datasetService");
 
-      try {
-        const { record, created } = await service.upsertRecord({
-          slugOrId,
-          projectId: project.id,
-          recordId,
-          entry,
-        });
+    let dataset;
+    try {
+      dataset = await service.getBySlugOrId({
+        slugOrId,
+        projectId: project.id,
+      });
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
 
-        return c.json(record, created ? 201 : 200);
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
+    try {
+      const updated = await service.upsertDataset({
+        projectId: project.id,
+        datasetId: dataset.id,
+        name: body.name ?? dataset.name,
+        columnTypes:
+          (body.columnTypes as DatasetColumns) ??
+          (dataset.columnTypes as DatasetColumns),
+      });
+
+      return c.json({
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        columnTypes: updated.columnTypes,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/datasets/${updated.id}`,
+        }),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "DatasetConflictError") {
+        return c.json(
+          {
+            error: "Conflict",
+            message: "A dataset with this slug already exists",
+          },
+          409,
+        );
       }
-    },
-  )
+      if (error instanceof Error && error.name === "DatasetNotFoundError") {
+        throw new NotFoundError("Dataset not found");
+      }
+      throw error;
+    }
+  },
+);
 
-  // ── Batch Delete Records ───────────────────────────────────────
+// ── Delete (Archive) Dataset ───────────────────────────────────
 secured.access(requires("datasets:manage")).delete(
-    "/:slugOrId/records",
-    datasetServiceMiddleware,
-    describeRoute({
-      description: "Delete records from a dataset by IDs",
-    }),
-    zValidator("json", deleteRecordsSchema, validationHook),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { recordIds } = c.req.valid("json");
-      const service = c.get("datasetService");
+  "/:slugOrId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Archive a dataset (soft-delete)",
+  }),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("datasetService");
 
-      let result;
-      try {
-        result = await service.deleteRecords({
-          slugOrId,
-          projectId: project.id,
-          recordIds,
-        });
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
+    try {
+      const result = await service.archiveDataset({
+        slugOrId,
+        projectId: project.id,
+      });
+      return c.json(result);
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+  },
+);
 
-      if (result.count === 0) {
-        throw new NotFoundError("No matching records found");
-      }
+// ── List Records (paginated) ───────────────────────────────────
+secured.access(requires("datasets:view")).get(
+  "/:slugOrId/records",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "List records for a dataset (paginated)",
+  }),
+  zValidator("query", paginationQuerySchema),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const { page, limit } = c.req.valid("query");
+    const service = c.get("datasetService");
 
-      return c.json({ deletedCount: result.count });
-    },
-  );
+    try {
+      const result = await service.listRecords({
+        slugOrId,
+        projectId: project.id,
+        page,
+        limit,
+      });
+      return c.json(result);
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+  },
+);
+
+// ── Update / Upsert Record ─────────────────────────────────────
+secured.access(requires("datasets:manage")).patch(
+  "/:slugOrId/records/:recordId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Update or create a record in a dataset",
+  }),
+  zValidator("json", updateRecordSchema),
+  async (c) => {
+    const { slugOrId, recordId } = c.req.param();
+    const project = c.get("project");
+    const { entry } = c.req.valid("json");
+    const service = c.get("datasetService");
+
+    try {
+      const { record, created } = await service.upsertRecord({
+        slugOrId,
+        projectId: project.id,
+        recordId,
+        entry,
+      });
+
+      return c.json(record, created ? 201 : 200);
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+  },
+);
+
+// ── Batch Delete Records ───────────────────────────────────────
+secured.access(requires("datasets:manage")).delete(
+  "/:slugOrId/records",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Delete records from a dataset by IDs",
+  }),
+  zValidator("json", deleteRecordsSchema, validationHook),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    const project = c.get("project");
+    const { recordIds } = c.req.valid("json");
+    const service = c.get("datasetService");
+
+    let result;
+    try {
+      result = await service.deleteRecords({
+        slugOrId,
+        projectId: project.id,
+        recordIds,
+      });
+    } catch (error) {
+      return mapDatasetNotFoundError(error);
+    }
+
+    if (result.count === 0) {
+      throw new NotFoundError("No matching records found");
+    }
+
+    return c.json({ deletedCount: result.count });
+  },
+);
 
 export const app = secured.hono;

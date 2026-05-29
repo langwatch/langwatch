@@ -13,98 +13,27 @@
  * service-to-service write path can drop the synthetic id entirely; until
  * then this preserves a stable per-project actor for forensic queries.
  */
+
+import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
-
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
+import { createProjectApp, patPermission } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
+import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
+import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
 // GatewayProviderCredentialService removed in iter 110; /providers REST
 // routes return 410 Gone until A3 lands the ModelProvider-backed
 // replacement surface (current proposal: fold into /model-providers).
 import {
-  VirtualKeyService,
   type CreateVirtualKeyInput,
+  VirtualKeyService,
 } from "~/server/gateway/virtualKey.service";
-import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
-import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-
-import { createProjectApp, anyAuthenticated } from "~/server/api/security";
-import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
-
-// PAT permission ceilings for every gateway-platform route. Legacy project
-// API tokens bypass the ceiling (full access — current behaviour); PATs must
-// have the matching RBAC permission at the project scope. Same pattern as
-// `src/server/routes/misc.ts` (analytics / workflows / traces / triggers).
-const requireVirtualKeysView = requireApiKeyPermission({
-  prisma,
-  permission: "virtualKeys:view",
-});
-const requireVirtualKeysCreate = requireApiKeyPermission({
-  prisma,
-  permission: "virtualKeys:create",
-});
-const requireVirtualKeysUpdate = requireApiKeyPermission({
-  prisma,
-  permission: "virtualKeys:update",
-});
-const requireVirtualKeysRotate = requireApiKeyPermission({
-  prisma,
-  permission: "virtualKeys:rotate",
-});
-const requireVirtualKeysDelete = requireApiKeyPermission({
-  prisma,
-  permission: "virtualKeys:delete",
-});
-const requireGatewayProvidersView = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayProviders:view",
-});
-const requireGatewayProvidersUpdate = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayProviders:update",
-});
-const requireGatewayProvidersManage = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayProviders:manage",
-});
-const requireGatewayBudgetsView = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayBudgets:view",
-});
-const requireGatewayBudgetsCreate = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayBudgets:create",
-});
-const requireGatewayBudgetsUpdate = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayBudgets:update",
-});
-const requireGatewayBudgetsDelete = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayBudgets:delete",
-});
-const requireGatewayCacheRulesView = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayCacheRules:view",
-});
-const requireGatewayCacheRulesCreate = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayCacheRules:create",
-});
-const requireGatewayCacheRulesUpdate = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayCacheRules:update",
-});
-const requireGatewayCacheRulesDelete = requireApiKeyPermission({
-  prisma,
-  permission: "gatewayCacheRules:delete",
-});
+import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -140,11 +69,6 @@ const budgetDtoSchema = z.object({
   spent_usd: z.string(),
   resets_at: z.string(),
   archived_at: z.string().nullable(),
-});
-
-const providerDtoSchema = z.object({
-  id: z.string(),
-  disabled_at: z.string().nullable().optional(),
 });
 
 const cacheRuleMatchersSchema = z
@@ -261,73 +185,75 @@ const secured = createProjectApp({ basePath: "/api/gateway/v1" });
 
 // ── Virtual keys ────────────────────────────────────────────────────────
 
-secured.access(anyAuthenticated()).get(
-    "/virtual-keys",
-    describeRoute({
-      summary: "List virtual keys",
-      description:
-        "Returns every non-archived virtual key in the caller's project, ordered by creation time.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Virtual keys for the project",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ data: z.array(virtualKeyDtoSchema) }),
-              ),
-            },
+secured.access(patPermission("virtualKeys:view")).get(
+  "/virtual-keys",
+  describeRoute({
+    summary: "List virtual keys",
+    description:
+      "Returns every non-archived virtual key in the caller's project, ordered by creation time.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Virtual keys for the project",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ data: z.array(virtualKeyDtoSchema) })),
           },
         },
       },
-    }),
-    requireVirtualKeysView,
-    async (c) => {
-      const project = c.get("project");
-      const service = VirtualKeyService.create(prisma);
-      const rows = await service.getAll(project.id);
-      return c.json({ data: rows.map(toVkDto) });
     },
-  )
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const service = VirtualKeyService.create(prisma);
+    const rows = await service.getAll(project.id);
+    return c.json({ data: rows.map(toVkDto) });
+  },
+);
 
-secured.access(anyAuthenticated()).post(
-    "/virtual-keys",
-    describeRoute({
-      summary: "Create virtual key",
-      description:
-        "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Virtual key created",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  virtual_key: virtualKeyDtoSchema,
-                  secret: z.string(),
-                }),
-              ),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
+secured.access(patPermission("virtualKeys:create")).post(
+  "/virtual-keys",
+  describeRoute({
+    summary: "Create virtual key",
+    description:
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Virtual key created",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                virtual_key: virtualKeyDtoSchema,
+                secret: z.string(),
+              }),
+            ),
           },
         },
       },
-    }),
-    requireVirtualKeysCreate,
-    async (c) => {
+      400: {
+        description: "Validation error",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const body = createVirtualKeySchema.safeParse(await c.req.json());
     if (!body.success) {
       return c.json(
-        { error: { type: "bad_request", code: "validation_error", message: body.error.message } },
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: body.error.message,
+          },
+        },
         400,
       );
     }
@@ -351,85 +277,93 @@ secured.access(anyAuthenticated()).post(
       "Created virtual key via REST",
     );
     // Secret is returned exactly once — caller MUST persist it.
-    return c.json(
-      { virtual_key: toVkDto(virtualKey), secret },
-      201,
-    );
-  })
+    return c.json({ virtual_key: toVkDto(virtualKey), secret }, 201);
+  },
+);
 
-secured.access(anyAuthenticated()).get(
-    "/virtual-keys/:id",
-    describeRoute({
-      summary: "Get virtual key",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Virtual key detail",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
+secured.access(patPermission("virtualKeys:view")).get(
+  "/virtual-keys/:id",
+  describeRoute({
+    summary: "Get virtual key",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Virtual key detail",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
           },
         },
       },
-    }),
-    requireVirtualKeysView,
-    async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const service = VirtualKeyService.create(prisma);
-      const organizationId = await orgIdForProject(project.id);
-      const vk = await service.getById(id, organizationId);
-      if (!vk) {
-        return c.json(
-          { error: { type: "not_found", code: "virtual_key_not_found", message: "virtual key not found" } },
-          404,
-        );
-      }
-      return c.json({ virtual_key: toVkDto(vk) });
+      404: {
+        description: "Not found",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
     },
-  )
-
-secured.access(anyAuthenticated()).patch(
-    "/virtual-keys/:id",
-    describeRoute({
-      summary: "Update virtual key",
-      description:
-        "Partial update — send only the fields you want to change. `provider_credential_ids` replaces the entire fallback chain. `config` is deep-merged.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const service = VirtualKeyService.create(prisma);
+    const organizationId = await orgIdForProject(project.id);
+    const vk = await service.getById(id, organizationId);
+    if (!vk) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "virtual_key_not_found",
+            message: "virtual key not found",
           },
         },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
+        404,
+      );
+    }
+    return c.json({ virtual_key: toVkDto(vk) });
+  },
+);
+
+secured.access(patPermission("virtualKeys:update")).patch(
+  "/virtual-keys/:id",
+  describeRoute({
+    summary: "Update virtual key",
+    description:
+      "Partial update — send only the fields you want to change. `provider_credential_ids` replaces the entire fallback chain. `config` is deep-merged.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Updated",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
           },
         },
       },
-    }),
-    requireVirtualKeysUpdate,
-    async (c) => {
+      400: {
+        description: "Validation error",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const body = updateVirtualKeySchema.safeParse(await c.req.json());
     if (!body.success) {
       return c.json(
-        { error: { type: "bad_request", code: "validation_error", message: body.error.message } },
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: body.error.message,
+          },
+        },
         400,
       );
     }
@@ -444,34 +378,34 @@ secured.access(anyAuthenticated()).patch(
       config: body.data.config,
     });
     return c.json({ virtual_key: toVkDto(updated) });
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).post(
-    "/virtual-keys/:id/rotate",
-    describeRoute({
-      summary: "Rotate virtual key secret",
-      description:
-        "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Rotated",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  virtual_key: virtualKeyDtoSchema,
-                  secret: z.string(),
-                }),
-              ),
-            },
+secured.access(patPermission("virtualKeys:rotate")).post(
+  "/virtual-keys/:id/rotate",
+  describeRoute({
+    summary: "Rotate virtual key secret",
+    description:
+      "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Rotated",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                virtual_key: virtualKeyDtoSchema,
+                secret: z.string(),
+              }),
+            ),
           },
         },
       },
-    }),
-    requireVirtualKeysRotate,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -482,29 +416,29 @@ secured.access(anyAuthenticated()).post(
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ virtual_key: toVkDto(virtualKey), secret });
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).post(
-    "/virtual-keys/:id/revoke",
-    describeRoute({
-      summary: "Revoke virtual key",
-      description:
-        "Marks the virtual key as revoked. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period).",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Revoked",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
+secured.access(patPermission("virtualKeys:delete")).post(
+  "/virtual-keys/:id/revoke",
+  describeRoute({
+    summary: "Revoke virtual key",
+    description:
+      "Marks the virtual key as revoked. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period).",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Revoked",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
           },
         },
       },
-    }),
-    requireVirtualKeysDelete,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -515,50 +449,50 @@ secured.access(anyAuthenticated()).post(
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ virtual_key: toVkDto(updated) });
-  })
+  },
+);
 
 // ── Gateway provider bindings ───────────────────────────────────────────
 
-secured.access(anyAuthenticated()).get(
-    "/providers",
-    describeRoute({
-      summary: "List provider bindings",
-      description:
-        "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
-      tags: ["Providers"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Provider bindings",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  data: z.array(
-                    z.object({
-                      id: z.string(),
-                      model_provider_id: z.string(),
-                      model_provider_name: z.string(),
-                      slot: z.string(),
-                      rate_limit_rpm: z.number().nullable(),
-                      rate_limit_tpm: z.number().nullable(),
-                      rate_limit_rpd: z.number().nullable(),
-                      rotation_policy: z.string(),
-                      fallback_priority_global: z.number().nullable(),
-                      health_status: z.string(),
-                      disabled_at: z.string().nullable(),
-                      created_at: z.string(),
-                    }),
-                  ),
-                }),
-              ),
-            },
+secured.access(patPermission("gatewayProviders:view")).get(
+  "/providers",
+  describeRoute({
+    summary: "List provider bindings",
+    description:
+      "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
+    tags: ["Providers"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Provider bindings",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                data: z.array(
+                  z.object({
+                    id: z.string(),
+                    model_provider_id: z.string(),
+                    model_provider_name: z.string(),
+                    slot: z.string(),
+                    rate_limit_rpm: z.number().nullable(),
+                    rate_limit_tpm: z.number().nullable(),
+                    rate_limit_rpd: z.number().nullable(),
+                    rotation_policy: z.string(),
+                    fallback_priority_global: z.number().nullable(),
+                    health_status: z.string(),
+                    disabled_at: z.string().nullable(),
+                    created_at: z.string(),
+                  }),
+                ),
+              }),
+            ),
           },
         },
       },
-    }),
-    requireGatewayProvidersView,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     return c.json(
       {
         error: "gone",
@@ -567,33 +501,33 @@ secured.access(anyAuthenticated()).get(
       },
       410,
     );
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).post(
-    "/providers",
-    describeRoute({
-      summary: "Bind a model provider to the gateway",
-      description:
-        "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
-      tags: ["Providers"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Binding created",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  provider_credential: z.object({ id: z.string() }),
-                }),
-              ),
-            },
+secured.access(patPermission("gatewayProviders:manage")).post(
+  "/providers",
+  describeRoute({
+    summary: "Bind a model provider to the gateway",
+    description:
+      "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
+    tags: ["Providers"],
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Binding created",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                provider_credential: z.object({ id: z.string() }),
+              }),
+            ),
           },
         },
       },
-    }),
-    requireGatewayProvidersManage,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     return c.json(
       {
         error: "gone",
@@ -602,31 +536,31 @@ secured.access(anyAuthenticated()).post(
       },
       410,
     );
-  })
+  },
+);
 
 // ── Budgets ─────────────────────────────────────────────────────────────
 
-secured.access(anyAuthenticated()).get(
-    "/budgets",
-    describeRoute({
-      summary: "List budgets applicable to the project",
-      description:
-        "Returns every budget that could apply to requests routed through this project — org, team, and project scope. VK and principal-scoped budgets are returned via their detail pages.",
-      tags: ["Budgets"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Applicable budgets",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ data: z.array(budgetDtoSchema) })),
-            },
+secured.access(patPermission("gatewayBudgets:view")).get(
+  "/budgets",
+  describeRoute({
+    summary: "List budgets applicable to the project",
+    description:
+      "Returns every budget that could apply to requests routed through this project — org, team, and project scope. VK and principal-scoped budgets are returned via their detail pages.",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Applicable budgets",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ data: z.array(budgetDtoSchema) })),
           },
         },
       },
-    }),
-    requireGatewayBudgetsView,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const service = GatewayBudgetService.create(prisma);
     const rows = await service.listForProject(project.id);
@@ -646,40 +580,46 @@ secured.access(anyAuthenticated()).get(
         archived_at: b.archivedAt?.toISOString() ?? null,
       })),
     });
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).post(
-    "/budgets",
-    describeRoute({
-      summary: "Create budget",
-      description:
-        "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).",
-      tags: ["Budgets"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Budget created",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
+secured.access(patPermission("gatewayBudgets:create")).post(
+  "/budgets",
+  describeRoute({
+    summary: "Create budget",
+    description:
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Budget created",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ budget: budgetDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayBudgetsCreate,
-    async (c) => {
+      400: {
+        description: "Validation error",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const body = createBudgetSchema.safeParse(await c.req.json());
     if (!body.success) {
       return c.json(
-        { error: { type: "bad_request", code: "validation_error", message: body.error.message } },
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: body.error.message,
+          },
+        },
         400,
       );
     }
@@ -697,29 +637,29 @@ secured.access(anyAuthenticated()).post(
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ budget: toBudgetDto(row) }, 201);
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).patch(
-    "/budgets/:id",
-    describeRoute({
-      summary: "Update budget",
-      description:
-        "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
-      tags: ["Budgets"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
+secured.access(patPermission("gatewayBudgets:update")).patch(
+  "/budgets/:id",
+  describeRoute({
+    summary: "Update budget",
+    description:
+      "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Updated",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ budget: budgetDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayBudgetsUpdate,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const raw = (await c.req.json()) as Record<string, unknown>;
@@ -730,41 +670,47 @@ secured.access(anyAuthenticated()).patch(
       organizationId,
       name: typeof raw.name === "string" ? raw.name : undefined,
       description:
-        raw.description === undefined ? undefined : (raw.description as string | null),
+        raw.description === undefined
+          ? undefined
+          : (raw.description as string | null),
       limitUsd:
-        raw.limit_usd !== undefined ? (raw.limit_usd as number | string) : undefined,
+        raw.limit_usd !== undefined
+          ? (raw.limit_usd as number | string)
+          : undefined,
       onBreach:
         raw.on_breach === "BLOCK" || raw.on_breach === "WARN"
           ? raw.on_breach
           : undefined,
       timezone:
-        raw.timezone === undefined ? undefined : (raw.timezone as string | null),
+        raw.timezone === undefined
+          ? undefined
+          : (raw.timezone as string | null),
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ budget: toBudgetDto(row) });
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).delete(
-    "/budgets/:id",
-    describeRoute({
-      summary: "Archive budget",
-      description:
-        "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
-      tags: ["Budgets"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
+secured.access(patPermission("gatewayBudgets:delete")).delete(
+  "/budgets/:id",
+  describeRoute({
+    summary: "Archive budget",
+    description:
+      "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Archived",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ budget: budgetDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayBudgetsDelete,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -775,35 +721,35 @@ secured.access(anyAuthenticated()).delete(
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ budget: toBudgetDto(row) });
-  })
+  },
+);
 
-  // ── Provider credentials — update + disable ────────────────────────────
+// ── Provider credentials — update + disable ────────────────────────────
 
-secured.access(anyAuthenticated()).patch(
-    "/providers/:id",
-    describeRoute({
-      summary: "Update provider binding",
-      description:
-        "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
-      tags: ["Providers"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  provider_credential: z.object({ id: z.string() }),
-                }),
-              ),
-            },
+secured.access(patPermission("gatewayProviders:update")).patch(
+  "/providers/:id",
+  describeRoute({
+    summary: "Update provider binding",
+    description:
+      "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
+    tags: ["Providers"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Updated",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                provider_credential: z.object({ id: z.string() }),
+              }),
+            ),
           },
         },
       },
-    }),
-    requireGatewayProvidersUpdate,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     return c.json(
       {
         error: "gone",
@@ -812,36 +758,36 @@ secured.access(anyAuthenticated()).patch(
       },
       410,
     );
-  })
+  },
+);
 
-secured.access(anyAuthenticated()).delete(
-    "/providers/:id",
-    describeRoute({
-      summary: "Disable provider binding",
-      description:
-        "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
-      tags: ["Providers"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Disabled",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  provider_credential: z.object({
-                    id: z.string(),
-                    disabled_at: z.string().nullable(),
-                  }),
+secured.access(patPermission("gatewayProviders:manage")).delete(
+  "/providers/:id",
+  describeRoute({
+    summary: "Disable provider binding",
+    description:
+      "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
+    tags: ["Providers"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Disabled",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                provider_credential: z.object({
+                  id: z.string(),
+                  disabled_at: z.string().nullable(),
                 }),
-              ),
-            },
+              }),
+            ),
           },
         },
       },
-    }),
-    requireGatewayProvidersManage,
-    async (c) => {
+    },
+  }),
+  async (c) => {
     return c.json(
       {
         error: "gone",
@@ -850,233 +796,220 @@ secured.access(anyAuthenticated()).delete(
       },
       410,
     );
-  })
+  },
+);
 
-  // ── Cache-control rules ────────────────────────────────────────────────
+// ── Cache-control rules ────────────────────────────────────────────────
 
-secured.access(anyAuthenticated()).get(
-    "/cache-rules",
-    describeRoute({
-      summary: "List cache-control rules",
-      description:
-        "Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Cache rules for the organisation",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ data: z.array(cacheRuleDtoSchema) }),
-              ),
-            },
+secured.access(patPermission("gatewayCacheRules:view")).get(
+  "/cache-rules",
+  describeRoute({
+    summary: "List cache-control rules",
+    description:
+      "Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.",
+    tags: ["Cache Rules"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Cache rules for the organisation",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ data: z.array(cacheRuleDtoSchema) })),
           },
         },
       },
-    }),
-    requireGatewayCacheRulesView,
-    async (c) => {
-      const project = c.get("project");
-      const organizationId = await orgIdForProject(project.id);
-      const service = GatewayCacheRuleService.create(prisma);
-      const rows = await service.list(organizationId);
-      return c.json({ data: rows.map(toCacheRuleDto) });
     },
-  )
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayCacheRuleService.create(prisma);
+    const rows = await service.list(organizationId);
+    return c.json({ data: rows.map(toCacheRuleDto) });
+  },
+);
 
-secured.access(anyAuthenticated()).get(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Get a cache rule",
-      description: "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
-      tags: ["Cache Rules"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "The rule",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ cache_rule: cacheRuleDtoSchema }),
-              ),
-            },
+secured.access(patPermission("gatewayCacheRules:view")).get(
+  "/cache-rules/:id",
+  describeRoute({
+    summary: "Get a cache rule",
+    description:
+      "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
+    tags: ["Cache Rules"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "The rule",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayCacheRulesView,
-    async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await orgIdForProject(project.id);
-      const service = GatewayCacheRuleService.create(prisma);
-      const row = await service.get(id, organizationId);
-      if (!row) {
-        return c.json(
-          {
-            error: {
-              type: "not_found",
-              code: "cache_rule_not_found",
-              message: `cache rule ${id} not found`,
-            },
-          },
-          404,
-        );
-      }
-      return c.json({ cache_rule: toCacheRuleDto(row) });
     },
-  )
-
-secured.access(anyAuthenticated()).post(
-    "/cache-rules",
-    describeRoute({
-      summary: "Create a cache rule",
-      description:
-        "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Created",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ cache_rule: cacheRuleDtoSchema }),
-              ),
-            },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayCacheRuleService.create(prisma);
+    const row = await service.get(id, organizationId);
+    if (!row) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "cache_rule_not_found",
+            message: `cache rule ${id} not found`,
           },
         },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
+        404,
+      );
+    }
+    return c.json({ cache_rule: toCacheRuleDto(row) });
+  },
+);
+
+secured.access(patPermission("gatewayCacheRules:create")).post(
+  "/cache-rules",
+  describeRoute({
+    summary: "Create a cache rule",
+    description:
+      "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
+    tags: ["Cache Rules"],
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Created",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayCacheRulesCreate,
-    async (c) => {
-      const project = c.get("project");
-      const body = createCacheRuleSchema.safeParse(await c.req.json());
-      if (!body.success) {
-        return c.json(
-          {
-            error: {
-              type: "bad_request",
-              code: "validation_error",
-              message: body.error.message,
-            },
-          },
-          400,
-        );
-      }
-      const organizationId = await orgIdForProject(project.id);
-      const service = GatewayCacheRuleService.create(prisma);
-      const row = await service.create({
-        organizationId,
-        name: body.data.name,
-        description: body.data.description ?? null,
-        priority: body.data.priority,
-        enabled: body.data.enabled,
-        matchers: body.data.matchers,
-        action: body.data.action,
-        actorUserId: machineActorForProject(project.id),
-      });
-      return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+      400: {
+        description: "Validation error",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
     },
-  )
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const body = createCacheRuleSchema.safeParse(await c.req.json());
+    if (!body.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: body.error.message,
+          },
+        },
+        400,
+      );
+    }
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayCacheRuleService.create(prisma);
+    const row = await service.create({
+      organizationId,
+      name: body.data.name,
+      description: body.data.description ?? null,
+      priority: body.data.priority,
+      enabled: body.data.enabled,
+      matchers: body.data.matchers,
+      action: body.data.action,
+      actorUserId: machineActorForProject(project.id),
+    });
+    return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+  },
+);
 
-secured.access(anyAuthenticated()).patch(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Update a cache rule",
-      description:
-        "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ cache_rule: cacheRuleDtoSchema }),
-              ),
-            },
+secured.access(patPermission("gatewayCacheRules:update")).patch(
+  "/cache-rules/:id",
+  describeRoute({
+    summary: "Update a cache rule",
+    description:
+      "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
+    tags: ["Cache Rules"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Updated",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayCacheRulesUpdate,
-    async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const body = updateCacheRuleSchema.safeParse(await c.req.json());
-      if (!body.success) {
-        return c.json(
-          {
-            error: {
-              type: "bad_request",
-              code: "validation_error",
-              message: body.error.message,
-            },
-          },
-          400,
-        );
-      }
-      const organizationId = await orgIdForProject(project.id);
-      const service = GatewayCacheRuleService.create(prisma);
-      const row = await service.update({
-        id,
-        organizationId,
-        name: body.data.name,
-        description: body.data.description,
-        priority: body.data.priority,
-        enabled: body.data.enabled,
-        matchers: body.data.matchers,
-        action: body.data.action,
-        actorUserId: machineActorForProject(project.id),
-      });
-      return c.json({ cache_rule: toCacheRuleDto(row) });
     },
-  )
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const body = updateCacheRuleSchema.safeParse(await c.req.json());
+    if (!body.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: body.error.message,
+          },
+        },
+        400,
+      );
+    }
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayCacheRuleService.create(prisma);
+    const row = await service.update({
+      id,
+      organizationId,
+      name: body.data.name,
+      description: body.data.description,
+      priority: body.data.priority,
+      enabled: body.data.enabled,
+      matchers: body.data.matchers,
+      action: body.data.action,
+      actorUserId: machineActorForProject(project.id),
+    });
+    return c.json({ cache_rule: toCacheRuleDto(row) });
+  },
+);
 
-secured.access(anyAuthenticated()).delete(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Archive a cache rule",
-      description:
-        "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Archived",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({ cache_rule: cacheRuleDtoSchema }),
-              ),
-            },
+secured.access(patPermission("gatewayCacheRules:delete")).delete(
+  "/cache-rules/:id",
+  describeRoute({
+    summary: "Archive a cache rule",
+    description:
+      "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
+    tags: ["Cache Rules"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Archived",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
           },
         },
       },
-    }),
-    requireGatewayCacheRulesDelete,
-    async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await orgIdForProject(project.id);
-      const service = GatewayCacheRuleService.create(prisma);
-      const row = await service.archive({
-        id,
-        organizationId,
-        actorUserId: machineActorForProject(project.id),
-      });
-      return c.json({ cache_rule: toCacheRuleDto(row) });
     },
-  );
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayCacheRuleService.create(prisma);
+    const row = await service.archive({
+      id,
+      organizationId,
+      actorUserId: machineActorForProject(project.id),
+    });
+    return c.json({ cache_rule: toCacheRuleDto(row) });
+  },
+);
 
 function toCacheRuleDto(r: import("@prisma/client").GatewayCacheRule) {
   return {

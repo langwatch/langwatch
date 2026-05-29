@@ -11,22 +11,19 @@
  * Iteration 1: route skeleton + auth middleware + contract-shaped stubs.
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
-import type { Context, Next } from "hono";
+
 import { createHash, createHmac, timingSafeEqual } from "crypto";
+import type { Context, Next } from "hono";
 import { z } from "zod";
 
 import { env } from "~/env.mjs";
-import {
-  createServiceApp,
-  internalSecret,
-} from "~/server/api/security";
-import { createLogger } from "~/utils/logger/server";
-
-import { prisma } from "~/server/db";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+
+import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
@@ -34,17 +31,24 @@ import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser"
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
-  VirtualKeyCryptoError,
   hashVirtualKeySecret,
   parseVirtualKey,
+  VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { createLogger } from "~/utils/logger/server";
 
-const secured = createServiceApp({ basePath: "/api/internal/gateway" });
+// `verifySecret` applies the HMAC verifier as the builder chain for every
+// route (uniform with `files/.../app.ts`), rather than an app-wide
+// `secured.use(...)`. `verifyGatewaySignature` is hoisted (function decl).
+const secured = createServiceApp({
+  basePath: "/api/internal/gateway",
+  verifySecret: verifyGatewaySignature,
+});
 
 const gatewayPolicy = () =>
   internalSecret(
-    "gateway HMAC signature verified in-handler via verifyGatewaySignature",
+    "gateway HMAC signature verified by the verifySecret chain (verifyGatewaySignature)",
   );
 
 const logger = createLogger("langwatch:gateway-internal");
@@ -132,7 +136,8 @@ function logAuthDecision(
 }
 
 async function verifyGatewaySignature(c: Context, next: Next) {
-  const secret = process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
+  const secret =
+    process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
     logAuthDecision(c, "gateway_internal_secret_missing", 500);
     return c.json(
@@ -226,8 +231,6 @@ async function verifyGatewaySignature(c: Context, next: Next) {
 
   await next();
 }
-
-secured.use(verifyGatewaySignature);
 
 // ── helpers ─────────────────────────────────────────────────────────────
 
@@ -396,9 +399,10 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
         return client;
       })
     : null;
-  const payload = await new GatewayConfigMaterialiser(prisma, chRepo).materialise(
-    vk,
-  );
+  const payload = await new GatewayConfigMaterialiser(
+    prisma,
+    chRepo,
+  ).materialise(vk);
   return c.json(payload, 200, {
     ETag: currentRevision,
     "Cache-Control": "no-store",
@@ -536,10 +540,7 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
   // Throttle to 60s to avoid hot-row contention at high RPS — admin
   // dashboards refresh on minute-scale anyway. Fire-and-forget so a
   // DB blip doesn't deny the request.
-  if (
-    !vk.lastUsedAt ||
-    Date.now() - vk.lastUsedAt.getTime() > 60 * 1000
-  ) {
+  if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
     const vkService = VirtualKeyService.create(prisma);
     void vkService.touchUsage(vk.id).catch(() => {});
   }

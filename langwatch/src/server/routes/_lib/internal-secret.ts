@@ -1,10 +1,19 @@
 import { timingSafeEqual } from "node:crypto";
+import type { Context } from "hono";
 
 /**
  * Validates the internal shared secret (CRON_API_KEY) from the Authorization
  * header for service-to-service routes (cron jobs, worker triggers, operational
  * tasks). These routes have no RBAC credential and no tenant context; the
  * shared secret is the entire authentication.
+ */
+export function validateInternalSecret(c: Context): boolean {
+  return isInternalSecretValid(c.req.header("authorization"));
+}
+
+/**
+ * Pure comparison seam behind {@link validateInternalSecret}, exposed for unit
+ * tests so they don't have to reconstruct a `Context`.
  *
  * Fails CLOSED: when CRON_API_KEY is not configured the gate denies every
  * caller. A direct `header === process.env.CRON_API_KEY` comparison made
@@ -13,14 +22,15 @@ import { timingSafeEqual } from "node:crypto";
  * destructive jobs (retention cleanup, lambda deletion, check re-runs). The
  * comparison is constant-time to avoid leaking the secret through timing.
  */
-export function validateInternalSecret(c: {
-  req: { header: (name: string) => string | undefined };
-}): boolean {
+export function isInternalSecretValid(
+  authorizationHeader: string | undefined,
+): boolean {
   const expected = process.env.CRON_API_KEY;
   if (!expected) return false;
 
-  const header = c.req.header("authorization");
-  const presented = header?.startsWith("Bearer ") ? header.slice(7) : header;
+  const presented = authorizationHeader?.startsWith("Bearer ")
+    ? authorizationHeader.slice(7)
+    : authorizationHeader;
   if (!presented) return false;
 
   const presentedBuf = Buffer.from(presented);

@@ -16,10 +16,10 @@ import type { Experiment } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
-import { createProjectApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
@@ -94,10 +94,9 @@ const secured = createProjectApp({
 
 // Mirror the canonical experiments-list permission: the tRPC procedures that
 // return this same project-scoped experiment list (experimentRouter
-// getAllByProjectId / getAllForEvaluationsList) both gate on workflows:view.
-// Using a different permission here would 403 a role that can already read the
-// same list through the canonical path.
-secured.access(requires("workflows:view")).get(
+// getAllByProjectId / getAllForEvaluationsList) gate on experiments:view, the
+// dedicated permission experiments now use instead of inheriting workflows:view.
+secured.access(requires("experiments:view")).get(
   "/",
   describeRoute({
     description:
@@ -115,62 +114,63 @@ secured.access(requires("workflows:view")).get(
     },
   }),
   async (c) => {
-      const project = c.get("project");
-      const page = parsePositiveInt({
-        value: c.req.query("page"),
-        fallback: 1,
+    const project = c.get("project");
+    const page = parsePositiveInt({
+      value: c.req.query("page"),
+      fallback: 1,
+    });
+    const pageSize = parsePositiveInt({
+      value: c.req.query("pageSize"),
+      fallback: DEFAULT_PAGE_SIZE,
+      max: MAX_PAGE_SIZE,
+    });
+
+    logger.info(
+      { projectId: project.id, page, pageSize },
+      "Listing experiments",
+    );
+
+    const { experiments: paged, totalHits } = await ExperimentService.create(
+      prisma,
+    ).getPage({
+      projectId: project.id,
+      page,
+      pageSize,
+    });
+
+    const runAggregates =
+      paged.length > 0
+        ? await ExperimentRunService.create(
+            prisma,
+          ).getRunAggregatesForExperimentIds({
+            projectId: project.id,
+            experimentIds: paged.map((e) => e.id),
+          })
+        : {};
+
+    const experiments = paged.map((experiment) => {
+      const aggregate = runAggregates[experiment.id] ?? {
+        runsCount: 0,
+        lastRunAt: null,
+      };
+      return toExperimentSummary({
+        experiment,
+        runsCount: aggregate.runsCount,
+        lastRunAt: aggregate.lastRunAt,
       });
-      const pageSize = parsePositiveInt({
-        value: c.req.query("pageSize"),
-        fallback: DEFAULT_PAGE_SIZE,
-        max: MAX_PAGE_SIZE,
-      });
+    });
 
-      logger.info(
-        { projectId: project.id, page, pageSize },
-        "Listing experiments",
-      );
-
-      const { experiments: paged, totalHits } =
-        await ExperimentService.create(prisma).getPage({
-          projectId: project.id,
-          page,
-          pageSize,
-        });
-
-      const runAggregates =
-        paged.length > 0
-          ? await ExperimentRunService.create(
-              prisma,
-            ).getRunAggregatesForExperimentIds({
-              projectId: project.id,
-              experimentIds: paged.map((e) => e.id),
-            })
-          : {};
-
-      const experiments = paged.map((experiment) => {
-        const aggregate = runAggregates[experiment.id] ?? {
-          runsCount: 0,
-          lastRunAt: null,
-        };
-        return toExperimentSummary({
-          experiment,
-          runsCount: aggregate.runsCount,
-          lastRunAt: aggregate.lastRunAt,
-        });
-      });
-
-      const offset = (page - 1) * pageSize;
-      return c.json({
-        experiments,
-        pagination: {
-          page,
-          pageSize,
-          totalHits,
-          hasMore: offset + paged.length < totalHits,
-        },
-      });
-    },
+    const offset = (page - 1) * pageSize;
+    return c.json({
+      experiments,
+      pagination: {
+        page,
+        pageSize,
+        totalHits,
+        hasMore: offset + paged.length < totalHits,
+      },
+    });
+  },
 );
 
 export const app = secured.hono;
