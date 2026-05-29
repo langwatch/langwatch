@@ -2,9 +2,10 @@ import type { Monaco } from "@monaco-editor/react";
 
 /**
  * Rich variable info the autocomplete uses: path + TypeScript-ish type +
- * optional description. Structurally matches the server's `VariableInfo`
- * returned from `automation.getTemplateScaffold.variables` — kept defined
- * here so the client layer doesn't reach into `~/server`.
+ * optional description. Lives next to the editor that consumes it; the
+ * paired `templates/scaffold.ts` re-exports the canonical list as
+ * `TEMPLATE_VARIABLES` and a drift-prevention test pins it to the server's
+ * `TEMPLATE_VARIABLES`.
  */
 export interface VariableInfo {
   path: string;

@@ -85,6 +85,7 @@ import {
   explainDomainError,
   readDomainError,
 } from "./logic/errorExplainer";
+import { buildClientScaffold } from "./templates/scaffold";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
@@ -215,23 +216,29 @@ export function AutomationDrawer({
     });
   }, [triggerQuery.data, automationId]);
 
-  // Scaffold: defaults / variables / example.
-  const scaffold = api.automation.getTemplateScaffold.useQuery(
-    { projectId },
-    { enabled: !!projectId },
+  // Scaffold (defaults + variables + example) is static client data — no
+  // reason to round-trip through tRPC for it. `useMemo` keyed to the project
+  // identity so URLs in `example` reflect the current project slug.
+  const scaffold = useMemo(
+    () =>
+      buildClientScaffold({
+        name: project?.name ?? "Project",
+        slug: project?.slug ?? "project",
+      }),
+    [project?.name, project?.slug],
   );
-  const variables = scaffold.data?.variables ?? [];
-  const defaults = scaffold.data?.defaults;
+  const variables = scaffold.variables;
+  const defaults = scaffold.defaults;
 
   const slackDefault =
     draft.slackTemplateType === "block_kit"
-      ? defaults?.slackBlockKit ?? ""
-      : defaults?.slackString ?? "";
+      ? defaults.slackBlockKit
+      : defaults.slackString;
   const subjectValue = draft.emailSubject.usingDefault
-    ? defaults?.emailSubject ?? ""
+    ? defaults.emailSubject
     : draft.emailSubject.value;
   const bodyValue = draft.emailBody.usingDefault
-    ? defaults?.emailBody ?? ""
+    ? defaults.emailBody
     : draft.emailBody.value;
   const slackValue = draft.slackTemplate.usingDefault
     ? slackDefault
@@ -482,7 +489,6 @@ export function AutomationDrawer({
 
       <ConfigurationSecondaryDrawer
         open={section === "configuration"}
-        scaffoldLoaded={!!scaffold.data}
         draft={draft}
         dispatch={dispatch}
         variables={variables}
@@ -491,7 +497,7 @@ export function AutomationDrawer({
         subjectValue={subjectValue}
         bodyValue={bodyValue}
         slackValue={slackValue}
-        example={scaffold.data?.example}
+        example={scaffold.example}
         organizationId={organization?.id}
         teamSlug={team?.slug}
         projectId={projectId}
@@ -1015,7 +1021,6 @@ function FiltersSecondaryDrawer({
 
 function ConfigurationSecondaryDrawer({
   open,
-  scaffoldLoaded,
   draft,
   dispatch,
   variables,
@@ -1031,10 +1036,6 @@ function ConfigurationSecondaryDrawer({
   onDone,
 }: {
   open: boolean;
-  /** When false, defaults haven't arrived yet — render a spinner instead of
-   *  the editors so they don't mount with empty values that the user then
-   *  has to refresh away. */
-  scaffoldLoaded: boolean;
   draft: AutomationDraft;
   dispatch: React.Dispatch<DraftAction>;
   variables: VariableInfo[];
@@ -1086,12 +1087,6 @@ function ConfigurationSecondaryDrawer({
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          {!scaffoldLoaded ? (
-            <HStack padding={6} color="fg.muted" gap={3}>
-              <Spinner size="sm" />
-              <Text>Loading default templates…</Text>
-            </HStack>
-          ) : (
           <VStack align="stretch" gap={4}>
             <IdentityFields draft={draft} dispatch={dispatch} />
             {draft.action === TriggerAction.SEND_EMAIL && (
@@ -1130,7 +1125,6 @@ function ConfigurationSecondaryDrawer({
               <AnnotationQueueConfig draft={draft} dispatch={dispatch} />
             )}
           </VStack>
-          )}
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">
