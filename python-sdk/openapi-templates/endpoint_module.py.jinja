@@ -1,4 +1,8 @@
-from http import HTTPStatus
+{# LangWatch fork of openapi-python-client v0.28.4 endpoint_module.py.jinja.
+   The only change vs upstream is the safe_http_status wrapper used in
+   _build_response (see below). Drop this override when upstream merges
+   https://github.com/openapi-generators/openapi-python-client/pull/1407
+   (tracked at https://github.com/openapi-generators/openapi-python-client/issues/1442). #}
 from typing import Any, cast
 from urllib.parse import quote
 
