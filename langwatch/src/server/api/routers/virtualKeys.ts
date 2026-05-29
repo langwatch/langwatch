@@ -28,6 +28,7 @@ import {
   type GuardrailAttachment,
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 
 import { authorizeInResolver, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -38,10 +39,7 @@ import {
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
 
-const scopeInputSchema = z.object({
-  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-  scopeId: z.string().min(1),
-});
+const scopeInputSchema = scopeAssignmentSchema;
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -340,7 +338,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // re-send config, revalidate the existing attachments against the
       // new project so a stale cross-project attachment can't survive the
       // move. A plain metadata update (no scope change, no new
-      // attachments) must not re-touch existing attachments — otherwise
+      // attachments) must not re-touch existing attachments, otherwise
       // renaming a VK would demand gatewayGuardrails:attach.
       const attachmentsToCheck =
         input.config?.guardrailAttachments ??

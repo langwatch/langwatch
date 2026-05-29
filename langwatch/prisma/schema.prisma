@@ -97,7 +97,6 @@ model User {
   roleBindings            RoleBinding[]
   apiKeys                 ApiKey[]
   gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
-  principalGatewayBudgets GatewayBudget[]          @relation("PrincipalScopedGatewayBudgets")
   principalVirtualKeys    VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
   personalTeams           Team[]                   @relation("PersonalTeamOwner")
   personalProjects        Project[]                @relation("PersonalProjectOwner")
@@ -190,7 +189,6 @@ model Team {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @default(now()) @updatedAt
   archivedAt     DateTime?
-  gatewayBudgets GatewayBudget[] @relation("TeamScopedGatewayBudgets")
 
   // Personal workspace per (org, user). Created on user's first
   // visit to an org. UI hides isPersonal=true teams from team
@@ -274,7 +272,6 @@ model Organization {
   license                String?                @db.Text
   licenseExpiresAt       DateTime?
   licenseLastValidatedAt DateTime?
-  gatewayBudgets         GatewayBudget[]        @relation("OrgScopedGatewayBudgets")
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
@@ -409,7 +406,6 @@ model Project {
   scenarios                Scenario[]
   suiteConfigurations      SimulationSuite[]
   savedViews               SavedView[]
-  gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
@@ -845,8 +841,15 @@ model ModelProvider {
   updatedAt              DateTime @default(now()) @updatedAt
   scopes                 ModelProviderScope[]
 
+  // Single-organization tenancy anchor (ADR-021). Every scope of a given
+  // provider resolves to the same organization, so this column is that org.
+  // Nullable for one release while the production backfill is verified; set
+  // NOT NULL in a follow-up migration.
+  organizationId         String?
+
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
+  @@index([organizationId])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -918,6 +921,13 @@ model ModelDefaultConfig {
     createdAt DateTime                  @default(now())
     updatedAt DateTime                  @updatedAt
     scopes    ModelDefaultConfigScope[]
+
+    // Single-organization tenancy anchor (ADR-021). Every scope a config
+    // attaches to resolves to the same organization. Nullable for one release
+    // while the production backfill is verified; set NOT NULL in a follow-up.
+    organizationId String?
+
+    @@index([organizationId])
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
@@ -1085,18 +1095,36 @@ model PublicShare {
   @@index([userId])
 }
 
+enum CustomLLMModelCostScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A custom model-cost override. Single-scope-per-row (ADR-021): the row
+// applies at exactly one scope, identified inline by (scopeType, scopeId),
+// and is anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> the static llmModels.json default, so
+// an org admin can set a cost once and have it apply to every project that
+// has no closer override. The legacy projectId column is kept (nullable)
+// for one release of read compatibility; new writes target the scope.
 model CustomLLMModelCost {
-  id                        String   @id @default(nanoid())
-  projectId                 String
+  id                        String                      @id @default(nanoid())
+  organizationId            String
+  scopeType                 CustomLLMModelCostScopeType @default(PROJECT)
+  scopeId                   String
+  projectId                 String?
   model                     String
   regex                     String
   inputCostPerToken         Float?
   outputCostPerToken        Float?
   cacheReadCostPerToken     Float?
   cacheCreationCostPerToken Float?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @default(now()) @updatedAt
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @default(now()) @updatedAt
 
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
   @@index([projectId])
 }
 
@@ -1801,7 +1829,6 @@ model VirtualKey {
   lastUsedAt  DateTime?
 
   scopes        VirtualKeyScope[]
-  budgets       GatewayBudget[]       @relation("VirtualKeyScopedGatewayBudgets")
   ledgerEntries GatewayBudgetLedger[]
 
   // Optional RoutingPolicy reference. When set, gateway pulls
@@ -2479,27 +2506,13 @@ model UserIngestionBinding {
 model GatewayBudget {
   id             String                 @id @default(nanoid())
   organizationId String
-  // Scope is identified by (scopeType, scopeId). The typed relations below
-  // exist for RI when a matching target row is deleted; scopeId is the
-  // canonical discriminator the query layer uses.
+  // Single source of truth for the target (ADR-021): inline (scopeType,
+  // scopeId) within one organization. scopeId is a team / project / virtual
+  // key / user id depending on scopeType; the query layer reads it directly.
+  // No typed FK columns — scope-entity deletion cleanup is a service-layer
+  // concern, consistent with the no-foreign-key-constraints convention.
   scopeType      GatewayBudgetScopeType
   scopeId        String
-
-  // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
-  organizationScopedId String?
-  organizationScoped   Organization? @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
-
-  teamScopedId String?
-  teamScoped   Team?   @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
-
-  projectScopedId String?
-  projectScoped   Project? @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
-
-  virtualKeyScopedId String?
-  virtualKeyScoped   VirtualKey? @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
-
-  principalUserId String?
-  principalUser   User?   @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
 
   name        String
   description String?

@@ -69,8 +69,12 @@ export type MaybeStoredModelProvider = Omit<
   | "circuitOpenedAt"
   | "lastHealthCheckAt"
   | "disabledAt"
+  // Single-organization tenancy anchor (ADR-021) lands on persisted rows;
+  // form-time shapes omit it, so widen to optional here.
+  | "organizationId"
 > & {
   id?: string;
+  organizationId?: string | null;
   rateLimitRpm?: number | null;
   rateLimitTpm?: number | null;
   rateLimitRpd?: number | null;

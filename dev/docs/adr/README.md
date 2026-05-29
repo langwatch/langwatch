@@ -14,6 +14,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [006](./006-redis-cluster-bullmq-hash-tags.md) | Redis cluster hash tags for BullMQ | Accepted |
 | [007](./007-event-sourcing-architecture.md) | Event sourcing architecture (fold/map projections) | Accepted |
 | [018](./018-form-validation-and-save.md) | Form validation and Save button behavior | Accepted |
+| [021](./021-multi-scope-targeting-and-tenancy.md) | Multi-scope targeting and single-org tenancy enforcement | Accepted |
 
 ## When to Write an ADR
 

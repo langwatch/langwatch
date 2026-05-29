@@ -7,6 +7,7 @@ import type {
 } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
+import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
 
 export type ModelDefaultsPrisma =
   | PrismaClient
@@ -76,11 +77,17 @@ export class ModelDefaultsRepository {
     authorId: string | null;
   }): Promise<{ id: string }> {
     const id = this.newConfigId();
+    // Single-organization anchor (ADR-021): every scope a config attaches to
+    // resolves to the same org, so the first scope is authoritative.
+    const organizationId = params.scopes[0]
+      ? await resolveOrganizationForScope(this.prisma, params.scopes[0])
+      : null;
     await this.prisma.modelDefaultConfig.create({
       data: {
         id,
         config: params.config,
         authorId: params.authorId,
+        organizationId: organizationId ?? undefined,
         scopes: {
           create: params.scopes.map((s) => ({
             id: this.newScopeId(),
