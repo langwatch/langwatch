@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TEMPLATE_VARIABLES } from "~/server/event-sourcing/outbox/templating/exampleContext";
-import { detectUnknownVariables } from "../liquidMonaco";
+import { detectUnknownVariables, positionInsideLiquid } from "../liquidMonaco";
 
 const VARS = TEMPLATE_VARIABLES;
 
@@ -47,6 +47,46 @@ describe("detectUnknownVariables", () => {
   describe("when the expression is a literal", () => {
     it("reports nothing", () => {
       expect(detectUnknownVariables("{{ 'hello' }} {{ 42 }}", VARS)).toEqual([]);
+    });
+  });
+});
+
+describe("positionInsideLiquid", () => {
+  describe("when the cursor is before any Liquid expression", () => {
+    it("returns false", () => {
+      const text = '{"a": "{{ x }}"}';
+      expect(positionInsideLiquid(text, 3)).toBe(false);
+    });
+  });
+
+  describe("when the cursor is inside a {{ ... }} expression", () => {
+    it("returns true", () => {
+      const text = '{"a": "{{ x }}"}';
+      const inside = text.indexOf("x");
+      expect(positionInsideLiquid(text, inside)).toBe(true);
+    });
+  });
+
+  describe("when the cursor is inside a {% ... %} tag", () => {
+    it("returns true", () => {
+      const text = '{"a": 1 {% if y %} ,"b": 2{% endif %}}';
+      const inside = text.indexOf("if y");
+      expect(positionInsideLiquid(text, inside + 1)).toBe(true);
+    });
+  });
+
+  describe("when the cursor is after a closed Liquid span", () => {
+    it("returns false", () => {
+      const text = '{"a": "{{ x }}"}';
+      const after = text.indexOf("}}") + 2;
+      expect(positionInsideLiquid(text, after + 1)).toBe(false);
+    });
+  });
+
+  describe("when the cursor sits inside an unterminated Liquid output", () => {
+    it("returns true so the Liquid completion provider keeps the surface", () => {
+      const text = '{"a": "Hello {{ user.n';
+      expect(positionInsideLiquid(text, text.length)).toBe(true);
     });
   });
 });

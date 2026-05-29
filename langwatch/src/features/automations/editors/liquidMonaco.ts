@@ -177,6 +177,14 @@ export function registerLiquidLanguage(
     >[1] = {
       triggerCharacters: [".", " ", "{", "%"],
       provideCompletionItems: (model, position) => {
+        // For `liquid-json`, surface Liquid completions only when the cursor
+        // is inside a `{{ }}` / `{% %}` span. Outside, the JSON-bridge
+        // completion provider handles the surface (schema-aware completions
+        // would otherwise be polluted with template variable names).
+        if (model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID) {
+          const offset = model.getOffsetAt(position);
+          if (!positionInsideLiquid(model.getValue(), offset)) return null;
+        }
         const lineUntil = model
           .getLineContent(position.lineNumber)
           .slice(0, position.column - 1);
@@ -228,6 +236,10 @@ export function registerLiquidLanguage(
       Monaco["languages"]["registerHoverProvider"]
     >[1] = {
       provideHover: (model, position) => {
+        if (model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID) {
+          const offset = model.getOffsetAt(position);
+          if (!positionInsideLiquid(model.getValue(), offset)) return null;
+        }
         const word = model.getWordAtPosition(position);
         if (!word) return null;
         const match = knownVariables.find(
@@ -356,6 +368,207 @@ export function clearLiquidMarkers(
 const SCHEMA_MARKER_OWNER = "liquid-json-schema";
 const registeredSchemas = new Map<string, object>();
 
+/** Map real-model URI → shadow-model URI, populated by `setupLiquidJsonSchema`.
+ *  The completion + hover bridges below look up the shadow for a `liquid-json`
+ *  model and forward to Monaco's JSON worker. */
+const shadowUriByRealUri = new Map<string, string>();
+let bridgesRegistered = false;
+
+/** Subset of the JSON worker exposed at runtime — Monaco's public types only
+ *  declare `parseJSONDocument` + `getMatchingSchemas`, but `doComplete` /
+ *  `doHover` are present and used by Monaco's own JSON completion / hover
+ *  adapters (see `monaco-editor/esm/vs/language/json/jsonMode.js`). */
+interface JsonWorkerWithLanguageOps {
+  doComplete?(
+    uri: string,
+    position: { line: number; character: number },
+  ): Promise<{ items?: JsonCompletionItem[] } | null | undefined>;
+  doHover?(
+    uri: string,
+    position: { line: number; character: number },
+  ): Promise<{
+    contents?: unknown;
+    range?: {
+      start: { line: number; character: number };
+      end: { line: number; character: number };
+    };
+  } | null | undefined>;
+}
+
+interface JsonCompletionItem {
+  label: string;
+  kind?: number;
+  detail?: string;
+  documentation?: string | { kind?: string; value: string };
+  insertText?: string;
+  insertTextFormat?: number;
+  sortText?: string;
+  filterText?: string;
+  textEdit?: {
+    range?: {
+      start: { line: number; character: number };
+      end: { line: number; character: number };
+    };
+    newText: string;
+  };
+}
+
+export function positionInsideLiquid(
+  text: string,
+  offset: number,
+): boolean {
+  // Closest preceding `{{` or `{%` versus its matching close — if a closer
+  // hasn't appeared yet, the cursor is still inside the expression. We bias
+  // toward the Liquid completion provider in this case so it owns the surface.
+  const lastOutputOpen = text.lastIndexOf("{{", offset - 1);
+  const lastTagOpen = text.lastIndexOf("{%", offset - 1);
+  const lastOpen = Math.max(lastOutputOpen, lastTagOpen);
+  if (lastOpen === -1) return false;
+  const isOutput = lastOpen === lastOutputOpen;
+  const closeMarker = isOutput ? "}}" : "%}";
+  const close = text.indexOf(closeMarker, lastOpen + 2);
+  return close === -1 || close >= offset;
+}
+
+const COMPLETION_TRIGGER_CHARACTERS = ['"', ":", ",", " ", "[", "{"];
+
+function convertCompletionKind(
+  monaco: Monaco,
+  kind: number | undefined,
+): number {
+  // vscode-languageserver-types CompletionItemKind → Monaco kind. The numeric
+  // values diverge between the two; map the ones the JSON service emits.
+  const k = monaco.languages.CompletionItemKind;
+  switch (kind) {
+    case 6:
+      return k.Variable;
+    case 10:
+      return k.Property;
+    case 12:
+      return k.Value;
+    case 14:
+      return k.Keyword;
+    case 15:
+      return k.Snippet;
+    default:
+      return k.Value;
+  }
+}
+
+function convertDocumentation(
+  doc: string | { kind?: string; value: string } | undefined,
+): { value: string } | string | undefined {
+  if (!doc) return undefined;
+  if (typeof doc === "string") return doc;
+  return { value: doc.value };
+}
+
+/** Lazily registers a single completion + hover provider on `liquid-json`
+ *  that forwards to the JSON worker. Idempotent across editor mounts. */
+function registerLiquidJsonBridges(monaco: Monaco): void {
+  if (bridgesRegistered) return;
+  bridgesRegistered = true;
+
+  monaco.languages.registerCompletionItemProvider(LIQUID_JSON_LANGUAGE_ID, {
+    triggerCharacters: COMPLETION_TRIGGER_CHARACTERS,
+    provideCompletionItems: async (model, position) => {
+      const offset = model.getOffsetAt(position);
+      if (positionInsideLiquid(model.getValue(), offset)) return null;
+
+      const shadowUri = shadowUriByRealUri.get(model.uri.toString());
+      if (!shadowUri) return null;
+      const shadowResource = monaco.Uri.parse(shadowUri);
+      const shadowModel = monaco.editor.getModel(shadowResource);
+      if (!shadowModel) return null;
+
+      const workerGetter = await monaco.languages.json.getWorker();
+      const worker = (await workerGetter(
+        shadowResource,
+      )) as unknown as JsonWorkerWithLanguageOps;
+      if (!worker.doComplete) return null;
+
+      const result = await worker.doComplete(shadowResource.toString(), {
+        line: position.lineNumber - 1,
+        character: position.column - 1,
+      });
+      if (!result?.items) return { suggestions: [] };
+
+      const wordInfo = model.getWordUntilPosition(position);
+      const fallbackRange = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: wordInfo.startColumn,
+        endColumn: wordInfo.endColumn,
+      };
+
+      const suggestions = result.items.map((item) => {
+        const range = item.textEdit?.range
+          ? {
+              startLineNumber: item.textEdit.range.start.line + 1,
+              startColumn: item.textEdit.range.start.character + 1,
+              endLineNumber: item.textEdit.range.end.line + 1,
+              endColumn: item.textEdit.range.end.character + 1,
+            }
+          : fallbackRange;
+        return {
+          label: item.label,
+          kind: convertCompletionKind(monaco, item.kind),
+          insertText: item.insertText ?? item.textEdit?.newText ?? item.label,
+          insertTextRules:
+            item.insertTextFormat === 2
+              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+              : undefined,
+          sortText: item.sortText,
+          filterText: item.filterText,
+          detail: item.detail,
+          documentation: convertDocumentation(item.documentation),
+          range,
+        };
+      });
+
+      return { suggestions };
+    },
+  });
+
+  monaco.languages.registerHoverProvider(LIQUID_JSON_LANGUAGE_ID, {
+    provideHover: async (model, position) => {
+      const offset = model.getOffsetAt(position);
+      if (positionInsideLiquid(model.getValue(), offset)) return null;
+
+      const shadowUri = shadowUriByRealUri.get(model.uri.toString());
+      if (!shadowUri) return null;
+      const shadowResource = monaco.Uri.parse(shadowUri);
+
+      const workerGetter = await monaco.languages.json.getWorker();
+      const worker = (await workerGetter(
+        shadowResource,
+      )) as unknown as JsonWorkerWithLanguageOps;
+      if (!worker.doHover) return null;
+
+      const result = await worker.doHover(shadowResource.toString(), {
+        line: position.lineNumber - 1,
+        character: position.column - 1,
+      });
+      if (!result) return null;
+
+      const contents = Array.isArray(result.contents)
+        ? result.contents
+        : [result.contents];
+      const items = contents
+        .map((c) => {
+          if (!c) return null;
+          if (typeof c === "string") return { value: c };
+          if (typeof c === "object" && "value" in c)
+            return { value: String((c as { value: unknown }).value) };
+          return null;
+        })
+        .filter((c): c is { value: string } => c !== null);
+
+      return { contents: items };
+    },
+  });
+}
+
 /**
  * Wires JSON Schema validation onto a `liquid-json` editor model. Liquid is
  * not valid JSON, so we maintain a hidden "shadow" model with the same
@@ -400,6 +613,9 @@ export function setupLiquidJsonSchema(params: {
     shadowResource,
   );
 
+  shadowUriByRealUri.set(realModel.uri.toString(), shadowUri);
+  registerLiquidJsonBridges(monaco);
+
   const mirrorMarkers = () => {
     const shadowMarkers = monaco.editor.getModelMarkers({
       resource: shadowResource,
@@ -436,6 +652,7 @@ export function setupLiquidJsonSchema(params: {
       onRealChange.dispose();
       onShadowMarkers.dispose();
       monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, []);
+      shadowUriByRealUri.delete(realModel.uri.toString());
       if (!shadowModel.isDisposed()) shadowModel.dispose();
     },
   };
