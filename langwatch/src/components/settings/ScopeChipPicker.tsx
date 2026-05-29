@@ -185,6 +185,7 @@ export function ScopeChipPicker({
   label = "Scope",
   showSummary = true,
   showQuickPicks = false,
+  singleSelect = false,
   currentOrganizationId,
   currentTeamId,
   currentProjectId,
@@ -205,6 +206,12 @@ export function ScopeChipPicker({
   label?: string;
   /** When false, hides the helper "Shared across …" line below the field. */
   showSummary?: boolean;
+  /** Single-scope mode: a row may live at exactly one scope (inline
+   *  (scopeType, scopeId) resources like model costs / budgets). Renders the
+   *  org/team/project quick-pick chips as a single-select, drops the
+   *  "Multiple" chip and the multi-select dropdown entirely. `value` is still
+   *  an array but holds at most one entry. */
+  singleSelect?: boolean;
   /** When true, render the Organization/Team/Project quick-pick chip
    *  row above the field and collapse the multi-select dropdown by
    *  default. Clicking the 4th "Multiple" chip (CheckCheck icon)
@@ -342,12 +349,12 @@ export function ScopeChipPicker({
     if (derivedMultiple) setMultipleMode(true);
   }, [derivedMultiple]);
 
-  const dropdownVisible = !showQuickPicks || multipleMode;
+  const dropdownVisible = singleSelect ? false : !showQuickPicks || multipleMode;
 
   return (
     <VStack align="start" width="full" gap={1.5}>
       {label && <SmallLabel>{label}</SmallLabel>}
-      {showQuickPicks && quickPicks.length > 0 && (
+      {(showQuickPicks || singleSelect) && quickPicks.length > 0 && (
         <Wrap gap={2} role="group" aria-label="Quick scope">
           {quickPicks.map((pick) => {
             const active = matchingQuickPick?.key === pick.key && !multipleMode;
@@ -375,20 +382,23 @@ export function ScopeChipPicker({
               one-scope case but exposes the multi-select dropdown for
               the long tail (one policy attached to N projects /
               cross-team rules). Active whenever the current selection
-              doesn't reduce to a single quick-pick scope. */}
-          <Button
-            type="button"
-            size="xs"
-            variant={multipleMode ? "solid" : "outline"}
-            aria-pressed={multipleMode}
-            onClick={() => setMultipleMode(true)}
-            data-testid="quick-scope-multiple"
-          >
-            <HStack gap={1}>
-              <CheckCheck size={14} aria-hidden />
-              <Text>Multiple</Text>
-            </HStack>
-          </Button>
+              doesn't reduce to a single quick-pick scope. Hidden in
+              single-scope mode, where multi-scope is not representable. */}
+          {!singleSelect && (
+            <Button
+              type="button"
+              size="xs"
+              variant={multipleMode ? "solid" : "outline"}
+              aria-pressed={multipleMode}
+              onClick={() => setMultipleMode(true)}
+              data-testid="quick-scope-multiple"
+            >
+              <HStack gap={1}>
+                <CheckCheck size={14} aria-hidden />
+                <Text>Multiple</Text>
+              </HStack>
+            </Button>
+          )}
         </Wrap>
       )}
       {dropdownVisible && (
