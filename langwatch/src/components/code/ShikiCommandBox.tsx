@@ -248,12 +248,15 @@ export function ShikiCommandBox({
         )}
 
         {/* Shiki-highlighted code output or fallback pre.
-            When rainbowOn, a `::after` pseudo-element paints a slow-sweeping
-            rainbow gradient sheen on top of the highlighted tokens. The
-            sheen is pointer-events:none + mix-blend-mode:screen so Shiki's
-            syntax colors stay readable and the copy/reveal buttons above
-            stay clickable. `@media (prefers-reduced-motion: reduce)` kills
-            the animation for users who opt out. */}
+            When rainbowOn, we apply PostHog's `.rainbow-text` recipe verbatim
+            (frontend/src/styles/base.scss:2070-2110 in the posthog repo):
+            5-stop linear gradient blue→blue→red→orange→yellow→blue, applied
+            as `background-clip: text` on the wrapper with `color: transparent`,
+            and a 3s `background-position-x` scroll animation. We override
+            Shiki's inline token colors on every nested span with
+            `color: inherit !important` so the gradient flows through every
+            character. `@media (prefers-reduced-motion: reduce)` kills the
+            scroll. */}
         <Box
           flex={1}
           overflowX="auto"
@@ -278,24 +281,28 @@ export function ShikiCommandBox({
               background: "transparent !important",
             },
             ...(rainbowOn && {
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                pointerEvents: "none",
-                backgroundImage:
-                  "linear-gradient(120deg, transparent 0%, rgba(255, 90, 90, 0.20) 18%, rgba(255, 190, 70, 0.20) 32%, rgba(80, 220, 140, 0.18) 48%, rgba(80, 180, 255, 0.20) 64%, rgba(200, 100, 255, 0.20) 80%, transparent 100%)",
-                backgroundSize: "220% 100%",
-                backgroundRepeat: "no-repeat",
-                mixBlendMode: "screen",
-                animation: "lwRainbowSweep 5.5s linear infinite",
+              color: "transparent",
+              backgroundImage:
+                "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundSize: "200% 100%",
+              animation: "lwRainbowScroll 3s linear infinite",
+              // Override Shiki's inline `color: <token-color>` on every nested
+              // span so the wrapper's gradient text-fill shows through every
+              // character. Shiki sets colors via inline style, so the spec's
+              // important-flag is required to win.
+              "& pre, & code, & span": {
+                color: "inherit !important",
+                WebkitTextFillColor: "inherit",
               },
-              "@keyframes lwRainbowSweep": {
-                "0%": { backgroundPosition: "-120% 0" },
-                "100%": { backgroundPosition: "220% 0" },
+              "@keyframes lwRainbowScroll": {
+                "0%": { backgroundPositionX: "0%" },
+                "100%": { backgroundPositionX: "200%" },
               },
               "@media (prefers-reduced-motion: reduce)": {
-                "&::after": { animation: "none", opacity: 0 },
+                animation: "none",
               },
             }),
           }}
