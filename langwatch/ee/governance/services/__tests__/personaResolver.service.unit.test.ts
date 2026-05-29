@@ -177,6 +177,18 @@ describe("resolvePersonaHome", () => {
       expect(result.destination).not.toBe("/governance");
     });
 
+    it("routes a member with no projects to onboarding, not the gated /me", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        firstProjectSlug: null,
+      });
+      // /me is flag-gated and 404s here, so there is no usable personal home;
+      // send the user to the recoverable onboarding bootstrap instead.
+      expect(result.destination).toBe("/onboarding/welcome");
+      expect(result.destination).not.toBe("/me");
+    });
+
     it("still honors an explicit user pin even when the flag is off", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -212,11 +224,21 @@ describe("resolvePersonaHomeSafe", () => {
     expect(result.destination).toBe("/team-prod/messages");
   });
 
-  it("falls back to /me when given partial input + no project slug", () => {
+  it("falls back to onboarding when partial input has no project slug and no governance UI", () => {
     const result = resolvePersonaHomeSafe({
       firstProjectSlug: null,
     });
+    // hasGovernanceUi defaults to false, so /me would 404 — route to the
+    // recoverable onboarding bootstrap instead.
     expect(result.persona).toBe("project_only");
+    expect(result.destination).toBe("/onboarding/welcome");
+  });
+
+  it("falls back to /me when no project slug but the governance UI is enabled", () => {
+    const result = resolvePersonaHomeSafe({
+      firstProjectSlug: null,
+      hasGovernanceUi: true,
+    });
     expect(result.destination).toBe("/me");
   });
 

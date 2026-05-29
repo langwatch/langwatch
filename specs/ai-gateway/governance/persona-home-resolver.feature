@@ -115,6 +115,14 @@ Feature: Persona-aware home resolver
     Then the resolver returns "/<projectSlug>/messages"
     And NOT "/governance"
 
+  Scenario: Non-governance org member with no projects → onboarding, not the gated /me
+    Given user "dave@acme.com" belongs to no projects (no ProjectMember rows)
+    But the org does not have the governance UI enabled
+    When the resolver runs for the user
+    Then the resolver returns "/onboarding/welcome"
+    And NOT "/me"
+    And the user lands on a recoverable bootstrap page rather than a 404
+
   # ---------------------------------------------------------------------------
   # User override
   # ---------------------------------------------------------------------------

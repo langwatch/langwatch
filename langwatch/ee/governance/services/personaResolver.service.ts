@@ -177,7 +177,7 @@ function mapPersonaToDestination(
 ): string {
   const projectHome = input.firstProjectSlug
     ? `/${input.firstProjectSlug}/messages`
-    : "/me";
+    : noProjectFallback(input.hasGovernanceUi);
 
   // `/me` and `/governance` are gated behind release_ui_ai_governance_enabled
   // and 404 when it is off. An org without the governance UI gets the
@@ -197,4 +197,15 @@ function mapPersonaToDestination(
     case "project_only":
       return projectHome;
   }
+}
+
+/**
+ * Where to send a user with no project membership. `/me` is the natural
+ * personal home, but it is flag-gated and 404s without the governance UI, so
+ * a non-governance org with no project falls back to the recoverable
+ * onboarding bootstrap instead (mirrors the org-less branch in
+ * pages/index.tsx) rather than the dead-end /me.
+ */
+function noProjectFallback(hasGovernanceUi: boolean): string {
+  return hasGovernanceUi ? "/me" : "/onboarding/welcome";
 }
