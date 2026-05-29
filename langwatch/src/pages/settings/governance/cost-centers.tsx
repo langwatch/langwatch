@@ -192,6 +192,7 @@ function AssignmentLink({
         borderBottomWidth="1px"
         borderColor="border.muted"
         justifyContent="space-between"
+        color="fg.muted"
         _hover={{ backgroundColor: "bg.muted" }}
       >
         <VStack align="start" gap={0}>
@@ -202,7 +203,7 @@ function AssignmentLink({
             {description}
           </Text>
         </VStack>
-        <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
+        <ExternalLink size={16} />
       </HStack>
     </Link>
   );

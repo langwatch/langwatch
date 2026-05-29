@@ -140,8 +140,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
 
   @bdd @cost-centers @ui
   Scenario: The cost-center control appears only once cost centers are configured
-    Given the governance preview flag is enabled for acme-corp
-    But no cost centers exist yet in acme-corp
+    Given no cost centers exist yet in acme-corp
     Then the members and teams pages show no cost-center column
     When the admin creates the first cost center
     Then the cost-center column appears on the members and teams pages

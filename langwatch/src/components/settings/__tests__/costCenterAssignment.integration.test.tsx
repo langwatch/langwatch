@@ -157,7 +157,15 @@ describe("cost-center assignment UI", () => {
           kind="user"
           entityId="user_robin"
           value={null}
-          costCenters={[{ id: "cc_mkt", name: "Marketing" }]}
+          costCenters={[
+            {
+              id: "cc_mkt",
+              name: "Marketing",
+              organizationId: "org-1",
+              createdAt: new Date("2026-01-01T00:00:00.000Z"),
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+          ]}
           onAssigned={vi.fn()}
         />,
       );
@@ -183,7 +191,15 @@ describe("cost-center assignment UI", () => {
           kind="team"
           entityId="team_platform"
           value={null}
-          costCenters={[{ id: "cc_eng", name: "Engineering" }]}
+          costCenters={[
+            {
+              id: "cc_eng",
+              name: "Engineering",
+              organizationId: "org-1",
+              createdAt: new Date("2026-01-01T00:00:00.000Z"),
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+          ]}
           onAssigned={vi.fn()}
         />,
       );
