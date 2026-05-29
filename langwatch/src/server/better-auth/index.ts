@@ -546,11 +546,55 @@ export const auth = betterAuth({
           if (email && typeof email === "string") {
             const domain = extractEmailDomain(email);
             if (domain) {
+              // Phase 1: check Organization.ssoProvider (legacy)
               const org = await prisma.organization.findUnique({
                 where: { ssoDomain: domain },
-                select: { ssoProvider: true },
+                select: { id: true, ssoProvider: true },
               });
-              if (org?.ssoProvider) {
+
+              // Phase 2: check SsoConnection with ssoEnforced
+              const ssoConnection = await prisma.ssoConnection.findFirst({
+                where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
+                select: { organizationId: true },
+              });
+
+              const enforcedOrgId = ssoConnection?.organizationId ?? (org?.ssoProvider ? org.id : null);
+
+              if (enforcedOrgId && matches("/sign-in/email")) {
+                // Sole-owner escape hatch: if the user is the only
+                // active ADMIN, allow password login to prevent lockout
+                // during IdP outages.
+                const user = await prisma.user.findFirst({
+                  where: { email },
+                  select: { id: true },
+                });
+
+                if (user) {
+                  const activeAdminCount = await prisma.organizationUser.count({
+                    where: {
+                      organizationId: enforcedOrgId,
+                      role: "ADMIN",
+                      user: { deactivatedAt: null },
+                    },
+                  });
+
+                  const userIsAdmin = await prisma.organizationUser.findFirst({
+                    where: {
+                      organizationId: enforcedOrgId,
+                      userId: user.id,
+                      role: "ADMIN",
+                    },
+                    select: { userId: true },
+                  });
+
+                  if (userIsAdmin && activeAdminCount === 1) {
+                    // Sole owner — allow password login as escape hatch
+                    return;
+                  }
+                }
+              }
+
+              if (enforcedOrgId) {
                 throw APIError.from("FORBIDDEN", {
                   code: "SSO_ENFORCED",
                   message:

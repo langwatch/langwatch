@@ -148,8 +148,7 @@ export default function SettingsLayout({
               <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
             )}
             <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            {/* TODO: re-enable enterprise gate before merging */}
-            {!isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/sso">SSO</MenuLink>
             )}
             {showEnterpriseNav && !isLiteMember && (

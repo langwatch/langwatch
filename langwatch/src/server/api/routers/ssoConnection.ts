@@ -7,7 +7,10 @@ import {
 } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { SsoConnectionService } from "~/server/sso/ssoConnection.service";
+import { validateOidcDiscovery } from "~/server/sso/oidcDiscovery";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const OIDC_PROVIDERS = new Set(["okta", "azure-ad", "google", "custom-oidc"]);
 
 const ssoConnectionProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
@@ -98,6 +101,18 @@ export const ssoConnectionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (OIDC_PROVIDERS.has(input.provider) && input.issuerUrl) {
+        const discovery = await validateOidcDiscovery({
+          issuerUrl: input.issuerUrl,
+        });
+        if (!discovery.valid) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `OIDC discovery validation failed: ${discovery.error}`,
+          });
+        }
+      }
+
       const service = SsoConnectionService.create(ctx.prisma);
       const connection = await service.createConnection({
         organizationId: input.organizationId,
@@ -142,6 +157,24 @@ export const ssoConnectionRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const effectiveProvider = input.provider;
+      const effectiveIssuerUrl = input.issuerUrl;
+      if (
+        effectiveProvider &&
+        OIDC_PROVIDERS.has(effectiveProvider) &&
+        effectiveIssuerUrl
+      ) {
+        const discovery = await validateOidcDiscovery({
+          issuerUrl: effectiveIssuerUrl,
+        });
+        if (!discovery.valid) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `OIDC discovery validation failed: ${discovery.error}`,
+          });
+        }
+      }
+
       const { id, organizationId, ...updates } = input;
       const service = SsoConnectionService.create(ctx.prisma);
       await service.updateConnection({

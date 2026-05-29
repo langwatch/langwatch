@@ -162,8 +162,7 @@ function SsoSettings() {
 
   if (!organization) return <SettingsLayout />;
 
-  // TODO: re-enable enterprise gate before merging
-  if (!isEnterprise && false) {
+  if (!isEnterprise) {
     return (
       <SettingsLayout>
         <VStack gap={6} align="start" width="full">
