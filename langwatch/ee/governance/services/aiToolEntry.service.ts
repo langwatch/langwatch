@@ -262,7 +262,6 @@ const STARTER_PACK_TILES: ReadonlyArray<{
       setupCommand: "langwatch claude",
       setupDocsUrl:
         "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
-      helperText: "Run from your terminal to provision a VK and launch Claude Code.",
     },
   },
   {
@@ -355,6 +354,23 @@ export class AiToolEntryService {
 
   static create(prisma: PrismaClient): AiToolEntryService {
     return new AiToolEntryService(prisma);
+  }
+
+  /**
+   * The starter-pack catalog the admin editor renders as a checklist so
+   * the admin picks which tools to publish instead of importing the whole
+   * set. Display-only projection of {@link STARTER_PACK_TILES}.
+   */
+  static listStarterPackTiles(): {
+    slug: string;
+    displayName: string;
+    type: AiToolType;
+  }[] {
+    return STARTER_PACK_TILES.map((t) => ({
+      slug: t.slug,
+      displayName: t.displayName,
+      type: t.type,
+    }));
   }
 
   /**
@@ -669,7 +685,17 @@ export class AiToolEntryService {
   async seedStarterPack(input: {
     organizationId: string;
     actorUserId?: string | null;
+    /**
+     * When set, only these starter slugs are published; unknown slugs are
+     * ignored. Omitted = the full pack (keeps the idempotent re-run path
+     * and any existing caller working unchanged).
+     */
+    slugs?: string[];
   }): Promise<{ created: number; updated: number; skipped: number }> {
+    const selectedTiles =
+      input.slugs === undefined
+        ? STARTER_PACK_TILES
+        : STARTER_PACK_TILES.filter((t) => input.slugs!.includes(t.slug));
     const existing = await this.prisma.aiToolEntry.findMany({
       where: {
         organizationId: input.organizationId,
@@ -692,7 +718,7 @@ export class AiToolEntryService {
     const toUpdate: { id: string; iconAsset: string }[] = [];
     let skipped = 0;
 
-    for (const tile of STARTER_PACK_TILES) {
+    for (const tile of selectedTiles) {
       const match = byFingerprint.get(fingerprint(tile.type, tile.displayName));
       if (!match) {
         toCreate.push(tile);
@@ -749,41 +775,46 @@ export class AiToolEntryService {
   }
 
   /**
-   * Returns the distinct set of `provider` strings the org has at
-   * least one *bindable* credential for — i.e. a live
-   * `GatewayProviderCredential` (`disabledAt: null`) on a project in
-   * the org whose parent `ModelProvider` is enabled. Drives the
-   * per-tile "Provider not configured" preflight on /me — without
-   * this, clicking an OpenAI tile in an Anthropic-only org silently
-   * mints a VK that 502s on first curl with `provider_error` (Sergey
-   * 3bbd7fbfc dogfood).
+   * Returns the distinct set of `provider` strings the caller can
+   * reach a *bindable* credential for — an enabled `ModelProvider`
+   * (`disabledAt: null`) scoped either org-wide or to a team/project
+   * the caller belongs to. Drives the per-tile "Provider not
+   * configured" preflight on /me — without this, clicking an OpenAI
+   * tile in an Anthropic-only org silently mints a VK that 502s on
+   * first curl with `provider_error` (Sergey 3bbd7fbfc dogfood).
+   *
+   * Scoping to the caller's memberships is load-bearing: a provider
+   * configured only on a team the caller is not a member of is not
+   * reachable by their personal VK, so reporting it as configured
+   * would green-light a tile that mints a VK which can't route.
    *
    * Why this exact predicate: it mirrors the materialiser's
    * fail-closed binding contract (a5601f80a). If a credential
-   * matching this shape exists anywhere in the org, the personal-VK
+   * matching this shape is reachable by the caller, the personal-VK
    * routing policy can route through it — guaranteeing the tile's
    * green state matches what the gateway will actually accept at
    * request time. Using the bare ModelProvider table (without the
    * `disabledAt: null` join) would over-report for orgs that have
    * an enabled MP but soft-disabled all of its bindings.
-   *
-   * Both `Project` and `ModelProvider` are exempt from
-   * `dbMultiTenancyProtection`. `GatewayProviderCredential` is NOT
-   * exempt but the `projectId: { in: ... }` shape satisfies the
-   * guard's `projectId.in` allowance (line 233 of that middleware).
    */
   async listConfiguredProvidersForUser({
     organizationId,
+    userId,
   }: {
     organizationId: string;
     userId: string;
   }): Promise<string[]> {
-    const teams = await this.prisma.team.findMany({
-      where: { organizationId },
-      select: { id: true, projects: { select: { id: true } } },
+    // Only teams the caller actually belongs to. A TEAM/PROJECT-scoped
+    // provider on a team the caller can't reach must not green-light the
+    // tile — ORGANIZATION-scoped credentials still count for every member.
+    const memberships = await this.prisma.teamUser.findMany({
+      where: { userId, team: { organizationId } },
+      select: { teamId: true, team: { select: { projects: { select: { id: true } } } } },
     });
-    const teamIds = teams.map((t) => t.id);
-    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
+    const teamIds = memberships.map((m) => m.teamId);
+    const projectIds = memberships.flatMap((m) =>
+      m.team.projects.map((p) => p.id),
+    );
 
     const rows = await this.prisma.modelProvider.findMany({
       where: {

@@ -260,6 +260,47 @@ describe("virtualKeys.update — guardrail attach", () => {
     });
   });
 
+  describe("when a scope change moves the VK away from its attached guardrails' project", () => {
+    /** @scenario Re-scoping a VK to a new project revalidates the existing guardrail attachments against that project */
+    it("rejects the scope move when previously-attached guardrails belong to the old project", async () => {
+      const movingVkId = `vk-move-${ns}`;
+      await prisma.virtualKey.create({
+        data: {
+          id: movingVkId,
+          organizationId: ORG_ID,
+          name: movingVkId,
+          hashedSecret: `hash-${movingVkId}`,
+          displayPrefix: "vk-lw-MOVE",
+          createdById: USER_ID,
+          config: {
+            guardrailAttachments: [
+              { direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] },
+            ],
+          },
+          scopes: { create: [{ scopeType: "PROJECT", scopeId: DEMO_PROJECT_ID }] },
+        },
+      });
+
+      try {
+        // Move it to OTHER_PROJECT without re-sending config. The existing
+        // DEMO_GUARDRAIL attachment must be rechecked against the new
+        // project and rejected, not left silently dangling.
+        await expect(
+          caller.virtualKeys.update({
+            organizationId: ORG_ID,
+            id: movingVkId,
+            scopes: [{ scopeType: "PROJECT", scopeId: OTHER_PROJECT_ID }],
+          }),
+        ).rejects.toThrow(/guardrail_project_mismatch/);
+      } finally {
+        await prisma.virtualKeyScope.deleteMany({
+          where: { virtualKeyId: movingVkId },
+        });
+        await prisma.virtualKey.deleteMany({ where: { id: movingVkId } });
+      }
+    });
+  });
+
   describe("when attaching a guardrail from the VK's own project", () => {
     /** @scenario VK attaches existing GatewayGuardrail rows by reference */
     it("persists the attachment tuple and emits a guardrail_attached audit row", async () => {

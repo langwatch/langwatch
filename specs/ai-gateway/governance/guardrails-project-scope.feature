@@ -148,3 +148,18 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
     # VK-side attach/detach actions are filed under gateway.virtual_key.*
     # because the AuditLog target is the VK row that opted in, not the
     # guardrail row itself. CRUD actions live on the guardrail target.
+
+  # ============================================================================
+  # Re-scoping revalidates existing attachments against the new project
+  # ============================================================================
+
+  @bdd @guardrails @rbac
+  Scenario: Re-scoping a VK to a new project revalidates the existing guardrail attachments against that project
+    Given a virtual key scoped to project "demo" with a guardrail attached from "demo"
+    When carol re-scopes the virtual key to project "other" without re-sending its config
+    Then the update is rejected with "guardrail_project_mismatch"
+    Because the previously-attached guardrail belongs to "demo", not "other"
+    And the virtual key is not moved, so its attachments never dangle across projects
+    # Guards the gap where only the request's attachments were validated:
+    # a project move that left config untouched used to strand the old
+    # attachment pointing at a guardrail the new project can't see.

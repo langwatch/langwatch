@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   } else {
     const created = await prisma.modelProvider.create({
       data: {
-        projectId: project.id,
+        organizationId: org.id,
         name: "OpenAI",
         provider: "openai",
         enabled: true,

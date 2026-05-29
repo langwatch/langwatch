@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SCOPE_TIERS, scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -133,15 +134,10 @@ export const modelProviderRouter = createTRPCRouter({
         // service runs the fail-closed authz check on every entry before
         // persisting — any non-manageable scope aborts the whole write.
         scopes: z
-          .array(
-            z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-              scopeId: z.string().min(1),
-            }),
-          )
+          .array(scopeAssignmentSchema)
           .min(1, "At least one scope must be selected.")
           .optional(),
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
+        scopeType: z.enum(SCOPE_TIERS).optional(),
         scopeId: z.string().optional(),
       }),
     )
@@ -346,7 +342,7 @@ export const modelProviderRouter = createTRPCRouter({
   setRoleAssignmentForScope: protectedProcedure
     .input(
       z.object({
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeType: z.enum(SCOPE_TIERS),
         scopeId: z.string(),
         role: z.enum(MODEL_ROLES),
         model: z.string().nullable(),
@@ -370,7 +366,7 @@ export const modelProviderRouter = createTRPCRouter({
   setFeatureOverrideForScope: protectedProcedure
     .input(
       z.object({
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeType: z.enum(SCOPE_TIERS),
         scopeId: z.string(),
         featureKey: z.string(),
         model: z.string().nullable(),
@@ -414,7 +410,7 @@ export const modelProviderRouter = createTRPCRouter({
         scopes: z
           .array(
             z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeType: z.enum(SCOPE_TIERS),
               scopeId: z.string().min(1),
             }),
           )
@@ -487,7 +483,7 @@ export const modelProviderRouter = createTRPCRouter({
         scopes: z
           .array(
             z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeType: z.enum(SCOPE_TIERS),
               scopeId: z.string().min(1),
             }),
           )

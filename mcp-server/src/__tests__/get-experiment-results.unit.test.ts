@@ -197,25 +197,116 @@ describe("handleExperimentResults()", () => {
         );
         const out = await handleExperimentResults({ runId: "missing" });
         expect(out).toContain("not found");
-        expect(out).toContain("platform_experiment_status");
+        expect(out).toContain("experimentSlug");
       });
     });
   });
 
   describe("given the run is still in progress", () => {
     describe("when results are requested", () => {
-      it("returns guidance to check status instead of partial results", async () => {
+      it("serves the partial rows logged so far with an in-progress note", async () => {
         mockMakeRequest.mockResolvedValueOnce({
           ...sample,
           progress: 2,
           total: 3,
-          timestamps: { createdAt: 0, updatedAt: 0, finishedAt: null },
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
         });
 
         const out = await handleExperimentResults({ runId: "unfinished" });
 
-        expect(out).toContain("results are not yet available");
-        expect(out).toContain("platform_experiment_status");
+        expect(out).toContain("**Status**: running");
+        expect(out).toContain("still in progress");
+        expect(out).toContain("Row #0");
+        expect(out).toContain("Progress**: 2/3");
+      });
+    });
+  });
+
+  describe("given the run was interrupted before finishing", () => {
+    describe("when results are requested", () => {
+      it("serves the partial rows with an interrupted note", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+
+        const out = await handleExperimentResults({ runId: "interrupted" });
+
+        expect(out).toContain("**Status**: interrupted");
+        expect(out).toContain("interrupted");
+        expect(out).toContain("Row #0");
+      });
+    });
+  });
+
+  describe("given a non-terminal run with zero rows", () => {
+    describe("when the run is still running", () => {
+      it("says the run is in progress", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        const out = await handleExperimentResults({ runId: "empty-running" });
+        expect(out).toContain("still in progress");
+        expect(out).not.toContain("interrupted");
+      });
+    });
+
+    describe("when the run was interrupted", () => {
+      it("says no rows were recorded before it was interrupted, not to wait", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        const out = await handleExperimentResults({ runId: "empty-interrupted" });
+        expect(out).toContain("interrupted");
+        expect(out).not.toContain("still in progress");
+        expect(out).not.toContain("Call again shortly");
+      });
+    });
+  });
+
+  describe("given no run state but rows exist (SDK / >24h run)", () => {
+    describe("when results are requested with a stopped run", () => {
+      it("renders results for a stopped run", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          timestamps: {
+            createdAt: 0,
+            updatedAt: 10,
+            finishedAt: null,
+            stoppedAt: 20,
+          },
+        });
+
+        const out = await handleExperimentResults({ runId: "stopped" });
+
+        expect(out).toContain("**Status**: stopped");
+        expect(out).toContain("Row #0");
       });
     });
   });

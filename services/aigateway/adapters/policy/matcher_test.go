@@ -122,3 +122,49 @@ func TestCheck_ExtractMCPNames_StringEntries(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
 }
+
+func TestCheck_ModelDenyMatches(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+	body := []byte(`{"model":"gpt-4o","messages":[]}`)
+
+	err := m.Check(context.Background(), rules, body)
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+}
+
+func TestCheck_ModelDenyNoMatch(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+	body := []byte(`{"model":"claude-haiku-4-5","messages":[]}`)
+
+	err := m.Check(context.Background(), rules, body)
+	assert.NoError(t, err)
+}
+
+func TestCheck_ModelAllowRestricts(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+	}
+	body := []byte(`{"model":"gpt-4o","messages":[]}`)
+
+	err := m.Check(context.Background(), rules, body)
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
+}
+
+func TestCheck_ModelAllowMatch(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+	}
+	body := []byte(`{"model":"claude-haiku-4-5","messages":[]}`)
+
+	err := m.Check(context.Background(), rules, body)
+	assert.NoError(t, err)
+}

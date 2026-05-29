@@ -64,6 +64,7 @@ async function main() {
   const defaultConfig = await prisma.modelDefaultConfig.create({
     data: {
       id: nanoid(),
+      organizationId: organization.id,
       config: {
         DEFAULT: "openai/gpt-5-mini",
         FAST: "openai/gpt-5-mini",

@@ -31,6 +31,21 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
     And each section shows an empty-state callout: "No <type> configured. Click Add tile to publish one."
     And each section shows a "+ Add tile" button in its header
 
+  Scenario: starter pack lets the admin choose which tools to publish
+    Given the org-scoped catalog is empty
+    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    Then the starter-pack callout lists every starter tool as a checkbox, all checked by default
+    When user "carol@acme.com" unchecks "AWS Bedrock" and "Google AI"
+    And user "carol@acme.com" imports the starter pack
+    Then only the checked tools are published to the org catalog
+    And the unchecked tools are not published
+
+  Scenario: importing the starter pack with no tools selected is not allowed
+    Given the org-scoped catalog is empty
+    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    And user "carol@acme.com" unchecks every starter tool
+    Then the import action is disabled
+
   Scenario: admin sees populated catalog with scope badges
     Given the catalog has these admin-visible entries:
       | type             | displayName    | scope        | scopeId          | enabled |

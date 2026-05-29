@@ -205,7 +205,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -330,7 +330,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -408,7 +408,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
             },
           },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -432,7 +432,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
             },
           },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 

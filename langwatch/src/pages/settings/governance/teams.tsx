@@ -10,11 +10,9 @@ import numeral from "numeral";
 import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -104,13 +102,6 @@ function GovernanceTeamsListPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled, isLoading: ffLoading } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    {
-      organizationId: orgId,
-      enabled: !!orgId,
-    },
-  );
 
   // Sort state lives in URL (`?sort=requests`) so the view is deep-linkable
   // and stable across refresh / share-this-view. `spend` is the canonical
@@ -134,9 +125,6 @@ function GovernanceTeamsListPage() {
     },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
 
   const teams = teamsQuery.data ?? [];
 
@@ -319,6 +307,10 @@ function Row({ team }: { team: SpendByTeam }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(GovernanceTeamsListPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceTeamsListPage),
+);

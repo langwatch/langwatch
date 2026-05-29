@@ -31,7 +31,15 @@ describe("OnboardingChecksService Integration", () => {
       where: { id: projectId },
       include: { team: true },
     });
-    organizationId = project?.team.organizationId ?? "";
+    // The model-provider inserts below anchor on organizationId (NOT NULL), so
+    // fail fast here if the fixture didn't resolve an org rather than surfacing
+    // a confusing Prisma create error mid-test.
+    if (!project?.team.organizationId) {
+      throw new Error(
+        `Test setup failed: project ${projectId} did not resolve to an organization`,
+      );
+    }
+    organizationId = project.team.organizationId;
 
     service = new OnboardingChecksService();
   });
@@ -78,6 +86,7 @@ describe("OnboardingChecksService Integration", () => {
           name: "OpenAI",
           provider: "openai",
           enabled: true,
+          organizationId,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: projectId }],
           },
@@ -99,6 +108,7 @@ describe("OnboardingChecksService Integration", () => {
           name: "Anthropic",
           provider: "anthropic",
           enabled: false,
+          organizationId,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: projectId }],
           },

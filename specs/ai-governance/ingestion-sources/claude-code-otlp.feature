@@ -234,9 +234,8 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
     And no ledger row is written
     And the source row's "events rejected" counter increments
 
-  Scenario: PII in chat content is redacted per the source's retention class
-    Given the source's retention class is "thirty_days"
-    And Bob's prompt includes a credit-card number
+  Scenario: PII in chat content is redacted on the ingest path
+    Given Bob's prompt includes a credit-card number
     When the OTLP body lands
     Then the existing OtlpSpanPiiRedactionService runs against the
       trace handoff (same as gateway path — origin doesn't change PII

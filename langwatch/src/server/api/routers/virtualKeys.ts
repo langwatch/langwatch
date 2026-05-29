@@ -23,18 +23,23 @@ import type { Session } from "~/server/auth";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import {
+  parseVirtualKeyConfig,
   virtualKeyConfigSchema,
   type GuardrailAttachment,
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 
-import { checkOrganizationPermission, hasProjectPermission } from "../rbac";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  assertCanManageAllScopes,
+  assertCanOperateOnAnyScope,
+  isVisibleToMembership,
+  loadMembershipSet,
+} from "~/server/gateway/virtualKey.authz";
 
-const scopeInputSchema = z.object({
-  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-  scopeId: z.string().min(1),
-});
+const scopeInputSchema = scopeAssignmentSchema;
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -60,6 +65,68 @@ async function resolveVkProjectId(
   }
   const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
   return projectScopes.length === 1 ? projectScopes[0]!.scopeId : null;
+}
+
+/**
+ * Every requested scope must belong to the VK's own organization.
+ * `assertCanManageAllScopes` only proves the caller controls each scope,
+ * not that the scope lives in `organizationId` — without this, a caller
+ * with manage rights in org A could submit `organizationId` for org B
+ * plus a scope from org A and write a cross-org VK row. ORGANIZATION
+ * scopes must equal the org; TEAM/PROJECT scopes must resolve to it.
+ */
+async function assertScopesBelongToOrg(
+  prisma: PrismaClient,
+  organizationId: string,
+  scopes: { scopeType: string; scopeId: string }[],
+): Promise<void> {
+  const teamIds = scopes
+    .filter((s) => s.scopeType === "TEAM")
+    .map((s) => s.scopeId);
+  const projectIds = scopes
+    .filter((s) => s.scopeType === "PROJECT")
+    .map((s) => s.scopeId);
+
+  for (const s of scopes) {
+    if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `scope_org_mismatch: scope ${s.scopeId} is not in organization ${organizationId}`,
+      });
+    }
+  }
+
+  if (teamIds.length > 0) {
+    const found = await prisma.team.findMany({
+      where: { id: { in: teamIds }, organizationId },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((t) => t.id));
+    for (const id of teamIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: team ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
+
+  if (projectIds.length > 0) {
+    const found = await prisma.project.findMany({
+      where: { id: { in: projectIds }, team: { organizationId } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((p) => p.id));
+    for (const id of projectIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: project ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -125,22 +192,45 @@ async function assertGuardrailAttachmentsAllowed(
 }
 
 export const virtualKeysRouter = createTRPCRouter({
+  // Visibility is membership-based, not permission-based: a caller sees a
+  // VK when one of its scopes intersects their membership set (org member
+  // sees org-scoped keys, team member sees that team's keys). The
+  // data-dependent membership filter runs in the resolver, so the builder's
+  // fail-closed gate is satisfied by authorizeInResolver rather than a
+  // coarse org-wide virtualKeys:view check that a plain member lacks.
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
       const service = VirtualKeyService.create(ctx.prisma);
       const keys = await service.getAll(input.organizationId);
-      return keys.map(toVirtualKeyCamelDto);
+      return keys
+        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
+        .map(toVirtualKeyCamelDto);
     }),
 
   get: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const vk = await service.getById(input.id, input.organizationId);
+      // A key the caller can't see is indistinguishable from one that
+      // doesn't exist — same NOT_FOUND, no existence leak.
       if (!vk) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      if (!isVisibleToMembership(membership, vk.scopes)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       return toVirtualKeyCamelDto(vk);
@@ -158,8 +248,21 @@ export const virtualKeysRouter = createTRPCRouter({
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkOrganizationPermission("virtualKeys:manage"))
+    // Per-scope authz (manage on EVERY requested scope) is data-dependent,
+    // so it runs in the resolver; authorizeInResolver satisfies the
+    // builder's fail-closed permission gate without re-introducing the
+    // coarse org-wide check.
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
+      await assertCanManageAllScopes(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scopes,
+      );
+      await assertScopesBelongToOrg(
+        ctx.prisma,
+        input.organizationId,
+        input.scopes,
+      );
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
@@ -197,20 +300,56 @@ export const virtualKeysRouter = createTRPCRouter({
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkOrganizationPermission("virtualKeys:manage"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
+      const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      // Mutating an existing key needs virtualKeys:update on one of the
+      // scopes it already lives in.
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      // Re-scoping additionally needs manage on every NEW scope, so a key
+      // can't be moved into a scope the caller doesn't control.
+      if (input.scopes) {
+        await assertCanManageAllScopes(
+          { prisma: ctx.prisma, session: ctx.session },
+          input.scopes,
+        );
+        await assertScopesBelongToOrg(
+          ctx.prisma,
+          input.organizationId,
+          input.scopes,
+        );
+      }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
         input.id,
         input.scopes,
       );
+      // Newly-submitted attachments are always validated. When the caller
+      // is ALSO changing scopes (a possible project move) but did not
+      // re-send config, revalidate the existing attachments against the
+      // new project so a stale cross-project attachment can't survive the
+      // move. A plain metadata update (no scope change, no new
+      // attachments) must not re-touch existing attachments, otherwise
+      // renaming a VK would demand gatewayGuardrails:attach.
+      const attachmentsToCheck =
+        input.config?.guardrailAttachments ??
+        (input.scopes !== undefined
+          ? parseVirtualKeyConfig(existing.config).guardrailAttachments
+          : undefined);
       await assertGuardrailAttachmentsAllowed(
         ctx,
         vkProjectId,
-        input.config?.guardrailAttachments,
+        attachmentsToCheck,
       );
-      const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.update({
         id: input.id,
         organizationId: input.organizationId,
@@ -226,9 +365,18 @@ export const virtualKeysRouter = createTRPCRouter({
 
   rotate: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:rotate"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:rotate",
+      );
       const { virtualKey, secret } = await service.rotate({
         id: input.id,
         organizationId: input.organizationId,
@@ -239,9 +387,18 @@ export const virtualKeysRouter = createTRPCRouter({
 
   revoke: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:delete"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:delete",
+      );
       const updated = await service.revoke({
         id: input.id,
         organizationId: input.organizationId,

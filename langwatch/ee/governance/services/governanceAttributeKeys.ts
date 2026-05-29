@@ -31,8 +31,6 @@ export const GOVERNANCE_ATTR = {
   INGESTION_SOURCE_TYPE: "langwatch.ingestion_source.source_type",
   /** "langwatch.ingestion_source.organization_id" — owner org of the source. */
   INGESTION_SOURCE_ORG_ID: "langwatch.ingestion_source.organization_id",
-  /** "langwatch.governance.retention_class" — per-origin retention policy ("thirty_days" / "one_year" / "seven_years"). */
-  RETENTION_CLASS: "langwatch.governance.retention_class",
   /** "langwatch.user_id" — actor (typically email) attribution for SpendByUser. */
   USER_ID: "langwatch.user_id",
   /** "langwatch.governance.anomaly_alert_id" — set by alertTrigger reactor to elevate OCSF severity. */

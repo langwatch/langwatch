@@ -111,7 +111,6 @@ async function main(): Promise<void> {
       description: null,
       ingestSecretHash,
       parserConfig: {},
-      retentionClass: "thirty_days",
       status: "awaiting_first_event",
       createdById: user.id,
     },

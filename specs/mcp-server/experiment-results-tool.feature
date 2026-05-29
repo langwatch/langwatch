@@ -31,10 +31,17 @@ Feature: MCP Experiment Results Tool
 
   @unimplemented
   Scenario: Agent requests a run that is still running
-    Given a run that has not finished yet
+    Given a run that has not finished yet but has logged some rows
     When the agent calls platform_experiment_results with that run id
-    Then the response explains that results are not yet available
-    And the response suggests polling platform_experiment_status
+    Then the response includes the rows logged so far
+    And the response notes that the run is still in progress and the results are partial
+
+  @unimplemented
+  Scenario: Agent requests a run that was interrupted before finishing
+    Given a run that logged rows but never sent a finished or stopped marker and has had no recent updates
+    When the agent calls platform_experiment_results with that run id
+    Then the response includes the rows logged so far
+    And the response notes that the run was likely interrupted
 
   @unimplemented
   Scenario: Agent requests a missing run

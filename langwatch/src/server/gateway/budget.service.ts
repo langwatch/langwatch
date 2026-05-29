@@ -4,14 +4,8 @@
  *
  * Scope invariants:
  *   - Every budget row belongs to exactly one organization.
- *   - `scopeType` + `scopeId` identifies the logical target.
- *   - Exactly one typed FK column (`organizationScopedId`,
- *     `teamScopedId`, `projectScopedId`, `virtualKeyScopedId`,
- *     `principalUserId`) is non-null, and it matches `scopeType`.
- *
- * The DB CHECK constraint `GatewayBudget_scope_check` enforces this at
- * write-time; the service layer enforces it up front to produce friendly
- * tRPC errors instead of a PG error.
+ *   - `scopeType` + `scopeId` identifies the logical target (ADR-021): the
+ *     single inline source of truth, with no typed FK columns mirroring it.
  */
 import type {
   GatewayBudget,
@@ -434,7 +428,6 @@ export class GatewayBudgetService {
     }
 
     const resetsAt = nextResetAt(input.window);
-    const scopeCols = scopeToColumns(input.scope);
     const projectId = resolveProjectFromScope(input.scope);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -442,12 +435,7 @@ export class GatewayBudgetService {
         data: {
           organizationId: input.organizationId,
           scopeType: scopeKindToEnum(input.scope.kind),
-          scopeId: scopeCols.scopeId,
-          organizationScopedId: scopeCols.organizationScopedId,
-          teamScopedId: scopeCols.teamScopedId,
-          projectScopedId: scopeCols.projectScopedId,
-          virtualKeyScopedId: scopeCols.virtualKeyScopedId,
-          principalUserId: scopeCols.principalUserId,
+          scopeId: scopeIdForScope(input.scope),
           name: input.name,
           description: input.description ?? null,
           window: input.window,
@@ -681,60 +669,21 @@ export class GatewayBudgetService {
   }
 }
 
-function scopeToColumns(scope: BudgetScope): {
-  scopeId: string;
-  organizationScopedId: string | null;
-  teamScopedId: string | null;
-  projectScopedId: string | null;
-  virtualKeyScopedId: string | null;
-  principalUserId: string | null;
-} {
+// The inline scopeId discriminator for a scope. Post-ADR-021 collapse this
+// is the only stored representation of the target; the typed FK columns it
+// used to mirror are gone.
+function scopeIdForScope(scope: BudgetScope): string {
   switch (scope.kind) {
     case "ORGANIZATION":
-      return {
-        scopeId: scope.organizationId,
-        organizationScopedId: scope.organizationId,
-        teamScopedId: null,
-        projectScopedId: null,
-        virtualKeyScopedId: null,
-        principalUserId: null,
-      };
+      return scope.organizationId;
     case "TEAM":
-      return {
-        scopeId: scope.teamId,
-        organizationScopedId: null,
-        teamScopedId: scope.teamId,
-        projectScopedId: null,
-        virtualKeyScopedId: null,
-        principalUserId: null,
-      };
+      return scope.teamId;
     case "PROJECT":
-      return {
-        scopeId: scope.projectId,
-        organizationScopedId: null,
-        teamScopedId: null,
-        projectScopedId: scope.projectId,
-        virtualKeyScopedId: null,
-        principalUserId: null,
-      };
+      return scope.projectId;
     case "VIRTUAL_KEY":
-      return {
-        scopeId: scope.virtualKeyId,
-        organizationScopedId: null,
-        teamScopedId: null,
-        projectScopedId: null,
-        virtualKeyScopedId: scope.virtualKeyId,
-        principalUserId: null,
-      };
+      return scope.virtualKeyId;
     case "PRINCIPAL":
-      return {
-        scopeId: scope.principalUserId,
-        organizationScopedId: null,
-        teamScopedId: null,
-        projectScopedId: null,
-        virtualKeyScopedId: null,
-        principalUserId: scope.principalUserId,
-      };
+      return scope.principalUserId;
   }
 }
 

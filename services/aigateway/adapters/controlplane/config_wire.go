@@ -224,6 +224,12 @@ func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
 	for _, a := range pr.URLs.Allow {
 		rules = append(rules, domain.PolicyRule{Pattern: a, Type: domain.PolicyAllow, Target: domain.PolicyTargetURL})
 	}
+	for _, d := range pr.Models.Deny {
+		rules = append(rules, domain.PolicyRule{Pattern: d, Type: domain.PolicyDeny, Target: domain.PolicyTargetModel})
+	}
+	for _, a := range pr.Models.Allow {
+		rules = append(rules, domain.PolicyRule{Pattern: a, Type: domain.PolicyAllow, Target: domain.PolicyTargetModel})
+	}
 	return rules
 }
 

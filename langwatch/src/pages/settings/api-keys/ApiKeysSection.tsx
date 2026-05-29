@@ -13,7 +13,7 @@ import {
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Clipboard, Key, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -21,6 +21,10 @@ import { useSession } from "~/utils/auth-client";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
+import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { useAvailableScopes } from "~/hooks/useAvailableScopes";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
+import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
@@ -52,6 +56,14 @@ function ProjectKeyActions({ apiKey }: { apiKey: string }) {
 /**
  * Unified API Keys table. Shows all user-scoped API keys plus the legacy
  * project key in one flat list. Admins see all keys in the org.
+ *
+ * The scope filter in the header narrows the visible rows using the same
+ * inclusive cascade as the model-providers page. Selecting a scope shows
+ * all keys whose ANY binding sits on the same branch of the org tree as
+ * the active filter — parents up, children down.
+ *
+ * Filter selection is persisted in the URL via `?scope=TYPE:id` so it
+ * survives reloads and can be deep-linked.
  */
 export function ApiKeysSection({
   organizationId,
@@ -87,6 +99,42 @@ export function ApiKeysSection({
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
+
+  // Derive available scopes (and org-tree hierarchy) for the filter dropdown
+  // from the organization graph.
+  const filterAvailable = useAvailableScopes(organization);
+  const { hierarchy } = filterAvailable;
+
+  // Scope filter — defaults to "all", persisted in URL as ?scope=TYPE:id.
+  // URL hydration and setter are shared with the model-providers page.
+  const [scopeFilter, handleScopeFilterChange] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: team?.id,
+    projectId: project?.id,
+  });
+
+  // Client-side filter: map each key's roleBindings → scopes so
+  // filterProvidersByScope can apply its inclusive cascade directly.
+  const allApiKeys = apiKeys.data ?? [];
+  const filteredKeys = useMemo(
+    () =>
+      filterProvidersByScope(
+        allApiKeys.map((k) => ({
+          ...k,
+          scopes: k.roleBindings.map((rb) => ({
+            scopeType: rb.scopeType,
+            scopeId: rb.scopeId,
+          })),
+        })),
+        scopeFilter,
+        {
+          hierarchy,
+          currentTeamId: team?.id,
+          currentProjectId: project?.id,
+        },
+      ),
+    [allApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
+  );
 
   const handleCreate = (input: CreateApiKeyInput): void => {
     if (input.permissionMode === "restricted" && input.bindings.length === 0) {
@@ -218,10 +266,27 @@ export function ApiKeysSection({
     );
   };
 
-  const activeKeys = apiKeys.data ?? [];
-
   // Build unified rows: API keys + project service key
   const projectApiKey = project?.apiKey;
+
+  // Decide whether the legacy project service key survives the active scope
+  // filter by running it through the same inclusive cascade as user-scoped keys.
+  // A fake row with a single PROJECT-scoped binding is synthesised so the same
+  // filterProvidersByScope logic can decide.
+  const showProjectKey: boolean = useMemo(() => {
+    if (!projectApiKey || !project?.id) return false;
+    // Synthesize a single-binding row so the project-service-key row reuses the
+    // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
+    // Intent: keep the cascade rules in ONE place — not a hack to bypass typing.
+    const fakeRow = {
+      scopes: [{ scopeType: "PROJECT" as const, scopeId: project.id }],
+    };
+    return filterProvidersByScope([fakeRow], scopeFilter, {
+      hierarchy,
+      currentTeamId: team?.id,
+      currentProjectId: project?.id,
+    }).length > 0;
+  }, [projectApiKey, project?.id, scopeFilter, hierarchy, team?.id]);
 
   const getStatus = (key: ApiKeyRow) => {
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
@@ -251,12 +316,21 @@ export function ApiKeysSection({
   return (
     <>
       <VStack gap={4} width="full" align="start">
-        <HStack width="full">
+        <HStack width="full" flexWrap="wrap" gap={2}>
           <Text fontSize="sm" color="fg.muted">
             Do not share your API keys or expose them in the browser or other
             client-side code.
           </Text>
           <Spacer />
+          {/* Scope filter — right side of header row, before the Create button.
+              Mirrors the layout of the model-providers page. */}
+          <ScopeFilterComponent
+            value={scopeFilter}
+            onChange={handleScopeFilterChange}
+            available={filterAvailable}
+            currentTeamId={team?.id}
+            currentProjectId={project?.id}
+          />
           <PageLayout.HeaderButton onClick={onCreateOpen}>
             <Plus size={16} />
             Create new secret key
@@ -280,8 +354,8 @@ export function ApiKeysSection({
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {/* Project service key row */}
-                {projectApiKey && (
+                {/* Project service key row — only shown when it survives the active scope filter */}
+                {showProjectKey && projectApiKey && (
                   <Table.Row>
                     <Table.Cell>
                       <HStack align="center">
@@ -319,7 +393,7 @@ export function ApiKeysSection({
                 )}
 
                 {/* User-scoped API key rows */}
-                {activeKeys.map((apiKey) => (
+                {filteredKeys.map((apiKey) => (
                   <Table.Row key={apiKey.id}>
                     <Table.Cell>
                       <HStack align="start">
@@ -412,11 +486,21 @@ export function ApiKeysSection({
                   </Table.Row>
                 ))}
 
-                {activeKeys.length === 0 && !projectApiKey && (
+                {filteredKeys.length === 0 && !showProjectKey && scopeFilter.kind === "all" && (
                   <Table.Row>
                     <Table.Cell colSpan={9}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>
                         No API keys. Create one to get started.
+                      </Text>
+                    </Table.Cell>
+                  </Table.Row>
+                )}
+                {filteredKeys.length === 0 && !showProjectKey && scopeFilter.kind !== "all" && (
+                  <Table.Row>
+                    <Table.Cell colSpan={9}>
+                      <Text color="fg.muted" textAlign="center" paddingY={4}>
+                        No keys match the current scope. Change the filter above to
+                        see other keys.
                       </Text>
                     </Table.Cell>
                   </Table.Row>

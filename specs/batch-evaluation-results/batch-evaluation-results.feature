@@ -81,6 +81,19 @@ Feature: Batch Evaluation Results Visualization
     Then the target cell shows an error indicator
     And the error message "Rate limit exceeded" is visible
 
+  Scenario: Reveal full error message on hover
+    Given a target execution failed with an error longer than two lines
+    When the results table renders
+    Then the error cell clamps the message to two lines
+    When I hover over the error cell
+    Then a tooltip shows the full error message
+
+  Scenario: Expand full error message on click
+    Given a target execution failed with an error longer than two lines
+    When I click on the error cell
+    Then the error expands into an overlay showing the full message
+    And I can dismiss the expanded view by clicking outside
+
   @unimplemented
   Scenario: Expand long target output
     Given a target output is longer than the cell max height (120px)

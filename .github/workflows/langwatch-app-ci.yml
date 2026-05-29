@@ -226,6 +226,18 @@ jobs:
       - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: langwatch
+        # Integration files run sequentially in a single long-lived fork
+        # worker (fileParallelism:false, for Redis contention). Under
+        # --coverage the v8 coverage data accumulates in that worker across
+        # every file in the shard until it crosses Node's ~4GB default heap,
+        # then GC-thrashes for hours and OOMs ("FATAL: JS heap out of memory",
+        # surfacing as a forks-worker termination timeout on whichever file
+        # happened to be running). NODE_OPTIONS is inherited by the fork
+        # worker (execArgv is not), so it raises the heap where it's needed.
+        # Stopgap; the durable fix is recycling the worker / shrinking
+        # per-file coverage retention.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           pnpm test:integration --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
@@ -382,6 +394,26 @@ jobs:
       - name: Build
         working-directory: langwatch
         run: pnpm build
+
+      # A successful `vite build` only proves the bundle compiles, not that it
+      # boots. Serve the built output and load it in a headless browser to
+      # catch runtime boot failures (white screens from chunk-init errors).
+      # Uses the runner's preinstalled Google Chrome (no browser download).
+      - name: Boot smoke test
+        working-directory: langwatch
+        env:
+          SMOKE_BROWSER_CHANNEL: chrome
+        run: |
+          pnpm exec vite preview --port 4173 --outDir dist/client &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:4173/ && break
+            sleep 1
+          done
+          # Under the runner's `bash -e`, a non-zero exit here fails the step
+          # (the gate we want); the EXIT trap still stops the preview server.
+          node scripts/smoke-boot.mjs
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

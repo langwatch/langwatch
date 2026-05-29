@@ -11,11 +11,9 @@ import numeral from "numeral";
 import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -49,10 +47,6 @@ function GovernanceUserDetailPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled, isLoading: ffLoading } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: orgId, enabled: !!orgId },
-  );
 
   const usersQuery = api.activityMonitor.spendByUser.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
@@ -64,9 +58,6 @@ function GovernanceUserDetailPage() {
       { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
     );
   const personalProject = personalProjectQuery.data;
-
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
 
   const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
   const pageTitle = user
@@ -204,6 +195,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(GovernanceUserDetailPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceUserDetailPage),
+);

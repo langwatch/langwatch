@@ -114,6 +114,12 @@ describe("experimentStatusCommand()", () => {
     vi.mocked(ExperimentsApiService).mockImplementation(() => ({
       startRun: vi.fn(),
       getRunStatus: mockGetRunStatus,
+      getRunResults: vi
+        .fn()
+        .mockRejectedValue(
+          new ExperimentsApiServiceError("Run not found", "get run results"),
+        ),
+      listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
     }) as unknown as ExperimentsApiService);
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -121,7 +127,7 @@ describe("experimentStatusCommand()", () => {
   });
 
   describe("when status is returned", () => {
-    it("calls getRunStatus with the run ID", async () => {
+    it("calls getRunStatus with the pinned run id", async () => {
       mockGetRunStatus.mockResolvedValue({
         runId: "run_123",
         status: "completed",
@@ -129,7 +135,7 @@ describe("experimentStatusCommand()", () => {
         total: 10,
       });
 
-      await experimentStatusCommand("run_123");
+      await experimentStatusCommand("doc-qa", { runId: "run_123" });
 
       expect(mockGetRunStatus).toHaveBeenCalledWith("run_123");
     });
@@ -146,7 +152,7 @@ describe("experimentStatusCommand()", () => {
       };
       mockGetRunStatus.mockResolvedValue(status);
 
-      await experimentStatusCommand("run_123", { format: "json" });
+      await experimentStatusCommand("doc-qa", { runId: "run_123", format: "json" });
 
       expect(console.log).toHaveBeenCalledWith(
         JSON.stringify(status, null, 2),
@@ -161,7 +167,7 @@ describe("experimentStatusCommand()", () => {
       );
 
       await expect(
-        experimentStatusCommand("nonexistent"),
+        experimentStatusCommand("doc-qa", { runId: "nonexistent" }),
       ).rejects.toThrow(ProcessExitError);
     });
   });

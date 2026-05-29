@@ -15,7 +15,7 @@
  * in the same store /api/otel/v1/traces uses; origin metadata
  * (`langwatch.origin.kind = "ingestion_source"`) distinguishes governance
  * data from application traces. The hidden per-org Governance Project
- * carries RBAC + retention class for governance data without leaking
+ * carries RBAC for governance data without leaking
  * into user-facing project surfaces.
  *
  * This commit is the FIRST step of the unified-trace branch correction:
@@ -69,7 +69,7 @@ import { checkIpRateLimit, extractClientIp } from "./rateLimit";
  * consumers (governance fold projection, OCSF read projection) filter
  * on `langwatch.origin.kind = "ingestion_source"`.
  *
- * Spec: receiver-shapes.feature, retention.feature.
+ * Spec: receiver-shapes.feature.
  */
 function buildOriginAttrs(source: IngestionSource) {
   return [
@@ -82,10 +82,6 @@ function buildOriginAttrs(source: IngestionSource) {
     {
       key: "langwatch.ingestion_source.source_type",
       value: { stringValue: source.sourceType },
-    },
-    {
-      key: "langwatch.governance.retention_class",
-      value: { stringValue: source.retentionClass },
     },
   ];
 }
@@ -319,9 +315,9 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
 //   1. Resolve / lazy-create the org's hidden Governance Project (single
 //      central helper, idempotent under concurrent first-mint races).
 //   2. Stamp origin metadata onto every span — langwatch.origin.kind +
-//      langwatch.ingestion_source.{id,organization_id,source_type} +
-//      langwatch.governance.retention_class. The governance fold
-//      projection + OCSF read projection downstream filter on these.
+//      langwatch.ingestion_source.{id,organization_id,source_type}.
+//      The governance fold projection + OCSF read projection downstream
+//      filter on these.
 //   3. Hand off to the existing trace pipeline via
 //      getApp().traces.collection.handleOtlpTraceRequest with the Gov
 //      Project as the tenant. The receiver does NOT write CH directly.
@@ -329,7 +325,6 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
 // Spec contracts:
 //   - receiver-shapes.feature (Lane-S)
 //   - architecture-invariants.feature (Lane-B)
-//   - retention.feature (Lane-S)
 // ---------------------------------------------------------------------------
 app.post("/otel/:sourceId", async (c: Context) => {
   const limited = await rateLimitGuard(c);
@@ -449,7 +444,6 @@ app.post("/otel/:sourceId", async (c: Context) => {
 // Spec contracts:
 //   - receiver-shapes.feature flat-event scenarios
 //   - architecture-invariants.feature unified-substrate scenarios
-//   - retention.feature origin-attribute-stamping scenarios
 // ---------------------------------------------------------------------------
 app.post("/webhook/:sourceId", async (c: Context) => {
   const limited = await rateLimitGuard(c);
@@ -584,8 +578,8 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
 
       // Audit / forensics: hand the LogRecords to the existing log
       // pipeline so they show up alongside spans in the trace viewer
-      // + /me Recent Activity. Stamp origin + retention attrs on every
-      // record first — governance retention/origin filtering reads them
+      // + /me Recent Activity. Stamp origin attrs on every
+      // record first — governance origin filtering reads them
       // off the log attributes, mirroring the trace path and the
       // webhook receiver.
       if (logRecordCount > 0) {

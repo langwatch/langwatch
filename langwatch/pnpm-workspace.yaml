@@ -27,8 +27,6 @@ overrides:
   "merge@<2.1.1": "2.1.1"
   # Security: validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": "13.15.22"
-  # Security: @remix-run/router XSS via open redirects (#227) via react-admin
-  "@remix-run/router@<=1.23.1": "1.23.2"
   # Security: express-rate-limit DoS (from mcp-server)
   "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
   # Security: glob ReDoS (from mcp-server)

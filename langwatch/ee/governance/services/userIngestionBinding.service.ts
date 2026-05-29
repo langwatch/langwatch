@@ -25,6 +25,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import { UserIngestionBindingRepository } from "../repositories/userIngestionBinding.repository";
+import { encryptCredential } from "./activity-monitor/ingestionCredentials";
 import {
   DEFAULT_GOVERNANCE_SURFACE,
   type GovernanceCallSurface,
@@ -156,6 +157,13 @@ export class UserIngestionBindingService {
 
     const issued = issueBindingToken();
 
+    // The credential blob carries a live upstream secret; never persist it
+    // as plaintext. Encrypt to a tagged string (the column stays Json).
+    const storedCredential: Prisma.InputJsonValue | typeof Prisma.DbNull =
+      encryptedCredential === undefined || encryptedCredential === null
+        ? Prisma.DbNull
+        : encryptCredential(encryptedCredential);
+
     const binding = await this.prisma.$transaction(async (tx) => {
       // If a soft-archived row exists, revive it with new token + clear
       // archivedAt rather than violating the (userId, templateId) UNIQUE.
@@ -167,7 +175,7 @@ export class UserIngestionBindingService {
               organizationId: project.organizationId,
               bindingAccessTokenHash: issued.hash,
               bindingAccessTokenPrefix: issued.prefix,
-              encryptedCredential: encryptedCredential ?? Prisma.DbNull,
+              encryptedCredential: storedCredential,
               enabled: true,
               archivedAt: null,
               lastSeenAt: null,
@@ -180,7 +188,7 @@ export class UserIngestionBindingService {
             organizationId: project.organizationId,
             bindingAccessTokenHash: issued.hash,
             bindingAccessTokenPrefix: issued.prefix,
-            encryptedCredential: encryptedCredential ?? Prisma.DbNull,
+            encryptedCredential: storedCredential,
           });
 
       await this.auditRepo.emit(tx, {

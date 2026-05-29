@@ -378,6 +378,7 @@ function SwitcherItem({
     <Menu.Item
       value={itemValue}
       fontSize="14px"
+      paddingY="5px"
       onClick={onSelect}
       asChild
     >
@@ -401,35 +402,40 @@ function SwitcherItem({
           e.preventDefault();
         }}
       >
-        <HStack gap={3} width="full" alignItems="start" paddingY={1}>
-          <Box paddingTop="2px">
-            {entry.kind === "project" ? (
-              <ProjectAvatar name={entry.label} />
-            ) : (
-              <Icon size={14} />
-            )}
-          </Box>
-          <VStack gap={0} alignItems="start" flex={1} minWidth={0}>
-            <HStack gap={2} width="full">
-              <Text
-                fontWeight={active ? "semibold" : "normal"}
-                truncate
-              >
-                {entry.label}
-              </Text>
-              {active && (
-                <Box marginLeft="auto" color="fg.muted">
-                  <Check size={14} />
-                </Box>
+        <VStack gap={0} width="full" alignItems="stretch">
+          <HStack gap={3} width="full" alignItems="center">
+            <Box
+              width="20px"
+              display="flex"
+              justifyContent="center"
+              flexShrink={0}
+            >
+              {entry.kind === "project" ? (
+                <ProjectAvatar name={entry.label} />
+              ) : (
+                <Icon size={14} />
               )}
-            </HStack>
-            {entry.subtitle && (
-              <Text fontSize="xs" color="fg.muted" truncate>
-                {entry.subtitle}
-              </Text>
+            </Box>
+            <Text
+              fontWeight={active ? "semibold" : "normal"}
+              truncate
+              flex={1}
+              minWidth={0}
+            >
+              {entry.label}
+            </Text>
+            {active && (
+              <Box color="fg.muted" flexShrink={0}>
+                <Check size={14} />
+              </Box>
             )}
-          </VStack>
-        </HStack>
+          </HStack>
+          {entry.subtitle && (
+            <Text fontSize="xs" color="fg.muted" truncate paddingLeft="32px">
+              {entry.subtitle}
+            </Text>
+          )}
+        </VStack>
       </Link>
     </Menu.Item>
   );

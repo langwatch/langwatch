@@ -27,12 +27,10 @@ import {
   type GroupBy,
 } from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -53,6 +51,8 @@ type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
+type SpendByCostCenter =
+  RouterOutputs["activityMonitor"]["spendByCostCenter"][number];
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
@@ -77,16 +77,10 @@ const fmtRelative = (date: Date | string | null): string => {
 };
 
 function GovernanceOverviewPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
@@ -112,6 +106,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, limit: 50 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const costCentersQuery = api.activityMonitor.spendByCostCenter.useQuery(
+    { organizationId: orgId, windowDays: 30 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
   const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -126,14 +124,12 @@ function GovernanceOverviewPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!governancePreviewEnabled) return <NotFoundScene />;
-
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
   const summary = summaryQuery.data;
   const users = usersQuery.data ?? [];
   const teams = teamsQuery.data ?? [];
+  const costCenters = costCentersQuery.data ?? [];
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
   const anomalyRules = anomalyRulesQuery.data ?? [];
@@ -362,6 +358,37 @@ function GovernanceOverviewPage() {
               <UserRowHeader />
               {users.slice(0, 5).map((u) => (
                 <UserRow key={u.actor} user={u} />
+              ))}
+            </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Spend by cost center"
+          subline="Spend grouped by cost center across every project in the org, including personal AI use (last 30 days)."
+          actions={
+            <Link
+              href="/settings/governance/cost-centers"
+              color="blue.600"
+              fontSize="sm"
+            >
+              Manage cost centers →
+            </Link>
+          }
+        >
+          {costCenters.length === 0 ? (
+            <Text color="fg.muted" fontSize="sm">
+              No spend to attribute this window. Assign people, teams, and
+              projects to cost centers to compare spend across the org.
+            </Text>
+          ) : (
+            <VStack align="stretch" gap={0}>
+              <CostCenterRowHeader />
+              {costCenters.map((c) => (
+                <CostCenterRow
+                  key={c.costCenterId ?? "unassigned"}
+                  costCenter={c}
+                />
               ))}
             </VStack>
           )}
@@ -947,6 +974,62 @@ function TeamRowHeader() {
   );
 }
 
+function CostCenterRowHeader() {
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="xs"
+      fontWeight="semibold"
+      color="fg.muted"
+      textTransform="uppercase"
+      letterSpacing="wider"
+    >
+      <Box flex={3}>Cost center</Box>
+      <Box flex={2}>Spend</Box>
+      <Box flex={2}>Requests</Box>
+    </HStack>
+  );
+}
+
+function CostCenterRow({ costCenter }: { costCenter: SpendByCostCenter }) {
+  const isUnassigned = costCenter.costCenterId === null;
+  const dotColor = isUnassigned
+    ? "#94a3b8"
+    : getHexColorForString(costCenter.costCenterName);
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="sm"
+    >
+      <Box flex={3}>
+        <HStack gap={2}>
+          <Box
+            width="10px"
+            height="10px"
+            borderRadius="full"
+            backgroundColor={dotColor}
+            flexShrink={0}
+          />
+          <Text
+            fontWeight="medium"
+            color={isUnassigned ? "fg.muted" : "fg"}
+          >
+            {costCenter.costCenterName}
+          </Text>
+        </HStack>
+      </Box>
+      <Box flex={2}>{fmtUsd(costCenter.spendUsd)}</Box>
+      <Box flex={2}>{numeral(costCenter.requestCount).format("0,0")}</Box>
+    </HStack>
+  );
+}
+
 /**
  * Trend cell rendering — three states:
  *   1. No prior baseline (first window of activity, or seed without
@@ -1103,6 +1186,10 @@ function UserRow({ user }: { user: SpendByUser }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(GovernanceOverviewPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceOverviewPage),
+);

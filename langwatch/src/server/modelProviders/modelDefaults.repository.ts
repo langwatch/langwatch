@@ -7,6 +7,7 @@ import type {
 } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
+import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 
 export type ModelDefaultsPrisma =
   | PrismaClient
@@ -76,11 +77,22 @@ export class ModelDefaultsRepository {
     authorId: string | null;
   }): Promise<{ id: string }> {
     const id = this.newConfigId();
+    // Single-organization anchor (ADR-021): every scope a config attaches to
+    // must resolve to the same org. Resolve all of them up front and reject a
+    // mixed or unresolvable set, so we never persist scope rows that disagree
+    // with the anchor. The column is NOT NULL, so an unresolvable scope is a
+    // hard error.
+    const organizationId = await resolveSingleOrganizationForScopes(
+      this.prisma,
+      params.scopes,
+      "model default config",
+    );
     await this.prisma.modelDefaultConfig.create({
       data: {
         id,
         config: params.config,
         authorId: params.authorId,
+        organizationId,
         scopes: {
           create: params.scopes.map((s) => ({
             id: this.newScopeId(),
@@ -123,6 +135,26 @@ export class ModelDefaultsRepository {
       );
     }
     const prisma = this.prisma as PrismaClient;
+    // Single-organization invariant (ADR-021): newly attached scopes must
+    // resolve to the same org the config is already anchored to. Otherwise this
+    // path could attach cross-org or orphaned scopes while organizationId stays
+    // pinned to the old tenant — the inconsistency create() now prevents.
+    if (params.toAdd.length > 0) {
+      const organizationId = await resolveSingleOrganizationForScopes(
+        prisma,
+        params.toAdd,
+        "model default config",
+      );
+      const existing = await prisma.modelDefaultConfig.findUnique({
+        where: { id: params.id },
+        select: { organizationId: true },
+      });
+      if (existing && existing.organizationId !== organizationId) {
+        throw new Error(
+          "Cannot update model default config: scopes must stay within the config's organization",
+        );
+      }
+    }
     await prisma.$transaction([
       prisma.modelDefaultConfig.update({
         where: { id: params.id },

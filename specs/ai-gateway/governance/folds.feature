@@ -15,7 +15,7 @@ Feature: Governance fold projections atop the unified observability store
   "ingestion_source"` are governance data; everything else is normal
   application traces and is excluded from the governance folds.
 
-  Companion: receiver-shapes.feature, retention.feature,
+  Companion: receiver-shapes.feature,
   event-log-durability.feature, anomaly-detection.feature.
 
   Background:

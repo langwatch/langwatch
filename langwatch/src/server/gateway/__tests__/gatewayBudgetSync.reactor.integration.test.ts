@@ -172,12 +172,6 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
         organizationId: ORG_ID,
         scopeType: "PROJECT",
         scopeId: PROJECT_ID,
-        // GatewayBudget_scope_check requires the typed FK matching scopeType
-        // to be set and all others to be NULL. Per scope value the matching
-        // FK is: ORGANIZATION→organizationScopedId, TEAM→teamScopedId,
-        // PROJECT→projectScopedId, VIRTUAL_KEY→virtualKeyScopedId,
-        // PRINCIPAL→principalUserId.
-        projectScopedId: PROJECT_ID,
         window: "MONTH",
         limitUsd: "1.00",
         onBreach: "BLOCK",

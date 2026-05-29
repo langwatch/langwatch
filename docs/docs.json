@@ -680,7 +680,8 @@
           {
             "group": "Dashboards",
             "pages": [
-              "ai-governance/governance-dashboard"
+              "ai-governance/governance-dashboard",
+              "ai-governance/cost-centers"
             ]
           },
           {
@@ -1207,7 +1208,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1779968783",
+      "source": "/ci/cache/busted/1780058776",
       "destination": "/"
     },
     {

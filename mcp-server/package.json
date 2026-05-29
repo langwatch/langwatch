@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "An MCP server for Langwatch.",
   "type": "module",
   "main": "./dist/index.js",
@@ -75,5 +75,10 @@
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
+  },
+  "pnpm": {
+    "overrides": {
+      "liquidjs": ">=10.26.0"
+    }
   }
 }

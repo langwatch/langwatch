@@ -11,6 +11,8 @@
  */
 import { Page, expect } from "@playwright/test";
 
+import { getProjectSlug } from "../helpers";
+
 // =============================================================================
 // Background Steps
 // =============================================================================
@@ -32,19 +34,7 @@ export async function givenIAmLoggedIntoProject(page: Page) {
  * When I am on the scenarios list page
  */
 export async function givenIAmOnTheScenariosListPage(page: Page) {
-  await page.goto("/");
-
-  // Wait for the sidebar Home link to appear (indicates app is loaded)
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 30000 });
-
-  const href = await homeLink.getAttribute("href");
-  const projectSlug = href?.replace(/^\//, "") || "";
-
-  if (!projectSlug) {
-    throw new Error("Could not extract project slug from Home link");
-  }
-
+  const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/simulations/scenarios`);
   await expect(page).toHaveURL(/simulations\/scenarios/);
 }
@@ -53,19 +43,7 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
  * Given I am on the simulations page (Runs)
  */
 export async function givenIAmOnTheSimulationsPage(page: Page) {
-  await page.goto("/");
-
-  // Wait for the sidebar Home link to appear (indicates app is loaded)
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 30000 });
-
-  const href = await homeLink.getAttribute("href");
-  const projectSlug = href?.replace(/^\//, "") || "";
-
-  if (!projectSlug) {
-    throw new Error("Could not extract project slug from Home link");
-  }
-
+  const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/simulations`);
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }

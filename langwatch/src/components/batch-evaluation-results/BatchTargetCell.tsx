@@ -117,7 +117,7 @@ export function BatchTargetCell({
   const renderOutput = (expanded: boolean) => {
     // Error state
     if (targetOutput.error) {
-      return (
+      const errorBox = (
         <HStack
           gap={2}
           p={2}
@@ -125,12 +125,42 @@ export function BatchTargetCell({
           borderRadius="md"
           color="red.fg"
           fontSize="13px"
+          cursor={expanded ? undefined : "pointer"}
+          onClick={expanded ? undefined : handleExpandOutput}
+          data-testid={`error-output-${targetOutput.targetId}`}
         >
           <Box flexShrink={0}>
             <LuCircleAlert size={16} />
           </Box>
           <Text lineClamp={expanded ? undefined : 2}>{targetOutput.error}</Text>
         </HStack>
+      );
+
+      // The cell clamps to two lines, so the full error is hidden. Surface it
+      // on hover (and on click via the expanded overlay above) instead of
+      // forcing the user to inspect the DOM.
+      if (expanded) {
+        return errorBox;
+      }
+
+      return (
+        <Tooltip
+          content={
+            <Text
+              fontSize="13px"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+              data-testid={`error-tooltip-${targetOutput.targetId}`}
+            >
+              {targetOutput.error}
+            </Text>
+          }
+          positioning={{ placement: "top" }}
+          openDelay={100}
+          contentProps={{ maxWidth: "480px" }}
+        >
+          {errorBox}
+        </Tooltip>
       );
     }
 

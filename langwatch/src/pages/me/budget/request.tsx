@@ -14,12 +14,10 @@ import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import MyLayout from "~/components/me/MyLayout";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -38,17 +36,13 @@ const parseUsd = (raw: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-export default function RequestBudgetIncreasePage() {
+function RequestBudgetIncreasePage() {
   const router = useRouter();
   const { data: session } = useRequiredSession();
-  const { project, organization } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-    });
 
   const scope = queryParam(router.query.scope);
   const scopeId = queryParam(router.query.scope_id);
@@ -97,8 +91,6 @@ export default function RequestBudgetIncreasePage() {
     },
   });
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!governancePreviewEnabled) return <NotFoundScene />;
 
   const noOrg = !!session && !organization;
 
@@ -286,3 +278,7 @@ function ContextRow({
     </HStack>
   );
 }
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(RequestBudgetIncreasePage);

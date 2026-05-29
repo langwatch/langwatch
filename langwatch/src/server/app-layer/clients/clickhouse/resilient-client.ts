@@ -59,6 +59,69 @@ function jitteredBackoff({
   return Math.min(exponential + jitter, maxDelayMs);
 }
 
+/**
+ * Runs an operation against ClickHouse, retrying transient failures with
+ * jittered backoff. Both reads and writes use this: a read rejected with
+ * "Too many simultaneous queries" (or any other transient overload /
+ * cluster-recovery condition) frees up within moments, and reads are
+ * idempotent, so retrying rides through the spike instead of surfacing a
+ * 500 to the user. Non-transient errors (e.g. a query syntax error) fail
+ * fast on the first attempt.
+ */
+async function withTransientRetry<T>(
+  fn: () => Promise<T>,
+  {
+    operation,
+    maxRetries,
+    baseDelayMs,
+    maxDelayMs,
+  }: {
+    operation: "query" | "insert";
+    maxRetries: number;
+    baseDelayMs: number;
+    maxDelayMs: number;
+  },
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      if (!isTransientError(error) || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
+
+      try {
+        logger.warn(
+          {
+            source: "clickhouse",
+            operation,
+            attempt: attempt + 1,
+            maxRetries,
+            delayMs: Math.round(delay),
+            error,
+          },
+          `Transient ClickHouse ${operation} error, retrying`,
+        );
+      } catch (loggingError) {
+        logger.error(
+          { loggingError },
+          `Failed to log transient ${operation} retry`,
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
 function safeQueryMeta(params: unknown): {
   queryId?: string;
   format?: string;
@@ -306,7 +369,11 @@ export function createResilientClickHouseClient({
     const table = extractTableName(params);
     const start = performance.now();
     try {
-      const result = await client.query(cleanedParams as Parameters<typeof client.query>[0]);
+      const result = await withTransientRetry(
+        () =>
+          client.query(cleanedParams as Parameters<typeof client.query>[0]),
+        { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
+      );
       const durationMs = performance.now() - start;
       const readBytes = extractReadBytes(result);
       // params (not cleanedParams) so extractExpectations can read langwatch_* keys
@@ -326,53 +393,25 @@ export function createResilientClickHouseClient({
   wrapper.insert = async (params) => {
     const insertTable = (params as unknown as Record<string, unknown>).table as string ?? "unknown";
     const start = performance.now();
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const result = await client.insert(params);
-        const durationMs = performance.now() - start;
-        logSuccess({ operation: "insert", durationMs, params });
-        observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
-        incrementClickHouseQueryCount("INSERT", "success");
-        return result;
-      } catch (error) {
-        lastError = error;
-
-        if (!isTransientError(error) || attempt === maxRetries) {
-          const durationMs = performance.now() - start;
-          logFailure({ operation: "insert", error, durationMs, params });
-          observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
-          incrementClickHouseQueryCount("INSERT", "error");
-          throw error;
-        }
-
-        const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
-
-        try {
-          logger.warn(
-            {
-              source: "clickhouse",
-              operation: "insert",
-              attempt: attempt + 1,
-              maxRetries,
-              delayMs: Math.round(delay),
-              error,
-            },
-            "Transient ClickHouse insert error, retrying"
-          );
-        } catch (loggingError) {
-          logger.error(
-            { loggingError },
-            "Failed to log transient insert retry"
-          );
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+    try {
+      const result = await withTransientRetry(() => client.insert(params), {
+        operation: "insert",
+        maxRetries,
+        baseDelayMs,
+        maxDelayMs,
+      });
+      const durationMs = performance.now() - start;
+      logSuccess({ operation: "insert", durationMs, params });
+      observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+      incrementClickHouseQueryCount("INSERT", "success");
+      return result;
+    } catch (error) {
+      const durationMs = performance.now() - start;
+      logFailure({ operation: "insert", error, durationMs, params });
+      observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+      incrementClickHouseQueryCount("INSERT", "error");
+      throw error;
     }
-
-    throw lastError;
   };
 
   return wrapper;
