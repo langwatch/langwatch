@@ -1,17 +1,24 @@
 import { TriggerAction } from "@prisma/client";
 import { z } from "zod";
-import type { SharedDef } from "../../types";
+import type { PreviewEnvelope, SharedDef } from "../../types";
 
-/** Basic RFC-shaped email check — same lenience as most browsers. We
- *  intentionally don't try to enforce deliverability; that is the
+/** Shape check: `something@something.something`. Deliverability is the
  *  mailer's job. */
-export const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RX = /^.+@.+\..+$/;
 
 export const emailActionParamsSchema = z.object({
   members: z.array(z.string().regex(EMAIL_RX, "Invalid email address")),
 });
 
 export type EmailActionParams = z.infer<typeof emailActionParamsSchema>;
+
+/** The render-time preview shape this provider's ConfigForm consumes.
+ *  Mirrors the server's `EmailPreview` from `trigger-template.service`. */
+export interface EmailPreview extends PreviewEnvelope {
+  channel: "email";
+  subject: string;
+  html: string;
+}
 
 const def: SharedDef = {
   action: TriggerAction.SEND_EMAIL,

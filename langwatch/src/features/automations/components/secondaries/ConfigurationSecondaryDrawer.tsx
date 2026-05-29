@@ -1,4 +1,5 @@
 import { VStack } from "@chakra-ui/react";
+import type { NotifyPreview } from "~/automations/providers/client";
 import type { ConfigFormCtx } from "~/automations/providers/types";
 import { useAutomationStore } from "../../state/automationStore";
 import { useActiveProvider } from "../../state/selectors";
@@ -16,7 +17,7 @@ export function ConfigurationSecondaryDrawer({
   onDone,
 }: {
   open: boolean;
-  ctx: ConfigFormCtx;
+  ctx: ConfigFormCtx<NotifyPreview>;
   onDone: () => void;
 }) {
   const active = useActiveProvider();

@@ -3,7 +3,7 @@ import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "~/utils/api";
 import {
-  EmailPreview,
+  EmailPreview as EmailPreviewView,
   ExampleData,
   FieldHeader,
   LiquidEditor,
@@ -17,7 +17,7 @@ import type {
   SavedTriggerRow,
   SummaryIdentity,
 } from "../../types";
-import { EMAIL_RX, type EmailActionParams } from "./shared";
+import { EMAIL_RX, type EmailActionParams, type EmailPreview } from "./shared";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default
@@ -87,7 +87,11 @@ function templatesFromSlice(slice: EmailSlice) {
  * "External" warning badge. A "+ Add email" input accepts arbitrary
  * addresses validated against `EMAIL_RX`.
  */
-function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice>) {
+function EmailConfigForm({
+  slice,
+  onChange,
+  ctx,
+}: ConfigFormProps<EmailSlice, EmailPreview>) {
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
     { slug: ctx.teamSlug ?? "", organizationId: ctx.organizationId ?? "" },
     { enabled: !!ctx.teamSlug && !!ctx.organizationId },
@@ -142,7 +146,7 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice>) 
     ? DEFAULT_EMAIL_BODY_TEMPLATE
     : slice.body.value;
 
-  const emailPreview = ctx.preview?.channel === "email" ? ctx.preview : undefined;
+  const emailPreview = ctx.preview;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -257,7 +261,10 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice>) 
         </Text>
         <PreviewWarnings data={emailPreview} />
         {emailPreview ? (
-          <EmailPreview subject={emailPreview.subject} html={emailPreview.html} />
+          <EmailPreviewView
+            subject={emailPreview.subject}
+            html={emailPreview.html}
+          />
         ) : (
           <Text color="fg.muted" textStyle="sm">
             Edit a template to preview.
@@ -271,7 +278,7 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice>) 
   );
 }
 
-const client: NotifyClientDef<EmailSlice> = {
+const client: NotifyClientDef<EmailSlice, EmailPreview> = {
   Icon: Mail,
   channel: "email",
   initialSlice,

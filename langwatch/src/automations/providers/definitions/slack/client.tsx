@@ -13,7 +13,7 @@ import {
   FieldHeader,
   LiquidEditor,
   PreviewWarnings,
-  SlackPreview,
+  SlackPreview as SlackPreviewView,
   VariableReference,
 } from "~/features/automations/editors/templateAuthoring";
 import {
@@ -26,7 +26,7 @@ import type {
   SavedTriggerRow,
   SummaryIdentity,
 } from "../../types";
-import { type SlackActionParams } from "./shared";
+import { type SlackActionParams, type SlackPreview } from "./shared";
 
 interface FieldDraft {
   value: string;
@@ -85,7 +85,11 @@ function templatesFromSlice(slice: SlackSlice) {
   };
 }
 
-function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice>) {
+function SlackConfigForm({
+  slice,
+  onChange,
+  ctx,
+}: ConfigFormProps<SlackSlice, SlackPreview>) {
   const isBlockKit = slice.templateType === "block_kit";
   const templateDefault = isBlockKit
     ? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
@@ -93,7 +97,7 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice>) 
   const templateValue = slice.template.usingDefault
     ? templateDefault
     : slice.template.value;
-  const slackPreview = ctx.preview?.channel === "slack" ? ctx.preview : undefined;
+  const slackPreview = ctx.preview;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -151,7 +155,7 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice>) 
         </Text>
         <PreviewWarnings data={slackPreview} />
         {slackPreview ? (
-          <SlackPreview payload={slackPreview.payload} />
+          <SlackPreviewView payload={slackPreview.payload} />
         ) : (
           <Text color="fg.muted" textStyle="sm">
             Edit a template to preview.
@@ -165,7 +169,7 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice>) 
   );
 }
 
-const client: NotifyClientDef<SlackSlice> = {
+const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   Icon: SiSlack,
   channel: "slack",
   initialSlice,

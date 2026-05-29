@@ -1,8 +1,8 @@
 import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
-import { isNotifyEntry } from "~/automations/providers/types";
+import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/client";
+import { type ConfigFormCtx, isNotifyEntry } from "~/automations/providers/types";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -288,14 +288,14 @@ export function AutomationDrawer({
     upsert,
   ]);
 
-  const configCtx = useMemo(
+  const configCtx = useMemo<ConfigFormCtx<NotifyPreview>>(
     () => ({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
       variables: scaffold.variables,
       example: scaffold.example,
-      preview: preview.data,
+      preview: preview.data as NotifyPreview | undefined,
       previewLoading: preview.isLoading,
     }),
     [

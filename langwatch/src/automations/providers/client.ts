@@ -8,9 +8,9 @@ import datasetClient, {
 } from "./definitions/dataset/client";
 import datasetShared from "./definitions/dataset/shared";
 import emailClient, { type EmailSlice } from "./definitions/email/client";
-import emailShared from "./definitions/email/shared";
+import emailShared, { type EmailPreview } from "./definitions/email/shared";
 import slackClient, { type SlackSlice } from "./definitions/slack/client";
-import slackShared from "./definitions/slack/shared";
+import slackShared, { type SlackPreview } from "./definitions/slack/shared";
 import {
   type ClientEntry,
   type NotifyClientEntry,
@@ -24,6 +24,21 @@ export interface SliceFor {
   [TriggerAction.ADD_TO_DATASET]: DatasetSlice;
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: AnnotationQueueSlice;
 }
+
+/** Per-action preview type. Action providers have no preview — they get
+ *  `never`. The sum of notify previews is `NotifyPreview` below. */
+export interface PreviewFor {
+  [TriggerAction.SEND_EMAIL]: EmailPreview;
+  [TriggerAction.SEND_SLACK_MESSAGE]: SlackPreview;
+  [TriggerAction.ADD_TO_DATASET]: never;
+  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: never;
+}
+
+/** The sum of every notify provider's render-time preview shape — the
+ *  type the orchestrator's `previewTemplate` mutation returns and the
+ *  type every notify ConfigForm narrows from. Built from the registry,
+ *  not enumerated here. */
+export type NotifyPreview = PreviewFor[keyof PreviewFor];
 
 /** The full slice record — one slice per provider, all present. The
  *  drawer keeps every slice in state so type-switching never loses

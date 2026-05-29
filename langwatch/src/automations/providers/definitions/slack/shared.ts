@@ -1,6 +1,6 @@
 import { TriggerAction } from "@prisma/client";
 import { z } from "zod";
-import type { SharedDef } from "../../types";
+import type { PreviewEnvelope, SharedDef } from "../../types";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 
@@ -14,6 +14,19 @@ export const slackActionParamsSchema = z.object({
 });
 
 export type SlackActionParams = z.infer<typeof slackActionParamsSchema>;
+
+/** Frontend-shaped Slack payload (mirrors the server's `SlackPayload`).
+ *  Kept local to the slack provider so `types.ts` stays channel-agnostic. */
+export type SlackPreviewPayload =
+  | { text: string }
+  | { blocks: Record<string, unknown>[] };
+
+/** The render-time preview shape this provider's ConfigForm consumes.
+ *  Mirrors the server's `SlackPreview` from `trigger-template.service`. */
+export interface SlackPreview extends PreviewEnvelope {
+  channel: "slack";
+  payload: SlackPreviewPayload;
+}
 
 const def: SharedDef = {
   action: TriggerAction.SEND_SLACK_MESSAGE,

@@ -79,8 +79,9 @@ export interface SummaryIdentity {
   name: string;
 }
 
-/** Context every `ConfigForm` receives from the orchestrator. */
-export interface ConfigFormCtx {
+/** Context every `ConfigForm` receives from the orchestrator. Generic
+ *  over the preview shape so each provider can declare its own. */
+export interface ConfigFormCtx<TPreview = unknown> {
   projectId: string;
   organizationId: string | undefined;
   teamSlug: string | undefined;
@@ -89,8 +90,8 @@ export interface ConfigFormCtx {
   /** The example data the preview renders against, shown via ExampleData. */
   example: unknown;
   /** Most recent live-preview result for the active notify channel,
-   *  or undefined for action providers. */
-  preview?: PreviewPayload;
+   *  or undefined for action providers. Shape is owned by the provider. */
+  preview?: TPreview;
   previewLoading?: boolean;
 }
 
@@ -102,26 +103,17 @@ export interface VariableInfo {
   description?: string;
 }
 
-/** The render-time preview payload returned by `automation.previewTemplate`. */
-export type PreviewPayload =
-  | {
-      channel: "email";
-      subject: string;
-      html: string;
-      usedDefault: boolean;
-      missingVariables: string[];
-      errors: string[];
-    }
-  | {
-      channel: "slack";
-      payload: { text: string } | { blocks: Record<string, unknown>[] };
-      usedDefault: boolean;
-      missingVariables: string[];
-      errors: string[];
-    };
+/** Channel-agnostic envelope every render-time preview carries. Provider
+ *  shared.ts files extend this with their own body (subject/html,
+ *  payload, …). The shared types layer never names a concrete channel. */
+export interface PreviewEnvelope {
+  usedDefault: boolean;
+  missingVariables: string[];
+  errors: string[];
+}
 
 /** The "client" definition (`client.tsx`) — UI + slice helpers. */
-export interface ClientDef<S = unknown> {
+export interface ClientDef<S = unknown, TPreview = unknown> {
   /** Icon rendered in the type picker. Lucide / react-icons component. */
   readonly Icon: ComponentType<{ size?: number }>;
 
@@ -144,19 +136,21 @@ export interface ClientDef<S = unknown> {
 
   /** Renders the provider-specific config inside the Configuration
    *  secondary drawer. */
-  readonly ConfigForm: ComponentType<ConfigFormProps<S>>;
+  readonly ConfigForm: ComponentType<ConfigFormProps<S, TPreview>>;
 }
 
-export interface ConfigFormProps<S> {
+export interface ConfigFormProps<S, TPreview = unknown> {
   slice: S;
   onChange: (next: S) => void;
-  ctx: ConfigFormCtx;
+  ctx: ConfigFormCtx<TPreview>;
 }
 
-/** Notify-specific client additions. */
-export interface NotifyClientDef<S = unknown> extends ClientDef<S> {
-  /** The channel string the preview/testFire endpoints accept. */
-  readonly channel: "email" | "slack";
+/** Notify-specific client additions. Generic over slice and preview. */
+export interface NotifyClientDef<S = unknown, TPreview = unknown>
+  extends ClientDef<S, TPreview> {
+  /** The channel string the preview/testFire endpoints accept. Each
+   *  provider names its own — the shared layer doesn't enumerate. */
+  readonly channel: string;
   /** Recipients / webhook for the test-fire mutation. */
   testFireTarget(slice: S): { recipients: string[]; webhook: string | null };
   /** Template strings contributed to the save payload (`templates`). */
@@ -173,14 +167,15 @@ export interface ServerDef {
 
 // ---- Registry entries ---------------------------------------------------
 
-export interface ClientEntry<S = unknown> {
+export interface ClientEntry<S = unknown, TPreview = unknown> {
   shared: SharedDef;
-  client: ClientDef<S> | NotifyClientDef<S>;
+  client: ClientDef<S, TPreview> | NotifyClientDef<S, TPreview>;
 }
 
-export interface NotifyClientEntry<S = unknown> extends ClientEntry<S> {
+export interface NotifyClientEntry<S = unknown, TPreview = unknown>
+  extends ClientEntry<S, TPreview> {
   shared: SharedDef & { category: "notify" };
-  client: NotifyClientDef<S>;
+  client: NotifyClientDef<S, TPreview>;
 }
 
 export interface ServerEntry {
