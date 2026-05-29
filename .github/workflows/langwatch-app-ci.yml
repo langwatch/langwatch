@@ -226,6 +226,18 @@ jobs:
       - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: langwatch
+        # Integration files run sequentially in a single long-lived fork
+        # worker (fileParallelism:false, for Redis/BullMQ contention). Under
+        # --coverage the v8 coverage data accumulates in that worker across
+        # every file in the shard until it crosses Node's ~4GB default heap,
+        # then GC-thrashes for hours and OOMs ("FATAL: JS heap out of memory",
+        # surfacing as a forks-worker termination timeout on whichever file
+        # happened to be running). NODE_OPTIONS is inherited by the fork
+        # worker (execArgv is not), so it raises the heap where it's needed.
+        # Stopgap; the durable fix is recycling the worker / shrinking
+        # per-file coverage retention.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           pnpm test:integration --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
