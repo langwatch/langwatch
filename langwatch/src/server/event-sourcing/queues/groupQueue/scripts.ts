@@ -27,14 +27,35 @@ export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
 export const PARK_RECONCILE_MAX_DRAIN = 1000;
 
 /**
- * TTL (ms) on the dynamic water-level cap key. The recompute runs on the same
- * 2s-gated, single-pod reconcile pass and refreshes this key; the TTL is several
+ * Cadence (ms) of the dispatch-tail reconcile pass (parked-group restore + the
+ * dynamic-cap recompute), gated single-pod via the reconcile-ts marker. The
+ * dynamic-cap TTL and the claimant window are both defined as multiples of this,
+ * so it is a named const rather than a bare literal in the dispatch scripts —
+ * retuning it keeps those relationships intact. Interpolated into the Lua.
+ */
+export const RECONCILE_INTERVAL_MS = 2000;
+
+/**
+ * TTL (ms) on the dynamic water-level cap key (= 5x RECONCILE_INTERVAL_MS). The
+ * recompute refreshes this key on every reconcile pass; the TTL spans several
  * intervals so a brief miss does not drop the cap. If the recompute stalls
  * entirely (every pod dead or wedged) the key lapses and dispatch falls back to
  * the static operator cap — fail PROTECTIVE (the low side), never permissive.
  * Interpolated into the Lua so there is a single source of truth.
  */
-export const DYNAMIC_CAP_TTL_MS = 10000;
+export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
+
+/**
+ * Hard bound on how many tenants the dynamic-cap recompute processes in one
+ * pass. The recompute does O(1) Redis calls per tenant (active ZCARD + parked
+ * ZCARD) inside a single eval on the single-threaded Redis; bounding it to the
+ * most-recently-active N keeps the worst case at ~3N calls every
+ * RECONCILE_INTERVAL_MS (sub-millisecond at N=1000) even if a pathological
+ * fan-out leaves thousands of tenants in the demand registry. The N most-recent
+ * claimants are the current contention set; older ones have aged out of the
+ * window and their in-flight is still enforced directly via tenant_active_z.
+ */
+export const MAX_DEMANDING_TENANTS = 1000;
 
 // Lua helper, prepended to every script that writes group keys. Refreshes the
 // safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
@@ -288,21 +309,31 @@ end
 -- needs to stop a newcomer reading 0 demand and pinning W at the full budget.
 local function recomputeDynamicCap(keyPrefix, budget, nowMs)
   local registryKey = keyPrefix .. "demanding-tenants"
-  local members = redis.call("ZRANGE", registryKey, 0, -1, "WITHSCORES")
+  -- Drop every tenant that has not enqueued within the claimant window in one
+  -- O(log N + M) trim. Enqueue-only freshness IS the demand signal, so an aged
+  -- member is no longer a claimant; this both bounds the ZSET and replaces the
+  -- per-member stale GC. A tenant still draining old in-flight work ages out of
+  -- the fairness fill here, but its slots stay enforced directly via
+  -- tenant_active_z, so it is never under-counted as a HARD cap, only as a
+  -- (work-conserving) fairness claim.
+  redis.call("ZREMRANGEBYSCORE", registryKey, "-inf", nowMs - ${CLAIMANT_WINDOW_MS})
+  -- Process at most MAX_DEMANDING_TENANTS most-recent claimants so a pathological
+  -- fan-out (thousands of distinct tenants active within the window) can never
+  -- block the single-threaded Redis on this 2s pass. The most-recent N are the
+  -- live contention set; the fill over them is the fair-share signal.
+  local members = redis.call("ZREVRANGE", registryKey, 0, ${MAX_DEMANDING_TENANTS} - 1)
   local measured = {}
   local presenceCount = 0
-  for i = 1, #members, 2 do
-    local tenantId = members[i]
-    local lastActive = tonumber(members[i + 1]) or 0
-    local fresh = (nowMs - lastActive) <= ${CLAIMANT_WINDOW_MS}
+  for _, tenantId in ipairs(members) do
+    -- Fresh by construction (aged members were trimmed above). demand_i =
+    -- in-flight (GC-d) + parked; a fresh tenant with zero of both is a brand-new
+    -- claimant whose burst is still entirely in ready = presence claimant.
     local d = tenantActiveCount(keyPrefix .. "tenant_active_z:", tenantId, nowMs)
             + redis.call("ZCARD", keyPrefix .. "parked:" .. tenantId)
     if d > 0 then
       measured[#measured + 1] = d
-    elseif fresh then
-      presenceCount = presenceCount + 1
     else
-      redis.call("ZREM", registryKey, tenantId)
+      presenceCount = presenceCount + 1
     end
   end
   local w = waterLevel(measured, presenceCount, budget)
@@ -549,7 +580,7 @@ local activeUntil = nowMs + activeTtlSec * 1000
 -- water-fill rides the same proven cadence at near-zero marginal cost.
 local reconcileTsKey = keyPrefix .. "reconcile-ts"
 local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
-if (nowMs - lastReconcile) >= 2000 then
+if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
   redis.call("SET", reconcileTsKey, nowMs)
   -- Recompute W before reconciling so unpark uses the fresh cap. Only when the
   -- cap is on (staticCap=0 is the kill switch) and a budget is configured.
@@ -766,7 +797,7 @@ local results = {}
 -- the same single-pod reconcile-ts cadence at near-zero marginal cost.
 local reconcileTsKey = keyPrefix .. "reconcile-ts"
 local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
-if (nowMs - lastReconcile) >= 2000 then
+if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
   redis.call("SET", reconcileTsKey, nowMs)
   if staticCap > 0 and globalBudget > 0 then
     recomputeDynamicCap(keyPrefix, globalBudget, nowMs)
