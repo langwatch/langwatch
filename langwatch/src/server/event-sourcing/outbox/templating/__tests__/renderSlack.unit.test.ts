@@ -1,0 +1,111 @@
+import { describe, expect, it } from "vitest";
+import { TEST_FIRE_NOTICE } from "../banner";
+import { renderTriggerSlack } from "../renderSlack";
+import { makeContext } from "./fixtures";
+
+function asText(payload: { text: string } | { blocks: unknown[] }): string {
+  if (!("text" in payload)) throw new Error("expected a text payload");
+  return payload.text;
+}
+
+function asBlocks(
+  payload: { text: string } | { blocks: Record<string, unknown>[] },
+): Record<string, unknown>[] {
+  if (!("blocks" in payload)) throw new Error("expected a blocks payload");
+  return payload.blocks;
+}
+
+describe("renderTriggerSlack", () => {
+  describe("when no custom template is provided", () => {
+    it("renders the default message as text", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: null,
+        template: null,
+        context: makeContext(),
+      });
+      const text = asText(slack.payload);
+      expect(text).toContain("High latency");
+      expect(text).toContain("https://app.langwatch.ai/acme/messages/trace_1");
+      expect(slack.usedDefault).toBe(true);
+    });
+  });
+
+  describe("when a string template is provided", () => {
+    it("renders it as plain text", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "string",
+        template: "Alert for {{ project.name }}: {{ trigger.name }}",
+        context: makeContext(),
+      });
+      expect(asText(slack.payload)).toBe("Alert for Acme: High latency");
+      expect(slack.usedDefault).toBe(false);
+    });
+  });
+
+  describe("when a Block Kit template renders valid JSON", () => {
+    it("sends a blocks payload through the allowlist", async () => {
+      const template = JSON.stringify([
+        { type: "header", text: { type: "plain_text", text: "{{ trigger.name }}" } },
+        { type: "divider" },
+        { type: "actions", elements: [{ type: "button", text: "x" }] },
+      ]);
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template,
+        context: makeContext(),
+      });
+      const blocks = asBlocks(slack.payload);
+      expect(blocks.map((b) => b.type)).toEqual(["header", "divider"]);
+      expect(slack.usedDefault).toBe(false);
+    });
+  });
+
+  describe("when a Block Kit template renders invalid JSON", () => {
+    it("falls back to the default text and surfaces the error", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: "this is not json {{ trigger.name }}",
+        context: makeContext(),
+      });
+      expect("text" in slack.payload).toBe(true);
+      expect(slack.usedDefault).toBe(true);
+      expect(slack.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when a string template throws while rendering", () => {
+    it("falls back to the default text", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "string",
+        template: "{{ trigger.name | nonexistent_filter }}",
+        context: makeContext(),
+      });
+      expect(asText(slack.payload)).toContain("High latency");
+      expect(slack.usedDefault).toBe(true);
+    });
+  });
+
+  describe("when dispatched as a test fire", () => {
+    it("prepends a banner to a text message", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "string",
+        template: "Body",
+        context: makeContext(),
+        testFire: true,
+      });
+      expect(asText(slack.payload)).toContain(TEST_FIRE_NOTICE);
+    });
+
+    it("prepends a banner block to a Block Kit message", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: JSON.stringify([{ type: "divider" }]),
+        context: makeContext(),
+        testFire: true,
+      });
+      const blocks = asBlocks(slack.payload);
+      expect(blocks[0]?.type).toBe("section");
+      expect(JSON.stringify(blocks[0])).toContain(TEST_FIRE_NOTICE);
+    });
+  });
+});
