@@ -10,6 +10,21 @@ const logger = createLogger(
   "langwatch:experiment-run-processing:experiment-run-item-append-store",
 );
 
+/** Walks the variable-length string fields instead of stringifying the entire
+ *  record (which the ClickHouse client would then stringify again). Fixed
+ *  fields are covered by the 128-byte base. */
+function estimateExperimentRunItemSizeBytes(
+  record: ClickHouseExperimentRunResultRecord,
+): number {
+  let size = 128;
+  size += record.DatasetEntry.length;
+  size += record.Predicted?.length ?? 0;
+  size += record.TargetError?.length ?? 0;
+  size += record.EvaluationDetails?.length ?? 0;
+  size += record.EvaluationInputs?.length ?? 0;
+  return size;
+}
+
 /**
  * Creates an AppendStore for experiment run result items.
  *
@@ -36,7 +51,7 @@ export function createExperimentRunItemAppendStore(
       const recordWithRetention = {
         ...record,
         _retention_days: retentionDays,
-        _size_bytes: JSON.stringify(record).length,
+        _size_bytes: estimateExperimentRunItemSizeBytes(record),
       };
 
       const client = await resolveClient(context.tenantId);

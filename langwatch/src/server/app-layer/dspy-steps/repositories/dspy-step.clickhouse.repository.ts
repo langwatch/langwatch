@@ -99,6 +99,11 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     const summary = computeLlmSummary(data.llmCalls);
     const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
 
+    const optimizerParametersJson = JSON.stringify(data.optimizerParameters);
+    const predictorsJson = JSON.stringify(data.predictors);
+    const examplesJson = JSON.stringify(data.examples);
+    const llmCallsJson = JSON.stringify(data.llmCalls);
+
     const record: ClickHouseWriteRecord = {
       Id: id,
       TenantId: data.tenantId,
@@ -109,10 +114,10 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       Score: data.score,
       Label: data.label,
       OptimizerName: data.optimizerName,
-      OptimizerParameters: JSON.stringify(data.optimizerParameters),
-      Predictors: JSON.stringify(data.predictors),
-      Examples: JSON.stringify(data.examples),
-      LlmCalls: JSON.stringify(data.llmCalls),
+      OptimizerParameters: optimizerParametersJson,
+      Predictors: predictorsJson,
+      Examples: examplesJson,
+      LlmCalls: llmCallsJson,
       LlmCallsTotal: summary.total,
       LlmCallsTotalTokens: summary.totalTokens,
       LlmCallsTotalCost: summary.totalCost,
@@ -120,7 +125,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       InsertedAt: new Date(data.insertedAt),
       UpdatedAt: new Date(data.updatedAt),
       _retention_days: 0,
-      _size_bytes: JSON.stringify(data.optimizerParameters).length + JSON.stringify(data.predictors).length + JSON.stringify(data.examples).length + JSON.stringify(data.llmCalls).length + 128,
+      _size_bytes: optimizerParametersJson.length + predictorsJson.length + examplesJson.length + llmCallsJson.length + 128,
     };
 
     const client = await this.resolveClient(data.tenantId);
@@ -155,6 +160,11 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       const summary = computeLlmSummary(mergedLlmCalls);
       const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
 
+      const optimizerParametersJson = JSON.stringify(data.optimizerParameters);
+      const predictorsJson = JSON.stringify(data.predictors);
+      const examplesJson = JSON.stringify(mergedExamples);
+      const llmCallsJson = JSON.stringify(mergedLlmCalls);
+
       const record: ClickHouseWriteRecord = {
         Id: id,
         TenantId: data.tenantId,
@@ -165,10 +175,10 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         Score: data.score,
         Label: data.label,
         OptimizerName: data.optimizerName,
-        OptimizerParameters: JSON.stringify(data.optimizerParameters),
-        Predictors: JSON.stringify(data.predictors),
-        Examples: JSON.stringify(mergedExamples),
-        LlmCalls: JSON.stringify(mergedLlmCalls),
+        OptimizerParameters: optimizerParametersJson,
+        Predictors: predictorsJson,
+        Examples: examplesJson,
+        LlmCalls: llmCallsJson,
         LlmCallsTotal: summary.total,
         LlmCallsTotalTokens: summary.totalTokens,
         LlmCallsTotalCost: summary.totalCost,
@@ -176,7 +186,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         InsertedAt: new Date(existing?.insertedAt ?? data.insertedAt),
         UpdatedAt: new Date(data.updatedAt),
         _retention_days: 0,
-        _size_bytes: JSON.stringify(data.optimizerParameters).length + JSON.stringify(mergedExamples).length + JSON.stringify(mergedLlmCalls).length + 128,
+        _size_bytes: optimizerParametersJson.length + examplesJson.length + llmCallsJson.length + 128,
       };
 
       const client = await this.resolveClient(data.tenantId);

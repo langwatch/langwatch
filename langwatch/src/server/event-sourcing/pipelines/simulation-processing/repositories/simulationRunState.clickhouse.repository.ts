@@ -25,14 +25,17 @@ const logger = createLogger(
   "langwatch:simulation-processing:run-state-repository",
 );
 
-function estimateSimulationRunSizeBytes(data: SimulationRunStateData): number {
+function estimateSimulationRunSizeBytes(
+  data: SimulationRunStateData,
+  traceMetricsJson: string,
+): number {
   let size = 128;
   for (const msg of data.Messages) {
     size += (msg.Content?.length ?? 0) + (msg.Role?.length ?? 0) + (msg.Rest?.length ?? 0);
   }
   size += (data.Reasoning?.length ?? 0) + (data.Error?.length ?? 0);
   size += (data.Metadata?.length ?? 0);
-  size += JSON.stringify(data.TraceMetrics).length;
+  size += traceMetricsJson.length;
   return size;
 }
 
@@ -137,8 +140,10 @@ export class SimulationRunStateRepositoryClickHouse<
     projectionId: string,
     projectionVersion: string,
     scenarioRunId: string,
-  ): ClickHouseSimulationRunWriteRecord {
-    return {
+  ): { record: ClickHouseSimulationRunWriteRecord; traceMetricsJson: string } {
+    const traceMetricsJson =
+      Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "";
+    const record: ClickHouseSimulationRunWriteRecord = {
       ProjectionId: projectionId,
       TenantId: tenantId,
       ScenarioRunId: scenarioRunId || data.ScenarioRunId,
@@ -165,7 +170,7 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
       RoleLatencies: data.RoleLatencies,
-      TraceMetricsJson: Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
+      TraceMetricsJson: traceMetricsJson,
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -178,6 +183,7 @@ export class SimulationRunStateRepositoryClickHouse<
       _retention_days: 0,
       _size_bytes: 0,
     };
+    return { record, traceMetricsJson };
   }
 
   async getProjection(
@@ -304,7 +310,7 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const scenarioRunId = String(projection.aggregateId);
-      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
+      const { record: projectionRecord, traceMetricsJson } = this.mapProjectionDataToClickHouseRecord(
         projection.data as SimulationRunStateData,
         String(context.tenantId),
         projection.id,
@@ -314,7 +320,10 @@ export class SimulationRunStateRepositoryClickHouse<
 
       const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
       projectionRecord._retention_days = retentionPolicy?.scenarios ?? 0;
-      projectionRecord._size_bytes = estimateSimulationRunSizeBytes(projection.data as SimulationRunStateData);
+      projectionRecord._size_bytes = estimateSimulationRunSizeBytes(
+        projection.data as SimulationRunStateData,
+        traceMetricsJson,
+      );
 
       const client = await this.resolveClient(context.tenantId);
       await client.insert({
@@ -374,7 +383,7 @@ export class SimulationRunStateRepositoryClickHouse<
       const retentionDays = retentionPolicy?.scenarios ?? 0;
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
-        const record = this.mapProjectionDataToClickHouseRecord(
+        const { record, traceMetricsJson } = this.mapProjectionDataToClickHouseRecord(
           projection.data as SimulationRunStateData,
           String(context.tenantId),
           projection.id,
@@ -382,7 +391,10 @@ export class SimulationRunStateRepositoryClickHouse<
           scenarioRunId,
         );
         record._retention_days = retentionDays;
-        record._size_bytes = estimateSimulationRunSizeBytes(projection.data as SimulationRunStateData);
+        record._size_bytes = estimateSimulationRunSizeBytes(
+          projection.data as SimulationRunStateData,
+          traceMetricsJson,
+        );
         return record;
       });
 
