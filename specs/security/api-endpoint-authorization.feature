@@ -26,10 +26,11 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     A route is registered through the secured app builder, whose verb methods are
     only reachable via `.access(policy)`. The policy is one of:
-      requires(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason)
+      requires(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason) | handlerManagedAuth(reason)
     Omitting it is a TypeScript error. Bypassing the builder is caught by a CI test
-    that introspects the fully composed router against the route registry plus an
-    explicit, documented legacy allowlist.
+    that introspects the fully composed router against the route registry. Every
+    family is migrated, so there is no allowlist: every concrete endpoint must
+    declare a policy.
 
     @unit
     Scenario: Registering a route without an access policy is a type error
@@ -40,14 +41,14 @@ Feature: Hono API endpoint authorization and tenant isolation
     @integration
     Scenario: The composed router has no route without a registered policy
       Given the fully composed API router from createApiRouter
-      When every mounted method and path is enumerated
-      Then each one is registered through SecuredApp or listed in the documented legacy allowlist
+      When every mounted concrete-method endpoint is enumerated
+      Then each one is registered through SecuredApp with a declared policy
       And any route that bypassed the builder fails this assertion
 
     @integration
     Scenario: A public or internal route declares a documented reason
       Given the route registry
-      When a route's policy is publicEndpoint or internalSecret
+      When a route's policy is publicEndpoint, internalSecret, or handlerManagedAuth
       Then it carries a non-empty human-readable reason
 
   # ============================================================================

@@ -105,16 +105,23 @@ Two layers prevent regression:
 1. **Type-level — `SecuredApp`** (`server/api/security/`). The builder's verb
    methods are only reachable through `.access(policy)`; the bare app exposes no
    `.get/.post/...`. Omitting the policy is a compile error. The policy is one of
-   `requires(permission)`, `anyAuthenticated()`, `publicEndpoint(reason)`, or
-   `internalSecret(reason)`.
+   `requires(permission)`, `anyAuthenticated()`, `publicEndpoint(reason)`,
+   `internalSecret(reason)`, or `handlerManagedAuth(reason)`. The last is for
+   legacy routes that authenticate inside their handler (in-handler API-key
+   resolution, `getServerAuthSession`, signature checks, or a framework like
+   tRPC/BetterAuth that runs its own per-request RBAC): the builder applies no
+   chain, but the route still declares a reviewable policy + reason. Prefer a
+   real `requires(...)` / `internalSecret(...)` strategy when the auth can be
+   expressed as middleware.
 
 2. **CI backstop — router introspection.** A test boots the fully composed
-   router and asserts every mounted endpoint is either registered through
-   `SecuredApp` (its policy recorded in the route registry) or listed in the
-   documented `LEGACY_UNSECURED_ROUTES` allowlist. A new route added via raw
-   Hono with no policy fails this test, so no human or agent can add an
-   unclassified endpoint by accident. The allowlist is the migration backlog —
-   it only shrinks as families move onto the builder.
+   router and asserts every mounted concrete-method endpoint is registered
+   through `SecuredApp` (its policy recorded in the route registry). A new route
+   added via raw Hono with no policy fails this test, so no human or agent can
+   add an unclassified endpoint by accident. Every route family is migrated, so
+   there is no allowlist — the guarantee covers the whole surface. (Method-`ALL`
+   entries — `.use` middleware, sub-app mounts, and the two OAuth-callback
+   rewrite shims — are not data endpoints and are excluded by construction.)
 
 See `specs/security/api-endpoint-authorization.feature` for the behavioral
 specification and bound tests.

@@ -310,6 +310,7 @@ secured.access(requires("datasets:manage")).post(
   // ── Batch Create Records ──────────────────────────────────────
 secured.access(requires("datasets:manage")).post(
     "/:slugOrId/records",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Create records in a dataset in batch",
     }),
@@ -346,6 +347,7 @@ secured.access(requires("datasets:manage")).post(
   // ── Legacy: Add Entries ────────────────────────────────────────
 secured.access(requires("datasets:manage")).post(
     "/:slug/entries",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Add entries to a dataset",
     }),
@@ -418,6 +420,7 @@ secured.access(requires("datasets:manage")).post(
   // ── Get Single Dataset ─────────────────────────────────────────
 secured.access(requires("datasets:view")).get(
     "/:slugOrId",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Get a dataset by its slug or id.",
       responses: {
@@ -477,6 +480,7 @@ secured.access(requires("datasets:view")).get(
   // ── Update Dataset ─────────────────────────────────────────────
 secured.access(requires("datasets:manage")).patch(
     "/:slugOrId",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Update a dataset by its slug or id",
     }),
@@ -540,6 +544,7 @@ secured.access(requires("datasets:manage")).patch(
   // ── Delete (Archive) Dataset ───────────────────────────────────
 secured.access(requires("datasets:manage")).delete(
     "/:slugOrId",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Archive a dataset (soft-delete)",
     }),
@@ -563,6 +568,7 @@ secured.access(requires("datasets:manage")).delete(
   // ── List Records (paginated) ───────────────────────────────────
 secured.access(requires("datasets:view")).get(
     "/:slugOrId/records",
+    datasetServiceMiddleware,
     describeRoute({
       description: "List records for a dataset (paginated)",
     }),
@@ -590,6 +596,7 @@ secured.access(requires("datasets:view")).get(
   // ── Update / Upsert Record ─────────────────────────────────────
 secured.access(requires("datasets:manage")).patch(
     "/:slugOrId/records/:recordId",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Update or create a record in a dataset",
     }),
@@ -618,6 +625,7 @@ secured.access(requires("datasets:manage")).patch(
   // ── Batch Delete Records ───────────────────────────────────────
 secured.access(requires("datasets:manage")).delete(
     "/:slugOrId/records",
+    datasetServiceMiddleware,
     describeRoute({
       description: "Delete records from a dataset by IDs",
     }),

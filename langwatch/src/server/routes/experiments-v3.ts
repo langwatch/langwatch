@@ -14,8 +14,7 @@ import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import type { Permission } from "~/server/api/rbac";
 import {
   enforceApiKeyCeiling,
@@ -54,9 +53,13 @@ import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
 
-export const app = new Hono().basePath("/api/experiments");
-app.use(tracerMiddleware({ name: "experiments-v3" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/experiments" });
+const sessionAuth = handlerManagedAuth(
+  "user session validated in-handler via getServerAuthSession",
+);
+const apiKeyAuth = handlerManagedAuth(
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+);
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
 // Python SDK still calls the old routes until it is updated in a follow-up.
@@ -148,7 +151,7 @@ const getRunUrl = (
 
 // ── POST /execute ────────────────────────────────────────────────────
 
-app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
+secured.access(sessionAuth).post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   const request = await c.req.json();
   const { projectId } = request;
 
@@ -272,7 +275,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
 
 // ── POST /abort ──────────────────────────────────────────────────────
 
-app.post("/abort", async (c) => {
+secured.access(sessionAuth).post("/abort", async (c) => {
   let body: { projectId?: string; runId?: string };
   try {
     body = await c.req.json();
@@ -328,7 +331,7 @@ app.post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-app.post("/:slug/run", async (c) => {
+secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:manage");
@@ -510,7 +513,7 @@ app.post("/:slug/run", async (c) => {
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-app.get("/runs", async (c) => {
+secured.access(apiKeyAuth).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
@@ -570,7 +573,7 @@ app.get("/runs", async (c) => {
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-app.get("/runs/:runId", async (c) => {
+secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -638,7 +641,7 @@ app.get("/runs/:runId", async (c) => {
 });
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-app.get("/runs/:runId/results", async (c) => {
+secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -716,3 +719,5 @@ app.get("/runs/:runId/results", async (c) => {
     );
   }
 });
+
+export const app = secured.hono;
