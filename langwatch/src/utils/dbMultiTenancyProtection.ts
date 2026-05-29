@@ -471,7 +471,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
 };
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  if (params.model && EXEMPT_MODELS.includes(params.model)) return;
+  // Raw queries ($queryRaw / $executeRaw) carry no model and no
+  // structured `where` clause for this guard to inspect — tenancy is
+  // the SQL author's responsibility (e.g. the outbox lease query filters
+  // by projectId in its SQL text). Mirrors guardOrganizationId, which
+  // also short-circuits when there is no model.
+  if (!params.model) return;
+  if (EXEMPT_MODELS.includes(params.model)) return;
 
   const action = params.action;
   const model = params.model;

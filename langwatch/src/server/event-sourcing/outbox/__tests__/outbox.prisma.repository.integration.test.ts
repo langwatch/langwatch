@@ -33,12 +33,12 @@ describe("PrismaOutboxRepository", () => {
   });
 
   afterEach(async () => {
-    await prisma.reactorOutbox.deleteMany({ where: { reactorName } });
+    await prisma.reactorOutbox.deleteMany({ where: { projectId, reactorName } });
   });
 
   afterAll(async () => {
     // Project / team / org are reused fixtures — don't delete them.
-    await prisma.reactorOutbox.deleteMany({ where: { reactorName } });
+    await prisma.reactorOutbox.deleteMany({ where: { projectId, reactorName } });
   });
 
   describe("insertIfAbsent", () => {
@@ -54,7 +54,7 @@ describe("PrismaOutboxRepository", () => {
         expect(inserted).toBe(true);
 
         const rows = await prisma.reactorOutbox.findMany({
-          where: { reactorName },
+          where: { projectId, reactorName },
         });
         expect(rows).toHaveLength(1);
         expect(rows[0]?.status).toBe("queued");
@@ -79,7 +79,7 @@ describe("PrismaOutboxRepository", () => {
         });
         expect(second).toBe(false);
         const rows = await prisma.reactorOutbox.findMany({
-          where: { reactorName },
+          where: { projectId, reactorName },
         });
         expect(rows).toHaveLength(1);
         expect((rows[0]?.payload as { v: number }).v).toBe(1);
@@ -161,7 +161,7 @@ describe("PrismaOutboxRepository", () => {
         expect(recovered).toBe(1);
 
         const row = await prisma.reactorOutbox.findFirst({
-          where: { reactorName },
+          where: { projectId, reactorName },
         });
         expect(row?.status).toBe("queued");
         expect(row?.leasedUntil).toBeNull();
@@ -218,8 +218,8 @@ describe("PrismaOutboxRepository", () => {
           now: new Date(),
         });
         // Simulate a concurrent recovery + re-lease bumping attempts.
-        await prisma.reactorOutbox.update({
-          where: { id: leased!.id },
+        await prisma.reactorOutbox.updateMany({
+          where: { id: leased!.id, projectId },
           data: { attempts: leased!.attempts + 1 },
         });
 
