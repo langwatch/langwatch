@@ -4,6 +4,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { createLogger } from "~/utils/logger/server";
+import { capStoredJson } from "~/server/utils/capStoredPayload";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
 import type { EvaluationRunRepository, GetByEvaluationIdParams } from "./evaluation-run.repository";
@@ -484,7 +485,7 @@ export class EvaluationRunClickHouseRepository
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
       Details: data.details,
-      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
+      Inputs: capStoredJson(data.inputs),
       Error: data.error,
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),

@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { capStoredText } from "~/server/utils/capStoredPayload";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
@@ -244,12 +245,15 @@ export class TraceIOAccumulationService {
  * via the fold projection, not directly.
  */
 function preferText(text: string | null | undefined, raw: unknown): string {
-  if (typeof text === "string" && text.length > 0) return text;
-  if (typeof raw === "string") return raw;
+  // Bound the persisted trace IO so a pathological agentic conversation can't
+  // grow the fold state / trace-summary column without limit. Defense-in-depth
+  // alongside the eval-input cap; normal IO is well under the threshold.
+  if (typeof text === "string" && text.length > 0) return capStoredText(text);
+  if (typeof raw === "string") return capStoredText(raw);
   // JSON.stringify(undefined) returns the literal value `undefined`,
   // not the string "undefined". Guard explicitly so a future caller
   // that hands us `undefined` doesn't silently corrupt the trace
   // summary with a non-string value cast to string.
   if (raw === undefined) return "";
-  return JSON.stringify(raw);
+  return capStoredText(JSON.stringify(raw));
 }
