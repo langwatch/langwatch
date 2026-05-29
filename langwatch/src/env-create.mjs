@@ -150,6 +150,13 @@ export function createEnvConfig() {
       // to retune (e.g. raise for a legitimate heavy single-tenant
       // workload).
       LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
+      // Post-2026-05-29 dynamic water-level cap (option C). Global in-flight
+      // budget = the fleet ceiling (pods x GLOBAL_QUEUE_CONCURRENCY) that the
+      // water-fill divides across competing tenants, so a lone tenant bursts to
+      // the full fleet and N contenders converge to a max-min fair share. Unset
+      // or "0" (default) keeps the fixed LANGWATCH_DISPATCH_TENANT_CAP behaviour
+      // — the feature ships inert and is enabled per-environment.
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
@@ -314,6 +321,8 @@ export function createEnvConfig() {
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
       LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET:
+        process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
         process.env.USE_S3_STORAGE?.toLowerCase() === "true",
