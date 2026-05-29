@@ -309,31 +309,38 @@ end
 -- needs to stop a newcomer reading 0 demand and pinning W at the full budget.
 local function recomputeDynamicCap(keyPrefix, budget, nowMs)
   local registryKey = keyPrefix .. "demanding-tenants"
-  -- Drop every tenant that has not enqueued within the claimant window in one
-  -- O(log N + M) trim. Enqueue-only freshness IS the demand signal, so an aged
-  -- member is no longer a claimant; this both bounds the ZSET and replaces the
-  -- per-member stale GC. A tenant still draining old in-flight work ages out of
-  -- the fairness fill here, but its slots stay enforced directly via
-  -- tenant_active_z, so it is never under-counted as a HARD cap, only as a
-  -- (work-conserving) fairness claim.
-  redis.call("ZREMRANGEBYSCORE", registryKey, "-inf", nowMs - ${CLAIMANT_WINDOW_MS})
-  -- Process at most MAX_DEMANDING_TENANTS most-recent claimants so a pathological
-  -- fan-out (thousands of distinct tenants active within the window) can never
-  -- block the single-threaded Redis on this 2s pass. The most-recent N are the
-  -- live contention set; the fill over them is the fair-share signal.
-  local members = redis.call("ZREVRANGE", registryKey, 0, ${MAX_DEMANDING_TENANTS} - 1)
+  -- Bound the registry SIZE by RANK (not by recency) so a churn of distinct
+  -- tenants cannot grow it unbounded, WITHOUT time-evicting a tenant that is
+  -- quiet-but-still-working: keep the most-recent 2*MAX by enqueue recency. This
+  -- is a no-op under normal load; only the least-recently-active tail is dropped
+  -- under extreme fan-out (and that tail is the least likely to still contend).
+  local size = redis.call("ZCARD", registryKey)
+  if size > 2 * ${MAX_DEMANDING_TENANTS} then
+    redis.call("ZREMRANGEBYRANK", registryKey, 0, size - 2 * ${MAX_DEMANDING_TENANTS} - 1)
+  end
+  -- Water-fill over at most MAX_DEMANDING_TENANTS most-recent claimants, bounding
+  -- the pass to ~3N Redis calls. Classify each by LIVE demand, consulting
+  -- tenant_active_z + parked BEFORE any recency eviction: a tenant with
+  -- active+parked>0 stays counted (measured) EVEN IF it stopped enqueuing more
+  -- than a window ago — dropping a still-draining tenant from the fill would
+  -- inflate W and let the others expand past their fair share under sustained
+  -- contention. Only a stale AND fully-idle member (no in-flight, none parked = a
+  -- drained phantom) is GC'd; a fresh idle member is a brand-new claimant whose
+  -- burst is still entirely in ready (presence).
+  local members = redis.call("ZREVRANGE", registryKey, 0, ${MAX_DEMANDING_TENANTS} - 1, "WITHSCORES")
   local measured = {}
   local presenceCount = 0
-  for _, tenantId in ipairs(members) do
-    -- Fresh by construction (aged members were trimmed above). demand_i =
-    -- in-flight (GC-d) + parked; a fresh tenant with zero of both is a brand-new
-    -- claimant whose burst is still entirely in ready = presence claimant.
+  for i = 1, #members, 2 do
+    local tenantId = members[i]
+    local lastActive = tonumber(members[i + 1]) or 0
     local d = tenantActiveCount(keyPrefix .. "tenant_active_z:", tenantId, nowMs)
             + redis.call("ZCARD", keyPrefix .. "parked:" .. tenantId)
     if d > 0 then
       measured[#measured + 1] = d
-    else
+    elseif (nowMs - lastActive) <= ${CLAIMANT_WINDOW_MS} then
       presenceCount = presenceCount + 1
+    else
+      redis.call("ZREM", registryKey, tenantId)
     end
   end
   local w = waterLevel(measured, presenceCount, budget)
