@@ -1,5 +1,4 @@
 import type { Organization } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -11,14 +10,11 @@ import {
 } from "~/server/app-layer/projects/project.service";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createOrgApp, requires } from "~/server/api/security";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
-import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import {
   BadRequestError,
   NotFoundError,
@@ -27,7 +23,7 @@ import { handleProjectError } from "./error-handler";
 
 patchZodOpenapi();
 
-type Variables = OrgAuthMiddlewareVariables & ProjectServiceMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
+type ExtraVariables = ProjectServiceMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -93,21 +89,20 @@ function projectResponse(project: {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/projects")
-  .use(tracerMiddleware({ name: "projects" }))
-  .use(loggerMiddleware())
-  .use(orgAuthMiddleware)
-  .use(projectServiceMiddleware)
-  .use(apiKeyServiceMiddleware)
-  .onError(handleProjectError)
+const secured = createOrgApp<ExtraVariables>({
+  basePath: "/api/projects",
+});
 
+secured.hono.onError(handleProjectError);
+
+secured
+  .access(requires("project:view"))
   .get(
     "/",
+    projectServiceMiddleware,
     describeRoute({
       description: "List all non-archived projects for the organization (paginated)",
     }),
-    requireOrgPermission("project:view"),
     zValidator("query", paginationQuerySchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -125,14 +120,17 @@ export const app = new Hono<{ Variables: Variables }>()
         pagination: result.pagination,
       });
     },
-  )
+  );
 
+secured
+  .access(requires("project:create"))
   .post(
     "/",
+    projectServiceMiddleware,
+    apiKeyServiceMiddleware,
     describeRoute({
       description: "Create a new project",
     }),
-    requireOrgPermission("project:create"),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -189,14 +187,16 @@ export const app = new Hono<{ Variables: Variables }>()
         201,
       );
     },
-  )
+  );
 
+secured
+  .access(requires("project:view"))
   .get(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
       description: "Get a project by its id",
     }),
-    requireOrgPermission("project:view"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -209,14 +209,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(projectResponse(project));
     },
-  )
+  );
 
+secured
+  .access(requires("project:update"))
   .patch(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
       description: "Update a project by its id",
     }),
-    requireOrgPermission("project:update"),
     zValidator("json", updateProjectSchema, validationHook),
     async (c) => {
       const { id } = c.req.param();
@@ -247,14 +249,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(projectResponse(project));
     },
-  )
+  );
 
+secured
+  .access(requires("project:delete"))
   .delete(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
       description: "Archive a project (soft-delete)",
     }),
-    requireOrgPermission("project:delete"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -280,3 +284,5 @@ export const app = new Hono<{ Variables: Variables }>()
       });
     },
   );
+
+export const app = secured.hono;

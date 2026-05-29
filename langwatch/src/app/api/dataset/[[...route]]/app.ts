@@ -1,23 +1,17 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  resourceLimitMiddleware,
-} from "../../middleware";
+import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
 } from "../../middleware/dataset-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import {
@@ -33,8 +27,6 @@ import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
-
-type Variables = AuthMiddlewareVariables & DatasetServiceMiddlewareVariables;
 
 // -- Validation schemas for new endpoints --
 
@@ -106,22 +98,24 @@ function mapDatasetNotFoundError(error: unknown): never {
   throw error;
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/dataset")
-  .use(tracerMiddleware({ name: "dataset" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .use(datasetServiceMiddleware)
-  .onError(handleDatasetError)
+const secured = createProjectApp<DatasetServiceMiddlewareVariables>({
+  basePath: "/api/dataset",
+});
 
-  // ── List Datasets (paginated) ──────────────────────────────────
-  .get(
-    "/",
-    requirePermission("datasets:view"),
-    describeRoute({
-      description: "List all non-archived datasets for the project (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
+// Preserve the dataset-specific error mapping (domain errors → HTTP codes).
+secured.hono.onError(handleDatasetError);
+
+// datasetServiceMiddleware runs AFTER the access chain (which authenticates and
+// sets `project`), so it is applied per-route rather than app-wide.
+
+// ── List Datasets (paginated) ──────────────────────────────────
+secured.access(requires("datasets:view")).get(
+  "/",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "List all non-archived datasets for the project (paginated)",
+  }),
+  zValidator("query", paginationQuerySchema),
     async (c) => {
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
@@ -144,18 +138,17 @@ export const app = new Hono<{ Variables: Variables }>()
         })),
       });
     },
-  )
+  );
 
-  // ── Create Dataset ─────────────────────────────────────────────
-  .post(
-    "/",
-    requirePermission("datasets:manage"),
-    describeRoute({
-      description: "Create a new dataset",
-    }),
-    requirePermission("datasets:manage"),
-    resourceLimitMiddleware("datasets"),
-    zValidator("json", createDatasetSchema, validationHook),
+// ── Create Dataset ─────────────────────────────────────────────
+secured.access(requires("datasets:manage")).post(
+  "/",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Create a new dataset",
+  }),
+  resourceLimitMiddleware("datasets"),
+  zValidator("json", createDatasetSchema, validationHook),
     async (c) => {
       const project = c.get("project");
       const { name, columnTypes } = c.req.valid("json");
@@ -196,20 +189,19 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Create + Upload Dataset from File ─────────────────────────
-  // IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
-  // so Hono doesn't match "upload" as a slugOrId parameter.
-  .post(
-    "/upload",
-    requirePermission("datasets:manage"),
-    describeRoute({
-      description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
-    }),
-    requirePermission("datasets:manage"),
-    resourceLimitMiddleware("datasets"),
-    async (c) => {
+// ── Create + Upload Dataset from File ─────────────────────────
+// IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
+// so Hono doesn't match "upload" as a slugOrId parameter.
+secured.access(requires("datasets:manage")).post(
+  "/upload",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+  }),
+  resourceLimitMiddleware("datasets"),
+  async (c) => {
       const project = c.get("project");
       const service = c.get("datasetService");
 
@@ -260,16 +252,16 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Upload File to Existing Dataset ─────────────────────────────
-  .post(
-    "/:slugOrId/upload",
-    requirePermission("datasets:manage"),
-    describeRoute({
-      description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
-    }),
-    async (c) => {
+// ── Upload File to Existing Dataset ─────────────────────────────
+secured.access(requires("datasets:manage")).post(
+  "/:slugOrId/upload",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
+  }),
+  async (c) => {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const service = c.get("datasetService");
@@ -316,9 +308,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Batch Create Records ──────────────────────────────────────
-  .post(
+secured.access(requires("datasets:manage")).post(
     "/:slugOrId/records",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Create records in a dataset in batch",
     }),
@@ -353,9 +344,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Legacy: Add Entries ────────────────────────────────────────
-  .post(
+secured.access(requires("datasets:manage")).post(
     "/:slug/entries",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Add entries to a dataset",
     }),
@@ -426,9 +416,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Get Single Dataset ─────────────────────────────────────────
-  .get(
+secured.access(requires("datasets:view")).get(
     "/:slugOrId",
-    requirePermission("datasets:view"),
     describeRoute({
       description: "Get a dataset by its slug or id.",
       responses: {
@@ -486,9 +475,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Update Dataset ─────────────────────────────────────────────
-  .patch(
+secured.access(requires("datasets:manage")).patch(
     "/:slugOrId",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Update a dataset by its slug or id",
     }),
@@ -550,9 +538,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Delete (Archive) Dataset ───────────────────────────────────
-  .delete(
+secured.access(requires("datasets:manage")).delete(
     "/:slugOrId",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Archive a dataset (soft-delete)",
     }),
@@ -574,9 +561,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── List Records (paginated) ───────────────────────────────────
-  .get(
+secured.access(requires("datasets:view")).get(
     "/:slugOrId/records",
-    requirePermission("datasets:view"),
     describeRoute({
       description: "List records for a dataset (paginated)",
     }),
@@ -602,9 +588,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Update / Upsert Record ─────────────────────────────────────
-  .patch(
+secured.access(requires("datasets:manage")).patch(
     "/:slugOrId/records/:recordId",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Update or create a record in a dataset",
     }),
@@ -631,9 +616,8 @@ export const app = new Hono<{ Variables: Variables }>()
   )
 
   // ── Batch Delete Records ───────────────────────────────────────
-  .delete(
+secured.access(requires("datasets:manage")).delete(
     "/:slugOrId/records",
-    requirePermission("datasets:manage"),
     describeRoute({
       description: "Delete records from a dataset by IDs",
     }),
@@ -662,3 +646,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ deletedCount: result.count });
     },
   );
+
+export const app = secured.hono;

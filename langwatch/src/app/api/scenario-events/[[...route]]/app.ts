@@ -1,8 +1,7 @@
-import type { Project } from "@prisma/client";
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
@@ -16,40 +15,19 @@ import {
   encodeEnd,
   encodeStart,
 } from "~/utils/streaming-event-codec";
-import {
-  authMiddleware, requirePermission,
-  blockTraceUsageExceededMiddleware,
-  handleError,
-  loggerMiddleware,
-  tracerMiddleware,
-} from "../../middleware";
+import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { checkScenarioSetLimitForRunStarted } from "./scenario-set-limit";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
-// Define types for our Hono context variables
-type Variables = {
-  project: Project;
-};
-
-// Define the Hono app
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/api/scenario-events");
-
-// Middleware
-app.use(tracerMiddleware({ name: "scenario-events" }));
-app.use(loggerMiddleware());
-app.use("/*", authMiddleware);
-app.use("/*", blockTraceUsageExceededMiddleware);
-app.onError(handleError);
+const secured = createProjectApp({ basePath: "/api/scenario-events" });
 
 // POST /api/scenario-events - Create a new scenario event
-app.post(
+secured.access(requires("scenarios:manage")).post(
   "/",
+  blockTraceUsageExceededMiddleware,
   bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
-  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Create a new scenario event",
     responses: {
@@ -155,9 +133,9 @@ app.post(
 );
 
 // DELETE /api/scenario-events - Delete all events for a project
-export const route = app.delete(
+export const route = secured.access(requires("scenarios:manage")).delete(
   "/",
-  requirePermission("scenarios:manage"),
+  blockTraceUsageExceededMiddleware,
   describeRoute({
     description: "Delete all events",
     responses: {
@@ -180,6 +158,8 @@ export const route = app.delete(
 );
 
 export type ScenarioEventsAppType = typeof route;
+
+export const app = secured.hono;
 
 async function dispatchSimulationEvent(
   projectId: string,

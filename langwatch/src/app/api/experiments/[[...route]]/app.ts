@@ -90,7 +90,6 @@ const toExperimentSummary = ({
 
 const secured = createProjectApp({
   basePath: "/api/experiments",
-  family: "experiments",
 });
 
 // Mirror the canonical experiments-list permission: the tRPC procedures that

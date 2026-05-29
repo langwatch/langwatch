@@ -10,7 +10,6 @@ const secured = createProjectApp<
   ModelProviderServiceMiddlewareVariables & OrganizationMiddlewareVariables
 >({
   basePath: "/api/model-providers",
-  family: "model-providers",
 });
 
 registerModelProviderRoutes(secured);

@@ -19,7 +19,6 @@ const logger = createLogger("langwatch:api:copilotkit");
 
 const secured = createProjectApp({
   basePath: "/api/copilotkit",
-  family: "copilotkit",
 });
 
 // The CopilotKit runtime adapts the project's prompt configs into the prompt

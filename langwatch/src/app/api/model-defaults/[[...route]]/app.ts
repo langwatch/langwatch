@@ -15,7 +15,6 @@ patchZodOpenapi();
  */
 const secured = createProjectApp({
   basePath: "/api/model-defaults",
-  family: "model-defaults",
 });
 
 registerModelDefaultsRoutes(secured);

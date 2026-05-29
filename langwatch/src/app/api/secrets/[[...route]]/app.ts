@@ -1,17 +1,10 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import { badRequestSchema } from "../../shared/schemas";
 import { SecretsService } from "../secrets.service";
@@ -19,8 +12,6 @@ import { SecretsService } from "../secrets.service";
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:secrets");
-
-type Variables = AuthMiddlewareVariables;
 
 const SECRET_NAME_REGEX = /^[A-Z][A-Z0-9_]*$/;
 
@@ -55,16 +46,10 @@ const updateSecretSchema = z.object({
 
 const secretsService = new SecretsService(prisma);
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/secrets")
-  .use(tracerMiddleware({ name: "secrets" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/secrets" });
 
-  .get(
+secured.access(requires("secrets:view")).get(
     "/",
-    requirePermission("secrets:view"),
     describeRoute({
       description:
         "List all secrets for the project (values are never returned)",
@@ -87,11 +72,10 @@ export const app = new Hono<{ Variables: Variables }>()
       const secrets = await secretsService.getAll({ projectId: project.id });
       return c.json(secrets);
     }
-  )
+  );
 
-  .get(
+secured.access(requires("secrets:view")).get(
     "/:id",
-    requirePermission("secrets:view"),
     describeRoute({
       description: "Get a secret by its ID (value is never returned)",
       responses: {
@@ -123,11 +107,10 @@ export const app = new Hono<{ Variables: Variables }>()
       }
       return c.json(secret);
     }
-  )
+  );
 
-  .post(
+secured.access(requires("secrets:manage")).post(
     "/",
-    requirePermission("secrets:manage"),
     describeRoute({
       description:
         "Create a new project secret. The value is encrypted at rest and never returned.",
@@ -168,11 +151,10 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(result.secret, 201);
     }
-  )
+  );
 
-  .put(
+secured.access(requires("secrets:manage")).put(
     "/:id",
-    requirePermission("secrets:manage"),
     describeRoute({
       description: "Update a secret's value",
       responses: {
@@ -211,11 +193,10 @@ export const app = new Hono<{ Variables: Variables }>()
       }
       return c.json(secret);
     }
-  )
+  );
 
-  .delete(
+secured.access(requires("secrets:manage")).delete(
     "/:id",
-    requirePermission("secrets:manage"),
     describeRoute({
       description: "Delete a secret",
       responses: {
@@ -250,3 +231,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ id, deleted: true });
     }
   );
+
+export const app = secured.hono;

@@ -38,6 +38,21 @@ const HTTP_VERBS = ["get", "post", "put", "patch", "delete"] as const;
 type HttpVerb = (typeof HTTP_VERBS)[number];
 
 /**
+ * Derive the family label (tracer span name + registry grouping) from the
+ * basePath so it can never typo or drift from the mount path: `/api/agents`
+ * becomes `agents`, `/api/gateway/v1` becomes `gateway-v1`.
+ */
+function familyFromBasePath(basePath: string): string {
+  return (
+    basePath
+      .replace(/^\/+/, "")
+      .replace(/^api\//, "")
+      .replace(/\/+$/, "")
+      .replace(/\//g, "-") || "api"
+  );
+}
+
+/**
  * The verb surface exposed by {@link SecuredApp.access}. Typed EXACTLY as the
  * underlying Hono instance's own verb methods, so validator inference
  * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved
@@ -64,14 +79,13 @@ export class SecuredApp<E extends Env> {
 
   constructor(args: {
     basePath: string;
-    family: string;
     strategy: AuthStrategy;
   }) {
     this.basePath = args.basePath;
-    this.family = args.family;
+    this.family = familyFromBasePath(args.basePath);
     this.strategy = args.strategy;
     this.hono = new Hono<E>().basePath(args.basePath);
-    this.hono.use(tracerMiddleware({ name: args.family }));
+    this.hono.use(tracerMiddleware({ name: this.family }));
     this.hono.use(loggerMiddleware());
     this.hono.onError(handleError);
   }
@@ -183,7 +197,6 @@ const orgStrategy: AuthStrategy = {
  */
 export function createProjectApp<Extra extends object = Record<never, never>>(args: {
   basePath: string;
-  family: string;
 }): SecuredApp<{ Variables: AuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: projectStrategy });
 }
@@ -195,7 +208,6 @@ export function createProjectApp<Extra extends object = Record<never, never>>(ar
  */
 export function createOrgApp<Extra extends object = Record<never, never>>(args: {
   basePath: string;
-  family: string;
 }): SecuredApp<{ Variables: OrgAuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: orgStrategy });
 }
@@ -207,7 +219,6 @@ export function createOrgApp<Extra extends object = Record<never, never>>(args: 
  */
 export function createServiceApp<E extends Env = Env>(args: {
   basePath: string;
-  family: string;
   verifySecret: MiddlewareHandler;
 }): SecuredApp<E> {
   const strategy: AuthStrategy = {
@@ -223,5 +234,5 @@ export function createServiceApp<E extends Env = Env>(args: {
       }
     },
   };
-  return new SecuredApp<E>({ basePath: args.basePath, family: args.family, strategy });
+  return new SecuredApp<E>({ basePath: args.basePath, strategy });
 }

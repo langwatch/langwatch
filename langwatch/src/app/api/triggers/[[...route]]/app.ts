@@ -1,5 +1,4 @@
 import type { Prisma, Trigger } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -9,22 +8,14 @@ import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp, requires } from "~/server/api/security";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { handleError } from "../../middleware";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:triggers");
-
-type Variables = AuthMiddlewareVariables;
 
 const triggerActionEnum = z.enum([
   "SEND_EMAIL",
@@ -96,17 +87,11 @@ function toTriggerResponse(trigger: Trigger) {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/triggers")
-  .use(tracerMiddleware({ name: "triggers" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/triggers" });
 
-  // ── List Triggers ──────────────────────────────────────────
-  .get(
+// ── List Triggers ──────────────────────────────────────────
+secured.access(requires("triggers:view")).get(
     "/",
-    requirePermission("triggers:view"),
     describeRoute({
       description: "List all active triggers (automations) for the project",
       responses: {
@@ -140,10 +125,9 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  // ── Get Trigger ────────────────────────────────────────────
-  .get(
+// ── Get Trigger ────────────────────────────────────────────
+secured.access(requires("triggers:view")).get(
     "/:id",
-    requirePermission("triggers:view"),
     describeRoute({
       description: "Get a trigger by its ID",
       responses: {
@@ -187,10 +171,9 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  // ── Create Trigger ─────────────────────────────────────────
-  .post(
+// ── Create Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).post(
     "/",
-    requirePermission("triggers:manage"),
     resourceLimitMiddleware("automations"),
     describeRoute({
       description: "Create a new trigger (automation)",
@@ -238,10 +221,9 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
-  // ── Update Trigger ─────────────────────────────────────────
-  .patch(
+// ── Update Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).patch(
     "/:id",
-    requirePermission("triggers:manage"),
     describeRoute({
       description: "Update a trigger (name, active state, message, filters)",
       responses: {
@@ -300,12 +282,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+  );
 
-  // ── Delete Trigger ─────────────────────────────────────────
-  .delete(
+// ── Delete Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).delete(
     "/:id",
-    requirePermission("triggers:manage"),
     describeRoute({
       description: "Delete (soft-delete) a trigger",
       responses: {
@@ -349,3 +330,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ id, deleted: true });
     },
   );
+
+export const app = secured.hono;

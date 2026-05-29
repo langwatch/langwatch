@@ -17,7 +17,6 @@ describe("SecuredApp", () => {
     it("records the route's policy in the registry under its full merged path", () => {
       const app = createServiceApp({
         basePath: "/api/__test_secured",
-        family: "test-secured",
         verifySecret: noopSecret,
       });
 
@@ -31,7 +30,8 @@ describe("SecuredApp", () => {
         kind: "internal",
         reason: "unit test route",
       });
-      expect(recorded?.family).toBe("test-secured");
+      // family is derived from basePath, never hand-passed.
+      expect(recorded?.family).toBe("__test_secured");
     });
   });
 
@@ -44,7 +44,6 @@ describe("SecuredApp", () => {
       };
       const app = createServiceApp({
         basePath: "/api/__test_chain",
-        family: "test-chain",
         verifySecret: secret,
       });
       app.access(internalSecret("chain test")).get("/x", (c) => {
@@ -65,7 +64,6 @@ describe("SecuredApp", () => {
       };
       const app = createServiceApp({
         basePath: "/api/__test_public",
-        family: "test-public",
         verifySecret: secret,
       });
       app.access(publicEndpoint("open probe")).get("/health", (c) => {
@@ -84,7 +82,6 @@ describe("SecuredApp", () => {
     it("does not expose verb methods on the bare app — only via access()", () => {
       const app = createServiceApp({
         basePath: "/api/__test_guard",
-        family: "test-guard",
         verifySecret: noopSecret,
       });
 

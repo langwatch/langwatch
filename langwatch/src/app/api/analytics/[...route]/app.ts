@@ -9,7 +9,6 @@ patchZodOpenapi();
 // the old optional `requirePermission` middleware.
 const secured = createProjectApp({
   basePath: "/api/analytics",
-  family: "analytics",
 });
 
 registerAnalyticsRoutes(secured);
