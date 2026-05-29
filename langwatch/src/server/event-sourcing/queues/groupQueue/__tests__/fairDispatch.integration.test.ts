@@ -17,12 +17,10 @@ import { GroupStagingScripts } from "../scripts";
 // static one). Fairness is produced INSIDE dispatch(); the signature does not
 // change, so these tests need no edit when the dynamic cap lands.
 //
-// The contention scenarios are it.skip until the dynamic water-level cap is
-// implemented: against today's static per-tenant cap they fail deterministically
-// (equal scores tie-break by member lex, so the lexically-smaller tenant prefix
-// monopolises the fleet). Un-skip each as the EVALSHA makes it pass - that is
-// the red-to-green contract. The work-conserving and priority guards below pass
-// today and protect against regressions.
+// The contention scenarios are enabled via LANGWATCH_DISPATCH_GLOBAL_BUDGET (set
+// in beforeEach) and assert the max-min fair outcome against the dynamic
+// water-level cap. The work-conserving and intra-tenant-priority guards hold
+// regardless of the cap and protect against regressions.
 
 let redis: Redis;
 let scripts: GroupStagingScripts;
@@ -170,11 +168,10 @@ describe("work-conserving fair dispatch", () => {
       // binds only under real contention; a slot that would otherwise idle is
       // filled past the fair cap rather than left empty.
       //
-      // it.skip until the dynamic cap lands: this is timing-coupled - it only
-      // exercises the phantom if a water-level recompute fires while the burster
-      // is still inside claimantWindow. Wire the exact clock advance
-      // (recomputeInterval < delta < claimantWindow, via the dispatch nowMs)
-      // once those constants are fixed in the EVALSHA.
+      // Timing-coupled: it only exercises the phantom if a water-level recompute
+      // fires while the burster is still inside the claimant window, so the test
+      // waits past the reconcile gate (RECONCILE_GATE_MS) after the busy tenant
+      // arrives, with the burster still fresh.
       it("does not let the idle tenant's stale claim cap the busy one", async () => {
         // burster bursts and fully drains: no active, no parked, but still fresh
         await stageForTenant("burster", 10);
