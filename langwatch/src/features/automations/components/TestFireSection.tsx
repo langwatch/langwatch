@@ -4,9 +4,15 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { useConfigComplete, useNotifyChannel, useTestHistory } from "../state/selectors";
 
 /**
- * Test fire row + history. Coloured by the most recent attempt so the
- * eye picks up failures fast. The orchestrator owns the actual mutation
- * — this component receives `onFire` + `loading`.
+ * Test fire row — last-attempt status + button. Coloured by the most
+ * recent attempt so the eye picks up failures fast.
+ *
+ * Industry-standard automation builders (Sentry, PagerDuty, Datadog)
+ * show only the *last* test result inline; the per-attempt history was
+ * useful for debugging but reads as noise in the steady state, so it's
+ * gone. The orchestrator's toaster surfaces success/failure detail at
+ * fire time; the store still keeps history in memory if we ever want
+ * a "Recent attempts" disclosure later.
  */
 export function TestFireSection({
   loading,
@@ -28,7 +34,6 @@ export function TestFireSection({
     : lastIsSuccess
       ? "green.400"
       : "red.400";
-  const bg = !last ? "bg" : lastIsSuccess ? "green.50" : "red.50";
 
   return (
     <Box
@@ -36,12 +41,11 @@ export function TestFireSection({
       borderColor={borderColor}
       borderRadius="md"
       padding={3}
-      bg={bg}
-      _dark={{ bg: !last ? "bg" : lastIsSuccess ? "green.900" : "red.900" }}
+      bg="bg"
     >
-      <HStack align="start">
+      <HStack align="start" gap={3}>
         <VStack align="start" gap={0} flex="1" minWidth="0">
-          <HStack>
+          <HStack gap={2}>
             <Text fontWeight="semibold">Test fire</Text>
             {last ? (
               lastIsSuccess ? (
@@ -54,9 +58,9 @@ export function TestFireSection({
           <Text textStyle="sm" color="fg.muted" lineClamp={2}>
             {last ? (
               <>
-                Last attempt {formatTimeAgo(last.at)}
+                {formatTimeAgo(last.at)}
                 {lastIsSuccess
-                  ? ` — sent to ${last.recipientCount} ${
+                  ? ` — delivered to ${last.recipientCount} ${
                       channel === "email" ? "recipient" : "webhook"
                     }${(last.recipientCount ?? 0) === 1 ? "" : "s"}`
                   : ` — ${last.errorTitle ?? "failed"}`}
@@ -76,37 +80,6 @@ export function TestFireSection({
           <Send size={14} /> Test fire
         </Button>
       </HStack>
-      {history.length > 1 ? (
-        <VStack align="stretch" gap={1} mt={3} pl={1}>
-          <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
-            Recent attempts
-          </Text>
-          {history.slice(1).map((attempt) => (
-            <HStack key={attempt.at} gap={2} align="start">
-              <Box pt="2px">
-                {attempt.status === "success" ? (
-                  <CircleCheck
-                    size={12}
-                    color="var(--chakra-colors-green-500)"
-                  />
-                ) : (
-                  <CircleX size={12} color="var(--chakra-colors-red-500)" />
-                )}
-              </Box>
-              <Text textStyle="xs" minWidth="100px" color="fg.muted">
-                {formatTimeAgo(attempt.at)}
-              </Text>
-              <Text textStyle="xs" color="fg.muted" lineClamp={1}>
-                {attempt.status === "success"
-                  ? `${attempt.recipientCount} delivered${
-                      attempt.usedDefault ? " (default template)" : ""
-                    }`
-                  : (attempt.errorDetail ?? attempt.errorTitle ?? "failed")}
-              </Text>
-            </HStack>
-          ))}
-        </VStack>
-      ) : null}
     </Box>
   );
 }

@@ -5,6 +5,7 @@ import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/cl
 import { type ConfigFormCtx, isNotifyEntry } from "~/automations/providers/types";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -38,6 +39,19 @@ import {
 import { buildClientScaffold } from "./templates/scaffold";
 
 const PREVIEW_DEBOUNCE_MS = 400;
+
+function saveDisabledReason(
+  conditionsSet: boolean,
+  configComplete: boolean,
+  actionPicked: boolean,
+): string {
+  const missing: string[] = [];
+  if (!conditionsSet) missing.push("set a trigger");
+  if (!actionPicked) missing.push("pick a type");
+  else if (!configComplete) missing.push("complete the setup");
+  if (missing.length === 0) return "";
+  return `To save, ${missing.join(" and ")}.`;
+}
 
 /**
  * Orchestrator for the staged automation authoring drawer (ADR-028).
@@ -338,17 +352,23 @@ export function AutomationDrawer({
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
-              <Button variant="ghost" onClick={closeDrawer}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                onClick={onSave}
-                loading={upsert.isLoading}
-                disabled={!canSave}
+              <Tooltip
+                content={saveDisabledReason(
+                  conditionsSet,
+                  configComplete,
+                  !!draft.action,
+                )}
+                disabled={canSave}
               >
-                {automationId ? "Save changes" : "Create automation"}
-              </Button>
+                <Button
+                  colorPalette="orange"
+                  onClick={onSave}
+                  loading={upsert.isLoading}
+                  disabled={!canSave}
+                >
+                  {automationId ? "Save changes" : "Create automation"}
+                </Button>
+              </Tooltip>
             </HStack>
           </Drawer.Footer>
         </Drawer.Content>
