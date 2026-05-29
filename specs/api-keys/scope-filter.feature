@@ -154,6 +154,19 @@ Feature: API Keys scope filter
     And no localStorage entry is written for the API Keys scope filter
 
   # ============================================================================
+  # Stale-URL resilience
+  # ============================================================================
+
+  @integration
+  Scenario: A stale URL pointing to a deleted scope falls back to "All you can see"
+    Given the URL contains `?scope=TEAM:non-existent-id`
+    And no team with that id exists in the org graph
+    When I navigate to Settings > API Keys
+    Then the filter trigger reads "All you can see"
+    And the table includes every API key the current user has access to
+    And the label does NOT contain the string "undefined"
+
+  # ============================================================================
   # Accessibility
   # ============================================================================
 

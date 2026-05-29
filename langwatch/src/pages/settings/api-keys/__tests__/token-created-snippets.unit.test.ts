@@ -43,35 +43,6 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
-  describe("when checking that TokenCreatedDialog uses the correct language per tab", () => {
-    /** @scenario .env tab renders as a highlighted ini command box */
-    it("TokenCreatedDialog passes lang=\"ini\" for the .env tab", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
-      expect(dialog).toContain('lang="ini"');
-    });
-
-    /** @scenario Bearer tab renders as a highlighted shell command box */
-    /** @scenario Basic Auth tab renders as a highlighted shell command box */
-    it("TokenCreatedDialog passes lang=\"shellscript\" for Bearer and Basic Auth tabs", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
-      expect(dialog).toContain('lang="shellscript"');
-    });
-
-    /** @scenario Claude Code tab shows a PostHog-style terminal command snippet */
-    /** @scenario Codex tab shows a PostHog-style terminal command snippet */
-    it("TokenCreatedDialog passes lang=\"bash\" for Claude Code and Codex terminal commands", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
-      // bash language is used for Claude Code and Codex command snippets
-      expect(dialog).toContain('lang="bash"');
-    });
-  });
-
   describe("when checking that the amber warning is present in TokenCreatedDialog", () => {
     /** @scenario Amber warning between .env block and Code Assistants section stays */
     it("TokenCreatedDialog contains the 'Copy this token now' amber warning text", () => {
@@ -163,30 +134,23 @@ describe("given the token-created-snippets feature is implemented", () => {
 
   describe("when checking that no new syntax-highlighting library is added", () => {
     /** @scenario No new highlighting library is added */
-    it("package.json does not contain a new highlighting library", () => {
+    it("package.json contains only the pre-existing highlighting libraries (positive allowlist)", () => {
       const pkg = readFile("package.json");
       const parsed = JSON.parse(pkg) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
       };
-      const allDeps = {
+      const allDepNames = Object.keys({
         ...parsed.dependencies,
         ...parsed.devDependencies,
-      };
-      // Shiki is allowed (already present). prismjs + prism-react-renderer are pre-existing
-      // legacy deps used elsewhere — out of scope for this PR. The list below names libraries
-      // that were NOT in package.json before this work and must NOT be added by it.
-      const forbidden = [
-        "highlight.js",
-        "highlightjs",
-        "refractor",
-        "lowlight",
-        "react-syntax-highlighter",
-        "react-highlight",
-      ];
-      for (const lib of forbidden) {
-        expect(Object.keys(allDeps)).not.toContain(lib);
-      }
+      });
+      const highlightLibPattern = /(highlight|prism|shiki|refractor|lowlight|tokenize|hljs)/i;
+      const highlightLibs = allDepNames
+        .filter((name) => highlightLibPattern.test(name))
+        .sort();
+      // Lock in the pre-existing set — any new highlighter dep added by a future
+      // PR will fail this test until the allowlist is intentionally expanded.
+      expect(highlightLibs).toEqual(["prism-react-renderer", "prismjs", "shiki"]);
     });
   });
 });

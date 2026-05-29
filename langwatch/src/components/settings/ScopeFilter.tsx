@@ -15,6 +15,9 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
+import type { AvailableScopes } from "~/hooks/useAvailableScopes";
+
+export type { AvailableScopes };
 
 export type ScopeFilter =
   | { kind: "all" }
@@ -26,12 +29,6 @@ export type ScopeFilter =
       scopeId: string;
       name: string;
     };
-
-export interface AvailableScopes {
-  organization?: { id: string; name: string } | null;
-  teams: Array<{ id: string; name: string }>;
-  projects: Array<{ id: string; name: string; teamId?: string | null }>;
-}
 
 interface Props {
   value: ScopeFilter;

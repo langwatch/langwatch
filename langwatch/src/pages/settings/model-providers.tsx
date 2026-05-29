@@ -13,16 +13,13 @@ import {
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
-import {
-  ScopeFilter as ScopeFilterComponent,
-  type ScopeFilter as PageScopeFilter,
-} from "../../components/settings/ScopeFilter";
+import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "~/utils/compat/next-router";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -31,10 +28,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
-import {
-  filterProvidersByScope,
-  type ScopeHierarchy,
-} from "../../utils/filterProvidersByScope";
+import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -83,82 +77,21 @@ export default function ModelsPage() {
     name: string;
   } | null>(null);
 
-  // Surface how many gateway bindings would be left orphaned by
+  // Build the `available` payload the filter dropdown needs (org / teams /
+  // projects / hierarchy). Pulled from the current organization graph so
+  // the page doesn't have to wait on the default-models query before the
+  // header filter can render.
+  const filterAvailable = useAvailableScopes(organization);
+  const { hierarchy } = filterAvailable;
 
   // One scope filter drives both tables on this page (Model Providers
-  // and Default Models). Shape matches the shared ScopeFilter primitive
-  // used in the header (also reused on /settings/api-keys).
-  const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
-    kind: "all",
+  // and Default Models). URL hydration and setter are shared with the
+  // api-keys page via useUrlScopeFilter.
+  const [scopeFilter, handleScopeFilterChange] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: team?.id,
+    projectId: project?.id,
   });
-  const router = useRouter();
-
-  // Persist scope filter changes to URL — mirrors the api-keys page so that
-  // reloading /settings/model-providers restores the active filter.
-  const handleScopeFilterChange = (next: PageScopeFilter) => {
-    setScopeFilter(next);
-    if (next.kind === "all") {
-      const { scope: _scope, ...rest } = router.query as Record<string, string>;
-      void router.replace({ query: rest });
-    } else if (next.kind === "team-current" && team?.id) {
-      void router.replace({ query: { ...router.query, scope: `TEAM:${team.id}` } });
-    } else if (next.kind === "project-current" && project?.id) {
-      void router.replace({
-        query: { ...router.query, scope: `PROJECT:${project.id}` },
-      });
-    } else if (next.kind === "specific") {
-      void router.replace({
-        query: { ...router.query, scope: `${next.scopeType}:${next.scopeId}` },
-      });
-    }
-  };
-
-  // Build the `available` payload the filter dropdown needs (org / teams /
-  // projects). Pulled from the current organization graph so the page
-  // doesn't have to wait on the default-models query before the header
-  // filter can render.
-  const filterAvailable = useAvailableScopes(organization);
-
-  // Hydrate scope filter from `?scope=TYPE:id` deep-links (e.g. the
-  // "Configure" link on the VK create / edit drawer's Eligible Model
-  // Providers section). URL contract is the colon-joined token shape
-  // shared with VirtualKeyScope serialisation:
-  //   ?scope=ORGANIZATION:<id>   ?scope=TEAM:<id>   ?scope=PROJECT:<id>
-  // Re-runs when filterAvailable populates so the chip can pick up the
-  // human-readable name from the org graph instead of an opaque id.
-  useEffect(() => {
-    const raw = router.query.scope;
-    if (typeof raw !== "string") return;
-    const sepIdx = raw.indexOf(":");
-    if (sepIdx <= 0 || sepIdx === raw.length - 1) return;
-    const scopeType = raw.slice(0, sepIdx);
-    const scopeId = raw.slice(sepIdx + 1);
-    if (
-      scopeType !== "ORGANIZATION" &&
-      scopeType !== "TEAM" &&
-      scopeType !== "PROJECT"
-    )
-      return;
-    let name: string | undefined;
-    if (scopeType === "ORGANIZATION") {
-      name =
-        filterAvailable.organization?.id === scopeId
-          ? filterAvailable.organization.name
-          : undefined;
-    } else if (scopeType === "TEAM") {
-      name = filterAvailable.teams.find((t) => t.id === scopeId)?.name;
-    } else {
-      name = filterAvailable.projects.find((p) => p.id === scopeId)?.name;
-    }
-    if (name !== undefined) {
-      setScopeFilter({ kind: "specific", scopeType, scopeId, name } as PageScopeFilter);
-    } else {
-      // Scope no longer exists in the org graph (deleted team/project from
-      // a stale URL) — fall back to "all" so the filter label doesn't render
-      // "Team: undefined" or similar.
-      setScopeFilter({ kind: "all" });
-    }
-  }, [router.query.scope, filterAvailable]);
 
   const allEnabledProviders = useMemo(() => {
     return allProvidersList.filter((provider) => provider.enabled);
@@ -172,21 +105,6 @@ export default function ModelsPage() {
   const enabledProviderKeys = useMemo(
     () => new Set(allEnabledProviders.map((p) => p.provider)),
     [allEnabledProviders],
-  );
-
-  // Hierarchy describing the org tree the page is rendering. Drives
-  // inclusive scope filtering (parents up, children down) for both the
-  // Model Providers and Default Models tables.
-  const hierarchy: ScopeHierarchy = useMemo(
-    () => ({
-      organization: organization ? { id: organization.id } : null,
-      teams: filterAvailable.teams.map((t) => ({ id: t.id })),
-      projects: filterAvailable.projects.map((p) => ({
-        id: p.id,
-        teamId: p.teamId,
-      })),
-    }),
-    [organization, filterAvailable],
   );
 
   // Client-side filter for the scope dropdown at the top of the page.

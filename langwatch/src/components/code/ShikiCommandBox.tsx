@@ -164,6 +164,7 @@ export function ShikiCommandBox({
 
   return (
     <Box
+      data-testid="shiki-command-box"
       position="relative"
       width="full"
       borderRadius="xl"

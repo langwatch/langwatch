@@ -13,7 +13,7 @@ import {
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Clipboard, Key, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -21,16 +21,10 @@ import { useSession } from "~/utils/auth-client";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
-import {
-  ScopeFilter as ScopeFilterComponent,
-  type ScopeFilter as PageScopeFilter,
-} from "~/components/settings/ScopeFilter";
+import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
-import {
-  filterProvidersByScope,
-  type ScopeHierarchy,
-} from "~/utils/filterProvidersByScope";
-import { useRouter } from "~/utils/compat/next-router";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
+import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
@@ -83,7 +77,6 @@ export function ApiKeysSection({
   const publicEnv = usePublicEnv();
   const { project, team, organization } = useOrganizationTeamProject();
   const endpoint = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
-  const router = useRouter();
 
   const apiKeys = api.apiKey.list.useQuery({ organizationId });
   const myBindings = api.apiKey.myBindings.useQuery({ organizationId });
@@ -107,85 +100,18 @@ export function ApiKeysSection({
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
 
-  // Scope filter — defaults to "all", persisted in URL as ?scope=TYPE:id
-  const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
-    kind: "all",
-  });
-
-  // Derive available scopes for the filter dropdown from the organization graph.
+  // Derive available scopes (and org-tree hierarchy) for the filter dropdown
+  // from the organization graph.
   const filterAvailable = useAvailableScopes(organization);
+  const { hierarchy } = filterAvailable;
 
-  // Hydrate scope filter from ?scope=TYPE:id URL param (mirrors model-providers).
-  useEffect(() => {
-    const raw = router.query.scope;
-    if (typeof raw !== "string") return;
-    const sepIdx = raw.indexOf(":");
-    if (sepIdx <= 0 || sepIdx === raw.length - 1) return;
-    const scopeType = raw.slice(0, sepIdx);
-    const scopeId = raw.slice(sepIdx + 1);
-    if (
-      scopeType !== "ORGANIZATION" &&
-      scopeType !== "TEAM" &&
-      scopeType !== "PROJECT"
-    )
-      return;
-    let name: string | undefined;
-    if (scopeType === "ORGANIZATION") {
-      name =
-        filterAvailable.organization?.id === scopeId
-          ? filterAvailable.organization.name
-          : undefined;
-    } else if (scopeType === "TEAM") {
-      name = filterAvailable.teams.find((t) => t.id === scopeId)?.name;
-    } else {
-      name = filterAvailable.projects.find((p) => p.id === scopeId)?.name;
-    }
-    if (name !== undefined) {
-      setScopeFilter({
-        kind: "specific",
-        scopeType,
-        scopeId,
-        name,
-      } as PageScopeFilter);
-    } else {
-      // Scope no longer exists in the org graph (deleted team/project from
-      // a stale URL) — fall back to "all" so the filter label doesn't render
-      // "Team: undefined" or similar.
-      setScopeFilter({ kind: "all" });
-    }
-  }, [router.query.scope, filterAvailable]);
-
-  // Persist scope filter changes to URL.
-  const handleScopeFilterChange = (next: PageScopeFilter) => {
-    setScopeFilter(next);
-    if (next.kind === "all") {
-      const { scope: _scope, ...rest } = router.query as Record<string, string>;
-      void router.replace({ query: rest });
-    } else if (next.kind === "team-current" && team?.id) {
-      void router.replace({ query: { ...router.query, scope: `TEAM:${team.id}` } });
-    } else if (next.kind === "project-current" && project?.id) {
-      void router.replace({
-        query: { ...router.query, scope: `PROJECT:${project.id}` },
-      });
-    } else if (next.kind === "specific") {
-      void router.replace({
-        query: { ...router.query, scope: `${next.scopeType}:${next.scopeId}` },
-      });
-    }
-  };
-
-  // Org-tree hierarchy for filterProvidersByScope cascade logic.
-  const hierarchy: ScopeHierarchy = useMemo(
-    () => ({
-      organization: organization ? { id: organization.id } : null,
-      teams: filterAvailable.teams.map((t) => ({ id: t.id })),
-      projects: filterAvailable.projects.map((p) => ({
-        id: p.id,
-        teamId: p.teamId,
-      })),
-    }),
-    [organization, filterAvailable],
-  );
+  // Scope filter — defaults to "all", persisted in URL as ?scope=TYPE:id.
+  // URL hydration and setter are shared with the model-providers page.
+  const [scopeFilter, handleScopeFilterChange] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: team?.id,
+    projectId: project?.id,
+  });
 
   // Client-side filter: map each key's roleBindings → scopes so
   // filterProvidersByScope can apply its inclusive cascade directly.
@@ -349,6 +275,9 @@ export function ApiKeysSection({
   // filterProvidersByScope logic can decide.
   const showProjectKey: boolean = useMemo(() => {
     if (!projectApiKey || !project?.id) return false;
+    // Synthesize a single-binding row so the project-service-key row reuses the
+    // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
+    // Intent: keep the cascade rules in ONE place — not a hack to bypass typing.
     const fakeRow = {
       scopes: [{ scopeType: "PROJECT" as const, scopeId: project.id }],
     };

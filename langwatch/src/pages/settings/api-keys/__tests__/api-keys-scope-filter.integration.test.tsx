@@ -494,4 +494,34 @@ describe("<ApiKeysSection /> scope filter", () => {
       });
     });
   });
+
+  describe("given the URL contains a stale scope param", () => {
+    describe("when the referenced team no longer exists in the org graph", () => {
+      /**
+       * @scenario A stale URL pointing to a deleted scope falls back to "All you can see"
+       */
+      it("falls back to 'All you can see' and shows all keys without rendering 'undefined'", async () => {
+        mockRouterQuery.scope = "TEAM:non-existent-id";
+
+        renderSection();
+
+        // Wait for hydration — the stale scope should resolve to "all"
+        await waitFor(() => {
+          const filter = screen.getByTestId("scope-filter");
+          expect(filter).toHaveTextContent("All you can see");
+        });
+
+        // All keys are visible (full table)
+        expect(screen.getByText("Org-Level Key")).toBeInTheDocument();
+        expect(screen.getByText("Team Red Key")).toBeInTheDocument();
+        expect(screen.getByText("Team Blue Key")).toBeInTheDocument();
+        expect(screen.getByText("Project Alpha Key")).toBeInTheDocument();
+        expect(screen.getByText("Project Beta Key")).toBeInTheDocument();
+
+        // The label must not contain the string "undefined"
+        const filter = screen.getByTestId("scope-filter");
+        expect(filter.textContent).not.toContain("undefined");
+      });
+    });
+  });
 });

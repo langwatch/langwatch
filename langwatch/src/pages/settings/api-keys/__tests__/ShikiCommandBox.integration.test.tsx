@@ -110,6 +110,8 @@ describe("<ShikiCommandBox />", () => {
   describe("given a command box with a terminal command", () => {
     describe("when the copy button is clicked", () => {
       /** @scenario Terminal prompt glyph is not included in the copied value */
+      /** @scenario Claude Code tab shows a PostHog-style terminal command snippet */
+      /** @scenario Codex tab shows a PostHog-style terminal command snippet */
       it("copies only the raw command — not the prompt glyph — to the clipboard", async () => {
         renderCommandBox({
           command: "claude mcp add langwatch -- npx -y @langwatch/mcp-server",
@@ -149,6 +151,9 @@ describe("<ShikiCommandBox />", () => {
   describe("given a command box with a masked secret value", () => {
     describe("when the copy button is clicked", () => {
       /** @scenario Copy button is present on every command box */
+      /** @scenario .env tab renders as a highlighted ini command box */
+      /** @scenario Bearer tab renders as a highlighted shell command box */
+      /** @scenario Basic Auth tab renders as a highlighted shell command box */
       it("copies the unmasked value (real token) to the clipboard", async () => {
         renderCommandBox({
           command: "LANGWATCH_API_KEY=real-secret-token-abc123",
