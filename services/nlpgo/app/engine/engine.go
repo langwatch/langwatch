@@ -596,13 +596,20 @@ func jsonSchemaForField(f dsl.Field) map[string]any {
 // non-JSON fallback.
 func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]any, []string) {
 	out := make(map[string]any, len(outputs))
-	var parsed map[string]any
-	if err := jsonUnmarshalRaw([]byte(content), &parsed); err != nil {
+
+	parsed, ok := recoverJSONObject(content)
+	if !ok {
+		// The completion wasn't a JSON object even after stripping a
+		// markdown ```json fence and extracting the first balanced {...}.
+		// Preserve the raw text in the first declared field so the
+		// response isn't lost, and warn so operators see the malformed
+		// structured response.
 		if len(outputs) > 0 {
 			out[outputs[0].Identifier] = content
 		}
-		return out, []string{fmt.Sprintf("signature: structured response did not parse as JSON object: %v", err)}
+		return out, []string{"signature: structured response did not parse as a JSON object"}
 	}
+
 	var warnings []string
 	for _, f := range outputs {
 		if v, ok := parsed[f.Identifier]; ok {
@@ -612,6 +619,32 @@ func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]an
 		}
 	}
 	return out, warnings
+}
+
+// recoverJSONObject parses an LLM completion into a JSON object, tolerating
+// the markdown ```json fence and surrounding prose that models (notably
+// Anthropic/Claude) emit even when a JSON response_format is requested.
+// Mirrors DSPy's JSONAdapter.parse, which strips the fence and extracts the
+// first balanced object before parsing. Tries, in order: the raw content,
+// the fence-stripped content, then the first balanced {...} object. Without
+// this, a fenced ```json{...}``` completion fails to parse and the whole
+// blob is dumped into the first output field instead of being split across
+// the declared fields.
+func recoverJSONObject(content string) (map[string]any, bool) {
+	candidates := []string{content}
+	if stripped := stripJSONFence(content); stripped != content {
+		candidates = append(candidates, stripped)
+	}
+	if obj, ok := extractFirstJSONObject(content); ok {
+		candidates = append(candidates, obj)
+	}
+	for _, c := range candidates {
+		var parsed map[string]any
+		if err := jsonUnmarshalRaw([]byte(c), &parsed); err == nil && parsed != nil {
+			return parsed, true
+		}
+	}
+	return nil, false
 }
 
 // runEvaluator dispatches an evaluator node to the LangWatch evaluator

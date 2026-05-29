@@ -162,6 +162,100 @@ func TestExtractSignatureOutputs_MissingFieldWarns(t *testing.T) {
 	assert.Contains(t, warnings[0], `"b"`)
 }
 
+// TestExtractSignatureOutputs_StripsMarkdownFence is the regression for the
+// nlpgo structured-output bug (Skai "Tool Selection Evaluator", rchaves
+// dogfood 2026-05-29): Anthropic/Claude wraps the JSON object in a ```json
+// markdown fence even when a response_format is requested, so a bare
+// json.Unmarshal choked and the engine dumped the WHOLE fenced blob into the
+// first declared field — leaving passed/details unset. Downstream nodes bound
+// to a specific field then received the raw blob. This executes the actual
+// extract path and asserts the fields split correctly.
+func TestExtractSignatureOutputs_StripsMarkdownFence(t *testing.T) {
+	outputs := []dsl.Field{
+		{Identifier: "passed", Type: dsl.FieldTypeBool},
+		{Identifier: "details", Type: dsl.FieldTypeStr},
+		{Identifier: "reasoning", Type: dsl.FieldTypeStr},
+	}
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{
+			"```json fence",
+			"```json\n{\"passed\": true, \"details\": \"CHECK 1: PASS\", \"reasoning\": \"no tools needed\"}\n```",
+		},
+		{
+			"bare ``` fence",
+			"```\n{\"passed\": true, \"details\": \"CHECK 1: PASS\", \"reasoning\": \"no tools needed\"}\n```",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, warnings := extractSignatureOutputs(tc.content, outputs)
+			assert.Empty(t, warnings, "fenced JSON must parse cleanly across declared fields")
+			assert.Equal(t, true, got["passed"], "bool field must split out as a real bool, not be lost in a raw blob")
+			assert.Equal(t, "CHECK 1: PASS", got["details"])
+			assert.Equal(t, "no tools needed", got["reasoning"],
+				"the field a downstream node binds to must hold its own value, not the whole blob")
+		})
+	}
+}
+
+// TestExtractSignatureOutputs_RecoversProseWrappedJSON covers a model that
+// surrounds the object with prose (no fence) — the balanced-object fallback
+// recovers the first {...} so the fields still split.
+func TestExtractSignatureOutputs_RecoversProseWrappedJSON(t *testing.T) {
+	outputs := []dsl.Field{{Identifier: "label", Type: dsl.FieldTypeStr}}
+	got, warnings := extractSignatureOutputs(`Sure! Here is the result: {"label":"weather"} — hope that helps.`, outputs)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "weather", got["label"])
+}
+
+func TestStripJSONFence(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"no fence passthrough", `{"a":1}`, `{"a":1}`},
+		{"json tag", "```json\n{\"a\":1}\n```", `{"a":1}`},
+		{"uppercase tag", "```JSON\n{\"a\":1}\n```", `{"a":1}`},
+		{"bare fence", "```\n{\"a\":1}\n```", `{"a":1}`},
+		{"leading whitespace", "  ```json\n{\"a\":1}\n```  ", `{"a":1}`},
+		{"no closing fence", "```json\n{\"a\":1}", `{"a":1}`},
+		{"plain text untouched", "just text", "just text"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, stripJSONFence(tc.in))
+		})
+	}
+}
+
+func TestExtractFirstJSONObject(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		want   string
+		wantOK bool
+	}{
+		{"plain object", `{"a":1}`, `{"a":1}`, true},
+		{"object with prose around", `prefix {"a":1} suffix`, `{"a":1}`, true},
+		{"brace inside string ignored", `{"a":"}"}`, `{"a":"}"}`, true},
+		{"escaped quote inside string", `{"a":"x\"}y"}`, `{"a":"x\"}y"}`, true},
+		{"nested object", `{"a":{"b":2}}`, `{"a":{"b":2}}`, true},
+		{"no object", `just text, no braces`, "", false},
+		{"unbalanced", `{"a":1`, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := extractFirstJSONObject(tc.in)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestJSONSchemaForField_ScalarMappings(t *testing.T) {
 	cases := []struct {
 		ft   dsl.FieldType
