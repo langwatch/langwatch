@@ -210,7 +210,9 @@ export function ScopeChipPicker({
    *  (scopeType, scopeId) resources like model costs / budgets). Renders the
    *  org/team/project quick-pick chips as a single-select, drops the
    *  "Multiple" chip and the multi-select dropdown entirely. `value` is still
-   *  an array but holds at most one entry. */
+   *  an array; the component collapses it to its first entry and never emits
+   *  more than one, so the single-scope contract holds even if a caller passes
+   *  a longer array. */
   singleSelect?: boolean;
   /** When true, render the Organization/Team/Project quick-pick chip
    *  row above the field and collapse the multi-select dropdown by
@@ -282,9 +284,14 @@ export function ScopeChipPicker({
     [options],
   );
 
+  // In single-scope mode the picker represents exactly one scope, so the
+  // value it operates on is collapsed to the first entry. In multi-scope mode
+  // this is identical to `value`, so nothing downstream changes.
+  const scopes = singleSelect ? value.slice(0, 1) : value;
+
   const selectedValues = useMemo(
-    () => value.map((s) => `${s.scopeType}:${s.scopeId}`),
-    [value],
+    () => scopes.map((s) => `${s.scopeType}:${s.scopeId}`),
+    [scopes],
   );
 
   // Quick-pick row + collapsible-multi mode. See `showQuickPicks` prop.
@@ -323,15 +330,15 @@ export function ScopeChipPicker({
   }, [currentOrganizationId, currentTeamId, currentProjectId]);
 
   const matchingQuickPick = useMemo(() => {
-    if (value.length !== 1) return null;
-    const s = value[0]!;
+    if (scopes.length !== 1) return null;
+    const s = scopes[0]!;
     return (
       quickPicks.find(
         (qp) =>
           qp.scope.scopeType === s.scopeType && qp.scope.scopeId === s.scopeId,
       ) ?? null
     );
-  }, [value, quickPicks]);
+  }, [scopes, quickPicks]);
 
   // `multipleMode` is local UI state: when true the dropdown is
   // visible and the "Multiple" chip is highlighted. Derived from the
@@ -412,7 +419,7 @@ export function ScopeChipPicker({
             .filter((o) => picked.has(o.value))
             .map((o) => ({ scopeType: o.scopeType, scopeId: o.scopeId }));
           onChange(
-            collapseRedundantScopes(next, value, {
+            collapseRedundantScopes(next, scopes, {
               organizationId,
               availableProjects:
                 availableProjects && availableProjects.length > 0
@@ -427,14 +434,14 @@ export function ScopeChipPicker({
         <Select.Trigger>
           <Select.ValueText placeholder="Pick one or more scopes">
             {() => {
-              if (value.length === 0) return "Pick one or more scopes";
+              if (scopes.length === 0) return "Pick one or more scopes";
               // Hydrate the chips with names looked up from the picker's
               // `options` so each chip reads "LangWatch" / "Acme Team" /
               // "web-app" instead of bare "Organization" / "Team" /
               // "Project". Without this, multiple teams render as
               // identical "Team", "Team" pills — the bug rchaves caught
               // in the model-provider drawer screenshot.
-              const named = value.map((v) => {
+              const named = scopes.map((v) => {
                 const match = options.find(
                   (o) =>
                     o.scopeType === v.scopeType && o.scopeId === v.scopeId,
@@ -498,7 +505,7 @@ export function ScopeChipPicker({
       {showSummary && (
         <Box>
           <Text fontSize="xs" color="gray.600">
-            {summariseSelection(value)}
+            {summariseSelection(scopes)}
           </Text>
         </Box>
       )}

@@ -2,7 +2,7 @@ import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@p
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
-import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
+import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
 
@@ -187,18 +187,16 @@ export class ModelProviderRepository {
         ? data.scopes
         : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
 
-    // Single-organization anchor (ADR-021): every scope resolves to the same
-    // org, so the page-context project's org is authoritative. The column is
-    // NOT NULL, so a project that can't resolve an org is a hard error.
-    const organizationId = await resolveOrganizationForScope(client, {
-      scopeType: "PROJECT",
-      scopeId: data.projectId,
-    });
-    if (!organizationId) {
-      throw new Error(
-        `Cannot create model provider: project ${data.projectId} does not resolve to an organization`,
-      );
-    }
+    // Single-organization anchor (ADR-021): every scope this provider attaches
+    // to must resolve to the same org. Resolve them all and reject a mixed or
+    // unresolvable set, so a caller can't slip in scopes from another org under
+    // one anchor. The column is NOT NULL, so an unresolvable scope is a hard
+    // error.
+    const organizationId = await resolveSingleOrganizationForScopes(
+      client,
+      scopes,
+      "model provider",
+    );
 
     return client.modelProvider.create({
       data: {

@@ -1,7 +1,7 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
-import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
 import { llmModels } from "./loadModelCatalog";
+import { ModelDefaultsRepository } from "./modelDefaults.repository";
 
 interface RegistryEntry {
   id: string;
@@ -132,27 +132,13 @@ export async function seedOnboardingDefaultsForProvider(params: {
   });
   if (existing) return;
 
-  // Single-organization anchor (ADR-021): resolve the org the seeded scope
-  // belongs to so the row is tenancy-anchored from creation. The column is
-  // NOT NULL, so an unresolvable scope is a hard error.
-  const organizationId = await resolveOrganizationForScope(prisma, {
-    scopeType,
-    scopeId,
-  });
-  if (!organizationId) {
-    throw new Error(
-      `Cannot seed onboarding defaults: scope ${scopeType}:${scopeId} does not resolve to an organization`,
-    );
-  }
-
-  await prisma.modelDefaultConfig.create({
-    data: {
-      config,
-      authorId: authorId ?? null,
-      organizationId,
-      scopes: {
-        create: [{ scopeType, scopeId }],
-      },
-    },
+  // Persist through the repository so the org anchor resolution + single-org
+  // invariant (ADR-021) live in one place. It mints the KSUIDs, resolves the
+  // org for the seeded scope, and hard-fails an unresolvable scope (the column
+  // is NOT NULL).
+  await new ModelDefaultsRepository(prisma).create({
+    config,
+    authorId: authorId ?? null,
+    scopes: [{ scopeType, scopeId }],
   });
 }

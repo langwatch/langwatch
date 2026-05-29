@@ -34,3 +34,33 @@ export async function resolveOrganizationForScope(
   });
   return project?.team.organizationId ?? null;
 }
+
+/**
+ * Resolve the single organization a set of scope targets all belong to, for
+ * resources anchored to one org (ADR-021). Every scope must resolve, and they
+ * must all resolve to the same organization; otherwise we'd persist scope rows
+ * that disagree with the row's organizationId anchor. Throws on an empty,
+ * unresolvable, or cross-organization set. `resourceLabel` is woven into the
+ * error message (e.g. "model provider").
+ */
+export async function resolveSingleOrganizationForScopes(
+  client: Client,
+  scopes: { scopeType: string; scopeId: string }[],
+  resourceLabel: string,
+): Promise<string> {
+  if (scopes.length === 0) {
+    throw new Error(
+      `Cannot create ${resourceLabel}: at least one scope is required to resolve an organization`,
+    );
+  }
+  const resolved = await Promise.all(
+    scopes.map((scope) => resolveOrganizationForScope(client, scope)),
+  );
+  const organizationId = resolved[0];
+  if (!organizationId || resolved.some((orgId) => orgId !== organizationId)) {
+    throw new Error(
+      `Cannot create ${resourceLabel}: all scopes must resolve to the same organization`,
+    );
+  }
+  return organizationId;
+}

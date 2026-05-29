@@ -530,6 +530,40 @@ describe("ModelProviderRepository", () => {
         expect(createCall.data.customKeys).toBeUndefined();
       });
     });
+
+    describe("when scopes resolve to different organizations", () => {
+      it("rejects the create instead of persisting cross-org scope rows", async () => {
+        await expect(
+          repository.create({
+            projectId: "proj_test",
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+            scopes: [
+              { scopeType: "ORGANIZATION", scopeId: "org_a" },
+              { scopeType: "ORGANIZATION", scopeId: "org_b" },
+            ],
+          }),
+        ).rejects.toThrow(/same organization/);
+        expect(prisma.modelProvider.create as any).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a scope does not resolve to an organization", () => {
+      it("rejects the create", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(null);
+
+        await expect(
+          repository.create({
+            projectId: "proj_orphan",
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+          }),
+        ).rejects.toThrow(/organization/);
+        expect(prisma.modelProvider.create as any).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("update()", () => {
