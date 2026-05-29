@@ -28,57 +28,43 @@ Feature: Work-conserving max-min fair dispatch
   # starvation-triggered, which is strictly stronger than a blanket cap because
   # it never penalises a tenant that is not starving anyone.
   #
-  # How fairness is produced (no allocation is ever computed):
-  #   When a slot frees, the waiting tenant with the FEWEST in-flight groups
-  #   wins it. Repeating that greedy choice converges to max-min fair share by
-  #   construction. One tenant alone is always the least-loaded, so it takes
-  #   every idle slot (a burst is processed in full). Two tenants both wanting
-  #   more than half ping-pong and converge to half each. A small tenant gets
-  #   its full (small) demand and the big tenants split the rest. The split is
-  #   emergent, not configured: there is no 80/20, no per-tenant cap number.
+  # How fairness is produced (a single scalar cap, recomputed off the hot path):
+  #   A water-level W is recomputed on the existing 2s reconcile pass and stored
+  #   as one scalar. The unchanged scan-and-park dispatch gate admits a tenant
+  #   until its in-flight count reaches W, then parks its excess. W water-fills a
+  #   global budget G (the fleet ceiling = pods x concurrency) across the tenants
+  #   that currently have demand: a lone tenant gets W=G and bursts to the whole
+  #   fleet; two equal tenants converge to G/2 each; a small tenant takes its
+  #   full demand and the big tenants split the rest. The split is emergent from
+  #   the fill, not a configured 80/20 and not a per-tenant allocation.
   #
   # Implementation invariants (learned from the 2026-05-27/28 incidents):
-  #   - Selection reads a SOFT per-tenant load summary (member = tenantId,
-  #     score = in-flight count) for a cheap O(log n) argmin over waiting
-  #     tenants. The summary is ADVISORY: it orders selection only. It is
-  #     reconciled from the authoritative tenant_active_z ZSET
-  #     (ZREMRANGEBYSCORE -inf now to GC lapsed slots, then ZCARD) on the
-  #     periodic GC pass. Drift in the summary mis-orders one selection window
-  #     and self-heals on the next reconcile; it can NEVER stall dispatch or
-  #     over-admit, because the free-slot check, the operator clamp, and the
-  #     reconcile all read tenant_active_z truth, never the hint. (Contrast the
-  #     2026-05 soft-cap leak: there a derived counter was a HARD GATE, so drift
-  #     meant park-storm and stall. A counter that is lethal as a gate is
-  #     harmless as an ordering hint.)
-  #   - The reconcile runs on ONE pod per interval via a staleness marker (a pod
-  #     reconciles only if the last-reconcile marker is older than the
-  #     interval), not on all M pods every pass: ~1x not Mx work on the
-  #     single-thread Redis, no leader election, and any pod takes over the
-  #     instant the marker goes stale.
-  #   - Selecting the winning tenant and dispatching its next group is ONE
-  #     server-side script round-trip (GC candidates, pick least-in-flight, pop
-  #     that tenant's ready group, record the slot), never an N+1 of per-tenant
-  #     reads.
-  #   - Mapping a chosen tenant to its next ready group is one of two
-  #     behaviourally-equivalent implementations, chosen by measured skip-depth
-  #     and group-hold-time, NOT fixed by this contract: (A) an additive
-  #     per-tenant ready index (O(log n) pop of the tenant's head group) or
-  #     (B) scan-and-skip on the single ready zset (pop the global head, admit
-  #     if its tenant is the fair winner else skip). Either way the legacy
-  #     single-ready keeps being drained continuously-until-empty during the
-  #     mixed-fleet rollout (see the upgrade rule), so no group an old pod
-  #     enqueues is stranded.
-  #   - The reserve is TEMPORAL, not SPATIAL. No slots are ever held empty for a
-  #     tenant that has not arrived. A newcomer has zero in-flight, so it is
-  #     instantly the least-loaded and wins the next freed slots. Newcomer
-  #     latency therefore equals one group-hold-time (slots free only by natural
-  #     drain, since dispatch gates rather than preempts). A bounded reserved
-  #     floor is added ONLY for the long-hold (evaluation) class, and ONLY if
-  #     measured p95 hold-time shows temporal reserve alone starves newcomers.
-  #   - Fail PROTECTIVE: any safety fallback (operator clamp default, summary
-  #     unavailable) resolves to the low/protective side, never the permissive
-  #     side. Stale-permissive would reopen the monopoly we are deleting;
-  #     stale-protective is merely slower but stays safe and fair.
+  #   - No new dispatch structure: reuses the existing scan-and-park gate
+  #     (DISPATCH_LUA / DISPATCH_BATCH_LUA), so there is NO mixed-fleet ready
+  #     migration. Only the scalar cap changes from a constant to W. Old pods on
+  #     the static cap and new pods on W co-exist on the same ready zset.
+  #   - W is recomputed on the 2s-gated, single-pod reconcile pass (the
+  #     reconcile-ts marker), never per-dispatch. It reads demand_i = in-flight
+  #     (tenant_active_z, GC-d) + parked for each tenant in a demand-recency ZSET
+  #     (demanding-tenants), avoiding any keyspace SCAN. There is NO per-tenant
+  #     load summary and NO argmin — the gate admits in priority order, it does
+  #     not select a tenant.
+  #   - demanding-tenants is ENQUEUE-populated (recency score = last enqueue), so
+  #     a newcomer whose burst is still entirely in ready is counted as a
+  #     presence claimant pulling a full share W; without that it would read zero
+  #     demand, pin W at the budget, and starve behind a higher-priority
+  #     incumbent. Enqueue-only freshness ages a bursted-then-idle tenant out of
+  #     the claimant window so it cannot linger as a phantom claim.
+  #   - The reserve is TEMPORAL, not SPATIAL: no slot is held empty for a tenant
+  #     that has not arrived (W=G when alone). A work-conserving override fills an
+  #     otherwise-idle slot from the LEAST-SERVED parked tenant, exceeding W (never
+  #     G — bounded by the pod's free slots) so fairness binds only under real
+  #     contention. The override's candidate set is the parked tenants only, so a
+  #     work-less phantom claim never wins a slot.
+  #   - Fail PROTECTIVE: the dynamic-cap key carries a TTL; a stalled recompute
+  #     lapses back to the static operator cap (the low side), never permissive.
+  #     The whole feature is gated behind LANGWATCH_DISPATCH_GLOBAL_BUDGET (0 =
+  #     off, the default), so it ships inert and back-compatible.
   #   - Total queue depth = sum of per-tenant pending (ready + parked +
   #     in-flight), exposed as one shared helper: the dispatcher reads it for
   #     fairness, the queue-depth autoscaler (ADR-021) reads the same primitive

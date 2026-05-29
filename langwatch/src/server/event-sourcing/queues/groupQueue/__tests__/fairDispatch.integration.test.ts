@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Redis } from "ioredis";
 import {
   startTestContainers,
@@ -107,15 +107,32 @@ beforeAll(async () => {
   redis = getTestRedisConnection()!;
 });
 
+const FLEET = 20;
+
 beforeEach(async () => {
   await redis.flushall();
   scripts = new GroupStagingScripts(redis, QUEUE_NAME);
   inflight = [];
+  // Enable the dynamic water-level cap with the global budget = fleet size, so a
+  // lone tenant gets W=G=20 and two contenders converge to G/2=10. readGlobalBudget
+  // reads process.env per dispatch, so setting it here takes effect immediately.
+  process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = String(FLEET);
+});
+
+afterEach(() => {
+  delete process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
 });
 
 afterAll(async () => {
   await stopTestContainers();
 });
+
+// The water level is recomputed on the 2s-gated reconcile pass; the first
+// dispatch always recomputes (last-reconcile = 0). When a second tenant arrives
+// mid-test we must wait past that gate so the next dispatch recomputes W with
+// both tenants present. One real clock throughout (stage/complete use Date.now()).
+const RECONCILE_GATE_MS = 2100;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("work-conserving fair dispatch", () => {
   describe("Rule: idle capacity is always used (work-conserving)", () => {
@@ -130,7 +147,7 @@ describe("work-conserving fair dispatch", () => {
     });
 
     describe("when one tenant under-demands and another wants more (max-min)", () => {
-      it.skip("gives the small tenant all its demand and the rest to the big one", async () => {
+      it("gives the small tenant all its demand and the rest to the big one", async () => {
         await stageForTenant("small", 3);
         await stageForTenant("big", 50);
 
@@ -158,7 +175,7 @@ describe("work-conserving fair dispatch", () => {
       // is still inside claimantWindow. Wire the exact clock advance
       // (recomputeInterval < delta < claimantWindow, via the dispatch nowMs)
       // once those constants are fixed in the EVALSHA.
-      it.skip("does not let the idle tenant's stale claim cap the busy one", async () => {
+      it("does not let the idle tenant's stale claim cap the busy one", async () => {
         // burster bursts and fully drains: no active, no parked, but still fresh
         await stageForTenant("burster", 10);
         await fillToFleet(10);
@@ -167,6 +184,10 @@ describe("work-conserving fair dispatch", () => {
 
         // busy is now the only tenant with real ready work
         await stageForTenant("busy", 50);
+        // wait past the reconcile gate so the next dispatch recomputes W with
+        // both tenants present while burster is still inside the claimant window
+        // - this is when the phantom claim would bite if the override were missing
+        await sleep(RECONCILE_GATE_MS);
         for (let round = 0; round < 6; round++) {
           await completeSome(5, "busy");
           await fillToFleet(20);
@@ -182,7 +203,7 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: fairness engages only under contention", () => {
     describe("when two equally-demanding tenants saturate the fleet", () => {
-      it.skip("splits the slots about evenly", async () => {
+      it("splits the slots about evenly", async () => {
         await stageForTenant("tenantA", 50);
         await stageForTenant("tenantB", 50);
 
@@ -197,7 +218,7 @@ describe("work-conserving fair dispatch", () => {
     });
 
     describe("when a runaway tenant and a small tenant compete", () => {
-      it.skip("serves the small tenant promptly and holds the runaway to its fair share", async () => {
+      it("serves the small tenant promptly and holds the runaway to its fair share", async () => {
         await stageForTenant("runaway", 100);
         await stageForTenant("small", 2);
 
@@ -214,7 +235,7 @@ describe("work-conserving fair dispatch", () => {
 
   describe("Rule: a newcomer is served as capacity frees, without holding slots idle", () => {
     describe("when a newcomer arrives after an incumbent has saturated the fleet", () => {
-      it.skip("serves the newcomer up to its fair share over sustained operation, having held no slot in reserve", async () => {
+      it("serves the newcomer up to its fair share over sustained operation, having held no slot in reserve", async () => {
         // Work-conserving when alone: the lone incumbent uses every slot. No
         // capacity was held empty in reserve for a tenant that had not arrived.
         await stageForTenant("incumbent", 100);
@@ -223,6 +244,9 @@ describe("work-conserving fair dispatch", () => {
 
         // Newcomer arrives into a saturated fleet.
         await stageForTenant("newcomer", 100);
+        // wait past the reconcile gate so W recomputes with the newcomer present
+        // (and still fresh) before the refill rounds
+        await sleep(RECONCILE_GATE_MS);
 
         // Sustained operation: slots free by natural drain and are refilled,
         // round after round. The model-agnostic guarantee is that the newcomer
@@ -304,10 +328,52 @@ describe("work-conserving fair dispatch", () => {
     it.todo("leaves other tenants unaffected by one tenant's ceiling");
   });
 
-  // Mixed-fleet rollout: old pods write legacy single-ready while new pods read
-  // the dynamic cap. Exercise once both code paths are co-resident.
+  // Mixed-fleet rollout: an old pod (feature off, static-cap path) and a new pod
+  // (feature on, dynamic-cap path) co-exist on the SAME ready zset - there is no
+  // separate structure to migrate. Modelled by toggling the budget env between
+  // the enqueue (old pod) and the dispatch (new pod).
   describe("Rule: upgrading the dispatch path loses no in-flight work", () => {
-    it.todo("dispatches every group queued before the upgrade");
-    it.todo("keeps draining legacy-ready continuously-until-empty during the rollout");
+    it("dispatches every group queued before the upgrade", async () => {
+      // old pod, feature off: groups land on the shared ready zset (and are NOT
+      // added to demanding-tenants)
+      delete process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
+      await stageForTenant("pre", 12);
+
+      // upgrade: feature on. The pre-upgrade groups are dispatched by the new
+      // path with nothing stranded (an empty demanding-tenants water-fills to
+      // W=G, so they are not starved by a zero-demand reading).
+      process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = String(FLEET);
+      await fillToFleet(FLEET);
+
+      expect((await inFlightByTenant()).pre).toBe(12);
+    });
+
+    it("keeps draining legacy-ready continuously-until-empty during the rollout", async () => {
+      let staged = 0;
+      let dispatched = 0;
+      for (let wave = 0; wave < 3; wave++) {
+        // old pod keeps adding to legacy-ready mid-rollout
+        delete process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
+        await stageForTenant("rollout", 5);
+        staged += 5;
+        // new pod drains a few each pass
+        process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET = String(FLEET);
+        for (let i = 0; i < 3; i++) {
+          const r = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+          if (!r) break;
+          dispatched++;
+          await scripts.complete({ groupId: r.groupId, stagedJobId: r.stagedJobId });
+        }
+      }
+      // new dispatcher keeps draining until legacy-ready is empty
+      for (;;) {
+        const r = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: ACTIVE_TTL_SEC });
+        if (!r) break;
+        dispatched++;
+        await scripts.complete({ groupId: r.groupId, stagedJobId: r.stagedJobId });
+      }
+      // every group an old pod added mid-rollout was dispatched - none stranded
+      expect(dispatched).toBe(staged);
+    });
   });
 });
