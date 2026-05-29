@@ -141,6 +141,43 @@ describe("work-conserving fair dispatch", () => {
         expect(inFlight.big).toBe(17);
       });
     });
+
+    describe("when a tenant bursts then goes idle while another stays busy", () => {
+      // Pins the work-conserving override against the "phantom claimant" hazard
+      // of the recency-based demand signal: a tenant that bursts then drains is
+      // still "fresh" in the demand window with active+parked=0, so it reads as
+      // a presence-claimant and pulls a fair share even though it has no real
+      // ready work. If the dynamic cap honoured that stale claim it would cap
+      // the genuinely-busy tenant and idle the freed slots - reintroducing the
+      // idle-behind-cap waste this whole feature removes. The contract: the cap
+      // binds only under real contention; a slot that would otherwise idle is
+      // filled past the fair cap rather than left empty.
+      //
+      // it.skip until the dynamic cap lands: this is timing-coupled - it only
+      // exercises the phantom if a water-level recompute fires while the burster
+      // is still inside claimantWindow. Wire the exact clock advance
+      // (recomputeInterval < delta < claimantWindow, via the dispatch nowMs)
+      // once those constants are fixed in the EVALSHA.
+      it.skip("does not let the idle tenant's stale claim cap the busy one", async () => {
+        // burster bursts and fully drains: no active, no parked, but still fresh
+        await stageForTenant("burster", 10);
+        await fillToFleet(10);
+        await completeSome(10, "burster");
+        expect((await inFlightByTenant()).burster ?? 0).toBe(0);
+
+        // busy is now the only tenant with real ready work
+        await stageForTenant("busy", 50);
+        for (let round = 0; round < 6; round++) {
+          await completeSome(5, "busy");
+          await fillToFleet(20);
+        }
+
+        const inFlight = await inFlightByTenant();
+        // busy uses the whole fleet; the burster's stale claim reserves nothing
+        expect(inFlight.busy).toBe(20);
+        expect(inFlight.burster ?? 0).toBe(0);
+      });
+    });
   });
 
   describe("Rule: fairness engages only under contention", () => {
