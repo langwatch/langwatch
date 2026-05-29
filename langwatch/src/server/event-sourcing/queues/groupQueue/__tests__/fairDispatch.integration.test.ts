@@ -325,6 +325,14 @@ describe("work-conserving fair dispatch", () => {
     it.todo("leaves other tenants unaffected by one tenant's ceiling");
   });
 
+  // Fail-protective: when the dynamic-cap value lapses (stalled recompute), the
+  // gate falls back to the static operator cap until the next reconcile rebuilds
+  // the water level from in-flight + parked truth.
+  describe("Rule: a stale dynamic cap fails safe and is rebuilt from truth", () => {
+    it.todo("falls back to the static operator cap when the dynamic-cap value has lapsed");
+    it.todo("rebuilds the water level from authoritative counts on the next reconcile");
+  });
+
   // Mixed-fleet rollout: an old pod (feature off, static-cap path) and a new pod
   // (feature on, dynamic-cap path) co-exist on the SAME ready zset - there is no
   // separate structure to migrate. Modelled by toggling the budget env between

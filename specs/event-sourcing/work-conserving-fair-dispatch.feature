@@ -47,7 +47,7 @@ Feature: Work-conserving max-min fair dispatch
   #     reconcile-ts marker), never per-dispatch. It reads demand_i = in-flight
   #     (tenant_active_z, GC-d) + parked for each tenant in a demand-recency ZSET
   #     (demanding-tenants), avoiding any keyspace SCAN. There is NO per-tenant
-  #     load summary and NO argmin — the gate admits in priority order, it does
+  #     load summary and NO argmin: the gate admits in priority order, it does
   #     not select a tenant.
   #   - demanding-tenants is ENQUEUE-populated (recency score = last enqueue), so
   #     a newcomer whose burst is still entirely in ready is counted as a
@@ -58,17 +58,19 @@ Feature: Work-conserving max-min fair dispatch
   #   - The reserve is TEMPORAL, not SPATIAL: no slot is held empty for a tenant
   #     that has not arrived (W=G when alone). A work-conserving override fills an
   #     otherwise-idle slot from the LEAST-SERVED parked tenant, exceeding W (never
-  #     G — bounded by the pod's free slots) so fairness binds only under real
+  #     G, bounded by the pod's free slots) so fairness binds only under real
   #     contention. The override's candidate set is the parked tenants only, so a
   #     work-less phantom claim never wins a slot.
   #   - Fail PROTECTIVE: the dynamic-cap key carries a TTL; a stalled recompute
   #     lapses back to the static operator cap (the low side), never permissive.
   #     The whole feature is gated behind LANGWATCH_DISPATCH_GLOBAL_BUDGET (0 =
   #     off, the default), so it ships inert and back-compatible.
-  #   - Total queue depth = sum of per-tenant pending (ready + parked +
-  #     in-flight), exposed as one shared helper: the dispatcher reads it for
-  #     fairness, the queue-depth autoscaler (ADR-021) reads the same primitive
-  #     for capacity.
+  #   - Two distinct reads, do not conflate them: the dispatcher's fairness
+  #     demand_i is in-flight + parked per tenant (from tenant_active_z and the
+  #     parked set); a ready-only newcomer enters the fill via fresh presence in
+  #     demanding-tenants, never via a ready count, so the gate never reads ready
+  #     for fairness. The queue-depth autoscaler (ADR-021) reads a separate
+  #     primitive: the full pending depth ready + parked + in-flight.
 
   Background:
     Given the GroupQueue is dispatching across a shared worker fleet
@@ -145,20 +147,20 @@ Feature: Work-conserving max-min fair dispatch
       Then its groups are taken in priority order
       And fairness only reorders dispatch across tenants, never within one
 
-  Rule: A tenant leaves and rejoins the rotation cleanly
+  Rule: A tenant leaves and rejoins contention cleanly
 
-    Scenario: A tenant drops out of dispatch the moment its work is exhausted
+    Scenario: A tenant stops competing the moment its work is exhausted
       Given two tenants competing under saturation
       When one tenant's waiting work is fully dispatched
-      Then it no longer takes a turn in the rotation
-      And the remaining tenant receives the freed capacity
-      And a tenant whose work is abandoned by a crash is swept from the rotation
+      Then it ages out of the demand set and stops pulling a fair share
+      And the remaining tenant expands into the freed capacity
+      And a tenant whose in-flight work is abandoned by a crash lapses out of the in-flight truth
 
-    Scenario: A drifted load summary self-heals and never stalls dispatch
-      Given the soft load summary disagrees with the authoritative in-flight truth
-      When the periodic reconcile runs
-      Then the summary is corrected from the authoritative counts
-      And dispatch never stalled or over-admitted while the summary was wrong
+    Scenario: A stale dynamic cap fails safe and is rebuilt from truth
+      Given the dynamic-cap value has lapsed after a stalled recompute
+      When dispatch runs before the next reconcile
+      Then it falls back to the static operator cap, never a permissive value
+      And the next reconcile rebuilds the water level from the authoritative in-flight and parked counts
 
   # Escape hatch only. The fair model should never need a hard ceiling, but ops
   # keeps a manual clamp for a pathological tenant. Off by default, and when the
