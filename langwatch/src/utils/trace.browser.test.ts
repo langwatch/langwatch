@@ -11,10 +11,12 @@ import { generateOtelSpanId, generateOtelTraceId } from "./trace";
 describe("trace id generation in real Chromium", () => {
   it("generates a valid OTel trace id", () => {
     expect(generateOtelTraceId()).toMatch(/^[0-9a-f]{32}$/);
+    expect(generateOtelTraceId()).not.toBe("0".repeat(32));
   });
 
   it("generates a valid OTel span id", () => {
     expect(generateOtelSpanId()).toMatch(/^[0-9a-f]{16}$/);
+    expect(generateOtelSpanId()).not.toBe("0".repeat(16));
   });
 
   it("does not reuse ids across calls", () => {
