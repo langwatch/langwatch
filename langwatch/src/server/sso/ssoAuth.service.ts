@@ -134,6 +134,22 @@ export class SsoAuthService {
     return { sessionToken, expiresAt };
   }
 
+  async isSoleAdminByEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const user = await this.repository.findUserByEmail({ email });
+    if (!user) return false;
+
+    return this.repository.isSoleAdmin({
+      userId: user.id,
+      organizationId,
+    });
+  }
+
   private async applyRoleMapping({
     userId,
     organizationId,

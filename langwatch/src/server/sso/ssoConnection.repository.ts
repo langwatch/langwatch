@@ -42,6 +42,17 @@ export class SsoConnectionRepository {
     });
   }
 
+  async findEnforcedByDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ organizationId: string } | null> {
+    return this.prisma.ssoConnection.findFirst({
+      where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
+      select: { organizationId: true },
+    });
+  }
+
   async findAllByOrganization({
     organizationId,
   }: {

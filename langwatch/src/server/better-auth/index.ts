@@ -554,10 +554,7 @@ export const auth = betterAuth({
                   select: { id: true, ssoProvider: true },
                 }),
               findEnforcedSsoConnection: (domain) =>
-                prisma.ssoConnection.findFirst({
-                  where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
-                  select: { organizationId: true },
-                }),
+                getApp().ssoConnection.getEnforcedConnectionByDomain({ domain }),
               getActivePlanType: async (organizationId) => {
                 try {
                   const plan = await getApp().planProvider.getActivePlan({ organizationId });
@@ -566,24 +563,8 @@ export const auth = betterAuth({
                   return null;
                 }
               },
-              findUserByEmail: (email) =>
-                prisma.user.findFirst({
-                  where: { email },
-                  select: { id: true },
-                }),
-              countActiveAdmins: (organizationId) =>
-                prisma.organizationUser.count({
-                  where: {
-                    organizationId,
-                    role: "ADMIN",
-                    user: { deactivatedAt: null },
-                  },
-                }),
-              findUserAdmin: ({ userId, organizationId }) =>
-                prisma.organizationUser.findFirst({
-                  where: { organizationId, userId, role: "ADMIN" },
-                  select: { userId: true },
-                }),
+              isSoleAdmin: ({ email, organizationId }) =>
+                getApp().ssoAuth.isSoleAdminByEmail({ email, organizationId }),
             },
           });
         } catch (e) {
@@ -600,10 +581,7 @@ export const auth = betterAuth({
           if (newEmail && typeof newEmail === "string") {
             const newDomain = extractEmailDomain(newEmail);
             if (newDomain) {
-              const enforced = await prisma.ssoConnection.findFirst({
-                where: { domain: newDomain, ssoEnforced: true, verifiedAt: { not: null } },
-                select: { id: true },
-              });
+              const enforced = await getApp().ssoConnection.getEnforcedConnectionByDomain({ domain: newDomain });
               if (enforced) {
                 throw APIError.from("BAD_REQUEST", {
                   code: "SSO_EMAIL_CHANGE_BLOCKED",

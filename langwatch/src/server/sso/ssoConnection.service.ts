@@ -25,6 +25,14 @@ export class SsoConnectionService {
     return this.repository.findVerifiedByDomain({ domain });
   }
 
+  async getEnforcedConnectionByDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ organizationId: string } | null> {
+    return this.repository.findEnforcedByDomain({ domain });
+  }
+
   async listConnections({
     organizationId,
   }: {

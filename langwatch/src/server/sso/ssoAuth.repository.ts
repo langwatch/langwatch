@@ -107,6 +107,31 @@ export class SsoAuthRepository {
     });
   }
 
+  async isSoleAdmin({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const activeAdminCount = await this.prisma.organizationUser.count({
+      where: {
+        organizationId,
+        role: "ADMIN",
+        user: { deactivatedAt: null },
+      },
+    });
+
+    if (activeAdminCount !== 1) return false;
+
+    const userIsAdmin = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, userId, role: "ADMIN" },
+      select: { userId: true },
+    });
+
+    return !!userIsAdmin;
+  }
+
   async updateMembershipRole({
     userId,
     organizationId,
