@@ -7,7 +7,7 @@
  *
  * Pins:
  *   1. PRINCIPAL kind round-trips through GatewayBudgetService.create
- *      and persists with `scopeType=PRINCIPAL`, `principalUserId` set.
+ *      and persists with `scopeType=PRINCIPAL` and the user as `scopeId`.
  *   2. Cross-org guard rejects principalUserId from outside the org.
  *   3. With ALL 5 scopes (org+team+project+VK+principal) configured,
  *      the cascade BLOCKs when only the PRINCIPAL is over-limit.
@@ -119,7 +119,7 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
   });
 
   describe("create with PRINCIPAL kind", () => {
-    it("persists scopeType=PRINCIPAL with the named user as scopeId + principalUserId", async () => {
+    it("persists scopeType=PRINCIPAL with the named user as scopeId", async () => {
       const created = await service.create({
         organizationId: ORG_ID,
         scope: { kind: "PRINCIPAL", principalUserId: ALICE_ID },
@@ -132,11 +132,6 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
 
       expect(created.scopeType).toBe("PRINCIPAL");
       expect(created.scopeId).toBe(ALICE_ID);
-      expect(created.principalUserId).toBe(ALICE_ID);
-      expect(created.organizationScopedId).toBeNull();
-      expect(created.teamScopedId).toBeNull();
-      expect(created.projectScopedId).toBeNull();
-      expect(created.virtualKeyScopedId).toBeNull();
 
       // Cleanup so the cascade scenarios start from a known empty state
       // for ORG_ID's PRINCIPAL slot.
@@ -160,7 +155,11 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
       });
 
       const persisted = await prisma.gatewayBudget.findFirst({
-        where: { organizationId: ORG_ID, principalUserId: OUTSIDER_ID },
+        where: {
+          organizationId: ORG_ID,
+          scopeType: "PRINCIPAL",
+          scopeId: OUTSIDER_ID,
+        },
       });
       expect(persisted).toBeNull();
     });
