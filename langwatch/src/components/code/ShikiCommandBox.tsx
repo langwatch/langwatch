@@ -66,6 +66,16 @@ export interface ShikiCommandBoxProps {
    * e.g. "Command", "Config".
    */
   copyLabel?: string;
+
+  /**
+   * When `true`, paints a slow-sweeping rainbow gradient sheen across the
+   * code area (PostHog-style "wizard" command shimmer). The sheen is a
+   * non-interactive `mix-blend-mode: screen` overlay — Shiki's syntax
+   * colors stay readable underneath. Defaults to the value of `showPrompt`
+   * (terminal commands shimmer; static `.env` / config blocks don't).
+   * Respects `prefers-reduced-motion` and disables the animation when set.
+   */
+  animateRainbow?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +99,12 @@ export function ShikiCommandBox({
   lang,
   showPrompt = false,
   copyLabel = "Command",
+  animateRainbow,
 }: ShikiCommandBoxProps): React.ReactElement {
+  // Default the rainbow sheen on for terminal-prompt snippets — those are
+  // the install/setup commands where a touch of motion adds delight.
+  // Static blocks (.env, Authorization headers, JSON config) stay calm.
+  const rainbowOn = animateRainbow ?? showPrompt;
   const hasReveal = Boolean(maskedCommand);
   const [revealed, setRevealed] = useState(!hasReveal);
   const [copied, setCopied] = useState(false);
@@ -232,11 +247,19 @@ export function ShikiCommandBox({
           </Box>
         )}
 
-        {/* Shiki-highlighted code output or fallback pre */}
+        {/* Shiki-highlighted code output or fallback pre.
+            When rainbowOn, a `::after` pseudo-element paints a slow-sweeping
+            rainbow gradient sheen on top of the highlighted tokens. The
+            sheen is pointer-events:none + mix-blend-mode:screen so Shiki's
+            syntax colors stay readable and the copy/reveal buttons above
+            stay clickable. `@media (prefers-reduced-motion: reduce)` kills
+            the animation for users who opt out. */}
         <Box
           flex={1}
           overflowX="auto"
+          position="relative"
           data-shiki-box
+          data-rainbow={rainbowOn ? "on" : "off"}
           css={{
             "& pre": {
               margin: "0 !important",
@@ -254,6 +277,27 @@ export function ShikiCommandBox({
               fontSize: "inherit",
               background: "transparent !important",
             },
+            ...(rainbowOn && {
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "none",
+                backgroundImage:
+                  "linear-gradient(120deg, transparent 0%, rgba(255, 90, 90, 0.20) 18%, rgba(255, 190, 70, 0.20) 32%, rgba(80, 220, 140, 0.18) 48%, rgba(80, 180, 255, 0.20) 64%, rgba(200, 100, 255, 0.20) 80%, transparent 100%)",
+                backgroundSize: "220% 100%",
+                backgroundRepeat: "no-repeat",
+                mixBlendMode: "screen",
+                animation: "lwRainbowSweep 5.5s linear infinite",
+              },
+              "@keyframes lwRainbowSweep": {
+                "0%": { backgroundPosition: "-120% 0" },
+                "100%": { backgroundPosition: "220% 0" },
+              },
+              "@media (prefers-reduced-motion: reduce)": {
+                "&::after": { animation: "none", opacity: 0 },
+              },
+            }),
           }}
         >
           {activeHtml ? (
