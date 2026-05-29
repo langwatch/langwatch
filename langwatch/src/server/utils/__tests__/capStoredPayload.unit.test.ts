@@ -55,6 +55,24 @@ describe("capStoredJson", () => {
     });
   });
 
+  describe("given a cap tighter than the preview size", () => {
+    const big = { conversation: "x".repeat(1024 * 1024) };
+
+    it("keeps the placeholder within the tight cap", () => {
+      const capped = capStoredJson(big, 512);
+      expect(utf8ByteLength(capped!)).toBeLessThanOrEqual(512);
+      expect(() => JSON.parse(capped!)).not.toThrow();
+    });
+
+    it("still produces valid JSON when the cap leaves no room for a preview", () => {
+      const capped = capStoredJson(big, 64);
+      expect(() => JSON.parse(capped!)).not.toThrow();
+      const parsed = JSON.parse(capped!) as { _truncated: boolean; _preview: string };
+      expect(parsed._truncated).toBe(true);
+      expect(parsed._preview).toBe("");
+    });
+  });
+
   describe("given a value that JSON.stringify drops to undefined", () => {
     it("returns null rather than the literal string undefined", () => {
       expect(capStoredJson(() => 1)).toBeNull();

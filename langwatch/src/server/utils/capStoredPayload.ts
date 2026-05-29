@@ -36,8 +36,15 @@ const KB = 1024;
  */
 export const DEFAULT_MAX_STORED_PAYLOAD_BYTES = 32 * KB;
 
-/** Bytes of the original kept as a debugging preview inside a JSON placeholder. */
+/** Upper bound on the debugging preview kept inside a JSON placeholder. */
 const JSON_PREVIEW_BYTES = 2 * KB;
+
+/**
+ * Generous allowance for the placeholder's fixed parts (the metadata keys, the
+ * numeric values, and JSON punctuation) so the preview budget leaves room for
+ * them under a tight cap.
+ */
+const PLACEHOLDER_OVERHEAD_BYTES = 128;
 
 /** UTF-8 byte length of a string, without allocating a Buffer copy. */
 export function utf8ByteLength(value: string): number {
@@ -72,11 +79,27 @@ export function capStoredJson(
   const bytes = utf8ByteLength(serialized);
   if (bytes <= maxBytes) return serialized;
 
+  // Bound the preview by the cap, not just the fixed upper limit, so a caller
+  // passing a tighter maxBytes still gets a placeholder within the cap.
+  const previewBudget = Math.max(
+    0,
+    Math.min(JSON_PREVIEW_BYTES, maxBytes - PLACEHOLDER_OVERHEAD_BYTES),
+  );
+  const placeholder = JSON.stringify({
+    _truncated: true,
+    _originalBytes: bytes,
+    _maxBytes: maxBytes,
+    _preview: truncateUtf8(serialized, previewBudget),
+  });
+  // JSON-escaping the preview can expand it past the budget; if the placeholder
+  // still exceeds the cap, drop the preview so the result is guaranteed within
+  // maxBytes (the no-preview skeleton fits any realistic cap).
+  if (utf8ByteLength(placeholder) <= maxBytes) return placeholder;
   return JSON.stringify({
     _truncated: true,
     _originalBytes: bytes,
     _maxBytes: maxBytes,
-    _preview: truncateUtf8(serialized, JSON_PREVIEW_BYTES),
+    _preview: "",
   });
 }
 
