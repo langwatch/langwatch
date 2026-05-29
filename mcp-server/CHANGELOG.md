@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.9.0...mcp-server@v0.10.0) (2026-05-29)
+
+
+### Features
+
+* **governance:** the LangWatch AI Governance Platform ([#3524](https://github.com/langwatch/langwatch/issues/3524)) ([7dcaa89](https://github.com/langwatch/langwatch/commit/7dcaa895e29f6f2cce8d1e9160ef857520af340a))
+
+
+### Bug Fixes
+
+* **deps:** move mcp-server pnpm.overrides to workspace root ([#4187](https://github.com/langwatch/langwatch/issues/4187)) ([89e45ce](https://github.com/langwatch/langwatch/commit/89e45cefa3c16ef1c11e1d74c24219b182c0d716))
+* **mcp:** serve partial experiment results and fix status for SDK runs ([#4276](https://github.com/langwatch/langwatch/issues/4276)) ([d21997a](https://github.com/langwatch/langwatch/commit/d21997a3c65146b0f52026dccf0907e2abeb8bb9))
+
+
+### Miscellaneous
+
+* **deps:** bump liquidjs to &gt;=10.26.0 (RCE GHSA-gf2q-c269-pqgc) in typescript-sdk, skills, mcp-server ([#4340](https://github.com/langwatch/langwatch/issues/4340)) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump liquidjs to &gt;=10.26.0 in typescript-sdk, skills, mcp-server (GHSA-gf2q-c269-pqgc) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+
 ## [0.9.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.8.0...mcp-server@v0.9.0) (2026-05-22)
 
 
