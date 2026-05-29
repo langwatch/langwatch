@@ -132,12 +132,12 @@ Feature: Work-conserving max-min fair dispatch
       Then the newcomer wins the slots freed by natural drain ahead of the incumbent
       And no slot was held empty in reserve before the newcomer arrived
 
-    Scenario: The long-hold class keeps a bounded floor only when measurement requires it
-      Given the reserved floor for the long-hold class is disabled by default
-      When measured p95 group-hold-time shows newcomers starve under temporal reserve alone
-      And an operator enables the bounded floor
-      Then a newcomer is guaranteed the floor of slots within a bounded time
-      And the floor is never larger than the measured need
+    Scenario: An operator can guarantee newcomers a minimum capacity when long jobs starve them
+      Given the newcomer minimum-capacity guarantee is disabled by default
+      When monitoring shows newcomers are starved because long-running jobs hold their slots
+      And an operator enables the guarantee
+      Then a newcomer receives its minimum capacity within a bounded time
+      And the guarantee reserves no more capacity than the observed need
 
   Rule: A tenant's own work keeps its priority order
 
@@ -154,7 +154,12 @@ Feature: Work-conserving max-min fair dispatch
       When one tenant's waiting work is fully dispatched
       Then it ages out of the demand set and stops pulling a fair share
       And the remaining tenant expands into the freed capacity
-      And a tenant whose in-flight work is abandoned by a crash lapses out of the in-flight truth
+
+    Scenario: A tenant whose work is abandoned by a crash is swept from contention
+      Given a tenant holds in-flight work while competing for capacity
+      When its worker crashes without completing that work
+      Then the abandoned slots lapse out of the in-flight truth
+      And that tenant no longer pulls a fair share
 
     Scenario: A stale dynamic cap fails safe and is rebuilt from truth
       Given the dynamic-cap value has lapsed after a stalled recompute
