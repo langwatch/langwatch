@@ -183,7 +183,7 @@ export async function processCommand<EventType extends Event>(
       // over-threshold command payload.
       if (handler.cleanupAfterStore) {
         try {
-          await handler.cleanupAfterStore();
+          await handler.cleanupAfterStore(command);
         } catch (err) {
           log?.warn(
             { error: err instanceof Error ? err.message : String(err), commandType },

@@ -123,7 +123,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
   describe("excludes reserved namespace keys from user-visible facet results", () => {
     /** @scenario Reserved namespace is excluded from user-visible facet enumeration */
     it("filters out keys starting with 'langwatch.reserved.' in the outer WHERE", () => {
-      // Reserved keys (e.g. langwatch.reserved.blobref.langwatch.output) are
+      // Reserved keys (e.g. langwatch.reserved.eventref.langwatch.output) are
       // server-internal plumbing that should never appear in the Traces UI
       // facet sidebar. A span with offloaded fields will carry these keys in
       // SpanAttributes; without this filter they would surface as browsable
@@ -134,7 +134,7 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       );
     });
 
-    it("SQL would exclude langwatch.reserved.blobref.langwatch.output from discovered keys", () => {
+    it("SQL would exclude langwatch.reserved.eventref.langwatch.output from discovered keys", () => {
       // Validate the filter is in the outer WHERE (post-arrayJoin) so it applies
       // before GROUP BY — the reserved key must not appear in the result set.
       const query = buildSpanAttributeKeysFacetQuery(baseCtx);

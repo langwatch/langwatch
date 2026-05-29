@@ -15,6 +15,11 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  capOversizedAttributes,
+  DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+import type { OtlpSpan, OtlpResource, OtlpAnyValue } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -47,6 +52,46 @@ export const IO_ATTR_KEYS = new Set([
  * the `langwatch.reserved.*` namespace are stripped at command-worker ingestion.
  */
 export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
+
+/**
+ * Read-only probe: returns true iff some stringValue or bytesValue (recursing into
+ * arrayValue/kvlistValue) exceeds maxBytes. Allocates nothing. Mirrors the traversal
+ * shape of `capAnyValue` in capOversizedAttributes.ts — changes there must be reflected here.
+ *
+ * Short-circuits on the first over-limit value found. Never throws.
+ */
+function attrValueExceeds(
+  value: OtlpAnyValue | null | undefined,
+  maxBytes: number,
+): boolean {
+  if (value == null || typeof value !== "object") return false;
+
+  if (typeof value.stringValue === "string") {
+    if (Buffer.byteLength(value.stringValue, "utf8") > maxBytes) return true;
+  }
+
+  if (value.bytesValue != null) {
+    const byteSize =
+      value.bytesValue instanceof Uint8Array
+        ? value.bytesValue.byteLength
+        : Buffer.byteLength(String(value.bytesValue), "utf8");
+    if (byteSize > maxBytes) return true;
+  }
+
+  if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
+    for (const item of value.arrayValue.values) {
+      if (attrValueExceeds(item as Parameters<typeof attrValueExceeds>[0], maxBytes)) return true;
+    }
+  }
+
+  if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
+    for (const entry of value.kvlistValue.values as Array<{ value?: Parameters<typeof attrValueExceeds>[0] }>) {
+      if (entry?.value && attrValueExceeds(entry.value, maxBytes)) return true;
+    }
+  }
+
+  return false;
+}
 
 /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
 function utf8Preview(value: string, maxBytes: number): string {
@@ -86,15 +131,26 @@ export function leanForProjection(event: Event): Event {
 }
 
 /**
- * Leans a SpanReceived event by truncating over-threshold IO attributes and
- * attaching eventref pointers. Returns a shallow-cloned event with a new attributes
- * array (no shared refs).
+ * Leans a SpanReceived event by:
+ *   1. Truncating over-threshold IO attributes (> IO_PREVIEW_BYTES) and attaching eventref pointers.
+ *   2. Capping any remaining non-IO / nested / binary attribute values exceeding
+ *      DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES via `capOversizedAttributes`.
+ *
+ * ORDER: IO 64 KB preview FIRST, then 256 KB cap on the result.
+ * IO attrs are already ≤ 64 KB after step 1, so the 256 KB cap never touches them — correct.
+ * Non-IO attrs get the 256 KB ceiling, matching the pre-spool worker behaviour.
+ * Non-IO caps get NO eventref (recovery is via full event_log read, not field-eventref).
+ *
+ * CLONE SAFETY: `capOversizedAttributes` mutates in place and recurses into nested objects.
+ * We scan the original attributes first (no allocation) to decide if the heavy path is needed.
+ * If needed, we structuredClone the span (and resource), then re-run the IO-lean pass on the
+ * CLONED attributes — so the original input event is byte-for-byte untouched. The clone only
+ * happens on the "heavy" branch so the sub-threshold hot path stays allocation-free.
  */
 function leanSpanReceivedEvent(event: Event): Event {
   const data = event.data as {
-    span?: {
-      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
-    };
+    span?: OtlpSpan;
+    resource?: OtlpResource | null;
   };
 
   // Guard: if span or attributes are absent (e.g. test events with empty data), pass through unchanged.
@@ -103,44 +159,82 @@ function leanSpanReceivedEvent(event: Event): Event {
   }
 
   const originalAttributes = data.span.attributes ?? [];
-  const newAttrs: Array<{ key: string; value: { stringValue?: string } }> = [];
-  const eventrefAttrs: Array<{ key: string; value: { stringValue: string } }> = [];
 
+  // Step 1 (scan only): check whether any IO attr exceeds IO_PREVIEW_BYTES.
+  let hasLargeIoAttr = false;
   for (const attr of originalAttributes) {
     if (
       IO_ATTR_KEYS.has(attr.key) &&
       typeof attr.value.stringValue === "string" &&
       Buffer.byteLength(attr.value.stringValue, "utf-8") > IO_PREVIEW_BYTES
     ) {
-      // Replace with preview
-      const preview = utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
-      newAttrs.push({ key: attr.key, value: { stringValue: preview } });
-      // Attach eventref pointer
-      eventrefAttrs.push({
-        key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
-        // ADR-022: embed event.id so the read path can JOIN event_log by
-        // EventId without guessing. The eventref carries `{field, eventId}`;
-        // the read path uses both in `BlobStore.getFromEventLog`.
-        value: { stringValue: JSON.stringify({ field: attr.key, eventId: event.id }) },
-      });
-    } else {
-      newAttrs.push({ ...attr, value: { ...attr.value } });
+      hasLargeIoAttr = true;
+      break;
     }
   }
 
-  if (eventrefAttrs.length === 0) {
-    // Nothing changed — return original to avoid unnecessary allocations
+  // Step 2 (scan only): check whether any non-IO attr might need the 256 KB cap.
+  // Uses attrValueExceeds for a precise recursive probe — a small structured attr
+  // (arrayValue/kvlistValue) no longer trips the heavy path unless a nested value
+  // actually exceeds DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES.
+  let needsNonIoCap = false;
+  for (const attr of originalAttributes) {
+    if (IO_ATTR_KEYS.has(attr.key)) continue; // IO attrs are handled separately
+    if (attrValueExceeds(attr.value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)) {
+      needsNonIoCap = true;
+      break;
+    }
+  }
+
+  if (!hasLargeIoAttr && !needsNonIoCap) {
+    // Sub-threshold event — return original, no allocations.
     return event;
   }
+
+  // Step 3: Deep-clone the span (and resource) so that all subsequent mutations —
+  // the IO-lean pass and capOversizedAttributes — operate on independent copies.
+  // structuredClone creates a fully independent deep copy; no shared object references remain.
+  const clonedSpan: OtlpSpan = structuredClone(data.span);
+  const clonedResource: OtlpResource | null = data.resource ? structuredClone(data.resource) : null;
+
+  // Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
+  if (hasLargeIoAttr) {
+    const ioLeanedAttrs: OtlpSpan["attributes"] = [];
+    const eventrefAttrs: OtlpSpan["attributes"] = [];
+
+    for (const attr of clonedSpan.attributes) {
+      if (
+        IO_ATTR_KEYS.has(attr.key) &&
+        typeof attr.value.stringValue === "string" &&
+        Buffer.byteLength(attr.value.stringValue, "utf-8") > IO_PREVIEW_BYTES
+      ) {
+        const preview = utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
+        ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
+        // ADR-022: embed event.id so the read path can JOIN event_log by
+        // EventId without guessing. The eventref carries `{field, eventId}`;
+        // the read path uses both in `BlobStore.getFromEventLog`.
+        eventrefAttrs.push({
+          key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
+          value: { stringValue: JSON.stringify({ field: attr.key, eventId: event.id }) },
+        });
+      } else {
+        ioLeanedAttrs.push(attr);
+      }
+    }
+
+    clonedSpan.attributes = [...ioLeanedAttrs, ...eventrefAttrs];
+  }
+
+  // Step 5: Cap non-IO / nested / binary values on the cloned span.
+  // IO attrs are already ≤ IO_PREVIEW_BYTES (64 KB) < DEFAULT_MAX (256 KB), so they are untouched.
+  capOversizedAttributes(clonedSpan, clonedResource);
 
   return {
     ...event,
     data: {
       ...data,
-      span: {
-        ...data.span,
-        attributes: [...newAttrs, ...eventrefAttrs],
-      },
+      span: clonedSpan,
+      resource: clonedResource,
     },
   };
 }

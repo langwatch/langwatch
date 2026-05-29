@@ -97,15 +97,6 @@ export class RecordSpanCommand implements CommandHandler<
   private readonly blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
 
   /**
-   * ADR-022: Set during handle() when the command carried a spoolRef.
-   * Read by cleanupAfterStore() which is called by processCommand() after
-   * storeEventsFn succeeds. Storing on the instance is safe because command
-   * handlers are instantiated per-queue-job (each job gets a fresh instance
-   * via `new Handler()`).
-   */
-  private _pendingSpoolRef?: string;
-
-  /**
    * @param deps - Optional partial of injectable dependencies. Any omitted
    *   required field is filled in from `createDefaultDependencies()`. This lets
    *   call sites inject just one dependency (e.g. `{ blobStore }` from the
@@ -157,6 +148,20 @@ export class RecordSpanCommand implements CommandHandler<
         // When spoolRef is present, the command was spooled at the edge because
         // the payload exceeded COMMAND_INLINE_THRESHOLD. Fetch the full span,
         // then process normally.
+
+        // ADR-022: Guard — if the command carries a spoolRef but this handler
+        // has no blobStore, we MUST throw rather than silently proceeding.
+        // The edge cleared span.attributes to [] before spooling, so continuing
+        // without reconstitution would write a span with empty attributes to
+        // event_log — permanent, silent data loss (event_log is the sole source
+        // of truth). Throwing lets the command framework retry / surface the
+        // misconfiguration instead of corrupting durable storage.
+        if (commandData.spoolRef && !this.blobStore) {
+          throw new Error(
+            `ADR-022: command carries spoolRef "${commandData.spoolRef}" but this handler has no blobStore configured to reconstitute the span. Refusing to emit a span with cleared attributes (would be permanent data loss in event_log).`,
+          );
+        }
+
         let resolvedCommandData = commandData;
         if (commandData.spoolRef && this.blobStore) {
           const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
@@ -301,15 +306,6 @@ export class RecordSpanCommand implements CommandHandler<
 
         const events = [spanReceivedEvent];
 
-        // ADR-022: Record the spool ref so cleanupAfterStore() can delete it
-        // AFTER storeEventsFn (event_log INSERT) succeeds. Deleting here (before
-        // the INSERT) would be a durability bug: if storeEventsFn throws the
-        // event is lost but the spool is already gone. cleanupAfterStore() is
-        // called by processCommand() only after the INSERT commits.
-        if (commandData.spoolRef && this.blobStore) {
-          this._pendingSpoolRef = commandData.spoolRef;
-        }
-
         return events;
       },
     );
@@ -321,12 +317,17 @@ export class RecordSpanCommand implements CommandHandler<
    * is only deleted once the event is durable — if the INSERT fails the spool
    * survives so the command can be retried. The 24h S3 lifecycle policy is the
    * safety net for orphans if this call itself fails.
+   *
+   * The spoolRef is read from the original command argument rather than instance
+   * state, eliminating the race bug that arose when a single handler instance was
+   * shared across parallel queue jobs (pipeline.ts uses withCommandInstance).
    */
-  async cleanupAfterStore(): Promise<void> {
-    if (this._pendingSpoolRef && this.blobStore) {
-      await this.blobStore.deleteSpool(this._pendingSpoolRef).catch((err: unknown) => {
+  async cleanupAfterStore(command: Command<RecordSpanCommandData>): Promise<void> {
+    const spoolRef = command.data.spoolRef;
+    if (spoolRef && this.blobStore) {
+      await this.blobStore.deleteSpool(spoolRef).catch((err: unknown) => {
         this.logger.warn(
-          { spoolRef: this._pendingSpoolRef, error: err instanceof Error ? err.message : String(err) },
+          { spoolRef, error: err instanceof Error ? err.message : String(err) },
           "Best-effort spool deletion failed — lifecycle policy will clean up",
         );
       });

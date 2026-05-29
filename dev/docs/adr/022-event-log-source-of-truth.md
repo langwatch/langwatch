@@ -140,6 +140,12 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - **Replay durability invariant restored.** `event_log` alone is sufficient. No "event_log + S3 jointly are the source of truth" caveat.
 - **The dispatch interposition runs unconditionally**, not gated by `release_trace_blob_offload`. It is a defensive content transformation: leaning is a no-op for sub-threshold IO (the modal case) and a safety-net lean for over-threshold IO regardless of flag. The flag gates the **user-visible** behavior (edge S3 spool + on-the-wire shape with the eventref attr); the interposition is server-internal and benefits projections + replay regardless. Rationale: gating the interposition would re-introduce the Redis clog risk for over-threshold IO when the flag is off, defeating the safety net.
 
+## On-prem / no-object-storage deployments
+
+- **Reads are object-storage-independent.** Full content lives in `event_log` (ClickHouse). `BlobStore.getFromEventLog` (`blob-store.service.ts:85-158`) issues a CH SELECT and parses `EventPayload`; it never calls `resolveS3Client`. "Show full" and online-eval work with no object storage present.
+- **The edge spool is flag-gated and fail-open.** `release_trace_blob_offload` off → edge spool code never runs → pre-ADR-022 behavior (worker-side `capOversizedAttributes` bounds the payload). Flag on but storage absent → edge PUT fails open (full inline payload forwarded, `warn` logged) — ingestion is never blocked.
+- **"No S3 equivalent" means no object storage at all.** S3-compatible stores (MinIO, Ceph RGW) satisfy the AWS S3 client; they are equivalent. Deployments with no object storage should leave `release_trace_blob_offload` off; they lose only the edge Redis-queue oversize protection, not any read-path capability.
+
 ## Rules
 
 - `leanForProjection` is **the** single source of truth for the leaned shape. It is invoked at the dispatch interposition AND in `replayExecutor.apply` before invoking projection handlers. Any future place that consumes events for projection MUST go through it. Tests pin this invariant.

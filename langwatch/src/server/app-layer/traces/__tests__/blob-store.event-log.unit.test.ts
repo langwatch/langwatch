@@ -272,3 +272,49 @@ describe("given a transient spool ref", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// getFromEventLog — S3-independence invariant (ADR-022 on-prem guarantee)
+// ---------------------------------------------------------------------------
+
+/**
+ * @scenario Read path is object-storage-independent (ADR-022 on-prem / no-object-storage).
+ * Proves that BlobStore.getFromEventLog never calls resolveS3Client, so deployments
+ * with no object storage can still serve "show full" and online-eval reads.
+ */
+describe("given a deployment with no object storage (resolveS3Client throws)", () => {
+  describe("when getFromEventLog is called with a valid event_log row", () => {
+    it("reads the field from event_log without touching S3", async () => {
+      const eventPayload = JSON.stringify({
+        data: {
+          span: {
+            attributes: [
+              { key: FIELD, value: { stringValue: FULL_VALUE } },
+            ],
+          },
+        },
+      });
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+
+      // resolveS3Client throws unconditionally — simulates a deployment with no
+      // object storage configured. getFromEventLog must never call this resolver.
+      const noStorageResolver: S3ClientResolver = () => {
+        throw new Error("no object storage configured");
+      };
+
+      const blobStore = new BlobStore(noStorageResolver, client as never);
+
+      const result = await blobStore.getFromEventLog({
+        eventId: EVENT_ID,
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(result).toBe(FULL_VALUE);
+    });
+  });
+});

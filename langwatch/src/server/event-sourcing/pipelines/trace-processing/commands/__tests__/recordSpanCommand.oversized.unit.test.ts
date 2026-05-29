@@ -217,7 +217,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
       // Simulate processCommand: handle first, then cleanupAfterStore (post storeEvents)
       await handler.handle(command);
-      await handler.cleanupAfterStore();
+      await handler.cleanupAfterStore(command);
 
       // deleteSpool is called once with the spool ref
       expect(deleteSpoolMock).toHaveBeenCalledOnce();
@@ -301,6 +301,172 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(
         Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
       ).toBe(300 * 1024);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Race-condition regression test (ADR-022 fix)
+// ---------------------------------------------------------------------------
+
+/**
+ * @scenario A single shared RecordSpanCommand instance processes two concurrent
+ * traces — cleanupAfterStore must use each command's own spoolRef, not shared
+ * instance state. Under the OLD implementation (storing spoolRef in an instance
+ * field `_pendingSpoolRef`), the second handle() call would overwrite the first
+ * job's spoolRef, causing cleanupAfterStore(cmdA) to delete cmdB's spool instead.
+ */
+describe("given a shared RecordSpanCommand instance processing two concurrent traces", () => {
+  const TRACE_ID_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1";
+  const SPAN_ID_A = "aaaaaaaaaaaaaaaa";
+  const SPOOL_REF_A = `trace-blobs/spool/projA/${TRACE_ID_A}/${SPAN_ID_A}`;
+
+  const TRACE_ID_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2";
+  const SPAN_ID_B = "bbbbbbbbbbbbbbbb";
+  const SPOOL_REF_B = `trace-blobs/spool/projB/${TRACE_ID_B}/${SPAN_ID_B}`;
+
+  const makeSpoolBody = (traceId: string, spanId: string) =>
+    JSON.stringify({
+      span: {
+        traceId,
+        spanId,
+        name: "test-span",
+        kind: 1,
+        startTimeUnixNano: { low: 0, high: 0 },
+        endTimeUnixNano: { low: 1000000, high: 0 },
+        attributes: [],
+        events: [],
+        links: [],
+        status: {},
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      },
+      resource: null,
+      instrumentationScope: null,
+    });
+
+  function makeConcurrentCommand({
+    spoolRef,
+    traceId,
+    spanId,
+  }: {
+    spoolRef: string;
+    traceId: string;
+    spanId: string;
+  }): Command<RecordSpanCommandData> {
+    return {
+      type: RECORD_SPAN_COMMAND_TYPE,
+      aggregateId: traceId,
+      tenantId: createTenantId(TENANT_ID),
+      data: {
+        tenantId: TENANT_ID,
+        occurredAt: 1700000000000,
+        spoolRef,
+        span: {
+          traceId,
+          spanId,
+          name: "test-span",
+          kind: 1,
+          startTimeUnixNano: { low: 0, high: 0 },
+          endTimeUnixNano: { low: 1000000, high: 0 },
+          attributes: [],
+          events: [],
+          links: [],
+          status: {},
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource: null,
+        instrumentationScope: null,
+      },
+    };
+  }
+
+  describe("when two jobs interleave on the same handler instance (handle A, handle B, cleanup A, cleanup B)", () => {
+    it("deletes each job's own spoolRef — not the other job's ref — pinning the race fix", async () => {
+      const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
+      const blobStore = {
+        getSpool: vi
+          .fn()
+          .mockImplementation(async (ref: string) => {
+            if (ref === SPOOL_REF_A) {
+              return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
+            }
+            return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
+          }),
+        deleteSpool: deleteSpoolMock,
+      } as unknown as BlobStore;
+
+      const deps = makeDeps();
+      // ONE shared handler instance — mirrors withCommandInstance in pipeline.ts
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
+
+      const cmdA = makeConcurrentCommand({
+        spoolRef: SPOOL_REF_A,
+        traceId: TRACE_ID_A,
+        spanId: SPAN_ID_A,
+      });
+      const cmdB = makeConcurrentCommand({
+        spoolRef: SPOOL_REF_B,
+        traceId: TRACE_ID_B,
+        spanId: SPAN_ID_B,
+      });
+
+      // Interleaved execution: both jobs handled before either cleanup runs
+      await handler.handle(cmdA);
+      await handler.handle(cmdB);
+      await handler.cleanupAfterStore(cmdA);
+      await handler.cleanupAfterStore(cmdB);
+
+      // Exactly two deletions — one per job, in order of cleanupAfterStore calls
+      expect(deleteSpoolMock).toHaveBeenCalledTimes(2);
+
+      // First cleanup must target cmdA's spool — NOT cmdB's
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(1, SPOOL_REF_A);
+
+      // Second cleanup must target cmdB's spool — NOT cmdA's
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(2, SPOOL_REF_B);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-022 guard: spoolRef present but no blobStore configured
+// ---------------------------------------------------------------------------
+
+/**
+ * @scenario A handler built without a blobStore receives a command that
+ * carries a spoolRef — the span's attributes have already been cleared by
+ * the edge. Without reconstitution, processing would emit a span with empty
+ * attributes to event_log (permanent data loss). The guard must throw instead.
+ */
+describe("given a command carrying a spoolRef but a handler with no blobStore", () => {
+  const SPOOL_REF = `trace-blobs/spool/${TENANT_ID}/${TRACE_ID}/${SPAN_ID}`;
+
+  describe("when handle() is called", () => {
+    it("throws rather than emitting a span with cleared attributes", async () => {
+      // Build deps WITHOUT a blobStore — simulates a misconfigured handler
+      const depsWithoutBlobStore: RecordSpanCommandDependencies = {
+        piiRedactionService: { redactSpan: vi.fn() },
+        costEnrichmentService: { enrichSpan: vi.fn() },
+        tokenEstimationService: { estimateSpanTokens: vi.fn() },
+        // blobStore intentionally omitted
+      };
+
+      const handler = new RecordSpanCommand(depsWithoutBlobStore);
+      const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
+
+      // Must reject with the ADR-022 guard message
+      await expect(handler.handle(command)).rejects.toThrow(
+        `ADR-022: command carries spoolRef "${SPOOL_REF}" but this handler has no blobStore configured to reconstitute the span. Refusing to emit a span with cleared attributes (would be permanent data loss in event_log).`,
+      );
+
+      // No event must have been produced (verified via piiRedactionService not being called)
+      expect(
+        depsWithoutBlobStore.piiRedactionService.redactSpan as ReturnType<typeof vi.fn>,
+      ).not.toHaveBeenCalled();
     });
   });
 });
