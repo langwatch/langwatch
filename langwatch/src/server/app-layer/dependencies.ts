@@ -34,6 +34,7 @@ import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import type { ShareService } from "./share/share.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
@@ -102,6 +103,7 @@ export interface AppDependencies {
   usageLimits: UsageLimitService;
   retentionPolicyCache: RetentionPolicyCache;
   dataRetention: DataRetentionDependencies;
+  share: ShareService;
   commands: AppCommands;
   ops?: OpsDependencies;
 

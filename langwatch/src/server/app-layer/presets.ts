@@ -126,6 +126,8 @@ import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSwee
 import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
 import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
+import { ShareService } from "./share/share.service";
+import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 
 /**
  * Late-bound handle for the scenario execution reactor.
@@ -377,6 +379,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     orphanSweep: orphanSweepService,
   };
 
+  const share = traced(
+    new ShareService(new PrismaShareRepository(prisma), pinnedTraceService),
+    "ShareService",
+  );
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -595,6 +602,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usageLimits,
     retentionPolicyCache,
     dataRetention,
+    share,
     commands,
     ops,
     _eventSourcing: es,
@@ -741,6 +749,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService(null),
       orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
     },
+    share: new ShareService(
+      new PrismaShareRepository(testPrisma),
+      new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
+    ),
     ...overrides,
   });
 }
