@@ -36,39 +36,24 @@ import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-const MOCK_SCIM_LOGS = [
-  {
-    id: "1",
-    time: "2 min ago",
-    method: "POST",
-    path: "/Users",
-    status: 201,
-    duration: 45,
-  },
-  {
-    id: "2",
-    time: "5 min ago",
-    method: "PATCH",
-    path: "/Users/abc123",
-    status: 200,
-    duration: 32,
-  },
-  {
-    id: "3",
-    time: "1 hour ago",
-    method: "POST",
-    path: "/Groups",
-    status: 201,
-    duration: 67,
-  },
-];
-
 type ScimLogFilter = "all" | "success" | "4xx" | "5xx";
 
 function statusColor(status: number) {
   if (status >= 200 && status < 300) return "green";
   if (status >= 400 && status < 500) return "yellow";
   return "red";
+}
+
+function formatRelativeTime(date: Date | string) {
+  const ms = Date.now() - new Date(date).getTime();
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function providerLabel(provider: string) {
@@ -160,6 +145,15 @@ function SsoSettings() {
     },
   });
 
+  const scimLogsQuery = api.ssoConnection.scimLogs.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+      statusFilter: scimFilter,
+      pathSearch: scimSearch || undefined,
+    },
+    { enabled: !!organization?.id },
+  );
+
   if (!organization) return <SettingsLayout />;
 
   if (!isEnterprise) {
@@ -203,7 +197,7 @@ function SsoSettings() {
     defaultOrgRole?: "ADMIN" | "MEMBER" | "EXTERNAL";
   }) => {
     if (editingConnection) {
-      const { clientSecret, ...rest } = data;
+      const { clientSecret, domain, ...rest } = data;
       updateMutation.mutate({
         organizationId: organization.id,
         id: editingConnection.id,
@@ -225,16 +219,7 @@ function SsoSettings() {
     });
   };
 
-  const filteredLogs = MOCK_SCIM_LOGS.filter((log) => {
-    if (scimFilter === "success" && (log.status < 200 || log.status >= 300))
-      return false;
-    if (scimFilter === "4xx" && (log.status < 400 || log.status >= 500))
-      return false;
-    if (scimFilter === "5xx" && log.status < 500) return false;
-    if (scimSearch && !log.path.toLowerCase().includes(scimSearch.toLowerCase()))
-      return false;
-    return true;
-  });
+  const scimLogs = scimLogsQuery.data?.items ?? [];
 
   return (
     <SettingsLayout>
@@ -462,11 +447,11 @@ function SsoSettings() {
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {filteredLogs.map((log) => (
+                    {scimLogs.map((log) => (
                       <Table.Row key={log.id} _hover={{ bg: "bg.muted" }}>
                         <Table.Cell>
                           <Text fontSize="xs" color="fg.muted">
-                            {log.time}
+                            {formatRelativeTime(log.createdAt)}
                           </Text>
                         </Table.Cell>
                         <Table.Cell>
@@ -492,7 +477,7 @@ function SsoSettings() {
                         </Table.Cell>
                       </Table.Row>
                     ))}
-                    {filteredLogs.length === 0 && (
+                    {scimLogs.length === 0 && (
                       <Table.Row>
                         <Table.Cell colSpan={5}>
                           <Text

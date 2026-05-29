@@ -217,4 +217,56 @@ export const ssoConnectionRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+
+  scimLogs: ssoConnectionProcedure
+    .input(
+      z.object({
+        cursor: z.string().optional(),
+        limit: z.number().min(1).max(100).default(50),
+        statusFilter: z
+          .enum(["all", "success", "4xx", "5xx"])
+          .default("all"),
+        pathSearch: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Record<string, unknown> = {
+        organizationId: input.organizationId,
+      };
+
+      if (input.statusFilter === "success") {
+        where.responseStatus = { gte: 200, lt: 300 };
+      } else if (input.statusFilter === "4xx") {
+        where.responseStatus = { gte: 400, lt: 500 };
+      } else if (input.statusFilter === "5xx") {
+        where.responseStatus = { gte: 500 };
+      }
+
+      if (input.pathSearch) {
+        where.requestPath = { contains: input.pathSearch, mode: "insensitive" };
+      }
+
+      const logs = await ctx.prisma.scimRequestLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      const hasMore = logs.length > input.limit;
+      const items = hasMore ? logs.slice(0, input.limit) : logs;
+
+      return {
+        items: items.map((log) => ({
+          id: log.id,
+          method: log.requestMethod,
+          path: log.requestPath,
+          status: log.responseStatus,
+          duration: log.durationMs,
+          identityProvider: log.identityProvider,
+          createdAt: log.createdAt,
+        })),
+        nextCursor: hasMore ? items[items.length - 1]?.id : undefined,
+      };
+    }),
 });

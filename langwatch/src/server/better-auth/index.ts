@@ -20,6 +20,8 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { extractEmailDomain } from "./sso";
+import { isEnterpriseTier } from "../api/enterprise";
+import { getApp } from "../app-layer/app";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -558,7 +560,23 @@ export const auth = betterAuth({
                 select: { organizationId: true },
               });
 
-              const enforcedOrgId = ssoConnection?.organizationId ?? (org?.ssoProvider ? org.id : null);
+              let enforcedOrgId = ssoConnection?.organizationId ?? (org?.ssoProvider ? org.id : null);
+
+              // Login-time license revalidation: if the org's enterprise
+              // license expired, silently degrade SSO enforcement so users
+              // aren't locked out.
+              if (enforcedOrgId) {
+                try {
+                  const plan = await getApp().planProvider.getActivePlan({
+                    organizationId: enforcedOrgId,
+                  });
+                  if (!isEnterpriseTier(plan.type)) {
+                    enforcedOrgId = null;
+                  }
+                } catch {
+                  enforcedOrgId = null;
+                }
+              }
 
               if (enforcedOrgId && matches("/sign-in/email")) {
                 // Sole-owner escape hatch: if the user is the only
@@ -606,6 +624,33 @@ export const auth = betterAuth({
         } catch (e) {
           if (e instanceof APIError) throw e;
           logger.error({ err: e }, "Failed to check SSO enforcement on credential endpoint");
+        }
+      }
+
+      // Email change protection: block changes to/from SSO-enforced domains
+      if (env.NEXTAUTH_PROVIDER === "email" && matches("/change-email")) {
+        try {
+          const body = ctx.body as { newEmail?: string } | undefined;
+          const newEmail = body?.newEmail;
+          if (newEmail && typeof newEmail === "string") {
+            const newDomain = extractEmailDomain(newEmail);
+            if (newDomain) {
+              const enforced = await prisma.ssoConnection.findFirst({
+                where: { domain: newDomain, ssoEnforced: true, verifiedAt: { not: null } },
+                select: { id: true },
+              });
+              if (enforced) {
+                throw APIError.from("BAD_REQUEST", {
+                  code: "SSO_EMAIL_CHANGE_BLOCKED",
+                  message:
+                    "Cannot change email to an SSO-enforced domain. Use your identity provider.",
+                });
+              }
+            }
+          }
+        } catch (e) {
+          if (e instanceof APIError) throw e;
+          logger.error({ err: e }, "Failed to check SSO enforcement on email change");
         }
       }
     },
