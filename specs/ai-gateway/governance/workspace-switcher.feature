@@ -104,9 +104,32 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
   @bdd @ui @workspace-switcher @empty
   Scenario: A user in no teams sees only the "My Workspace" entry plus a hint
     Given user "newhire@acme.com" is in zero teams and zero projects
+    And newhire's organization enables the AI governance feature
     When she opens the switcher
     Then she sees only the "My Workspace" entry
     And below it a hint reads "Ask your admin to add you to a team to see more contexts here."
+
+  # ---------------------------------------------------------------------------
+  # Personal entry governance gate
+  # ---------------------------------------------------------------------------
+  #
+  # "My Workspace" links to /me, which is gated behind the AI governance flag
+  # and 404s when the flag is off. So the personal entry only renders when at
+  # least one of the user's organizations enables governance. Org-less users
+  # keep it — it is their only context.
+
+  @bdd @ui @workspace-switcher @personal-gate @integration
+  Scenario: The personal entry is hidden when no organization enables governance
+    Given the user belongs to organizations, none of which enable AI governance
+    When the user opens the workspace switcher
+    Then the "My Workspace" personal entry is not shown
+    And only the team and project contexts are listed
+
+  @bdd @ui @workspace-switcher @personal-gate @integration
+  Scenario: The personal entry shows when any organization enables governance
+    Given at least one of the user's organizations enables AI governance
+    When the user opens the workspace switcher
+    Then the "My Workspace" personal entry is shown
 
   @bdd @ui @workspace-switcher @single-team
   Scenario: A solo user (no teams/projects) — switcher remains visible but does not auto-collapse
@@ -238,7 +261,7 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
         loading (preserves intent without breaking the project's
         own redirect logic)
 
-  @bdd @ui @workspace-switcher @add-project @stage-2c
+  @bdd @ui @workspace-switcher @add-project @stage-2c @integration
   Scenario: The dropdown shows a per-team "+ New project" button (admin-only)
     Given the user is an organization admin OR a team admin on team T
     When the user opens the switcher
@@ -248,7 +271,7 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     And the user's org-membership / team-membership filters apply (a
         viewer-only member on team T sees no "+ New project" entry there)
 
-  @bdd @ui @workspace-switcher @add-project @stage-2c
+  @bdd @ui @workspace-switcher @add-project @stage-2c @integration
   Scenario: The "+ New project" button is suppressed for non-admin members
     Given the user is a regular member (not admin) on team T
     When the user opens the switcher

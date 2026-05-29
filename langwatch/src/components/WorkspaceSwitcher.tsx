@@ -2,16 +2,18 @@ import {
   Box,
   Button,
   HStack,
+  IconButton,
   Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Folder, User, Users } from "lucide-react";
+import { Check, ChevronDown, Folder, Plus, User, Users } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
 import { Menu } from "./ui/menu";
 import { Link } from "./ui/link";
+import { Tooltip } from "./ui/tooltip";
 import { ProjectAvatar } from "./ProjectAvatar";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
@@ -31,6 +33,12 @@ export type WorkspaceSwitcherEntry =
       href: string;
       label: string;
       subtitle?: string;
+      /**
+       * Whether the current user may create a project in this team (org or
+       * team admin). Drives the per-team "+ New project" affordance — viewers
+       * never see it. Defaults to false when omitted.
+       */
+      canCreateProject?: boolean;
     }
   | {
       kind: "project";
@@ -58,7 +66,12 @@ export type WorkspaceSwitcherCurrent =
   | { kind: "unknown" };
 
 export type WorkspaceSwitcherProps = {
-  personal: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
+  /**
+   * The "My Workspace" personal entry. Omitted when the personal portal is
+   * not available to the user (no organization has the governance flag), so
+   * the switcher hides the entry rather than linking to a page that 404s.
+   */
+  personal?: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
   teams: Array<Extract<WorkspaceSwitcherEntry, { kind: "team" }>>;
   projects: Array<Extract<WorkspaceSwitcherEntry, { kind: "project" }>>;
   /**
@@ -68,6 +81,13 @@ export type WorkspaceSwitcherProps = {
    * URL-driven selection (e.g. tests, programmatic preview cards).
    */
   current?: WorkspaceSwitcherCurrent;
+  /**
+   * Invoked when the user clicks a team row's "+ New project" button. The
+   * consumer opens the create-project drawer scoped to that team. The button
+   * only renders for teams whose `canCreateProject` is true and only when
+   * this callback is provided.
+   */
+  onCreateProjectForTeam?: (args: { teamId: string; orgId: string }) => void;
 };
 
 const ICON_BY_KIND = {
@@ -96,7 +116,7 @@ function currentLabel(
   projects: WorkspaceSwitcherProps["projects"],
 ): { label: string; kind: keyof typeof ICON_BY_KIND } {
   if (current.kind === "personal") {
-    return { label: personal.label, kind: "personal" };
+    return { label: personal?.label ?? "My Workspace", kind: "personal" };
   }
   if (current.kind === "team") {
     const t = teams.find((t) => t.teamId === current.teamId);
@@ -132,6 +152,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   teams,
   projects,
   current: currentProp,
+  onCreateProjectForTeam,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -250,16 +271,18 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content minWidth="280px" maxHeight="70vh" overflowY="auto">
-              <Group title="My Workspace">
-                <SwitcherItem
-                  entry={personal}
-                  active={entryIsCurrent(personal, current)}
-                  onSelect={() => {
-                    setOpen(false);
-                    void router.push(personal.href);
-                  }}
-                />
-              </Group>
+              {personal && (
+                <Group title="My Workspace">
+                  <SwitcherItem
+                    entry={personal}
+                    active={entryIsCurrent(personal, current)}
+                    onSelect={() => {
+                      setOpen(false);
+                      void router.push(personal.href);
+                    }}
+                  />
+                </Group>
+              )}
 
               {orgs.map((org) => (
                 <Group
@@ -270,14 +293,40 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                     const teamProjects = projectsByTeam.get(team.teamId) ?? [];
                     return (
                       <Box key={team.teamId}>
-                        <SwitcherItem
-                          entry={team}
-                          active={entryIsCurrent(team, current)}
-                          onSelect={() => {
-                            setOpen(false);
-                            void router.push(team.href);
-                          }}
-                        />
+                        <Box position="relative">
+                          <SwitcherItem
+                            entry={team}
+                            active={entryIsCurrent(team, current)}
+                            onSelect={() => {
+                              setOpen(false);
+                              void router.push(team.href);
+                            }}
+                          />
+                          {team.canCreateProject && onCreateProjectForTeam && (
+                            <Tooltip content="New project in this team">
+                              <IconButton
+                                aria-label={`New project in ${team.label}`}
+                                size="xs"
+                                variant="ghost"
+                                position="absolute"
+                                right={2}
+                                top="50%"
+                                transform="translateY(-50%)"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setOpen(false);
+                                  onCreateProjectForTeam({
+                                    teamId: team.teamId,
+                                    orgId: team.orgId,
+                                  });
+                                }}
+                              >
+                                <Plus size={14} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
                         {teamProjects.length > 0 && (
                           <VStack gap={0} align="stretch" paddingLeft={5}>
                             {teamProjects.map((project) => (

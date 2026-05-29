@@ -67,7 +67,7 @@ export function CostCenterPicker({
   };
 
   return (
-    <NativeSelect.Root size="sm" maxW="200px" disabled={isPending}>
+    <NativeSelect.Root size="sm" minW="160px" maxW="220px" disabled={isPending}>
       <NativeSelect.Field
         value={value ?? ""}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
