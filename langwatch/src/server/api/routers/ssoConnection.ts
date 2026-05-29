@@ -163,6 +163,16 @@ export const ssoConnectionRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  verifyDomain: ssoConnectionProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = SsoConnectionService.create(ctx.prisma);
+      return service.verifyDomain({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
+    }),
+
   toggleEnforcement: ssoConnectionProcedure
     .input(z.object({ id: z.string(), ssoEnforced: z.boolean() }))
     .mutation(async ({ ctx, input }) => {

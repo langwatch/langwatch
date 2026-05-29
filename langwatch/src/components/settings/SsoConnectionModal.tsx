@@ -181,16 +181,20 @@ interface Props {
     jitProvisioning?: boolean;
     defaultOrgRole?: "ADMIN" | "MEMBER" | "EXTERNAL";
   }) => void;
+  onVerify?: () => void;
   editingConnection?: SsoConnectionListItem | null;
   saving?: boolean;
+  verifying?: boolean;
 }
 
 export function SsoConnectionModal({
   open,
   onClose,
   onSave,
+  onVerify,
   editingConnection,
   saving,
+  verifying,
 }: Props) {
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -342,9 +346,16 @@ export function SsoConnectionModal({
                         </HStack>
                       </VStack>
                     </Box>
-                    <Button size="sm" variant="outline" disabled>
-                      Verify Domain
-                    </Button>
+                    {isEditing && !form.verifiedAt && onVerify && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onVerify}
+                        loading={verifying}
+                      >
+                        Verify Domain
+                      </Button>
+                    )}
                   </VStack>
                 </Box>
               )}

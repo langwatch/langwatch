@@ -1,5 +1,6 @@
 import type { PrismaClient, SsoConnection } from "@prisma/client";
 import { encrypt } from "../../utils/encryption";
+import { verifyDomainDns } from "./dnsVerification";
 import { SsoConnectionRepository } from "./ssoConnection.repository";
 
 export class SsoConnectionService {
@@ -130,6 +131,38 @@ export class SsoConnectionService {
     organizationId: string;
   }): Promise<void> {
     return this.repository.delete({ id, organizationId });
+  }
+
+  async verifyDomain({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ verified: boolean }> {
+    const connection = await this.repository.findById({ id, organizationId });
+    if (!connection) {
+      return { verified: false };
+    }
+
+    if (connection.verifiedAt) {
+      return { verified: true };
+    }
+
+    const verified = await verifyDomainDns({
+      domain: connection.domain,
+      expectedToken: connection.verificationToken,
+    });
+
+    if (verified) {
+      await this.repository.update({
+        id,
+        organizationId,
+        data: { verifiedAt: new Date() },
+      });
+    }
+
+    return { verified };
   }
 
   async toggleEnforcement({

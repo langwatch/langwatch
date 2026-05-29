@@ -134,6 +134,23 @@ function SsoSettings() {
     },
   });
 
+  const verifyMutation = api.ssoConnection.verifyDomain.useMutation({
+    onSuccess: (result) => {
+      void connectionsQuery.refetch();
+      if (result.verified) {
+        toaster.create({ title: "Domain verified", type: "success" });
+      } else {
+        toaster.create({
+          title: "DNS record not found — check your TXT record and try again",
+          type: "warning",
+        });
+      }
+    },
+    onError: (error) => {
+      toaster.create({ title: error.message, type: "error" });
+    },
+  });
+
   const toggleMutation = api.ssoConnection.toggleEnforcement.useMutation({
     onSuccess: () => {
       void connectionsQuery.refetch();
@@ -506,8 +523,18 @@ function SsoSettings() {
           setEditingConnection(null);
         }}
         onSave={handleSave}
+        onVerify={
+          editingConnection
+            ? () =>
+                verifyMutation.mutate({
+                  organizationId: organization.id,
+                  id: editingConnection.id,
+                })
+            : undefined
+        }
         editingConnection={editingConnection}
         saving={createMutation.isPending || updateMutation.isPending}
+        verifying={verifyMutation.isPending}
       />
 
       {/* Delete Confirmation */}
