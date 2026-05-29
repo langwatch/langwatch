@@ -5,7 +5,7 @@ import {
   stopTestContainers,
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupStagingScripts } from "../scripts";
+import { GroupStagingScripts, CLAIMANT_WINDOW_MS } from "../scripts";
 
 // Behavioral suite for specs/event-sourcing/work-conserving-fair-dispatch.feature.
 //
@@ -335,6 +335,47 @@ describe("work-conserving fair dispatch", () => {
 
         expect(first?.groupId).toBe(gid("solo", "early"));
         expect(second?.groupId).toBe(gid("solo", "late"));
+      });
+    });
+  });
+
+  // Regression for the dynamic-cap recompute (ebbd3eeea): a tenant that stops
+  // enqueuing for longer than the claimant window but still holds in-flight or
+  // parked work must stay a measured claimant - it must NOT be evicted from the
+  // water-fill by recency alone, or W inflates and a fresh co-tenant expands past
+  // its fair share, starving the quiet-but-working tenant.
+  describe("Rule: a still-working tenant is not evicted by going quiet", () => {
+    describe("when a tenant holds work but stops enqueuing past the claimant window", () => {
+      it("keeps its fair share while a fresh co-tenant does not take the whole fleet", async () => {
+        // quiet bursts and, alone, fills the fleet (W=G) with active + parked work
+        await stageForTenant("quiet", 50);
+        await fillToFleet(FLEET);
+        expect((await inFlightByTenant()).quiet).toBe(FLEET);
+
+        // age quiet's demand recency past the claimant window WITHOUT a new
+        // enqueue (it is still holding all that active + parked work)
+        await redis.zadd(
+          `${keyPrefix()}demanding-tenants`,
+          Date.now() - CLAIMANT_WINDOW_MS - 1000,
+          "quiet",
+        );
+
+        // a fresh co-tenant arrives and competes
+        await stageForTenant("fresh", 50);
+        // wait past the reconcile gate so the next dispatch recomputes W with both
+        await sleep(RECONCILE_GATE_MS);
+
+        for (let round = 0; round < 8; round++) {
+          await completeSome(5);
+          await fillToFleet(FLEET);
+        }
+
+        const inFlight = await inFlightByTenant();
+        // quiet was kept in the fill (its parked work still competes); it is not
+        // starved, and fresh is held to its fair share rather than the whole fleet
+        expect(inFlight.quiet ?? 0).toBeGreaterThanOrEqual(8);
+        expect(inFlight.fresh ?? 0).toBeLessThanOrEqual(12);
+        expect((inFlight.quiet ?? 0) + (inFlight.fresh ?? 0)).toBe(FLEET);
       });
     });
   });
