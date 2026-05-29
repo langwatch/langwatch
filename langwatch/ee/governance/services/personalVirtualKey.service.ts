@@ -212,20 +212,25 @@ export class PersonalVirtualKeyService {
   }
 
   /**
-   * List the caller's personal VKs across personal projects in an org.
-   * Never includes the secret.
+   * List personal VKs in an org. Never includes the secret.
+   *
+   * `userId` scopes the result to one principal (the caller's own keys, or
+   * a specific user's keys for an off-boarding sweep). Omit it to list every
+   * personal VK in the org — used by admins holding
+   * `virtualKeys:viewOtherPersonal`. The caller is responsible for the perm
+   * check; this service never authorizes.
    */
   async list({
     userId,
     organizationId,
   }: {
-    userId: string;
+    userId?: string;
     organizationId: string;
   }) {
     return await this.prisma.virtualKey.findMany({
       where: {
         organizationId,
-        principalUserId: userId,
+        principalUserId: userId !== undefined ? userId : { not: null },
         revokedAt: null,
       },
       select: {

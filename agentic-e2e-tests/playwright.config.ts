@@ -44,10 +44,23 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
 
+    /* In CI, use the runner's preinstalled Google Chrome
+     * (E2E_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
+     * Locally it falls back to Playwright's bundled Chromium. Applies to all
+     * projects (setup + specs) since none override channel. */
+    ...(process.env.E2E_BROWSER_CHANNEL
+      ? { channel: process.env.E2E_BROWSER_CHANNEL }
+      : {}),
+
     /* Collect trace on failure for debugging */
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    /* Video needs Playwright's own pinned ffmpeg binary, which the bundled
+     * Chromium download would normally supply. We skip that download in CI
+     * (system Chrome via channel), so video is opt-in via E2E_RECORD_VIDEO to
+     * avoid a separate ffmpeg install. Trace already captures DOM, network,
+     * and console for debugging. */
+    video: process.env.E2E_RECORD_VIDEO ? "retain-on-failure" : "off",
 
     /* Reasonable timeouts */
     actionTimeout: 15000,

@@ -33,4 +33,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   ownerUserId: null,
   presenceEnabled: false,
   personalFeatures: {},
+  costCenterId: null,
 }));

@@ -128,16 +128,26 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Org/project already exists, skipping setup.");
   }
 
-  // Step 4: Navigate to the app root and wait for main navigation.
-  // This confirms the session + org/project are wired up before saving state.
-  console.log("Navigating to app root to confirm setup...");
-  await page.goto("/");
+  // Step 4: Confirm the authenticated shell on a settings page. We use
+  // /settings rather than the app root because root redirects to the
+  // trace-backed personal landing, whose data fetch can disturb the layout;
+  // /settings renders the same sidebar from Postgres alone. We confirm we did
+  // not bounce back to /auth and that the sidebar rendered. (The old "Home"
+  // link no longer exists in the personal-portal sidebar.)
+  console.log("Navigating to settings to confirm setup...");
+  await page.goto("/settings");
 
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
   try {
-    await homeLink.waitFor({ state: "visible", timeout: 30000 });
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
+      timeout: 30000,
+    });
+    // href is stable regardless of sidebar expand state (collapsed links
+    // drop their text label), so match the Settings nav link by href.
+    await expect(
+      page.locator('a[href="/settings"]').first(),
+    ).toBeVisible({ timeout: 30000 });
   } catch (err) {
-    console.log("Home link not visible. URL:", page.url());
+    console.log("Authenticated shell not confirmed. URL:", page.url());
     await page.screenshot({
       path: path.join(__dirname, "..", "debug-post-setup.png"),
     });

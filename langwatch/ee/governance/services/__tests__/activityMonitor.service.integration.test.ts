@@ -49,7 +49,6 @@ const ORIGIN_VALUE = "ingestion_source";
 const SOURCE_ID_KEY = "langwatch.ingestion_source.id";
 const SOURCE_TYPE_KEY = "langwatch.ingestion_source.source_type";
 const ORG_ID_KEY = "langwatch.ingestion_source.organization_id";
-const RETENTION_KEY = "langwatch.governance.retention_class";
 const USER_KEY = "langwatch.user_id";
 
 interface SeedTrace {
@@ -214,7 +213,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         [SOURCE_ID_KEY]: primarySourceId,
         [SOURCE_TYPE_KEY]: "otel_generic",
         [ORG_ID_KEY]: primaryOrg.id,
-        [RETENTION_KEY]: "thirty_days",
         [USER_KEY]: "alice@example.com",
       },
     });
@@ -230,7 +228,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         [SOURCE_ID_KEY]: primarySourceId,
         [SOURCE_TYPE_KEY]: "otel_generic",
         [ORG_ID_KEY]: primaryOrg.id,
-        [RETENTION_KEY]: "thirty_days",
         [USER_KEY]: "bob@example.com",
       },
     });
@@ -246,7 +243,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         [SOURCE_ID_KEY]: secondarySourceId,
         [SOURCE_TYPE_KEY]: "claude_cowork",
         [ORG_ID_KEY]: primaryOrg.id,
-        [RETENTION_KEY]: "thirty_days",
         [USER_KEY]: "carol@example.com",
       },
     });
@@ -276,7 +272,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         [SOURCE_ID_KEY]: crossSourceId,
         [SOURCE_TYPE_KEY]: "otel_generic",
         [ORG_ID_KEY]: crossOrg.id,
-        [RETENTION_KEY]: "thirty_days",
         [USER_KEY]: "alice@cross.example.com",
       },
     });
@@ -290,7 +285,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         [SOURCE_ID_KEY]: secondarySourceId,
         [SOURCE_TYPE_KEY]: "claude_cowork",
         [ORG_ID_KEY]: primaryOrg.id,
-        [RETENTION_KEY]: "thirty_days",
       },
       inWindow,
     );
@@ -310,7 +304,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           status: "active",
           ingestSecretHash: "test",
           parserConfig: {},
-          retentionClass: "thirty_days",
         },
         {
           id: secondarySourceId,
@@ -321,7 +314,6 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           status: "active",
           ingestSecretHash: "test",
           parserConfig: {},
-          retentionClass: "thirty_days",
         },
       ],
     });

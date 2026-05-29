@@ -2,12 +2,20 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   resolveHotDays,
   parseTTLDaysFromEngineMetadata,
+  hasLegacyRetentionTTL,
+  shouldRewriteTTL,
   buildDesiredTTLExpression,
   TABLE_TTL_CONFIG,
   TIERED_STORAGE_POLICY,
   reconcileTTL,
   type TableTTLEntry,
 } from "../ttlReconciler";
+
+const legacyRetentionEngineFull =
+  "ReplicatedMergeTree() TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold', " +
+  "toDateTime(EndTime) + toIntervalDay(30) DELETE WHERE RetentionClass = 'thirty_days', " +
+  "toDateTime(EndTime) + toIntervalDay(365) DELETE WHERE RetentionClass = 'one_year' " +
+  "SETTINGS index_granularity = 8192";
 
 const sampleEntry: TableTTLEntry = {
   table: "stored_spans",
@@ -136,6 +144,82 @@ describe("ttlReconciler", () => {
     describe("when engine_full is empty", () => {
       it("returns null", () => {
         expect(parseTTLDaysFromEngineMetadata("")).toBeNull();
+      });
+    });
+  });
+
+  describe("hasLegacyRetentionTTL()", () => {
+    describe("when engine_full carries a RetentionClass DELETE clause", () => {
+      it("detects the legacy clause", () => {
+        expect(hasLegacyRetentionTTL(legacyRetentionEngineFull)).toBe(true);
+      });
+    });
+
+    describe("when engine_full has a clean MOVE-only TTL", () => {
+      it("returns false", () => {
+        const engineFull =
+          "ReplicatedMergeTree() TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'";
+        expect(hasLegacyRetentionTTL(engineFull)).toBe(false);
+      });
+    });
+
+    describe("when engine_full has no TTL", () => {
+      it("returns false", () => {
+        expect(hasLegacyRetentionTTL("MergeTree ORDER BY (TenantId)")).toBe(
+          false,
+        );
+      });
+    });
+  });
+
+  describe("shouldRewriteTTL()", () => {
+    describe("when the cold-storage day count differs from desired", () => {
+      it("requires a rewrite", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 30,
+            desiredDays: 49,
+            engineFull:
+              "TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'",
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the day count matches and the TTL is clean", () => {
+      it("skips the rewrite", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 49,
+            desiredDays: 49,
+            engineFull:
+              "TTL toDateTime(EndTime) + toIntervalDay(49) TO VOLUME 'cold'",
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the day count matches but a legacy retention DELETE clause lingers", () => {
+      it("still requires a rewrite to strip the legacy clause", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 30,
+            desiredDays: 30,
+            engineFull: legacyRetentionEngineFull,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when no TTL is set on a fresh install", () => {
+      it("requires a rewrite to apply the desired TTL", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: null,
+            desiredDays: 49,
+            engineFull: "MergeTree ORDER BY (TenantId)",
+          }),
+        ).toBe(true);
       });
     });
   });

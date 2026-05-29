@@ -20,14 +20,13 @@
 #
 # Companion specs (this file references but does not duplicate):
 # - event-log-durability.feature → append-only invariants, projection-rebuild semantics
-# - retention.feature             → per-origin retention class mechanics + plan ceiling
 # - folds.feature                 → governance_kpis + governance_ocsf_events derivation
 # - receiver-shapes.feature       → per-source-type wire shape (spans vs logs)
 # - architecture-invariants.feature → cross-cutting unified-substrate invariants
 # - ui-contract.feature           → /governance UI contract + hidden-project filter discipline
 # - siem-export.feature           → OCSF read API contract + thin push wrapper
 
-Feature: Governance compliance baseline — append-only event log + retention + RBAC
+Feature: Governance compliance baseline — append-only event log + RBAC
 
   Background:
     Given the unified observability substrate is the single source of truth for governance events
@@ -35,22 +34,6 @@ Feature: Governance compliance baseline — append-only event log + retention + 
     And every governance event carries origin metadata in the langwatch.origin.* namespace
     And derived governance KPI / OCSF read shapes live in dedicated fold projections
     And cryptographic tamper-evidence is filed as a follow-up hardening layer
-
-  # ─────────────────────────────────────────────────────────────────────
-  # Per-origin retention class — see retention.feature for mechanics
-  # ─────────────────────────────────────────────────────────────────────
-  #
-  # The retention-class mechanics (per-IngestionSource config, langwatch.
-  # governance.retention_class attribute stamping, CH TTL enforcement,
-  # org-plan ceiling, default class) are the source of truth in
-  # retention.feature. This compliance baseline references that contract
-  # and asserts only the COMPLIANCE GUARANTEES it underwrites:
-
-  Scenario: Retention class implementation underwrites the SOC2/HIPAA/EU-AI-Act audit windows
-    Given retention.feature defines operational (30d) / compliance (1y) / archive (7y) classes with org-plan ceiling
-    When a customer asks "can your retention meet our SOC2 / HIPAA / EU AI Act window?"
-    Then the answer maps to the class their plan permits per retention.feature
-    And no governance event survives past the plan ceiling regardless of source request
 
   # ─────────────────────────────────────────────────────────────────────
   # Hidden Governance Project — see architecture-invariants.feature + ui-contract.feature
@@ -145,11 +128,11 @@ Feature: Governance compliance baseline — append-only event log + retention + 
 
     Examples:
       | framework         | mechanism                                                                              |
-      | SOC2 Type II      | per-origin retention + RBAC via hidden Gov Project + append-only event_log             |
+      | SOC2 Type II      | RBAC via hidden Gov Project + append-only event_log                                    |
       | ISO 27001         | same as SOC2 + access-control logging via existing audit trails                        |
-      | EU AI Act         | per-event attribution (actor / action / target / cost / tokens) + retention + RBAC     |
-      | GDPR              | PII redaction in trace pipeline + right-to-erasure via project-scoped delete + retention TTL |
-      | HIPAA-most-uses   | retention archive class + RBAC + PII redaction (HITECH strict tamper-evident: deferred) |
+      | EU AI Act         | per-event attribution (actor / action / target / cost / tokens) + RBAC                 |
+      | GDPR              | PII redaction in trace pipeline + right-to-erasure via project-scoped delete           |
+      | HIPAA-most-uses   | RBAC + PII redaction (HITECH strict tamper-evident: deferred)                          |
 
   Scenario: Compliance scope doc is honest about deferred items
     Given the compliance-architecture docs page is published

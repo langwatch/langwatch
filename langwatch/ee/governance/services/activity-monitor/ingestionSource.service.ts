@@ -30,6 +30,7 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { encryptParserConfigCredentials } from "./ingestionCredentials";
 
 /**
  * Non-enterprise plans can create up to this many active IngestionSources
@@ -62,24 +63,6 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "http_custom",
 ] as const;
 
-/** Canonical retention bucket values. Free-form string in the DB column
- *  for extensibility (matching IngestionSource.sourceType pattern); this
- *  constant is the source of truth in TS. CH TTL policy reads the value
- *  from `langwatch.governance.retention_class` at delete-time. */
-export const RETENTION_CLASSES = {
-  THIRTY_DAYS: "thirty_days",
-  ONE_YEAR: "one_year",
-  SEVEN_YEARS: "seven_years",
-} as const;
-export type RetentionClass =
-  (typeof RETENTION_CLASSES)[keyof typeof RETENTION_CLASSES];
-
-export const SUPPORTED_RETENTION_CLASSES: readonly RetentionClass[] = [
-  "thirty_days",
-  "one_year",
-  "seven_years",
-] as const;
-
 export interface CreateIngestionSourceInput {
   organizationId: string;
   teamId?: string | null;
@@ -87,7 +70,6 @@ export interface CreateIngestionSourceInput {
   name: string;
   description?: string | null;
   parserConfig?: Record<string, unknown>;
-  retentionClass?: RetentionClass;
   /**
    * Phase 10: opaque adapter config persisted on IngestionSource.pullConfig.
    * Worker resolves `pullConfig.adapter` through the pullerAdapterRegistry
@@ -107,7 +89,6 @@ export interface UpdateIngestionSourceInput {
   name?: string;
   description?: string | null;
   parserConfig?: Record<string, unknown>;
-  retentionClass?: RetentionClass;
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
 }
@@ -225,10 +206,6 @@ export class IngestionSourceService {
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       throw new Error(`Unsupported sourceType: ${input.sourceType}`);
     }
-    const retentionClass = input.retentionClass ?? "thirty_days";
-    if (!SUPPORTED_RETENTION_CLASSES.includes(retentionClass)) {
-      throw new Error(`Unsupported retentionClass: ${retentionClass}`);
-    }
 
     // Lazy-ensure the hidden Governance Project on first source mint —
     // every IngestionSource for an org routes its events through this
@@ -250,10 +227,10 @@ export class IngestionSourceService {
     // change. `parserConfig` wins on key conflicts (it's the
     // canonical input for push-mode sources); `pullConfig` data
     // fills in for pull-mode adapters.
-    const mergedParserConfig: Record<string, unknown> = {
+    const mergedParserConfig = encryptParserConfigCredentials({
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
-    };
+    })!;
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -264,7 +241,6 @@ export class IngestionSourceService {
         ingestSecretHash,
         parserConfig: mergedParserConfig as Prisma.InputJsonValue,
         pullSchedule: input.pullSchedule ?? null,
-        retentionClass,
         status: "awaiting_first_event",
         createdById: input.actorUserId,
       },
@@ -285,15 +261,9 @@ export class IngestionSourceService {
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
-      data.parserConfig = input.parserConfig as Prisma.InputJsonValue;
-    }
-    if (input.retentionClass !== undefined) {
-      if (!SUPPORTED_RETENTION_CLASSES.includes(input.retentionClass)) {
-        throw new Error(
-          `Unsupported retentionClass: ${input.retentionClass}`,
-        );
-      }
-      data.retentionClass = input.retentionClass;
+      data.parserConfig = encryptParserConfigCredentials(
+        input.parserConfig,
+      ) as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
     if (input.teamId !== undefined) {
@@ -323,13 +293,13 @@ export class IngestionSourceService {
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
     const priorParser = (existing.parserConfig as Record<string, unknown>) ?? {};
-    const merged = {
+    const merged = encryptParserConfigCredentials({
       ...priorParser,
       _rotation: {
         priorHash: existing.ingestSecretHash,
         expiresAt: Date.now() + ROTATION_GRACE_MS,
       },
-    };
+    })!;
     const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data: {

@@ -8,7 +8,7 @@ import {
   otelAttributesToNestedAttributes,
   type TraceForCollection,
 } from "./otel.traces";
-import type { SpanInputOutput } from "./types";
+import type { SpanInputOutput, SpanMetrics } from "./types";
 import {
   convertFromUnixNano,
   decodeBase64OpenTelemetryId,
@@ -78,6 +78,8 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
               let identifier = logRecord.body.stringValue;
               let input: SpanInputOutput | null = null;
               let output: SpanInputOutput | null = null;
+              let model: string | null = null;
+              let metrics: SpanMetrics | null = null;
 
               if (springAIScopeNames.includes(scopeLog.scope?.name ?? "")) {
                 const logString = logRecord.body.stringValue;
@@ -114,14 +116,58 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
               }
 
               if (claudeCodeScopeNames.includes(scopeLog.scope?.name ?? "")) {
-                const promptAttribute = logRecord.attributes?.find(
-                  (attribute) => attribute?.key === "prompt",
-                );
-                if (promptAttribute) {
+                const attrs = logRecord.attributes ?? [];
+                const attrValue = (key: string) =>
+                  attrs.find((attribute) => attribute?.key === key)?.value;
+                const attrNumber = (key: string): number | null => {
+                  const v = attrValue(key);
+                  if (!v) return null;
+                  const raw =
+                    v.stringValue ??
+                    (v.intValue as string | number | undefined) ??
+                    v.doubleValue;
+                  const n =
+                    typeof raw === "string"
+                      ? Number(raw)
+                      : typeof raw === "number"
+                        ? raw
+                        : NaN;
+                  return Number.isFinite(n) ? n : null;
+                };
+
+                const promptValue = attrValue("prompt");
+                if (promptValue) {
                   input = {
                     type: "text",
-                    value: promptAttribute.value?.stringValue ?? "",
+                    value: promptValue.stringValue ?? "",
                   };
+                }
+
+                // Claude Code emits one `claude_code.api_request` log record
+                // per model call carrying cost + tokens + model directly on
+                // its attributes (no OTTL on this personal-binding path).
+                // Lift them onto the span so the trace itself shows
+                // gen_ai-style cost/usage, matching what the OTTL ingestion
+                // path produces for the org governance feed.
+                const isApiRequest =
+                  attrValue("event.name")?.stringValue === "api_request" ||
+                  logRecord.body.stringValue === "claude_code.api_request";
+                if (isApiRequest) {
+                  model = attrValue("model")?.stringValue ?? null;
+                  const cost = attrNumber("cost_usd");
+                  const promptTokens = attrNumber("input_tokens");
+                  const completionTokens = attrNumber("output_tokens");
+                  const cacheRead = attrNumber("cache_read_tokens");
+                  const cacheCreation = attrNumber("cache_creation_tokens");
+                  const next: SpanMetrics = {};
+                  if (cost !== null) next.cost = cost;
+                  if (promptTokens !== null) next.prompt_tokens = promptTokens;
+                  if (completionTokens !== null)
+                    next.completion_tokens = completionTokens;
+                  if (cacheRead !== null) next.cache_read_input_tokens = cacheRead;
+                  if (cacheCreation !== null)
+                    next.cache_creation_input_tokens = cacheCreation;
+                  if (Object.keys(next).length > 0) metrics = next;
                 }
               }
 
@@ -148,6 +194,8 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
                   type: "llm",
                   input: input,
                   output: output,
+                  ...(model ? { model } : {}),
+                  ...(metrics ? { metrics } : {}),
                   params: otelAttributesToNestedAttributes(
                     logRecord.attributes ?? [],
                   ),

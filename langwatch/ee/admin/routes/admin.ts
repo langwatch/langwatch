@@ -7,7 +7,7 @@
  *
  * Mounted by `src/server/api-router.ts`. Exposes:
  *   - POST|DELETE /api/admin/impersonate
- *   - POST        /api/admin/:resource   (react-admin / ra-data-simple-prisma)
+ *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
 import {
   defaultHandler,
@@ -139,7 +139,7 @@ app.post("/admin/:resource", async (c) => {
     return c.json({ message: "Bad request" }, 400);
   }
 
-  // The react-admin body comes with resource + method inside it, but the
+  // The request body carries resource + method inside it, but the
   // URL also has the resource param. We use the body's resource field
   // since that's what defaultHandler expects.
   if (!body.resource) {
