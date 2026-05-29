@@ -20,11 +20,21 @@
  */
 
 import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { Check, Clipboard, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { copyToClipboard } from "~/features/onboarding/components/sections/shared/copy-to-clipboard";
 import { codeToHtml } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
+
+// PostHog's rainbow-scroll keyframes, defined via Emotion's `keyframes`
+// helper so the animation name is hoisted to a global stylesheet (Chakra's
+// `css` prop doesn't reliably hoist nested `@keyframes`).
+// Source: posthog/frontend/src/styles/base.scss:2100-2108
+const lwRainbowScroll = keyframes`
+  0% { background-position-x: 0%; }
+  100% { background-position-x: 200%; }
+`;
 
 // ---------------------------------------------------------------------------
 // Component props
@@ -288,7 +298,7 @@ export function ShikiCommandBox({
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundSize: "200% 100%",
-              animation: "lwRainbowScroll 3s linear infinite",
+              animation: `${lwRainbowScroll} 3s linear infinite`,
               // Override Shiki's inline `color: <token-color>` on every nested
               // span so the wrapper's gradient text-fill shows through every
               // character. Shiki sets colors via inline style, so the spec's
@@ -296,10 +306,9 @@ export function ShikiCommandBox({
               "& pre, & code, & span": {
                 color: "inherit !important",
                 WebkitTextFillColor: "inherit",
-              },
-              "@keyframes lwRainbowScroll": {
-                "0%": { backgroundPositionX: "0%" },
-                "100%": { backgroundPositionX: "200%" },
+                backgroundImage: "inherit",
+                backgroundClip: "inherit",
+                WebkitBackgroundClip: "inherit",
               },
               "@media (prefers-reduced-motion: reduce)": {
                 animation: "none",
