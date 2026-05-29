@@ -126,7 +126,7 @@ importers:
         version: 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-web':
         specifier: '>=2.0.1'
-        version: 2.6.0(@opentelemetry/api@1.9.0)
+        version: 2.7.1(@opentelemetry/api@1.9.0)
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
@@ -988,8 +988,8 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
 
-  '@opentelemetry/sdk-trace-web@2.6.0':
-    resolution: {integrity: sha512-xyYmLFatwUeYnB7NtQ2Ydl9Y8uiblN+EDo5YEjnk7ZRMhGFyt1wgPqb8EYvATLuDiRVtxid1fJsL6RH1fCQMIA==}
+  '@opentelemetry/sdk-trace-web@2.7.1':
+    resolution: {integrity: sha512-K806OouCSOjMd8Nr7+ZCq3QT22tdAzzS/7h8vprfiKjkgFQ99/dvwU8d12WJANA6D5Qtme65hyBAqAu9CkQuxQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
@@ -3801,7 +3801,7 @@ snapshots:
       '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
 
-  '@opentelemetry/sdk-trace-web@2.6.0(@opentelemetry/api@1.9.0)':
+  '@opentelemetry/sdk-trace-web@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
