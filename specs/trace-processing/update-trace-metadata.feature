@@ -118,7 +118,7 @@ Feature: Update trace metadata by trace ID
 
   # ─── API Endpoint ──────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: tRPC mutation updates trace metadata successfully
     Given a user with "traces:update" permission
     When the user calls traces.changeMetadata with:
@@ -129,13 +129,13 @@ Feature: Update trace metadata by trace ID
     Then the mutation returns success with the traceId
     And the trace summary in ClickHouse reflects the updated attributes
 
-  @integration
+  @integration @unimplemented
   Scenario: Mutation rejects users without traces:update permission
     Given a user with only "traces:read" permission
     When the user calls traces.changeMetadata
     Then the request is rejected with a permission error
 
-  @integration
+  @integration @unimplemented
   Scenario: Mutation rejects non-existent trace
     When the user calls traces.changeMetadata for a traceId that does not exist
     Then the mutation returns a "trace not found" error
@@ -143,7 +143,7 @@ Feature: Update trace metadata by trace ID
 
   # ─── Reactors ──────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Metadata update triggers trace broadcast reactor
     When a TraceMetadataChangedEvent is processed through the fold projection
     Then the traceUpdateBroadcastReactor fires

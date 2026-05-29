@@ -59,6 +59,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when user_id is updated via metadata event", () => {
+    /** @scenario Reserved field user_id is deep-merged into attributes */
     it("maps user_id to langwatch.user_id and preserves other attributes", () => {
       const projection = makeProjection();
       const state = {
@@ -78,6 +79,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when customer_id is updated via metadata event", () => {
+    /** @scenario Reserved field customer_id is deep-merged into attributes */
     it("maps customer_id to langwatch.customer_id", () => {
       const projection = makeProjection();
       const state = {
@@ -97,6 +99,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when thread_id is updated via metadata event", () => {
+    /** @scenario Reserved field thread_id is deep-merged into attributes */
     it("maps thread_id to gen_ai.conversation.id", () => {
       const projection = makeProjection();
       const state = createInitState();
@@ -111,6 +114,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when labels are set via metadata event", () => {
+    /** @scenario Labels replace the existing labels array and set the override latch */
     it("replaces existing labels and sets the override latch", () => {
       const projection = makeProjection();
       const state = {
@@ -129,6 +133,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when a late-arriving span has labels and the latch is set", () => {
+    /** @scenario Late-arriving span does not clobber API-set labels */
     it("does not clobber API-set labels", () => {
       const state = {
         ...createInitState(),
@@ -149,6 +154,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when custom metadata keys are set", () => {
+    /** @scenario Custom metadata keys are deep-merged with metadata prefix */
     it("prefixes with metadata. and preserves existing custom keys", () => {
       const projection = makeProjection();
       const state = {
@@ -167,6 +173,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when custom metadata JSON objects are deep-merged", () => {
+    /** @scenario Custom metadata JSON objects are deep-merged */
     it("merges new keys into existing JSON object", () => {
       const projection = makeProjection();
       const state = {
@@ -187,6 +194,7 @@ describe("TraceSummaryFoldProjection metadata handler", () => {
   });
 
   describe("when metadata is updated", () => {
+    /** @scenario Metadata update does not affect non-metadata trace fields */
     it("does not affect non-metadata trace fields", () => {
       const projection = makeProjection();
       const state = {
