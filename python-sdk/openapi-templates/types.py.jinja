@@ -1,8 +1,13 @@
 {# LangWatch fork of openapi-python-client v0.28.4 types.py.jinja.
    Changes vs upstream: adds safe_http_status() helper and widens
-   Response.status_code to HTTPStatus | int. Drop this override when
-   upstream merges https://github.com/openapi-generators/openapi-python-client/pull/1407
-   (tracked at https://github.com/openapi-generators/openapi-python-client/issues/1442). #}
+   Response.status_code to HTTPStatus | int.
+
+   Revisit this override when bumping openapi-python-client (pinned in
+   Makefile). Upstream tracking:
+     https://github.com/openapi-generators/openapi-python-client/issues/1442
+     https://github.com/openapi-generators/openapi-python-client/pull/1407
+   If a non-crashing path lands (opt-in flag or new default), switch to
+   it and drop this template. #}
 """ Contains some shared types for properties """
 
 from collections.abc import Mapping, MutableMapping
