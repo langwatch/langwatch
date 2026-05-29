@@ -378,6 +378,7 @@ function SwitcherItem({
     <Menu.Item
       value={itemValue}
       fontSize="14px"
+      paddingY="2px"
       onClick={onSelect}
       asChild
     >
@@ -401,7 +402,7 @@ function SwitcherItem({
           e.preventDefault();
         }}
       >
-        <HStack gap={3} width="full" alignItems="start" paddingY={0.5}>
+        <HStack gap={3} width="full" alignItems="start" paddingY={0}>
           <Box paddingTop="2px">
             {entry.kind === "project" ? (
               <ProjectAvatar name={entry.label} />

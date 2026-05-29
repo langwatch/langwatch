@@ -8,13 +8,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { CostCenterEditDrawer } from "~/components/settings/CostCenterEditDrawer";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -220,17 +223,13 @@ function CostCenterList({
   isLoading: boolean;
   onChanged: () => Promise<void>;
 }) {
-  const renameMutation = api.costCenters.rename.useMutation({
-    onSuccess: async () => {
-      toaster.create({ title: "Cost center renamed", type: "success" });
-      await onChanged();
-    },
-    onError: (e) =>
-      toaster.create({ title: "Rename failed", description: e.message, type: "error" }),
-  });
+  const [editing, setEditing] = useState<CostCenter | null>(null);
+  const [archiving, setArchiving] = useState<CostCenter | null>(null);
+
   const archiveMutation = api.costCenters.archive.useMutation({
     onSuccess: async () => {
       toaster.create({ title: "Cost center archived", type: "success" });
+      setArchiving(null);
       await onChanged();
     },
     onError: (e) =>
@@ -238,74 +237,89 @@ function CostCenterList({
   });
 
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      <Box
-        paddingY={2}
-        paddingX={3}
-        borderBottomWidth="1px"
+    <>
+      <VStack
+        align="stretch"
+        gap={0}
+        borderWidth="1px"
         borderColor="border.muted"
-        backgroundColor="bg.subtle"
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
+        borderRadius="md"
+        overflow="hidden"
       >
-        Cost centers
-      </Box>
-      {isLoading ? (
-        <Box padding={4}>
-          <Spinner />
+        <Box
+          paddingY={2}
+          paddingX={3}
+          borderBottomWidth="1px"
+          borderColor="border.muted"
+          backgroundColor="bg.subtle"
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Cost centers
         </Box>
-      ) : costCenters.length === 0 ? (
-        <Box padding={4} color="fg.muted" fontSize="sm">
-          No cost centers yet. Create one above to start attributing spend.
-        </Box>
-      ) : (
-        costCenters.map((cc) => (
-          <CostCenterRow
-            key={cc.id}
-            orgId={orgId}
-            costCenter={cc}
-            onRename={(name) =>
-              renameMutation.mutate({ organizationId: orgId, id: cc.id, name })
-            }
-            onArchive={() =>
-              archiveMutation.mutate({ organizationId: orgId, id: cc.id })
-            }
-            renaming={renameMutation.isLoading}
-            archiving={archiveMutation.isLoading}
-          />
-        ))
-      )}
-    </VStack>
+        {isLoading ? (
+          <Box padding={4}>
+            <Spinner />
+          </Box>
+        ) : costCenters.length === 0 ? (
+          <Box padding={4} color="fg.muted" fontSize="sm">
+            No cost centers yet. Create one above to start attributing spend.
+          </Box>
+        ) : (
+          costCenters.map((cc) => (
+            <CostCenterRow
+              key={cc.id}
+              costCenter={cc}
+              onEdit={() => setEditing(cc)}
+              onArchive={() => setArchiving(cc)}
+            />
+          ))
+        )}
+      </VStack>
+
+      <CostCenterEditDrawer
+        organizationId={orgId}
+        costCenter={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={() => {
+          setEditing(null);
+          void onChanged();
+        }}
+      />
+      <ConfirmDialog
+        open={!!archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+        title={`Archive ${archiving?.name ?? "cost center"}?`}
+        message="Spend already attributed to this cost center rolls up under Unassigned. The cost center stops appearing in the assignment pickers."
+        confirmLabel="Archive"
+        tone="warning"
+        loading={archiveMutation.isLoading}
+        onConfirm={() => {
+          if (archiving) {
+            archiveMutation.mutate({ organizationId: orgId, id: archiving.id });
+          }
+        }}
+      />
+    </>
   );
 }
 
 function CostCenterRow({
   costCenter,
-  onRename,
+  onEdit,
   onArchive,
-  renaming,
-  archiving,
 }: {
-  orgId: string;
   costCenter: CostCenter;
-  onRename: (name: string) => void;
+  onEdit: () => void;
   onArchive: () => void;
-  renaming: boolean;
-  archiving: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(costCenter.name);
-
   return (
     <HStack
       paddingY={2}
@@ -315,57 +329,22 @@ function CostCenterRow({
       fontSize="sm"
       justifyContent="space-between"
     >
-      {editing ? (
-        <HStack flex={1}>
-          <Input
-            size="sm"
-            maxW="sm"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-          />
-          <Button
-            size="xs"
-            colorPalette="orange"
-            loading={renaming}
-            disabled={!draft.trim() || draft.trim() === costCenter.name}
-            onClick={() => {
-              onRename(draft.trim());
-              setEditing(false);
-            }}
-          >
-            Save
+      <Text fontWeight="medium">{costCenter.name}</Text>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button variant="ghost" size="xs" aria-label="Actions">
+            <MoreVertical size={14} />
           </Button>
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              setDraft(costCenter.name);
-              setEditing(false);
-            }}
-          >
-            Cancel
-          </Button>
-        </HStack>
-      ) : (
-        <>
-          <Text fontWeight="medium">{costCenter.name}</Text>
-          <HStack>
-            <Button size="xs" variant="ghost" onClick={() => setEditing(true)}>
-              Rename
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              colorPalette="red"
-              loading={archiving}
-              onClick={onArchive}
-            >
-              Archive
-            </Button>
-          </HStack>
-        </>
-      )}
+        </Menu.Trigger>
+        <Menu.Content>
+          <Menu.Item value="edit" onClick={onEdit}>
+            <Pencil size={14} /> Edit
+          </Menu.Item>
+          <Menu.Item value="archive" onClick={onArchive}>
+            <Archive size={14} /> Archive
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
     </HStack>
   );
 }
