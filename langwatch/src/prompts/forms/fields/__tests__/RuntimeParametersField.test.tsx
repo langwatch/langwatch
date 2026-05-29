@@ -63,6 +63,7 @@ afterEach(cleanup);
 
 describe("<RuntimeParametersField />", () => {
   describe("when rendering empty state", () => {
+    /** @scenario Parameters tab shows empty state when no parameters are defined */
     it("shows header with + Add button and empty state text", () => {
       renderField();
 
@@ -73,6 +74,7 @@ describe("<RuntimeParametersField />", () => {
   });
 
   describe("when adding key-value parameters", () => {
+    /** @scenario Parameters tab shows "+ Add" button and allows adding key-value parameters */
     it("adds a parameter row and writes to the form", async () => {
       const user = userEvent.setup();
       renderField({ existing: "value" });
@@ -92,6 +94,7 @@ describe("<RuntimeParametersField />", () => {
   });
 
   describe("when removing a parameter", () => {
+    /** @scenario User deletes a parameter via the remove button */
     it("removes the row and updates the form", async () => {
       const user = userEvent.setup();
       renderField({ enabled: true, retries: 3 });
@@ -122,6 +125,7 @@ describe("<RuntimeParametersField />", () => {
   });
 
   describe("when editing a parameter value", () => {
+    /** @scenario User edits parameter key and value inline */
     it("updates the form with the new value", () => {
       renderField({ environment: "production" });
 

@@ -1,6 +1,7 @@
 import type {
   LlmPromptConfig,
   Organization,
+  Prisma,
   Project,
   Team,
 } from "@prisma/client";
@@ -210,7 +211,7 @@ describe("Prompts API", () => {
           data: llmPromptConfigVersionFactory.build({
             configId: config.id,
             projectId: testProjectId,
-          }) as any,
+          }) as unknown as Prisma.LlmPromptConfigVersionUncheckedCreateInput,
         });
       });
 

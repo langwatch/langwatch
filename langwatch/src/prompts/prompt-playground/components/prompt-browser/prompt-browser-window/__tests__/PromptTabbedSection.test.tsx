@@ -571,6 +571,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(screen.getByTestId("add-parameter-button")).toBeInTheDocument();
     });
 
+    /** @scenario Parameters tab shows explanation text distinguishing parameters from variables */
     it("shows explanation text on Parameters and Variables tabs", async () => {
       const user = userEvent.setup();
       renderPromptTabbedSection(

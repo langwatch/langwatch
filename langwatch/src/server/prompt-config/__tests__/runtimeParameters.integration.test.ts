@@ -36,6 +36,7 @@ describe("Feature: Prompt runtime parameters", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
