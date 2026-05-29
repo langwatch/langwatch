@@ -70,6 +70,12 @@ export class OutboxService {
    * `enqueued: false`. The caller is responsible for posting a
    * wakeup to the GroupQueue afterwards.
    *
+   * Claim-once: when a row already exists, the second call's
+   * `payload` / `groupKey` / `maxAttempts` are DISCARDED — the
+   * original row is the source of truth (ADR-022 row-per-match). A
+   * caller that mutates the payload shape and replays will still
+   * dispatch the original payload, by design.
+   *
    * Validates that `groupKey` starts with `${projectId}/` so the
    * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-023). A
    * misformatted key would silently land in the wrong tenant bucket
@@ -110,33 +116,42 @@ export class OutboxService {
     });
   }
 
-  async markDispatched(rowId: string): Promise<void> {
-    await this.repository.markDispatched({ rowId, now: this.now() });
+  async markDispatched({
+    rowId,
+    projectId,
+  }: {
+    rowId: string;
+    projectId: string;
+  }): Promise<void> {
+    await this.repository.markDispatched({
+      rowId,
+      projectId,
+      now: this.now(),
+    });
   }
 
   /**
-   * Record a retryable failure. Increments attempts, schedules the
-   * next attempt via exponential backoff, and promotes to `dead`
-   * when the row exceeds its `maxAttempts`.
+   * Record a retryable failure. Schedules the next attempt via
+   * exponential backoff, and promotes to `dead` when the row has
+   * exceeded its `maxAttempts`.
    *
-   * The repository has already incremented `attempts` on lease, so
-   * the row passed back here reflects the post-attempt count.
+   * Operates on the leased row passed in by the drainer — the
+   * repository already incremented `attempts` on lease, so
+   * `row.attempts` reflects the post-attempt count. No re-read: the
+   * underlying `markRetry` is a CAS on (status `dispatching`,
+   * `attempts`), so a concurrent recovery + re-lease cannot be
+   * clobbered by a stale write.
    */
   async markFailedRetryable(
     params: MarkFailedRetryableParams,
   ): Promise<MarkFailedRetryableResult> {
-    const row = await this.repository.findById(params.rowId);
-    if (!row) {
-      throw new Error(
-        `OutboxService.markFailedRetryable: row ${params.rowId} not found`,
-      );
-    }
-
+    const { row } = params;
     const now = this.now();
 
     if (row.attempts >= row.maxAttempts) {
       await this.repository.markRetry({
         rowId: row.id,
+        projectId: row.projectId,
         attempts: row.attempts,
         status: "dead",
         nextAttemptAt: null,
@@ -159,6 +174,7 @@ export class OutboxService {
 
     await this.repository.markRetry({
       rowId: row.id,
+      projectId: row.projectId,
       attempts: row.attempts,
       status: "failed_retryable",
       nextAttemptAt,
@@ -172,22 +188,20 @@ export class OutboxService {
   /**
    * Force a row to `dead` regardless of attempts — used when the
    * dispatcher reports a permanently fatal failure (e.g. 4xx from
-   * provider, malformed template).
+   * provider, malformed template). Operates on the leased row; the
+   * underlying CAS guards against clobbering a re-leased row.
    */
   async markDead({
-    rowId,
+    row,
     error,
   }: {
-    rowId: string;
+    row: OutboxRow;
     error: string;
   }): Promise<void> {
-    const row = await this.repository.findById(rowId);
-    if (!row) {
-      throw new Error(`OutboxService.markDead: row ${rowId} not found`);
-    }
     const now = this.now();
     await this.repository.markRetry({
       rowId: row.id,
+      projectId: row.projectId,
       attempts: row.attempts,
       status: "dead",
       nextAttemptAt: null,

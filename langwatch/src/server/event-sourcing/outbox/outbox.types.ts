@@ -65,7 +65,12 @@ export interface LeaseOutboxParams {
 }
 
 export interface MarkFailedRetryableParams {
-  rowId: string;
+  /**
+   * The leased row being failed. Carries the post-lease `attempts`
+   * count and `projectId` so the service can decide dead-promotion and
+   * scope the write without a racy re-read.
+   */
+  row: OutboxRow;
   error: string;
   /**
    * Optional explicit backoff override (ms). When omitted, the service

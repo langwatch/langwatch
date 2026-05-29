@@ -23,7 +23,9 @@ CREATE TABLE "ReactorOutbox" (
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "maxAttempts" INTEGER NOT NULL DEFAULT 8,
     "leasedUntil" TIMESTAMP(3),
-    "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Nullable: cleared to NULL when a row is promoted to 'dead' (a
+    -- terminal row schedules no further attempt). Live rows default to now().
+    "nextAttemptAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     "lastError" TEXT,
     "lastErrorAt" TIMESTAMP(3),
     "dispatchedAt" TIMESTAMP(3),

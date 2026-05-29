@@ -69,6 +69,20 @@ export class OutboxDrainer {
     this.maxRowsPerWakeup =
       options.maxRowsPerWakeup ?? DEFAULT_MAX_ROWS_PER_WAKEUP;
     this.scheduleWakeup = options.scheduleWakeup;
+
+    // A non-positive cap would make handleWakeup's drain loop exit
+    // immediately and reschedule a follow-up wakeup every time —
+    // an infinite churn loop. A non-positive lease duration would
+    // hand out leases that are already expired. Fail loudly at wiring.
+    if (!Number.isFinite(this.leaseDurationMs) || this.leaseDurationMs <= 0) {
+      throw new Error("OutboxDrainer: leaseDurationMs must be > 0");
+    }
+    if (
+      !Number.isFinite(this.maxRowsPerWakeup) ||
+      this.maxRowsPerWakeup <= 0
+    ) {
+      throw new Error("OutboxDrainer: maxRowsPerWakeup must be > 0");
+    }
   }
 
   registerDispatcher(reactorName: string, dispatcher: OutboxDispatcher): void {
@@ -136,7 +150,10 @@ export class OutboxDrainer {
   }): Promise<void> {
     try {
       await dispatcher(row);
-      await this.outboxService.markDispatched(row.id);
+      await this.outboxService.markDispatched({
+        rowId: row.id,
+        projectId: row.projectId,
+      });
       return;
     } catch (error) {
       const isRetryable = !isDispatchError(error) || error.retryable;
@@ -144,7 +161,7 @@ export class OutboxDrainer {
         error instanceof Error ? error.message : String(error);
 
       if (!isRetryable) {
-        await this.outboxService.markDead({ rowId: row.id, error: message });
+        await this.outboxService.markDead({ row, error: message });
         logger.warn(
           {
             rowId: row.id,
@@ -165,7 +182,7 @@ export class OutboxDrainer {
       }
 
       const result = await this.outboxService.markFailedRetryable({
-        rowId: row.id,
+        row,
         error: message,
       });
 

@@ -2686,7 +2686,10 @@ model ReactorOutbox {
     // `dispatching`. A wakeup that arrives after `leasedUntil` may
     // re-lease the row (assumed crashed worker).
     leasedUntil    DateTime?
-    nextAttemptAt  DateTime            @default(now())
+    // Nullable: cleared (NULL) when a row is promoted to `dead`, since a
+    // terminal row no longer schedules a next attempt. Queued/retrying
+    // rows always carry a concrete timestamp (defaults to now()).
+    nextAttemptAt  DateTime?           @default(now())
     lastError      String?
     lastErrorAt    DateTime?
     dispatchedAt   DateTime?

@@ -55,6 +55,7 @@ class InMemoryOutboxRepository implements OutboxRepository {
         r.projectId === query.projectId &&
         r.reactorName === query.reactorName &&
         (r.status === "queued" || r.status === "failed_retryable") &&
+        r.nextAttemptAt !== null &&
         r.nextAttemptAt <= query.now,
     );
     if (!candidate) return null;
@@ -90,13 +91,22 @@ class InMemoryOutboxRepository implements OutboxRepository {
 
   async markDispatched({
     rowId,
+    projectId,
     now,
   }: {
     rowId: string;
+    projectId: string;
     now: Date;
   }): Promise<void> {
-    const row = this.rows.find((r) => r.id === rowId);
-    if (!row) throw new Error(`row ${rowId} not found`);
+    // Mirror the prisma CAS: only a still-`dispatching` row owned by
+    // the project transitions.
+    const row = this.rows.find(
+      (r) =>
+        r.id === rowId &&
+        r.projectId === projectId &&
+        r.status === "dispatching",
+    );
+    if (!row) return;
     row.status = "dispatched";
     row.leasedUntil = null;
     row.dispatchedAt = now;
@@ -104,19 +114,34 @@ class InMemoryOutboxRepository implements OutboxRepository {
   }
 
   async markRetry(update: OutboxRetryUpdate): Promise<void> {
-    const row = this.rows.find((r) => r.id === update.rowId);
-    if (!row) throw new Error(`row ${update.rowId} not found`);
-    row.attempts = update.attempts;
+    // Conditional CAS on (projectId, status `dispatching`, attempts) —
+    // a stale write no-ops instead of clobbering a re-leased row.
+    const row = this.rows.find(
+      (r) =>
+        r.id === update.rowId &&
+        r.projectId === update.projectId &&
+        r.status === "dispatching" &&
+        r.attempts === update.attempts,
+    );
+    if (!row) return;
     row.status = update.status;
-    row.nextAttemptAt = update.nextAttemptAt ?? row.nextAttemptAt;
+    row.nextAttemptAt = update.nextAttemptAt;
     row.leasedUntil = null;
     row.lastError = update.lastError;
     row.lastErrorAt = update.lastErrorAt;
     row.updatedAt = update.lastErrorAt;
   }
 
-  async findById(rowId: string): Promise<OutboxRow | null> {
-    return this.rows.find((r) => r.id === rowId) ?? null;
+  async findById({
+    rowId,
+    projectId,
+  }: {
+    rowId: string;
+    projectId: string;
+  }): Promise<OutboxRow | null> {
+    return (
+      this.rows.find((r) => r.id === rowId && r.projectId === projectId) ?? null
+    );
   }
 
   async list(query: OutboxListQuery): Promise<OutboxRow[]> {
@@ -271,7 +296,7 @@ describe("OutboxService", () => {
           leaseDurationMs: 30_000,
         });
         const result = await service.markFailedRetryable({
-          rowId: leased!.id,
+          row: leased!,
           error: "transient",
         });
         expect(result.status).toBe("failed_retryable");
@@ -303,7 +328,7 @@ describe("OutboxService", () => {
           leaseDurationMs: 30_000,
         });
         const result = await service.markFailedRetryable({
-          rowId: leased!.id,
+          row: leased!,
           error: "still broken",
         });
         expect(result.status).toBe("dead");
@@ -329,7 +354,7 @@ describe("OutboxService", () => {
           reactorName: "alertDispatch",
           leaseDurationMs: 30_000,
         });
-        await service.markDead({ rowId: leased!.id, error: "unrecoverable" });
+        await service.markDead({ row: leased!, error: "unrecoverable" });
         expect(repo.rows[0]!.status).toBe("dead");
         expect(repo.rows[0]!.lastError).toBe("unrecoverable");
       });

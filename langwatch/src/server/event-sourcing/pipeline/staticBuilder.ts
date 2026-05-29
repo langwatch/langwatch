@@ -276,6 +276,14 @@ export class StaticPipelineBuilderWithNameAndType<
     reactorName: string,
     definition: OutboxReactorDefinition<EventType>,
   ): this {
+    if (definition.name !== reactorName) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Outbox reactor name mismatch: arg "${reactorName}" !== definition.name "${definition.name}"`,
+        { reactorName, definitionName: definition.name, projectionName },
+      );
+    }
+
     const nameTaken =
       this.foldReactors.has(reactorName) ||
       this.mapReactors.has(reactorName) ||

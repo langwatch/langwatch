@@ -200,6 +200,24 @@ describe("StaticPipelineBuilder validations", () => {
     });
   });
 
+  describe("when the reactorName argument differs from definition.name", () => {
+    it("throws ConfigurationError so the identities cannot drift", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("myFold");
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "definitionName",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withFoldProjection("myFold", fold)
+          .withOutbox("myFold", "argName", outboxReactor),
+      ).toThrow(/name mismatch/);
+    });
+  });
+
   describe("when an outbox reactor reuses an existing reactor name", () => {
     it("throws ConfigurationError", () => {
       const fold = createMockFoldProjectionDefinition<Event>("myFold");

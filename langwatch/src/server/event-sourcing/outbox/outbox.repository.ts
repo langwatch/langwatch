@@ -1,11 +1,11 @@
-import type { OutboxRow, OutboxStatus } from "./outbox.types";
+import type { OutboxPayload, OutboxRow, OutboxStatus } from "./outbox.types";
 
 export interface OutboxInsertRow {
   projectId: string;
   reactorName: string;
   dedupKey: string;
   groupKey: string;
-  payload: unknown;
+  payload: OutboxPayload;
   maxAttempts?: number;
 }
 
@@ -18,6 +18,14 @@ export interface OutboxLeaseQuery {
 
 export interface OutboxRetryUpdate {
   rowId: string;
+  /** Tenancy guard — every write is scoped to the owning project. */
+  projectId: string;
+  /**
+   * Expected `attempts` of the leased row. The update is a conditional
+   * CAS — it only applies while the row is still `dispatching` with
+   * this exact attempt count, so a stale read cannot clobber a row a
+   * recovery sweep already re-queued and a second worker re-leased.
+   */
   attempts: number;
   status: Extract<OutboxStatus, "failed_retryable" | "dead">;
   nextAttemptAt: Date | null;
@@ -72,15 +80,23 @@ export interface OutboxRepository {
 
   markDispatched({
     rowId,
+    projectId,
     now,
   }: {
     rowId: string;
+    projectId: string;
     now: Date;
   }): Promise<void>;
 
   markRetry(update: OutboxRetryUpdate): Promise<void>;
 
-  findById(rowId: string): Promise<OutboxRow | null>;
+  findById({
+    rowId,
+    projectId,
+  }: {
+    rowId: string;
+    projectId: string;
+  }): Promise<OutboxRow | null>;
 
   list(query: OutboxListQuery): Promise<OutboxRow[]>;
 }

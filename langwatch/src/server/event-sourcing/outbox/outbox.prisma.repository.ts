@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type {
   OutboxInsertRow,
   OutboxLeaseQuery,
@@ -26,7 +26,7 @@ export class PrismaOutboxRepository implements OutboxRepository {
         reactorName: row.reactorName,
         dedupKey: row.dedupKey,
         groupKey: row.groupKey,
-        payload: row.payload as Prisma.InputJsonValue,
+        payload: row.payload,
         maxAttempts: row.maxAttempts,
       },
       skipDuplicates: true,
@@ -93,13 +93,18 @@ export class PrismaOutboxRepository implements OutboxRepository {
 
   async markDispatched({
     rowId,
+    projectId,
     now,
   }: {
     rowId: string;
+    projectId: string;
     now: Date;
   }): Promise<void> {
-    await this.prisma.reactorOutbox.update({
-      where: { id: rowId },
+    // CAS on `dispatching`: a row a recovery sweep already re-queued
+    // (and a second worker re-leased) must not be marked dispatched by
+    // this stale worker. projectId keeps the write tenant-scoped.
+    await this.prisma.reactorOutbox.updateMany({
+      where: { id: rowId, projectId, status: "dispatching" },
       data: {
         status: "dispatched",
         leasedUntil: null,
@@ -111,18 +116,23 @@ export class PrismaOutboxRepository implements OutboxRepository {
 
   async markRetry({
     rowId,
+    projectId,
     attempts,
     status,
     nextAttemptAt,
     lastError,
     lastErrorAt,
   }: OutboxRetryUpdate): Promise<void> {
-    await this.prisma.reactorOutbox.update({
-      where: { id: rowId },
+    // Conditional CAS: only transition while the row is still the one
+    // this worker leased (`dispatching` + the same attempt count). If a
+    // recovery sweep re-queued it and another worker re-leased
+    // (bumping attempts), this no-ops instead of clobbering live state.
+    // projectId scopes the write to the owning tenant.
+    await this.prisma.reactorOutbox.updateMany({
+      where: { id: rowId, projectId, status: "dispatching", attempts },
       data: {
         status,
-        attempts,
-        nextAttemptAt: nextAttemptAt ?? undefined,
+        nextAttemptAt,
         leasedUntil: null,
         lastError,
         lastErrorAt,
@@ -131,8 +141,16 @@ export class PrismaOutboxRepository implements OutboxRepository {
     });
   }
 
-  async findById(rowId: string): Promise<OutboxRow | null> {
-    return this.prisma.reactorOutbox.findUnique({ where: { id: rowId } });
+  async findById({
+    rowId,
+    projectId,
+  }: {
+    rowId: string;
+    projectId: string;
+  }): Promise<OutboxRow | null> {
+    return this.prisma.reactorOutbox.findFirst({
+      where: { id: rowId, projectId },
+    });
   }
 
   async list({

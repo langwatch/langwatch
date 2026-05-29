@@ -168,4 +168,109 @@ describe("PrismaOutboxRepository", () => {
       });
     });
   });
+
+  describe("markDispatched", () => {
+    describe("when the row is still leased to this worker", () => {
+      it("marks it dispatched (scoped by projectId)", async () => {
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: "dispatch-me",
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          payload: {},
+        });
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+        expect(leased).not.toBeNull();
+
+        await repo.markDispatched({
+          rowId: leased!.id,
+          projectId,
+          now: new Date(),
+        });
+
+        const row = await repo.findById({ rowId: leased!.id, projectId });
+        expect(row?.status).toBe("dispatched");
+        expect(row?.leasedUntil).toBeNull();
+        expect(row?.dispatchedAt).not.toBeNull();
+      });
+    });
+  });
+
+  describe("markRetry", () => {
+    describe("when the attempts count no longer matches the leased row", () => {
+      it("no-ops so a stale worker cannot clobber a re-leased row", async () => {
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: "cas-guard",
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          payload: {},
+        });
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+        // Simulate a concurrent recovery + re-lease bumping attempts.
+        await prisma.reactorOutbox.update({
+          where: { id: leased!.id },
+          data: { attempts: leased!.attempts + 1 },
+        });
+
+        await repo.markRetry({
+          rowId: leased!.id,
+          projectId,
+          attempts: leased!.attempts,
+          status: "failed_retryable",
+          nextAttemptAt: new Date(Date.now() + 1_000),
+          lastError: "stale",
+          lastErrorAt: new Date(),
+        });
+
+        const row = await repo.findById({ rowId: leased!.id, projectId });
+        // Untouched: still dispatching, lastError never written.
+        expect(row?.status).toBe("dispatching");
+        expect(row?.lastError).toBeNull();
+      });
+    });
+
+    describe("when promoting an exhausted row to dead", () => {
+      it("clears nextAttemptAt to null", async () => {
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: "dead-row",
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          payload: {},
+          maxAttempts: 1,
+        });
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+
+        await repo.markRetry({
+          rowId: leased!.id,
+          projectId,
+          attempts: leased!.attempts,
+          status: "dead",
+          nextAttemptAt: null,
+          lastError: "exhausted",
+          lastErrorAt: new Date(),
+        });
+
+        const row = await repo.findById({ rowId: leased!.id, projectId });
+        expect(row?.status).toBe("dead");
+        expect(row?.nextAttemptAt).toBeNull();
+      });
+    });
+  });
 });

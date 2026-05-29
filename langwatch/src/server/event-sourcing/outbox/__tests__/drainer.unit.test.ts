@@ -24,15 +24,15 @@ class StubRepository implements OutboxRepository {
       async () => 0,
     );
   markDispatched =
-    vi.fn<(args: { rowId: string; now: Date }) => Promise<void>>(
-      async () => undefined,
-    );
+    vi.fn<
+      (args: { rowId: string; projectId: string; now: Date }) => Promise<void>
+    >(async () => undefined);
   markRetry = vi.fn<(update: OutboxRetryUpdate) => Promise<void>>(
     async () => undefined,
   );
-  findById = vi.fn<(rowId: string) => Promise<OutboxRow | null>>(
-    async (id: string) => this.rows.find((r) => r.id === id) ?? null,
-  );
+  findById = vi.fn<
+    (args: { rowId: string; projectId: string }) => Promise<OutboxRow | null>
+  >(async ({ rowId }) => this.rows.find((r) => r.id === rowId) ?? null);
   list = vi.fn<() => Promise<OutboxRow[]>>(async () => []);
 }
 
@@ -218,6 +218,30 @@ describe("OutboxDrainer.handleWakeup", () => {
       expect(dispatcher).toHaveBeenCalledTimes(3);
       expect(scheduleWakeup).toHaveBeenCalledTimes(1);
       expect(scheduleWakeup.mock.calls[0]![0].delayMs).toBeUndefined();
+    });
+  });
+
+  describe("when constructed with a non-positive maxRowsPerWakeup", () => {
+    it("throws so a wakeup-churn loop cannot be wired up", () => {
+      expect(
+        () =>
+          new OutboxDrainer(service, {
+            scheduleWakeup,
+            maxRowsPerWakeup: 0,
+          }),
+      ).toThrow(/maxRowsPerWakeup must be > 0/);
+    });
+  });
+
+  describe("when constructed with a non-positive leaseDurationMs", () => {
+    it("throws so already-expired leases cannot be handed out", () => {
+      expect(
+        () =>
+          new OutboxDrainer(service, {
+            scheduleWakeup,
+            leaseDurationMs: 0,
+          }),
+      ).toThrow(/leaseDurationMs must be > 0/);
     });
   });
 
