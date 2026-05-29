@@ -1,11 +1,11 @@
 ---
 title: 'Update trace metadata'
-description: 'Update metadata on an existing trace by trace ID. Supports deep merge for custom metadata; labels are fully replaced, user identity and thread ID are mapped to canonical attributes.'
+description: 'Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.'
 ---
 
 ## `PATCH /api/traces/{traceId}/metadata`
 
-Update metadata on a trace after it has been created. This is useful for attaching labels, user identity, or custom metadata from backend processes that resolve after trace ingestion.
+Update metadata on a trace after it has been created. Under the hood, this injects a synthetic span through the standard ingestion pipeline — traces remain immutable per the OpenTelemetry spec, and "updating" a trace means adding a span that carries the new attributes. This is useful for attaching labels, user identity, or custom metadata from backend processes that resolve after trace ingestion.
 
 ### Authentication
 
@@ -49,9 +49,9 @@ Any key not in the reserved list is stored as `metadata.{key}` in trace attribut
 
 ### Merge Semantics
 
-- **Deep merge**: new keys are added, existing keys are updated, keys not in the request are preserved
-- **Labels**: the labels array **replaces** the existing labels entirely (it does not union-merge). Once set via this API, labels are protected from being overwritten by late-arriving spans
-- **JSON objects**: custom metadata values that are JSON objects are shallow-merged with existing values (`{...existing, ...new}`)
+- **Attribute accumulation**: the synthetic span's resource attributes are processed through the standard attribute accumulation pipeline — new keys are added, existing keys are updated by the last-write-wins rule
+- **Labels**: the labels array is set as-is on the span resource. If a later span also carries labels, last write wins
+- **Custom fields**: stored as `langwatch.metadata.*` resource attributes on the synthetic span
 
 ### Size Limits
 
@@ -77,7 +77,6 @@ Requires `traces:update` permission on the project.
 | Status | Description |
 |--------|-------------|
 | 400 | Empty metadata object, oversized payload, or invalid field values |
-| 404 | Trace not found |
 | 403 | Missing `traces:update` permission |
 
 ### Example

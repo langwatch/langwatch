@@ -13,7 +13,8 @@ import {
   TraceService,
 } from "~/server/traces/trace.service";
 import { getApp } from "~/server/app-layer/app";
-import { traceMetadataInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { type SecuredApp, requires } from "~/server/api/security";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -332,5 +333,122 @@ export function registerTracesRoutes(
       }),
     });
   },
+  );
+
+  // PATCH /:traceId/metadata - Update trace metadata via synthetic span
+  const metadataValueSchema = z.union([
+    z.string().max(4096),
+    z.number(),
+    z.boolean(),
+    z.array(z.string()),
+    z.record(z.unknown()),
+  ]);
+
+  const metadataInputSchema = z
+    .record(metadataValueSchema)
+    .refine((obj) => Object.keys(obj).length > 0, {
+      message: "metadata must contain at least one key",
+    })
+    .refine((obj) => JSON.stringify(obj).length <= 32768, {
+      message: "total metadata payload must not exceed 32KB",
+    });
+
+  const RESERVED_METADATA_KEYS = new Set([
+    "user_id",
+    "customer_id",
+    "thread_id",
+    "labels",
+  ]);
+
+  function splitMetadata(metadata: Record<string, unknown>): {
+    reserved: ReservedTraceMetadata;
+    custom: CustomMetadata;
+  } {
+    const reserved: ReservedTraceMetadata = {};
+    const custom: CustomMetadata = {};
+
+    for (const [key, value] of Object.entries(metadata)) {
+      if (RESERVED_METADATA_KEYS.has(key)) {
+        (reserved as Record<string, unknown>)[key] = value;
+      } else {
+        custom[key] = value as CustomMetadata[string];
+      }
+    }
+
+    return { reserved, custom };
+  }
+
+  secured.access(requires("traces:update")).patch(
+    "/:traceId/metadata",
+    describeRoute({
+      tags: ["Traces"],
+      summary: "Update trace metadata",
+      description:
+        "Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.",
+      responses: {
+        200: {
+          description: "Metadata updated successfully",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ traceId: z.string() })),
+            },
+          },
+        },
+        ...baseResponses,
+      },
+    }),
+    zValidator(
+      "json",
+      z.object({
+        metadata: metadataInputSchema,
+      }),
+    ),
+    async (c) => {
+      const project = c.get("project");
+      const traceId = c.req.param("traceId");
+      const body = c.req.valid("json");
+
+      const { reserved, custom } = splitMetadata(body.metadata);
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata: reserved,
+        customMetadata: custom,
+      });
+
+      const now = Date.now();
+      const nowNano = String(now * 1_000_000);
+      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      await getApp().traces.recordSpan({
+        tenantId: project.id,
+        span: {
+          traceId,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.metadata_update",
+          kind: 1,
+          startTimeUnixNano: nowNano,
+          endTimeUnixNano: nowNano,
+          attributes: [
+            {
+              key: "langwatch.span.type",
+              value: { stringValue: "span" },
+            },
+          ],
+          events: [],
+          links: [],
+          status: { code: 1 },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource,
+        instrumentationScope: { name: "langwatch.api.metadata_update" },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: now,
+      });
+
+      return c.json({ traceId });
+    },
   );
 }

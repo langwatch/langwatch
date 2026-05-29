@@ -92,7 +92,6 @@ export const traceSummaryDataSchema = z.object({
    * the next time the projection re-folds.
    */
   traceNameUserOverridden: z.boolean().optional(),
-  labelsUserOverridden: z.boolean().optional(),
   /**
    * True when `traceName` came from the "no real root, fall back to
    * earliest span" path rather than a span with `parentSpanId === null`.
