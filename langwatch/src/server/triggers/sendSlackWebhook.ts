@@ -1,8 +1,8 @@
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
 import { IncomingWebhook } from "@slack/webhook";
 import type { Trace } from "~/server/tracer/types";
+import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
-import { captureException } from "../../utils/posthogErrorCapture";
 
 interface TriggerData {
   traceId?: string;
@@ -111,6 +111,8 @@ export const sendSlackWebhook = async ({
       icon_emoji: ":robot_face:",
     });
   } catch (err) {
-    captureException(err);
+    throw toDispatchError(err, {
+      message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+    });
   }
 };

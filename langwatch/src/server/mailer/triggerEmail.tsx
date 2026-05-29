@@ -6,6 +6,7 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
+import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
 
@@ -53,13 +54,19 @@ export const sendTriggerEmail = async ({
     </Html>,
   );
 
-  await sendEmail({
-    to: triggerEmails,
-    subject: `${
-      triggerType ? `(${triggerType}) ` : ""
-    }Trigger - ${triggerName}`,
-    html: emailHtml,
-  });
+  try {
+    await sendEmail({
+      to: triggerEmails,
+      subject: `${
+        triggerType ? `(${triggerType}) ` : ""
+      }Trigger - ${triggerName}`,
+      html: emailHtml,
+    });
+  } catch (err) {
+    throw toDispatchError(err, {
+      message: `Trigger email dispatch failed for trigger "${triggerName}"`,
+    });
+  }
 };
 
 const TriggerTable = ({

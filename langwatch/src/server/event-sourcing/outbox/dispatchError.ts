@@ -37,3 +37,59 @@ export class DispatchError extends Error {
 export function isDispatchError(error: unknown): error is DispatchError {
   return error instanceof DispatchError;
 }
+
+/**
+ * Whether an HTTP status warrants a retry, per ADR-027:
+ *   - 429 (rate limited) and 5xx (server error) → retry with backoff
+ *   - any other 4xx → terminal (revoked webhook, bad request, auth failure)
+ */
+export function isRetryableHttpStatus(status: number): boolean {
+  if (status === 429) return true;
+  return status >= 500 && status < 600;
+}
+
+/**
+ * Best-effort extraction of an HTTP status from the many error shapes the
+ * dispatch providers raise (AWS SDK v3, axios/@slack/webhook, SendGrid, fetch).
+ * Returns undefined for transport errors (ECONNREFUSED, ETIMEDOUT, …) that
+ * carry no HTTP status — those are treated as retryable by the caller.
+ *
+ * Note `code` is only read when numeric: SendGrid uses a numeric `code` for the
+ * status, whereas Node transport errors and @slack/webhook use a string `code`.
+ */
+export function extractHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const e = error as Record<string, any>;
+  const candidates = [
+    e.$metadata?.httpStatusCode,
+    e.response?.status,
+    e.response?.statusCode,
+    e.statusCode,
+    e.status,
+    e.original?.response?.status,
+    e.original?.response?.statusCode,
+    typeof e.code === "number" ? e.code : undefined,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && candidate >= 100 && candidate < 600) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Converts a raw dispatch failure into a DispatchError with a retryable
+ * decision derived from its HTTP status. An already-typed DispatchError is
+ * returned unchanged. Failures with no recognizable status default to
+ * retryable — see ADR-027 for why the unknown case is conservative.
+ */
+export function toDispatchError(
+  error: unknown,
+  { message }: { message: string },
+): DispatchError {
+  if (isDispatchError(error)) return error;
+  const status = extractHttpStatus(error);
+  const retryable = status === undefined ? true : isRetryableHttpStatus(status);
+  return new DispatchError({ message, retryable, cause: error });
+}

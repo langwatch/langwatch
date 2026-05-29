@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { captureException } from "~/utils/posthogErrorCapture";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
@@ -492,6 +495,74 @@ describe("evaluationAlertTrigger reactor", () => {
 
       expect(deps.triggers.claimSend).toHaveBeenCalled();
       expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a trigger's dispatch fails", () => {
+    it("surfaces the failure with its retryable flag and does not record the trigger as run", async () => {
+      const trigger = createTrigger();
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        trigger,
+      ]);
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+      vi.mocked(sendTriggerEmail).mockRejectedValueOnce(
+        new DispatchError({ message: "provider 500", retryable: true }),
+      );
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(createEvent(), context);
+
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
+      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledWith(
+        expect.any(DispatchError),
+        expect.objectContaining({
+          extra: expect.objectContaining({ retryable: true }),
+        }),
+      );
+    });
+  });
+
+  describe("when one of several matching triggers fails to dispatch", () => {
+    it("still dispatches the remaining triggers", async () => {
+      const failing = createTrigger({ id: "trigger-failing" });
+      const succeeding = createTrigger({ id: "trigger-ok" });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        failing,
+        succeeding,
+      ]);
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+      vi.mocked(sendTriggerEmail)
+        .mockRejectedValueOnce(
+          new DispatchError({ message: "revoked", retryable: false }),
+        )
+        .mockResolvedValueOnce(undefined);
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(createEvent(), context);
+
+      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(2);
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(1);
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
+        "trigger-ok",
+        "tenant-1",
+      );
     });
   });
 

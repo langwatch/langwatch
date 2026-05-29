@@ -16,6 +16,65 @@ import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:trigger-action-dispatch");
 
+/**
+ * Trigger actions split into two classes that dispatch on different schedules.
+ * See dev/docs/adr/025-notify-persistent-action-classification.md.
+ *
+ * - Notify actions land in front of a human; they may be batched into a digest
+ *   window to avoid notification storms.
+ * - Persist actions write durable data the customer asked for; batching them
+ *   would defeat the intent, so they always dispatch immediately.
+ *
+ * The two sets must together cover every TriggerAction value, with no overlap
+ * (enforced by the unit test). A new action type must be classified here at the
+ * point it is introduced.
+ */
+export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
+  TriggerAction.SEND_EMAIL,
+  TriggerAction.SEND_SLACK_MESSAGE,
+]);
+
+export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
+  TriggerAction.ADD_TO_DATASET,
+  TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+]);
+
+export const NOTIFICATION_CADENCES = [
+  "immediate",
+  "5min_digest",
+  "15min_digest",
+  "hourly_digest",
+] as const;
+
+export type NotificationCadence = (typeof NOTIFICATION_CADENCES)[number];
+
+export const CADENCE_WINDOW_MS: Record<NotificationCadence, number> = {
+  immediate: 0,
+  "5min_digest": 5 * 60 * 1000,
+  "15min_digest": 15 * 60 * 1000,
+  hourly_digest: 60 * 60 * 1000,
+};
+
+/**
+ * Resolves when a matched trigger should dispatch. This is the contract the
+ * outbox dispatch layer reads: persist actions and immediate-cadence notify
+ * actions fire now; digest-cadence notify actions open a window that closes
+ * `CADENCE_WINDOW_MS` later.
+ */
+export function computeScheduledFor({
+  action,
+  cadence,
+  now,
+}: {
+  action: TriggerAction;
+  cadence: NotificationCadence;
+  now: Date;
+}): Date {
+  if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;
+  if (cadence === "immediate") return now;
+  return new Date(now.getTime() + CADENCE_WINDOW_MS[cadence]);
+}
+
 export interface TriggerActionDispatchDeps {
   triggers: TriggerService;
   projects: ProjectService;

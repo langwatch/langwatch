@@ -11,6 +11,7 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { isDispatchError } from "../../../outbox/dispatchError";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -188,12 +189,18 @@ export function createEvaluationAlertTriggerReactor(
             foldState: traceSummary,
           });
         } catch (error) {
+          // A failed dispatch now throws (DispatchError) rather than being
+          // swallowed; surface its retryable classification for operators. The
+          // claim already landed, so the in-line path does not retry — the
+          // outbox migration is what adds durable retry.
+          const retryable = isDispatchError(error) ? error.retryable : undefined;
           logger.error(
             {
               tenantId,
               traceId,
               triggerId: trigger.id,
               evaluationId: evalRun.evaluationId,
+              retryable,
               error: error instanceof Error ? error.message : String(error),
             },
             "Failed to evaluate trigger on evaluation completion",
@@ -205,6 +212,7 @@ export function createEvaluationAlertTriggerReactor(
               triggerId: trigger.id,
               evaluationId: evalRun.evaluationId,
               triggerAction: trigger.action,
+              retryable,
             },
           });
         }
