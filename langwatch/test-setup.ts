@@ -17,9 +17,20 @@ dotenv.config({ path: ".env" });
 // file's graph at setup time, before that file's own `vi.mock("posthog-node")`
 // hoist applies, breaking posthog.unit.test.ts. Loading it after the tests run
 // keeps each file's mocks intact.
+//
+// The flush is wrapped because posthog-node's shutdown clears the local-eval
+// poller (the hang fix) FIRST, then does a final network flush that builds a
+// `new URL(...)`. In a jsdom suite this hook runs as the env globals are being
+// torn down, so `URL` may already be gone and the flush throws — by which
+// point the interval is already cleared, so the error is safe to ignore.
 afterAll(async () => {
-  const { shutdownPostHog } = await import("./src/server/posthog");
-  await shutdownPostHog();
+  try {
+    const { shutdownPostHog } = await import("./src/server/posthog");
+    await shutdownPostHog();
+  } catch {
+    // Teardown-phase flush can throw once test env globals (URL/fetch) are
+    // gone; the poller is already cleared by then, so swallow it.
+  }
 });
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
