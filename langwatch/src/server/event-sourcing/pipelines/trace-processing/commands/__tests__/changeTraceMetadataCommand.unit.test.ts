@@ -1,20 +1,17 @@
-import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createTenantId, type Command } from "../../../../";
+import { createTenantId, type Command, type Event } from "../../../../";
+import type { CommandEnvelope } from "../../../../commands/commandEnvelope";
 import {
   CHANGE_TRACE_METADATA_COMMAND_TYPE,
   TRACE_METADATA_CHANGED_EVENT_TYPE,
 } from "../../schemas/constants";
-import { traceMetadataChangedEventDataSchema } from "../../schemas/events";
+import {
+  traceMetadataChangedEventDataSchema,
+  type TraceMetadataChangedEventData,
+} from "../../schemas/events";
 import { ChangeTraceMetadataCommand } from "../changeTraceMetadataCommand";
 
-type CommandData = {
-  traceId: string;
-  metadata: Record<string, unknown>;
-  changedByUserId: string | null;
-  tenantId: string;
-  occurredAt: number;
-};
+type CommandData = TraceMetadataChangedEventData & CommandEnvelope;
 
 function makeCommand(
   overrides: Partial<CommandData> = {},
@@ -46,7 +43,7 @@ describe("ChangeTraceMetadataCommand", () => {
         changedByUserId: "user-123",
       });
 
-      const events = handler.handle(command);
+      const events = handler.handle(command) as Event[];
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -102,8 +99,8 @@ describe("ChangeTraceMetadataCommand", () => {
       const cmd1 = makeCommand(data);
       const cmd2 = makeCommand(data);
 
-      const events1 = handler.handle(cmd1);
-      const events2 = handler.handle(cmd2);
+      const events1 = handler.handle(cmd1) as Event[];
+      const events2 = handler.handle(cmd2) as Event[];
 
       expect(events1[0]!.idempotencyKey).toBe(events2[0]!.idempotencyKey);
     });
@@ -118,8 +115,8 @@ describe("ChangeTraceMetadataCommand", () => {
         metadata: { labels: ["qa"], user_id: "u1" },
       });
 
-      const events1 = handler.handle(cmd1);
-      const events2 = handler.handle(cmd2);
+      const events1 = handler.handle(cmd1) as Event[];
+      const events2 = handler.handle(cmd2) as Event[];
 
       expect(events1[0]!.idempotencyKey).toBe(events2[0]!.idempotencyKey);
     });
