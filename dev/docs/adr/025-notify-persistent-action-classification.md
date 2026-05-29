@@ -99,7 +99,7 @@ Per-trigger cadence is congruent with today's data model and costs nothing extra
 
 `immediate`, `5min_digest`, `15min_digest`, `hourly_digest` cover the meaningful operational regimes:
 
-- `immediate`: alerts that need to wake oncall now.
+- `immediate`: alerts that need to wake on-call now.
 - `5min_digest`: typical notification-storm protection without losing fresh signal.
 - `15min_digest`: low-priority alerts where some batching is desired.
 - `hourly_digest`: passive monitoring digests.
@@ -113,8 +113,8 @@ Daily and weekly digests aren't included in v1 — they cross the "is this still
 - **UI surface in trigger settings.** Cadence dropdown, visible only when the action is in `NOTIFY_TRIGGER_ACTIONS`. Persist-action triggers don't see the field.
 - **Operator default for new notify triggers is `5min_digest`**, which is a behavior change vs today's implicit immediate. A migration banner / changelog notes this and links to the cadence settings. Existing triggers don't change.
 - **The classification is the contract** for the outbox layer. `computeScheduledFor(action, cadence)` is the single function called by `.withOutbox`-registered reactors' `cadenceWindowMs` resolvers.
-- **Future action types** (e.g., a hypothetical `SEND_WEBHOOK`, `OPEN_INCIDENT`) must be classified at the point of introduction. The two sets together must cover every `TriggerAction` enum value — enforce with a unit test that asserts `NOTIFY_TRIGGER_ACTIONS.union(PERSIST_TRIGGER_ACTIONS).equals(allTriggerActions)`.
-- **Multi-destination fan-out is a notify-side concern, not persist-side.** NOTIFY actions will eventually want one trigger → multiple destinations, potentially with different cadences each ("page oncall immediately, also digest to #monitoring every 15 min"). Today's workaround is duplicating the trigger. PERSIST actions stay 1-destination by design — there's no "fan out a dataset write." When fan-out lands, it lives on the notify path: a notify trigger references a list of `(channel, cadence)` pairs, the outbox row carries the destination identity, and `groupKey` extends from `${projectId}/${reactorName}:${triggerId}` to `${projectId}/${reactorName}:${triggerId}:${channelId}` so each destination gets its own cadence window. No outbox-framework change required; the schema split (per-trigger row → notify-policy-with-channels) is the work. Out of scope here.
+- **Future action types** (e.g., a hypothetical `SEND_WEBHOOK`, `OPEN_INCIDENT`) must be classified at the point of introduction. The two sets together must cover every `TriggerAction` enum value — enforce with a unit test that asserts the union of `NOTIFY_TRIGGER_ACTIONS` and `PERSIST_TRIGGER_ACTIONS` has the same size as `allTriggerActions` and that every element of `allTriggerActions` is present in the union.
+- **Multi-destination fan-out is a notify-side concern, not persist-side.** NOTIFY actions will eventually want one trigger → multiple destinations, potentially with different cadences each ("page on-call immediately, also digest to #monitoring every 15 min"). Today's workaround is duplicating the trigger. PERSIST actions stay 1-destination by design — there's no "fan out a dataset write." When fan-out lands, it lives on the notify path: a notify trigger references a list of `(channel, cadence)` pairs, the outbox row carries the destination identity, and `groupKey` extends from `${projectId}/${reactorName}:${triggerId}` to `${projectId}/${reactorName}:${triggerId}:${channelId}` so each destination gets its own cadence window. No outbox-framework change required; the schema split (per-trigger row → notify-policy-with-channels) is the work. Out of scope here.
 
 ## References
 
