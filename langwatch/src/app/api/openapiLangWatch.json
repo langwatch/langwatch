@@ -13578,7 +13578,7 @@
                       "minLength": 1
                     }
                   },
-                  "config": {
+                  "parameters": {
                     "type": "object",
                     "additionalProperties": {}
                   }
@@ -15425,7 +15425,7 @@
                       "minLength": 1
                     }
                   },
-                  "config": {
+                  "parameters": {
                     "type": "object",
                     "additionalProperties": {}
                   },

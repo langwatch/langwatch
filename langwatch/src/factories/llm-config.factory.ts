@@ -1,6 +1,7 @@
 import {
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
+  type Prisma,
   PromptScope,
 } from "@prisma/client";
 import { Factory } from "fishery";
@@ -85,3 +86,15 @@ export const llmPromptConfigVersionFactory = Factory.define<
     >;
   };
 });
+
+export function buildVersionCreateInput(
+  overrides: Parameters<typeof llmPromptConfigVersionFactory.build>[0],
+): Prisma.LlmPromptConfigVersionUncheckedCreateInput {
+  const { configData, runtimeParameters, ...fields } =
+    llmPromptConfigVersionFactory.build(overrides);
+  return {
+    ...fields,
+    configData: JSON.parse(JSON.stringify(configData)),
+    runtimeParameters: JSON.parse(JSON.stringify(runtimeParameters ?? {})),
+  };
+}

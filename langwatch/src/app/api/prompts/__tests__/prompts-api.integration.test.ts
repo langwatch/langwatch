@@ -1,15 +1,14 @@
 import type {
   LlmPromptConfig,
   Organization,
-  Prisma,
   Project,
   Team,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildVersionCreateInput,
   llmPromptConfigFactory,
-  llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
@@ -208,10 +207,10 @@ describe("Prompts API", () => {
         });
 
         await prisma.llmPromptConfigVersion.create({
-          data: llmPromptConfigVersionFactory.build({
+          data: buildVersionCreateInput({
             configId: config.id,
             projectId: testProjectId,
-          }) as unknown as Prisma.LlmPromptConfigVersionUncheckedCreateInput,
+          }),
         });
       });
 

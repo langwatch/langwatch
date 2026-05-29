@@ -994,7 +994,14 @@ export class PromptService {
           localBaseVersion.configData as Record<string, unknown>,
         );
 
-        if (baseComparison.isEqual) {
+        const baseParametersEqual = runtimeParametersEqual(
+          params.parameters,
+          localBaseVersion.runtimeParameters as
+            | Record<string, unknown>
+            | undefined,
+        );
+
+        if (baseComparison.isEqual && baseParametersEqual) {
           // Local hasn't changed since base version - can safely update
           return { action: "up_to_date", prompt: existingPrompt };
         }

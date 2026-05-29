@@ -347,6 +347,53 @@ describe("Feature: Prompt runtime parameters", () => {
     });
   });
 
+  describe("when local is behind and only parameters changed", () => {
+    it("detects conflict instead of returning up_to_date", async () => {
+      const handle = `stale-params-${nanoid()}`;
+
+      const localConfigData = {
+        prompt: "You are a stale assistant",
+        model: "openai/gpt-5-mini",
+        messages: [
+          { role: "user" as const, content: "{{input}}" },
+        ],
+        inputs: [{ identifier: "input", type: "str" as const }],
+        outputs: [{ identifier: "output", type: "str" as const }],
+      };
+
+      // v1: create with initial parameters
+      await service.syncPrompt({
+        idOrHandle: handle,
+        projectId: testProject.id,
+        organizationId: testOrganization.id,
+        localConfigData,
+        parameters: { env: "staging" },
+      });
+
+      // v2: server-side update (different config to bump version)
+      await service.syncPrompt({
+        idOrHandle: handle,
+        projectId: testProject.id,
+        organizationId: testOrganization.id,
+        localConfigData,
+        localVersion: 1,
+        parameters: { env: "production" },
+      });
+
+      // Local still on v1, same configData but changed parameters
+      const result = await service.syncPrompt({
+        idOrHandle: handle,
+        projectId: testProject.id,
+        organizationId: testOrganization.id,
+        localConfigData,
+        localVersion: 1,
+        parameters: { env: "development" },
+      });
+
+      expect(result.action).toBe("conflict");
+    });
+  });
+
   describe("when parameters contain deeply nested values", () => {
     it("preserves nested structure through create and fetch", async () => {
       const params = {
