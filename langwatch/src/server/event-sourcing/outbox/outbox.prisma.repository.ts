@@ -20,15 +20,20 @@ export class PrismaOutboxRepository implements OutboxRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async insertIfAbsent(row: OutboxInsertRow): Promise<boolean> {
+    // `data` is an array (not a bare object): the multitenancy guard's
+    // createMany branch maps over data to assert projectId on every row,
+    // so it requires the array form.
     const result = await this.prisma.reactorOutbox.createMany({
-      data: {
-        projectId: row.projectId,
-        reactorName: row.reactorName,
-        dedupKey: row.dedupKey,
-        groupKey: row.groupKey,
-        payload: row.payload,
-        maxAttempts: row.maxAttempts,
-      },
+      data: [
+        {
+          projectId: row.projectId,
+          reactorName: row.reactorName,
+          dedupKey: row.dedupKey,
+          groupKey: row.groupKey,
+          payload: row.payload,
+          maxAttempts: row.maxAttempts,
+        },
+      ],
       skipDuplicates: true,
     });
     return result.count > 0;
