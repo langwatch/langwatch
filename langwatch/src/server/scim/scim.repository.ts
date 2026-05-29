@@ -68,24 +68,26 @@ export class ScimRepository {
     organizationId: string;
     scimManaged?: boolean;
   }): Promise<void> {
-    await this.prisma.organizationUser.create({
-      data: {
-        userId,
-        organizationId,
-        role: "MEMBER",
-        scimManaged,
-      },
-    });
-    await this.prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.organizationUser.create({
+        data: {
+          userId,
+          organizationId,
+          role: "MEMBER",
+          scimManaged,
+        },
+      }),
+      this.prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          userId,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
+        },
+      }),
+    ]);
   }
 
   async deleteUserAtomically({
@@ -102,10 +104,15 @@ export class ScimRepository {
       await tx.roleBinding.deleteMany({
         where: { userId, organizationId },
       });
-      await tx.user.update({
-        where: { id: userId },
-        data: { deactivatedAt: new Date() },
+      const remainingMemberships = await tx.organizationUser.count({
+        where: { userId },
       });
+      if (remainingMemberships === 0) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { deactivatedAt: new Date() },
+        });
+      }
     });
   }
 

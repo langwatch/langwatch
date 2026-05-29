@@ -22,6 +22,7 @@ import {
 import { extractEmailDomain } from "./sso";
 import { isEnterpriseTier } from "../api/enterprise";
 import { getApp } from "../app-layer/app";
+import { checkSsoEnforcement } from "./sso-enforcement";
 
 const logger = createLogger("langwatch:better-auth");
 

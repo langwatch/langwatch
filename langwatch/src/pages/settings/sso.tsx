@@ -183,8 +183,8 @@ function SsoSettings() {
   const handleSave = (data: {
     domain: string;
     provider: string;
-    clientId: string;
-    clientSecret: string;
+    clientId?: string | null;
+    clientSecret?: string | null;
     issuerUrl?: string | null;
     tenantId?: string | null;
     samlEntityId?: string | null;

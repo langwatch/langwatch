@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { PrismaClient } from "@prisma/client";
+import type { SsoConnection } from "@prisma/client";
 import { decrypt } from "../../utils/encryption";
 import { createLogger } from "../../utils/logger/server";
 
@@ -20,11 +20,13 @@ interface OAuthTokens {
   token_type: string;
 }
 
-interface OAuthUserInfo {
+export interface OAuthUserInfo {
   sub: string;
   email: string;
   name?: string;
   picture?: string;
+  groups?: string[];
+  role?: string;
 }
 
 async function discoverOidcEndpoints({
@@ -171,22 +173,16 @@ export function clearStateCookie({ secure }: { secure: boolean }): string {
 }
 
 export async function buildAuthorizationUrl({
-  prisma,
-  domain,
+  connection,
   callbackUrl,
   state,
 }: {
-  prisma: PrismaClient;
-  domain: string;
+  connection: SsoConnection;
   callbackUrl: string;
   state: string;
-}): Promise<{ url: string; organizationId: string }> {
-  const connection = await prisma.ssoConnection.findFirst({
-    where: { domain, verifiedAt: { not: null } },
-  });
-
-  if (!connection) {
-    throw new Error(`No verified SSO connection for domain ${domain}`);
+}): Promise<{ url: string }> {
+  if (!connection.clientId) {
+    throw new Error(`SSO connection for ${connection.domain} has no client ID (SAML connections use a different flow)`);
   }
 
   const endpoints = await resolveEndpoints({
@@ -205,38 +201,30 @@ export async function buildAuthorizationUrl({
 
   return {
     url: `${endpoints.authorizationEndpoint}?${params.toString()}`,
-    organizationId: connection.organizationId,
   };
 }
 
 export async function exchangeCodeForUser({
-  prisma,
-  domain,
+  connection,
   code,
   callbackUrl,
 }: {
-  prisma: PrismaClient;
-  domain: string;
+  connection: SsoConnection;
   code: string;
   callbackUrl: string;
 }): Promise<{
   userInfo: OAuthUserInfo;
-  organizationId: string;
   provider: string;
 }> {
-  const connection = await prisma.ssoConnection.findFirst({
-    where: { domain, verifiedAt: { not: null } },
-  });
-
-  if (!connection) {
-    throw new Error(`No verified SSO connection for domain ${domain}`);
+  if (!connection.clientId || !connection.clientSecretEnc) {
+    throw new Error(`SSO connection for ${connection.domain} is missing OAuth credentials`);
   }
 
   let clientSecret: string;
   try {
     clientSecret = decrypt(connection.clientSecretEnc);
   } catch (err) {
-    logger.error({ err, domain }, "Failed to decrypt client secret");
+    logger.error({ err, domain: connection.domain }, "Failed to decrypt client secret");
     throw new Error("SSO configuration error — contact your administrator");
   }
 
@@ -261,7 +249,7 @@ export async function exchangeCodeForUser({
   if (!tokenResponse.ok) {
     const body = await tokenResponse.text();
     logger.error(
-      { status: tokenResponse.status, body, domain },
+      { status: tokenResponse.status, body, domain: connection.domain },
       "Token exchange failed",
     );
     throw new Error("Failed to exchange authorization code");
@@ -277,15 +265,38 @@ export async function exchangeCodeForUser({
     throw new Error("Failed to fetch user info from IdP");
   }
 
-  const userInfo = (await userInfoResponse.json()) as OAuthUserInfo;
+  const rawUserInfo = (await userInfoResponse.json()) as Record<string, unknown>;
 
-  if (!userInfo.email) {
+  const attrMap = (connection.attributeMapping ?? {}) as Record<string, string>;
+  const emailClaim = attrMap.email ?? "email";
+  const nameClaim = attrMap.name ?? "name";
+  const groupsClaim = attrMap.groups ?? "groups";
+  const roleClaim = attrMap.role ?? "role";
+
+  const email = rawUserInfo[emailClaim] as string | undefined;
+  if (!email) {
     throw new Error("IdP did not return an email address");
   }
 
+  const rawGroups = rawUserInfo[groupsClaim];
+  const groups = Array.isArray(rawGroups)
+    ? rawGroups.filter((g): g is string => typeof g === "string")
+    : undefined;
+
+  const rawRole = rawUserInfo[roleClaim];
+  const role = typeof rawRole === "string" ? rawRole : undefined;
+
+  const userInfo: OAuthUserInfo = {
+    sub: rawUserInfo.sub as string,
+    email,
+    name: (rawUserInfo[nameClaim] as string) ?? undefined,
+    picture: (rawUserInfo.picture as string) ?? undefined,
+    groups,
+    role,
+  };
+
   return {
     userInfo,
-    organizationId: connection.organizationId,
     provider: connection.provider,
   };
 }

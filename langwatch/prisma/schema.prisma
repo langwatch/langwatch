@@ -311,8 +311,8 @@ model SsoConnection {
   verifiedAt        DateTime?
 
   provider          String
-  clientId          String
-  clientSecretEnc   String
+  clientId          String?
+  clientSecretEnc   String?
   issuerUrl         String?
   tenantId          String?
 

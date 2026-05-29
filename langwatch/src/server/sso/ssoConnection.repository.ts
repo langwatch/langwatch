@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient, type SsoConnection } from "@prisma/client";
+import { SsoConnectionNotFoundError } from "./errors";
 
 export class SsoConnectionRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -28,6 +29,16 @@ export class SsoConnectionRepository {
   }): Promise<SsoConnection | null> {
     return this.prisma.ssoConnection.findFirst({
       where: { domain, organizationId },
+    });
+  }
+
+  async findVerifiedByDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<SsoConnection | null> {
+    return this.prisma.ssoConnection.findFirst({
+      where: { domain, verifiedAt: { not: null } },
     });
   }
 
@@ -62,8 +73,8 @@ export class SsoConnectionRepository {
     organizationId: string;
     domain: string;
     provider: string;
-    clientId: string;
-    clientSecretEnc: string;
+    clientId?: string | null;
+    clientSecretEnc?: string | null;
     issuerUrl?: string | null;
     tenantId?: string | null;
     samlEntityId?: string | null;
@@ -105,8 +116,8 @@ export class SsoConnectionRepository {
     organizationId: string;
     data: {
       provider?: string;
-      clientId?: string;
-      clientSecretEnc?: string;
+      clientId?: string | null;
+      clientSecretEnc?: string | null;
       issuerUrl?: string | null;
       tenantId?: string | null;
       samlEntityId?: string | null;
@@ -136,10 +147,17 @@ export class SsoConnectionRepository {
           : (roleMapping as Prisma.InputJsonValue);
     }
 
-    return this.prisma.ssoConnection.update({
-      where: { id, organizationId },
-      data: prismaData,
-    });
+    try {
+      return await this.prisma.ssoConnection.update({
+        where: { id, organizationId },
+        data: prismaData,
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new SsoConnectionNotFoundError(id);
+      }
+      throw err;
+    }
   }
 
   async delete({
@@ -149,8 +167,15 @@ export class SsoConnectionRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
-    await this.prisma.ssoConnection.delete({
-      where: { id, organizationId },
-    });
+    try {
+      await this.prisma.ssoConnection.delete({
+        where: { id, organizationId },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new SsoConnectionNotFoundError(id);
+      }
+      throw err;
+    }
   }
 }

@@ -7,7 +7,6 @@
  * - src/pages/api/auth/logout.ts    (explicit cookie-clearing logout)
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
-import crypto from "crypto";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
@@ -25,6 +24,8 @@ import {
   generateState,
   parseStateCookie,
 } from "~/server/sso/ssoOAuth";
+import { SsoConnectionService } from "~/server/sso/ssoConnection.service";
+import { SsoAuthService } from "~/server/sso/ssoAuth.service";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -173,9 +174,15 @@ secured.access(authPolicy()).get("/auth/sso/:domain", async (c) => {
   const isSecure = env.NEXTAUTH_URL.startsWith("https");
 
   try {
+    const connectionService = SsoConnectionService.create(prisma);
+    const connection = await connectionService.getVerifiedConnectionByDomain({ domain });
+
+    if (!connection) {
+      throw new Error(`No verified SSO connection for domain ${domain}`);
+    }
+
     const { url } = await buildAuthorizationUrl({
-      prisma,
-      domain,
+      connection,
       callbackUrl,
       state,
     });
@@ -235,80 +242,42 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
   const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
 
   try {
+    const connectionService = SsoConnectionService.create(prisma);
+    const connection = await connectionService.getVerifiedConnectionByDomain({ domain });
+
+    if (!connection) {
+      throw new Error(`No verified SSO connection for domain ${domain}`);
+    }
+
     const { userInfo, provider } = await exchangeCodeForUser({
-      prisma,
-      domain,
+      connection,
       code,
       callbackUrl,
     });
 
-    // Find or create the user + account, then create a session.
-    // This mirrors BetterAuth's genericOAuth flow but reads config from DB.
-    let user = await prisma.user.findFirst({
-      where: { email: userInfo.email },
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: userInfo.email,
-          name:
-            userInfo.name ?? userInfo.email.split("@")[0] ?? "SSO User",
-          image: userInfo.picture ?? null,
-          emailVerified: true,
-        },
-      });
-    }
-
-    if (user.deactivatedAt) {
-      return c.redirect(
-        `/auth/signin?error=${encodeURIComponent("Your account has been deactivated.")}`,
-        302,
-      );
-    }
-
-    // Link or update the OAuth account
-    const existingAccount = await prisma.account.findFirst({
-      where: {
-        userId: user.id,
-        provider,
-        providerAccountId: userInfo.sub,
+    const ssoAuthService = SsoAuthService.create(prisma);
+    const result = await ssoAuthService.handleSsoCallback({
+      userInfo,
+      provider,
+      organizationId: connection.organizationId,
+      roleMappingConfig: {
+        defaultOrgRole: connection.defaultOrgRole,
+        roleMapping: connection.roleMapping as Record<string, unknown> | null,
       },
+      ipAddress:
+        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+      userAgent: c.req.header("user-agent") ?? null,
     });
 
-    if (!existingAccount) {
-      await prisma.account.create({
-        data: {
-          userId: user.id,
-          provider,
-          providerAccountId: userInfo.sub,
-          accountId: userInfo.sub,
-        },
-      });
+    if (result.redirectTo) {
+      return c.redirect(result.redirectTo, 302);
     }
 
-    // Create a session
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.session.create({
-      data: {
-        sessionToken,
-        userId: user.id,
-        expires: expiresAt,
-        ssoAuthenticatedAt: new Date(),
-        ipAddress:
-          c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
-        userAgent: c.req.header("user-agent") ?? null,
-      },
-    });
-
-    // Set the session cookie (same format BetterAuth uses)
     const cookieName = isSecure
       ? "__Secure-better-auth.session_token"
       : "better-auth.session_token";
     const cookieParts = [
-      `${cookieName}=${sessionToken}`,
+      `${cookieName}=${result.sessionToken}`,
       "Path=/",
       "HttpOnly",
       "SameSite=Lax",

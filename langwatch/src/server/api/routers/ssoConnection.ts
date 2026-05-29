@@ -84,8 +84,8 @@ export const ssoConnectionRouter = createTRPCRouter({
       z.object({
         domain: z.string().min(1).max(253),
         provider: z.string().min(1),
-        clientId: z.string().min(1),
-        clientSecret: z.string().min(1),
+        clientId: z.string().min(1).nullish(),
+        clientSecret: z.string().min(1).nullish(),
         issuerUrl: z.string().nullish(),
         tenantId: z.string().nullish(),
         samlEntityId: z.string().nullish(),
@@ -140,8 +140,8 @@ export const ssoConnectionRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         provider: z.string().min(1).optional(),
-        clientId: z.string().min(1).optional(),
-        clientSecret: z.string().min(1).optional(),
+        clientId: z.string().min(1).nullish(),
+        clientSecret: z.string().min(1).nullish(),
         issuerUrl: z.string().nullish(),
         tenantId: z.string().nullish(),
         samlEntityId: z.string().nullish(),
@@ -230,43 +230,13 @@ export const ssoConnectionRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const where: Record<string, unknown> = {
+      const service = SsoConnectionService.create(ctx.prisma);
+      return service.listScimLogs({
         organizationId: input.organizationId,
-      };
-
-      if (input.statusFilter === "success") {
-        where.responseStatus = { gte: 200, lt: 300 };
-      } else if (input.statusFilter === "4xx") {
-        where.responseStatus = { gte: 400, lt: 500 };
-      } else if (input.statusFilter === "5xx") {
-        where.responseStatus = { gte: 500 };
-      }
-
-      if (input.pathSearch) {
-        where.requestPath = { contains: input.pathSearch, mode: "insensitive" };
-      }
-
-      const logs = await ctx.prisma.scimRequestLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: input.limit + 1,
-        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+        statusFilter: input.statusFilter,
+        pathSearch: input.pathSearch,
+        cursor: input.cursor,
+        limit: input.limit,
       });
-
-      const hasMore = logs.length > input.limit;
-      const items = hasMore ? logs.slice(0, input.limit) : logs;
-
-      return {
-        items: items.map((log) => ({
-          id: log.id,
-          method: log.requestMethod,
-          path: log.requestPath,
-          status: log.responseStatus,
-          duration: log.durationMs,
-          identityProvider: log.identityProvider,
-          createdAt: log.createdAt,
-        })),
-        nextCursor: hasMore ? items[items.length - 1]?.id : undefined,
-      };
     }),
 });

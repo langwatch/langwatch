@@ -68,8 +68,14 @@ function CopyButton({ value }: { value: string }) {
       variant="ghost"
       size="xs"
       onClick={() => {
-        void navigator.clipboard.writeText(value);
-        toaster.create({ title: "Copied to clipboard", type: "success" });
+        navigator.clipboard
+          .writeText(value)
+          .then(() => {
+            toaster.create({ title: "Copied to clipboard", type: "success" });
+          })
+          .catch(() => {
+            toaster.create({ title: "Failed to copy", type: "error" });
+          });
       }}
     >
       <Clipboard size={14} />
@@ -136,7 +142,7 @@ function connectionToForm(conn: SsoConnectionListItem): FormState {
   return {
     domain: conn.domain,
     provider: conn.provider,
-    clientId: conn.clientId,
+    clientId: conn.clientId ?? "",
     clientSecret: "",
     issuerUrl: conn.issuerUrl ?? "",
     tenantId: conn.tenantId ?? "",
@@ -223,20 +229,46 @@ export function SsoConnectionModal({
       : "";
 
   const handleSave = () => {
-    if (!form.domain || !form.clientId) {
+    if (form.provider === "custom-saml") {
+      if (!form.domain || !form.samlEntityId || !form.samlSsoUrl || !form.samlCertificate) {
+        toaster.create({
+          title: "Domain, Entity ID, SSO URL, and Certificate are required for SAML",
+          type: "error",
+        });
+        return;
+      }
+    } else {
+      if (!form.domain || !form.clientId) {
+        toaster.create({
+          title: "Please fill in all required fields",
+          type: "error",
+        });
+        return;
+      }
+      if (!isEditing && !form.clientSecret) {
+        toaster.create({
+          title: "Client secret is required",
+          type: "error",
+        });
+        return;
+      }
+    }
+
+    if ((form.provider === "okta" || form.provider === "custom-oidc") && !form.issuerUrl) {
       toaster.create({
-        title: "Please fill in all required fields",
+        title: "Issuer URL is required for this provider",
         type: "error",
       });
       return;
     }
-    if (!isEditing && !form.clientSecret) {
+    if (form.provider === "azure-ad" && !form.tenantId) {
       toaster.create({
-        title: "Client secret is required",
+        title: "Tenant ID is required for Azure AD",
         type: "error",
       });
       return;
     }
+
     setConfirmOpen(true);
   };
 
@@ -769,11 +801,18 @@ export function SsoConnectionModal({
           </Dialog.Header>
           <Dialog.CloseTrigger />
           <Dialog.Body>
-            <Text fontSize="sm">
-              Every user with an <strong>@{form.domain}</strong> email will be
-              redirected to your identity provider on sign-in. Password and
-              social login will be blocked for this domain.
-            </Text>
+            {form.ssoEnforced ? (
+              <Text fontSize="sm">
+                Every user with an <strong>@{form.domain}</strong> email will be
+                redirected to your identity provider on sign-in. Password and
+                social login will be blocked for this domain.
+              </Text>
+            ) : (
+              <Text fontSize="sm">
+                SSO will be configured for <strong>@{form.domain}</strong>.
+                Users can choose to sign in via SSO or other enabled methods.
+              </Text>
+            )}
           </Dialog.Body>
           <Dialog.Footer>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>

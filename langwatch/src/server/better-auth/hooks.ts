@@ -322,12 +322,6 @@ export const beforeAccountCreate = async ({
  * Credential accounts (providerId = "credential") skip this entirely — on-prem
  * email-mode deployments don't configure SSO.
  */
-const ROLE_PRIORITY: Record<string, number> = {
-  ADMIN: 3,
-  MEMBER: 2,
-  EXTERNAL: 1,
-};
-
 const applySsoRoleMapping = async ({
   prisma,
   userId,
