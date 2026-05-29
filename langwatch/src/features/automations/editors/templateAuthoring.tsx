@@ -1,9 +1,10 @@
-import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import * as React from "react";
 import dynamic from "~/utils/compat/next-dynamic";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
+import { Link } from "~/components/ui/link";
 import {
   clearLiquidMarkers,
   LIQUID_JSON_LANGUAGE_ID,
@@ -21,11 +22,11 @@ export type { VariableInfo };
 /**
  * Building blocks shared by every notification config stage (email subject,
  * email body, Slack template): a Monaco Liquid editor with autocomplete +
- * unknown-variable validation, and a "using default" header with Reset.
- * The heavyweight preview panels (email iframe, Block Kit chrome,
- * variable reference, example data) were retired in favour of an info-icon
- * pip next to "Preview" plus a tooltipped `VariableInfoIcon` on each
- * field header.
+ * unknown-variable validation, a "using default" header with Reset, plus
+ * compact preview pieces (`CompactEmailPreview`, `CompactSlackPreview`) —
+ * just the rendered output, no surrounding chrome / variable reference /
+ * example-data panels. The heavier "variable surface" lives next to each
+ * field header as a hover tooltip on `VariableInfoIcon`.
  */
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -177,6 +178,187 @@ export function LiquidEditor({
         options={editorOptions}
       />
     </Box>
+  );
+}
+
+/**
+ * Compact email preview — the rendered HTML in a small sandboxed iframe,
+ * with the subject line above. No surrounding panel chrome; sized to sit
+ * inline below the body editor without dominating the drawer.
+ */
+export function CompactEmailPreview({
+  subject,
+  html,
+}: {
+  subject: string;
+  html: string;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text textStyle="xs" color="fg.muted">
+        Subject
+      </Text>
+      <Text fontWeight="medium" textStyle="sm">
+        {subject}
+      </Text>
+      <Box
+        border="1px solid"
+        borderColor="border"
+        borderRadius="md"
+        overflow="hidden"
+        height="200px"
+        bg="white"
+      >
+        <iframe
+          srcDoc={html}
+          sandbox=""
+          title="Email preview"
+          style={{ width: "100%", height: "100%", border: "none" }}
+        />
+      </Box>
+    </VStack>
+  );
+}
+
+type SlackBlock = Record<string, unknown>;
+
+/** Compact Slack preview — renders mrkdwn or Block Kit blocks inline,
+ *  no border chrome. The "Open in Slack Block Kit Builder" link sits
+ *  below as a thin row when blocks are present. */
+export function CompactSlackPreview({
+  payload,
+}: {
+  payload: { text: string } | { blocks: SlackBlock[] };
+}) {
+  const builderUrl = useMemo(() => {
+    if (!("blocks" in payload)) return null;
+    const json = JSON.stringify({ blocks: payload.blocks });
+    return `https://app.slack.com/block-kit-builder#${encodeURIComponent(json)}`;
+  }, [payload]);
+
+  return (
+    <VStack align="stretch" gap={2}>
+      <Box
+        bg="bg.subtle"
+        borderRadius="md"
+        padding={3}
+        maxHeight="240px"
+        overflowY="auto"
+      >
+        {"text" in payload ? (
+          <Text whiteSpace="pre-wrap" textStyle="sm">
+            {renderSlackMrkdwn(payload.text)}
+          </Text>
+        ) : (
+          <BlockKitBlocks blocks={payload.blocks} />
+        )}
+      </Box>
+      {builderUrl ? (
+        <Link href={builderUrl} isExternal color="orange.400" textStyle="xs">
+          Open in Slack Block Kit Builder
+        </Link>
+      ) : null}
+    </VStack>
+  );
+}
+
+function BlockKitBlocks({ blocks }: { blocks: SlackBlock[] }) {
+  return (
+    <VStack align="stretch" gap={2}>
+      {blocks.map((block, i) => (
+        <BlockKitBlock key={i} block={block} />
+      ))}
+    </VStack>
+  );
+}
+
+function blockText(block: SlackBlock): string {
+  const text = block.text;
+  if (typeof text === "string") return text;
+  if (text && typeof text === "object" && "text" in text) {
+    const inner = (text as { text?: unknown }).text;
+    return typeof inner === "string" ? inner : "";
+  }
+  return "";
+}
+
+function BlockKitBlock({ block }: { block: SlackBlock }) {
+  switch (block.type) {
+    case "header":
+      return (
+        <Text fontWeight="bold" textStyle="sm">
+          {blockText(block)}
+        </Text>
+      );
+    case "section":
+      return (
+        <Text whiteSpace="pre-wrap" textStyle="sm">
+          {renderSlackMrkdwn(blockText(block))}
+        </Text>
+      );
+    case "context": {
+      const elements = Array.isArray(block.elements) ? block.elements : [];
+      const text = elements
+        .map((el) =>
+          el && typeof el === "object" && "text" in el
+            ? String((el as { text?: unknown }).text ?? "")
+            : "",
+        )
+        .join("  ");
+      return (
+        <Text textStyle="xs" color="fg.muted" whiteSpace="pre-wrap">
+          {renderSlackMrkdwn(text)}
+        </Text>
+      );
+    }
+    case "divider":
+      return <Separator />;
+    default:
+      return null;
+  }
+}
+
+function renderSlackMrkdwn(text: string): React.ReactNode[] {
+  const linkPattern = /<(https?:\/\/[^>|]+)(?:\|([^>]+))?>/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = linkPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(
+        <Fragment key={key++}>
+          {renderBold(text.slice(lastIndex, match.index))}
+        </Fragment>,
+      );
+    }
+    const url = match[1]!;
+    const label = match[2] ?? url;
+    nodes.push(
+      <Link key={key++} href={url} isExternal color="orange.400">
+        {label}
+      </Link>,
+    );
+    lastIndex = linkPattern.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(
+      <Fragment key={key++}>{renderBold(text.slice(lastIndex))}</Fragment>,
+    );
+  }
+  return nodes;
+}
+
+function renderBold(text: string): React.ReactNode[] {
+  return text.split(/(\*[^*]+\*)/g).map((segment, i) =>
+    segment.startsWith("*") && segment.endsWith("*") && segment.length > 2 ? (
+      <Text as="span" key={i} fontWeight="bold">
+        {segment.slice(1, -1)}
+      </Text>
+    ) : (
+      <Fragment key={i}>{segment}</Fragment>
+    ),
   );
 }
 

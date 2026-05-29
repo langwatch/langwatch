@@ -2,9 +2,9 @@ import { Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "~/utils/api";
-import { PreviewStatusIcon } from "~/features/automations/components/PreviewStatusIcon";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import {
+  CompactEmailPreview,
   FieldHeader,
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
@@ -265,15 +265,12 @@ function EmailConfigForm({
         }
       />
 
-      <HStack gap={2}>
-        <Text textStyle="sm" fontWeight="semibold">
-          Preview
-        </Text>
-        <PreviewStatusIcon
-          preview={emailPreview}
-          loading={ctx.previewLoading}
+      {emailPreview ? (
+        <CompactEmailPreview
+          subject={emailPreview.subject}
+          html={emailPreview.html}
         />
-      </HStack>
+      ) : null}
     </VStack>
   );
 }

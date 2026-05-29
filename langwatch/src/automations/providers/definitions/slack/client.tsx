@@ -1,18 +1,11 @@
-import {
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { SiSlack } from "react-icons/si";
-import { PreviewStatusIcon } from "~/features/automations/components/PreviewStatusIcon";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
 import {
+  CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
@@ -167,15 +160,7 @@ function SlackConfigForm({
         }
       />
 
-      <HStack gap={2}>
-        <Text textStyle="sm" fontWeight="semibold">
-          Preview
-        </Text>
-        <PreviewStatusIcon
-          preview={slackPreview}
-          loading={ctx.previewLoading}
-        />
-      </HStack>
+      {slackPreview ? <CompactSlackPreview payload={slackPreview.payload} /> : null}
     </VStack>
   );
 }
