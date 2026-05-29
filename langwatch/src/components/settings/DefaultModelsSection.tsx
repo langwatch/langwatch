@@ -53,9 +53,9 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import {
-  DefaultModelsScopeFilter,
+  ScopeFilter as ScopeFilterComponent,
   type ScopeFilter,
-} from "./DefaultModelsScopeFilter";
+} from "./ScopeFilter";
 import { ModelChip } from "./ModelChip";
 import { toaster } from "~/components/ui/toaster";
 import {
@@ -244,7 +244,7 @@ export function DefaultModelsSection({
               In the controlled case the filter lives in the page header,
               so we skip rendering it here to avoid the duplicate. */}
           {controlledFilter === undefined && (
-            <DefaultModelsScopeFilter
+            <ScopeFilterComponent
               value={filter}
               onChange={setFilter}
               available={data.available}
