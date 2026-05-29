@@ -4,40 +4,40 @@ updates:
     directory: "/langwatch"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 20
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "npm"
     directory: "/typescript-sdk"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "npm"
     directory: "/mcp-server"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "uv"
     directory: "/python-sdk"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "uv"
     directory: "/langwatch_nlp"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 50
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 50
