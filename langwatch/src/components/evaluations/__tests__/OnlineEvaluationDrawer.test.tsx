@@ -66,7 +66,7 @@ Element.prototype.scrollIntoView = vi.fn();
  * CRITICAL Integration test - Tests the REAL navigation flow where the drawer's
  * open prop actually changes during navigation (as happens in production).
  */
-// TODO(#3240): re-enable after react-admin 5.13.1 provider wrapper fix
+// TODO(#3240): re-enable once the drawer test provider wrapper is fixed.
 describe.skip("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -227,7 +227,7 @@ describe.skip("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => 
   });
 });
 
-// Skipped: broken by react-admin pin in #3241 — see langwatch/langwatch#3240.
+// Skipped pending the drawer test provider wrapper fix (langwatch/langwatch#3240).
 describe.skip("OnlineEvaluationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();

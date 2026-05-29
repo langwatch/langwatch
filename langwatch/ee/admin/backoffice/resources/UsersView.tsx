@@ -476,8 +476,8 @@ function UserEditDrawer({
  * Renders a wrapped list of clickable chips for the Users table's
  * Organizations / Projects columns. Each chip deep-links to the matching
  * Backoffice list page with the row's id pre-loaded into the `q` search
- * param so the user lands on a single-row, filtered view — same one-click
- * drill-down the old react-admin `ReferenceField` used to give us.
+ * param so the user lands on a single-row, filtered view, giving a one-click
+ * drill-down from the Users table into the related record.
  */
 function RefChipList({
   refs,

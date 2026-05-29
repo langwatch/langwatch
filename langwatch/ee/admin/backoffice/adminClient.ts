@@ -1,12 +1,11 @@
 /**
  * Thin typed wrapper around the Hono `/api/admin/:resource` endpoints.
  *
- * The backend (see `ee/admin/routes/admin.ts`) is the same
- * `ra-data-simple-prisma` handler that used to back the react-admin UI:
- * every call is a POST with `{ resource, method, params }`. We keep using it
- * untouched so all business logic (user deactivate/reactivate side effects,
- * org ssoDomain normalization, subscription list join, search logic, audit
- * logs) remains unchanged — only the UI is rewritten.
+ * The backend (see `ee/admin/routes/admin.ts`) is a `ra-data-simple-prisma`
+ * handler: every call is a POST with `{ resource, method, params }`. The
+ * Chakra backoffice UI talks to it through this wrapper, keeping all business
+ * logic (user deactivate/reactivate side effects, org ssoDomain normalization,
+ * subscription list join, search logic, audit logs) in one place on the server.
  */
 
 export type ResourceName =
