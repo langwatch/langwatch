@@ -1,8 +1,20 @@
 import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
-import { vi } from "vitest";
+import { afterAll, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
+import { shutdownPostHog } from "./src/server/posthog";
 dotenv.config({ path: ".env" });
+
+// Any test that evaluates a PostHog-backed PRODUCT flag (e.g. resolveHome ->
+// featureFlagService.isEnabled) constructs the posthog-node client, whose
+// local-evaluation poller is a setInterval that posthog-node does not unref.
+// That timer keeps the worker's event loop alive, so under --coverage (where
+// vitest awaits a graceful worker exit instead of force-killing the pool) the
+// shard hangs after every test has already passed. Shutting the client down
+// per file clears the interval; it no-ops when nothing constructed a client.
+afterAll(async () => {
+  await shutdownPostHog();
+});
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
 // Tests don't need actual chart rendering - we're testing our logic, not recharts itself.
