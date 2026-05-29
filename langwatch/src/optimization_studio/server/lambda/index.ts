@@ -555,19 +555,34 @@ export const invokeLambda = async (
     // Get the project-specific Lambda ARN
     const functionArn = await getProjectLambdaArn(projectId);
 
-    // A synchronous Lambda invoke caps the request body at 6 MB, so a heavy
-    // dataset row (a multi-megabyte conversation) fails before our code runs
-    // with "Request must be smaller than 6291456 bytes". When the receiver
-    // can fetch a presigned URL, offload the oversized body to S3 and invoke
-    // with an empty body + the staged header instead. The object is deleted
-    // once the response stream completes.
+    // Build the full Lambda invoke Payload. The 6 MB synchronous-invoke cap
+    // applies to THIS serialized envelope — where `body` is embedded as a
+    // JSON-escaped string (quotes/backslashes doubled) plus the rawPath /
+    // requestContext / headers overhead — not to the raw event body. So a
+    // heavy dataset row fails before our code runs with "Request must be
+    // smaller than 6291456 bytes".
+    const buildInvokeBody = (p: {
+      body: string;
+      headers: Record<string, string>;
+    }) =>
+      JSON.stringify({
+        rawPath: path,
+        requestContext: { http: { method: "POST" } },
+        ...p,
+      });
+
+    // When the receiver can fetch a presigned URL, offload the body to S3 and
+    // invoke with an empty body + the staged header instead. The object is
+    // deleted once the response stream completes. The staging decision is made
+    // against the ACTUAL invoke-envelope size (post-escaping), so a body that
+    // only crosses the cap after escaping is still offloaded.
     let stagedInvoke: StagedObject | null = null;
-    let invokePayload = payload;
+    let invokeBody = buildInvokeBody(payload);
     if (options.supportsStaging) {
-      const bodyBytes = Buffer.byteLength(payload.body, "utf-8");
+      const invokeBytes = Buffer.byteLength(invokeBody, "utf-8");
       const threshold =
         env.LANGEVALS_STAGING_THRESHOLD_BYTES ?? STUDIO_INVOKE_STAGING_THRESHOLD_BYTES;
-      if (bodyBytes > threshold) {
+      if (invokeBytes > threshold) {
         stagedInvoke = await stagePayloadToS3({
           projectId,
           keyPrefix: `${STUDIO_STAGING_PREFIX}/${projectId}`,
@@ -575,31 +590,23 @@ export const invokeLambda = async (
           ttlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
         });
         logger.info(
-          { projectId, path, bodyBytes, thresholdBytes: threshold },
+          { projectId, path, invokeBytes, thresholdBytes: threshold },
           "staged oversized studio invoke payload via presigned S3 URL",
         );
-        invokePayload = {
+        invokeBody = buildInvokeBody({
           body: "",
           headers: {
             ...payload.headers,
             [STAGED_PAYLOAD_HEADER]: stagedInvoke.stagedUrl,
           },
-        };
+        });
       }
     }
 
     const command = new InvokeWithResponseStreamCommand({
       FunctionName: functionArn,
       InvocationType: "RequestResponse",
-      Payload: JSON.stringify({
-        rawPath: path,
-        requestContext: {
-          http: {
-            method: "POST",
-          },
-        },
-        ...invokePayload,
-      }),
+      Payload: invokeBody,
     });
 
     const { EventStream } = await lambda.send(command);

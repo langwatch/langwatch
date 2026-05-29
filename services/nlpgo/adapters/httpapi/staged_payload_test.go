@@ -59,12 +59,28 @@ func TestFetchStagedPayload_ReturnsBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	body, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL)
+	body, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL, 1<<20)
 	if err != nil {
 		t.Fatalf("fetchStagedPayload error: %v", err)
 	}
 	if string(body) != want {
 		t.Fatalf("body mismatch: got %q want %q", body, want)
+	}
+}
+
+// given an upstream body larger than the byte limit
+// when fetchStagedPayload reads it
+// then it errors instead of silently returning a truncated body
+// (io.LimitReader truncates rather than erroring, so we read limit+1).
+func TestFetchStagedPayload_OverLimitErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(strings.Repeat("x", 100)))
+	}))
+	defer srv.Close()
+
+	if _, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL, 10); err == nil {
+		t.Fatal("expected error when body exceeds the byte limit, got nil")
 	}
 }
 
@@ -78,7 +94,7 @@ func TestFetchStagedPayload_Non2xxIsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL); err == nil {
+	if _, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL, 1<<20); err == nil {
 		t.Fatal("expected error on non-2xx, got nil")
 	}
 }

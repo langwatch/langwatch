@@ -88,10 +88,10 @@ func isAWSS3Host(host string) bool {
 }
 
 // fetchStagedPayload GETs the (already-validated) presigned URL and returns
-// the body, bounded to maxStagedPayloadBytes. The caller MUST validate the
-// URL with validateStagedPayloadURL first; this function does the transport
-// only so it stays unit-testable against an httptest server.
-func fetchStagedPayload(ctx context.Context, client *http.Client, raw string) ([]byte, error) {
+// the body, bounded to maxBytes. The caller MUST validate the URL with
+// validateStagedPayloadURL first; this function does the transport only so it
+// stays unit-testable against an httptest server.
+func fetchStagedPayload(ctx context.Context, client *http.Client, raw string, maxBytes int64) ([]byte, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -107,9 +107,15 @@ func fetchStagedPayload(ctx context.Context, client *http.Client, raw string) ([
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("staged payload fetch returned status %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxStagedPayloadBytes))
+	// Read one byte past the limit so we can distinguish "exactly at limit"
+	// from "over limit" — io.LimitReader silently truncates rather than
+	// erroring, which would otherwise hand back a corrupt (clipped) body.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read staged payload body: %w", err)
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("staged payload exceeds %d byte limit", maxBytes)
 	}
 	return body, nil
 }
@@ -122,7 +128,7 @@ func readStudioRequestBody(r *http.Request, client *http.Client) ([]byte, error)
 		if err := validateStagedPayloadURL(staged); err != nil {
 			return nil, err
 		}
-		return fetchStagedPayload(r.Context(), client, staged)
+		return fetchStagedPayload(r.Context(), client, staged, maxStagedPayloadBytes)
 	}
 	return io.ReadAll(r.Body)
 }
