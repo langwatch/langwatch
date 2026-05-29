@@ -77,8 +77,15 @@ async function statusFromResults(params: {
       "GET",
       `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as ResultsForStatus;
-  } catch {
-    return null;
+  } catch (error) {
+    // Only a genuine "no such run" is a fallback miss (-> guidance). Real
+    // 5xx / auth / network errors must propagate, not be masked as not-found.
+    const code = error instanceof LangWatchApiError ? error.status : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    if (code === 404 || (code === undefined && /404|not found/i.test(message))) {
+      return null;
+    }
+    throw error;
   }
 
   const status = deriveRunStatus(results.timestamps);
@@ -135,7 +142,7 @@ export async function handleExperimentStatus(params: {
         "",
         `Could not find run \`${params.runId}\`. SDK-logged runs and runs older than 24h are not in the live run-state and must be resolved by experiment slug.`,
         "",
-        "> Pass `experimentSlug` (find it with `platform_experiment_list_runs`), or fetch the rows directly with `platform_experiment_results`.",
+        "> Pass `experimentSlug`: discover it with `platform_experiment_list`, then use `platform_experiment_list_runs` for the run ids. Or fetch the rows directly with `platform_experiment_results`.",
       ].join("\n");
     }
     throw error;

@@ -113,7 +113,7 @@ export async function handleExperimentResults(params: {
         "",
         `Could not load results for run \`${params.runId}\`. The run id may be incorrect, or its run state may have expired (Redis keeps it for 24h).`,
         "",
-        "> Pass `experimentSlug` to load results for runs older than 24h. Use `platform_experiment_list_runs` to find the slug and run id.",
+        "> Pass `experimentSlug` to load results for runs older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` for the run ids.",
       ].join("\n");
     }
     throw error;
@@ -127,12 +127,12 @@ export async function handleExperimentResults(params: {
       "",
       `Could not load results for run \`${params.runId}\`.`,
       "",
-      "> Pass `experimentSlug` if the run is older than 24h, or use `platform_experiment_list_runs` to confirm the run id.",
+      "> Pass `experimentSlug` if the run is older than 24h. Discover the slug with `platform_experiment_list`, then `platform_experiment_list_runs` to confirm the run id.",
     ].join("\n");
   }
 
-  // Partial results are served even while the run is still in progress —
-  // rows land in ClickHouse incrementally, so a "running" or "interrupted"
+  // Partial results are served even while the run is still in progress.
+  // Rows land in ClickHouse incrementally, so a "running" or "interrupted"
   // run can still expose every row recorded so far. A run only fails to set
   // finished_at/stopped_at when the SDK process dies before flushing, but the
   // rows it did log are still useful, so we never gate on a terminal status.
@@ -247,10 +247,12 @@ export async function handleExperimentResults(params: {
   if (rows.length === 0) {
     if (filter === "failed") {
       lines.push("_No rows matched the filter._");
-    } else if (partial) {
+    } else if (runStatus === "running") {
       lines.push(
-        "_No rows recorded yet — the run is still in progress. Call again shortly._",
+        "_No rows recorded yet. The run is still in progress; call again shortly._",
       );
+    } else if (runStatus === "interrupted") {
+      lines.push("_No rows were recorded before the run was interrupted._");
     } else {
       lines.push("_No rows recorded for this run._");
     }

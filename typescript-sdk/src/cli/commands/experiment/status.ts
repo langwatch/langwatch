@@ -28,6 +28,7 @@ const statusFromResults = async ({
   runId: string;
   experimentSlug: string;
 }): Promise<{
+  runId: string;
   status: string;
   progress: number;
   total: number;
@@ -38,6 +39,7 @@ const statusFromResults = async ({
   try {
     const results = await service.getRunResults({ runId, experimentSlug });
     return {
+      runId,
       status: deriveRunStatus(results.timestamps),
       progress: results.progress ?? results.dataset.length,
       total: results.total ?? results.dataset.length,
@@ -45,8 +47,14 @@ const statusFromResults = async ({
       finishedAt: results.timestamps.finishedAt ?? undefined,
       stoppedAt: results.timestamps.stoppedAt ?? undefined,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    // Only a genuine "no such run" is a fallback miss. Real 5xx / auth /
+    // network errors must propagate so they aren't masked as not-found.
+    const message = error instanceof Error ? error.message : String(error);
+    if (/404|not found/i.test(message)) {
+      return null;
+    }
+    throw error;
   }
 };
 
@@ -62,6 +70,7 @@ export const experimentStatusCommand = async (
 
   try {
     let status: {
+      runId?: string;
       status: string;
       progress: number;
       total: number;

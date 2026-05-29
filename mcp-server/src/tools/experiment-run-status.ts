@@ -1,7 +1,7 @@
 // Experiment runs are stored as a timestamp-driven state in ClickHouse: a run
 // is "completed" once finishedAt is set, "stopped" once stoppedAt is set, and
 // otherwise still "running". A run that stopped emitting updates a while ago
-// without ever finishing is reported as "interrupted" — the SDK process likely
+// without ever finishing is reported as "interrupted": the SDK process likely
 // died before sending finished_at/stopped_at.
 
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000;
@@ -31,6 +31,6 @@ export const deriveRunStatus = (
 };
 
 // Whether the run is in a terminal state. Non-terminal runs (running /
-// interrupted) can still be queried — their results are partial.
+// interrupted) can still be queried; their results are partial.
 export const isTerminalStatus = (status: RunStatus): boolean =>
   status === "completed" || status === "stopped";

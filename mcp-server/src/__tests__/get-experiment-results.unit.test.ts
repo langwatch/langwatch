@@ -249,6 +249,47 @@ describe("handleExperimentResults()", () => {
     });
   });
 
+  describe("given a non-terminal run with zero rows", () => {
+    describe("when the run is still running", () => {
+      it("says the run is in progress", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        const out = await handleExperimentResults({ runId: "empty-running" });
+        expect(out).toContain("still in progress");
+        expect(out).not.toContain("interrupted");
+      });
+    });
+
+    describe("when the run was interrupted", () => {
+      it("says no rows were recorded before it was interrupted, not to wait", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        const out = await handleExperimentResults({ runId: "empty-interrupted" });
+        expect(out).toContain("interrupted");
+        expect(out).not.toContain("still in progress");
+        expect(out).not.toContain("Call again shortly");
+      });
+    });
+  });
+
   describe("given no run state but rows exist (SDK / >24h run)", () => {
     describe("when results are requested with a stopped run", () => {
       it("renders results for a stopped run", async () => {

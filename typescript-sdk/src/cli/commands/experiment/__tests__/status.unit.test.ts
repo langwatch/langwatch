@@ -112,5 +112,30 @@ describe("experimentStatusCommand()", () => {
       });
       expect(mockGetRunResults).not.toHaveBeenCalled();
     });
+
+    it("keeps runId in the json fallback output for schema parity", async () => {
+      mockGetRunStatus.mockRejectedValue(new Error("Run not found"));
+      mockGetRunResults.mockResolvedValue({
+        progress: 5,
+        total: 5,
+        dataset: [1, 2, 3, 4, 5],
+        timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+      });
+      await experimentStatusCommand("sdk_run", {
+        experiment: "doc-qa",
+        format: "json",
+      });
+      const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      const payload = JSON.parse(printed);
+      expect(payload.runId).toBe("sdk_run");
+    });
+
+    it("propagates a real fallback error instead of masking it as not-found", async () => {
+      mockGetRunStatus.mockRejectedValue(new Error("Run not found"));
+      mockGetRunResults.mockRejectedValue(new Error("get run results: 500 Internal Server Error"));
+      await expect(
+        experimentStatusCommand("sdk_run", { experiment: "doc-qa" }),
+      ).rejects.toMatchObject({ code: 1 });
+    });
   });
 });

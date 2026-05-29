@@ -211,6 +211,29 @@ describe("experimentResultsCommand()", () => {
     });
   });
 
+  describe("given a non-terminal run with zero rows", () => {
+    describe("when the run was interrupted", () => {
+      it("does not tell the user to wait for more rows", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({ runId: "interrupted" });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).toContain("interrupted");
+        expect(printed).not.toContain("No rows matched the filter");
+        expect(printed).not.toContain("still in progress");
+      });
+    });
+  });
+
   describe("given the API call fails", () => {
     describe("when the run is missing", () => {
       it("exits with code 1", async () => {

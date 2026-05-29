@@ -175,5 +175,20 @@ describe("handleExperimentStatus()", () => {
         handleExperimentStatus({ runId: "nope" }),
       ).rejects.toThrow();
     });
+
+    it("propagates a real (non-404) error from the results fallback instead of faking not-found", async () => {
+      mockMakeRequest
+        .mockRejectedValueOnce(
+          new LangWatchApiError("missing", 404, "Run not found"),
+        )
+        .mockRejectedValueOnce(
+          new LangWatchApiError("boom", 500, "Internal error"),
+        );
+
+      // The fallback's 500 ("boom") must surface, not the original 404 ("missing").
+      await expect(
+        handleExperimentStatus({ runId: "sdk_run", experimentSlug: "doc-qa" }),
+      ).rejects.toThrow(/boom/);
+    });
   });
 });
