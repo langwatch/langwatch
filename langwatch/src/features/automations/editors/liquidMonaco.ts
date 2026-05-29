@@ -602,10 +602,12 @@ export function setupLiquidJsonSchema(params: {
     allowComments: false,
     schemas: Array.from(registeredSchemas.entries()).map(([uri, s]) => ({
       uri: `inmemory://schemas/${encodeURIComponent(uri)}.schema.json`,
-      // Match by basename glob — Monaco normalises the model URI internally
-      // and an exact-string `file:///...` match was unreliable across
-      // versions. The basename is unique per editor (caller's responsibility).
-      fileMatch: [`*${basenameOfUri(uri)}`],
+      // Match the shadow model by basename. Per Monaco's docs the `**`
+      // wildcard spans path separators while a plain `*` does not, so
+      // `**/<basename>` is the right shape to attach the schema to the
+      // shadow URI's path. Basenames must be unique per editor — that's
+      // the caller's responsibility.
+      fileMatch: [`**/${basenameOfUri(uri)}`],
       schema: s,
     })),
   });
