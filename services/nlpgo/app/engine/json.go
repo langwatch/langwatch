@@ -28,11 +28,12 @@ func stripJSONFence(s string) string {
 	if nl == -1 {
 		return s
 	}
-	inner := trimmed[nl+1:]
-	// Drop the trailing closing fence if present.
-	if idx := strings.LastIndex(inner, "```"); idx != -1 {
-		inner = inner[:idx]
-	}
+	// Only strip a real closing fence at the very end (TrimSuffix), never
+	// an interior ``` that legitimately appears inside a JSON string value
+	// (e.g. a fenced code snippet). Any prose after the closing fence is
+	// handled by the balanced-object recovery, so we don't need LastIndex.
+	inner := strings.TrimSpace(trimmed[nl+1:])
+	inner = strings.TrimSuffix(inner, "```")
 	return strings.TrimSpace(inner)
 }
 

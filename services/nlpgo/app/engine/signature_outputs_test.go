@@ -223,6 +223,10 @@ func TestStripJSONFence(t *testing.T) {
 		{"bare fence", "```\n{\"a\":1}\n```", `{"a":1}`},
 		{"leading whitespace", "  ```json\n{\"a\":1}\n```  ", `{"a":1}`},
 		{"no closing fence", "```json\n{\"a\":1}", `{"a":1}`},
+		// An interior ``` inside a string value (no real closing fence)
+		// must NOT be treated as the closing fence — only a genuine
+		// trailing fence is stripped.
+		{"interior fence not stripped", "```json\n{\"code\":\"a```b\"}", `{"code":"a` + "```" + `b"}`},
 		{"plain text untouched", "just text", "just text"},
 	}
 	for _, tc := range cases {
