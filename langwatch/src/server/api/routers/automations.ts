@@ -5,10 +5,15 @@ import { generate as ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
+import { DomainError } from "~/server/app-layer/domain-error";
+import {
+  MissingAnnotatorError,
+  MissingSlackWebhookError,
+  ProjectNotFoundError,
+  RecipientNotInTeamError,
+} from "~/server/app-layer/triggers/errors";
 import {
   type DraftProject,
-  TemplateValidationError,
-  TestFireUnavailableError,
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
@@ -47,25 +52,55 @@ const actionParamsSchema = z.object({
     .optional(),
 });
 
+type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
+
+function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
+  switch (httpStatus) {
+    case 400:
+      return "BAD_REQUEST";
+    case 401:
+      return "UNAUTHORIZED";
+    case 403:
+      return "FORBIDDEN";
+    case 404:
+      return "NOT_FOUND";
+    case 409:
+      return "CONFLICT";
+    case 422:
+      return "UNPROCESSABLE_CONTENT";
+    case 429:
+      return "TOO_MANY_REQUESTS";
+    default:
+      return "INTERNAL_SERVER_ERROR";
+  }
+}
+
+/**
+ * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
+ * value is a `DomainError`. The shared `errorFormatter` in `trpc.ts` serialises
+ * that cause as `error.data.domainError = { kind, meta, telemetry, … }` so the
+ * client gets the full structured payload — that is the "incredibly good error
+ * handling" surface (see ADR-028 follow-up).
+ */
 function toTemplateTRPCError(err: unknown): TRPCError {
   if (err instanceof TRPCError) return err;
-  if (
-    err instanceof TemplateValidationError ||
-    err instanceof TestFireUnavailableError
-  ) {
-    return new TRPCError({ code: "BAD_REQUEST", message: err.message });
+  if (err instanceof DomainError) {
+    return new TRPCError({
+      code: httpStatusToTRPCCode(err.httpStatus),
+      message: err.message,
+      cause: err,
+    });
   }
   return new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: err instanceof Error ? err.message : "Unexpected error",
+    cause: err instanceof Error ? err : undefined,
   });
 }
 
 async function resolveProjectIdentity(projectId: string): Promise<DraftProject> {
   const project = await getApp().projects.getById(projectId);
-  if (!project) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-  }
+  if (!project) throw new ProjectNotFoundError(projectId);
   return { name: project.name, slug: project.slug };
 }
 
@@ -85,23 +120,19 @@ async function ensureEmailRecipientsInTeam(
     where: { id: projectId },
     select: { teamId: true, team: { select: { organizationId: true } } },
   });
-  if (!project) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-  }
+  if (!project) throw new ProjectNotFoundError(projectId);
   const roleService = new RoleService(ctx.prisma);
   const teamBindings = await roleService.getTeamMembersWithUsers({
     organizationId: project.team.organizationId,
     teamId: project.teamId,
   });
-  const teamEmails = new Set(
-    teamBindings.flatMap((b) => (b.user ? [b.user.email] : [])),
+  const teamEmails = teamBindings.flatMap((b) =>
+    b.user ? [b.user.email] : [],
   );
+  const teamEmailSet = new Set(teamEmails);
   for (const email of recipients) {
-    if (!teamEmails.has(email)) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Recipient ${email} is not a member of this team`,
-      });
+    if (!teamEmailSet.has(email)) {
+      throw new RecipientNotInTeamError(email, teamEmails);
     }
   }
 }
@@ -454,6 +485,7 @@ export const automationRouter = createTRPCRouter({
         alertType: z.nativeEnum(AlertType).nullable().optional(),
         message: z.string().nullable().optional(),
         filters: triggerFiltersSchema,
+        customGraphId: z.string().nullable().optional(),
         actionParams: actionParamsSchema,
         templates: templateDraftSchema,
       }),
@@ -462,39 +494,32 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         validateTemplateDraft(input.templates);
+        if (
+          input.action === TriggerAction.SEND_EMAIL &&
+          input.actionParams.members &&
+          input.actionParams.members.length > 0
+        ) {
+          await ensureEmailRecipientsInTeam(
+            ctx,
+            input.projectId,
+            input.actionParams.members,
+          );
+        }
+        if (
+          input.action === TriggerAction.SEND_SLACK_MESSAGE &&
+          !input.actionParams.slackWebhook
+        ) {
+          throw new MissingSlackWebhookError();
+        }
+        if (
+          input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+          (!input.actionParams.annotators ||
+            input.actionParams.annotators.length === 0)
+        ) {
+          throw new MissingAnnotatorError();
+        }
       } catch (err) {
         throw toTemplateTRPCError(err);
-      }
-
-      if (
-        input.action === TriggerAction.SEND_EMAIL &&
-        input.actionParams.members &&
-        input.actionParams.members.length > 0
-      ) {
-        await ensureEmailRecipientsInTeam(
-          ctx,
-          input.projectId,
-          input.actionParams.members,
-        );
-      }
-      if (
-        input.action === TriggerAction.SEND_SLACK_MESSAGE &&
-        !input.actionParams.slackWebhook
-      ) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "A Slack webhook is required for Slack automations.",
-        });
-      }
-      if (
-        input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
-        (!input.actionParams.annotators ||
-          input.actionParams.annotators.length === 0)
-      ) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "At least one annotator is required.",
-        });
       }
 
       const data = {
@@ -503,6 +528,7 @@ export const automationRouter = createTRPCRouter({
         alertType: input.alertType ?? null,
         message: input.message ?? null,
         filters: JSON.stringify(input.filters),
+        customGraphId: input.customGraphId ?? null,
         actionParams: input.actionParams,
         slackTemplateType: input.templates.slackTemplateType ?? null,
         slackTemplate: input.templates.slackTemplate ?? null,

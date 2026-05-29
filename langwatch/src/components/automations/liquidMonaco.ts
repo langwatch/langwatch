@@ -1,6 +1,18 @@
 import type { Monaco } from "@monaco-editor/react";
 
 /**
+ * Rich variable info the autocomplete uses: path + TypeScript-ish type +
+ * optional description. Structurally matches the server's `VariableInfo`
+ * returned from `automation.getTemplateScaffold.variables` — kept defined
+ * here so the client layer doesn't reach into `~/server`.
+ */
+export interface VariableInfo {
+  path: string;
+  type: string;
+  description?: string;
+}
+
+/**
  * Client-side Monaco support for editing trigger notification templates: a
  * lightweight Liquid language (tokens for `{{ }}` / `{% %}`), autocomplete for
  * the known template variables, and validation that flags references to a
@@ -41,7 +53,7 @@ const KEYWORDS = new Set([
   "forloop",
 ]);
 
-let knownVariables: string[] = [];
+let knownVariables: VariableInfo[] = [];
 let languageRegistered = false;
 let providersRegistered = false;
 
@@ -56,7 +68,7 @@ function rootOf(path: string): string {
  */
 export function registerLiquidLanguage(
   monaco: Monaco,
-  variables: string[],
+  variables: VariableInfo[],
 ): void {
   knownVariables = variables;
 
@@ -103,11 +115,14 @@ export function registerLiquidLanguage(
         };
 
         const variableItems = knownVariables.map((variable) => ({
-          label: variable,
+          label: variable.path,
           kind: monaco.languages.CompletionItemKind.Variable,
-          insertText: variable,
+          insertText: variable.path,
           range,
-          detail: "Template variable",
+          detail: variable.type,
+          documentation: variable.description
+            ? { value: variable.description }
+            : undefined,
         }));
 
         const snippets = [
@@ -187,10 +202,14 @@ export interface UnknownVariable {
  */
 export function detectUnknownVariables(
   text: string,
-  variables: string[],
+  variables: VariableInfo[],
 ): UnknownVariable[] {
-  const known = new Set(variables.map(rootOf));
+  const known = new Set(variables.map((v) => rootOf(v.path)));
   known.add("forloop");
+  // The internal `matches[]` array stays available on the context even though
+  // it is not in the advertised variable list — accept it as a known root so
+  // we don't warn on advanced templates that iterate it.
+  known.add("matches");
   collectLocals(text, known);
   const knownRoots = [...known].sort();
 
@@ -224,7 +243,7 @@ export function detectUnknownVariables(
 export function validateLiquidModel(
   monaco: Monaco,
   model: MonacoTextModel,
-  variables: string[],
+  variables: VariableInfo[],
 ): void {
   const markers: Parameters<Monaco["editor"]["setModelMarkers"]>[2] =
     detectUnknownVariables(model.getValue(), variables).map((unknown) => {

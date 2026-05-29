@@ -12,6 +12,14 @@ export interface TemplateContext {
   trigger: TemplateTriggerVars;
   project: TemplateProjectVars;
   digest: TemplateDigestVars;
+  /**
+   * The single matched trace for immediate-cadence dispatches. This is the
+   * variable surface authors write against today (ADR-028); a digest cadence
+   * (ADR-025, future) will expose `matches[]` for iteration. Both reference
+   * the same underlying records — `match === matches[0] ?? null`.
+   */
+  match: TemplateMatchVars | null;
+  /** Internal: kept on the context so the renderer can iterate when needed. */
   matches: TemplateMatchVars[];
 }
 
@@ -105,6 +113,21 @@ export function buildTemplateContext({
   matches: TemplateMatchInput[];
   window?: { start?: Date | null; end?: Date | null };
 }): TemplateContext {
+  const mapped: TemplateMatchVars[] = matches.map((match) => ({
+    trace: {
+      id: match.traceId ?? null,
+      input: match.input ?? "",
+      output: match.output ?? "",
+      url: matchUrl({
+        baseHost,
+        projectSlug: project.slug,
+        traceId: match.traceId,
+        graphId: match.graphId,
+      }),
+      metadata: match.metadata ?? {},
+    },
+    evaluation: match.evaluation ?? null,
+  }));
   return {
     trigger,
     project: {
@@ -117,20 +140,7 @@ export function buildTemplateContext({
       windowStart: window?.start ? window.start.toISOString() : null,
       windowEnd: window?.end ? window.end.toISOString() : null,
     },
-    matches: matches.map((match) => ({
-      trace: {
-        id: match.traceId ?? null,
-        input: match.input ?? "",
-        output: match.output ?? "",
-        url: matchUrl({
-          baseHost,
-          projectSlug: project.slug,
-          traceId: match.traceId,
-          graphId: match.graphId,
-        }),
-        metadata: match.metadata ?? {},
-      },
-      evaluation: match.evaluation ?? null,
-    })),
+    match: mapped[0] ?? null,
+    matches: mapped,
   };
 }

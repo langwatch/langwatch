@@ -1,15 +1,14 @@
 import { AlertType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { EXAMPLE_MATCHES, TEMPLATE_VARIABLE_PATHS } from "../exampleContext";
+import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../exampleContext";
+
+const TEMPLATE_VARIABLE_PATHS = TEMPLATE_VARIABLES.map((v) => v.path);
 import { buildTemplateContext } from "../templateContext";
 
 function resolve(path: string, context: unknown): unknown {
   const segments = path.split(".");
   const root = segments[0];
-  let current: unknown =
-    root === "m"
-      ? (context as { matches: unknown[] }).matches[0]
-      : (context as Record<string, unknown>)[root!];
+  let current: unknown = (context as Record<string, unknown>)[root!];
   for (const segment of segments.slice(1)) {
     if (current == null) return undefined;
     current = (current as Record<string, unknown>)[segment];

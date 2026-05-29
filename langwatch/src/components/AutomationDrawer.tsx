@@ -39,6 +39,7 @@ import {
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import type { TRPCClientErrorLike } from "@trpc/client";
 import {
   EmailPreview,
   ExampleData,
@@ -49,6 +50,13 @@ import {
   VariableReference,
   type FieldDraft,
 } from "./automations/templateAuthoring";
+import {
+  CONDITIONS_JSON_SCHEMA,
+  CONDITIONS_MODEL_URI,
+  SLACK_BLOCK_KIT_JSON_SCHEMA,
+  SLACK_BLOCK_KIT_MODEL_URI,
+  registerJsonSchema,
+} from "./automations/monacoSchemas";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -76,12 +84,15 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 });
 
 type SlackTemplateType = "string" | "block_kit";
+type ConditionSource = "trace" | "customGraph";
 
 interface AutomationDraft {
   action: TriggerAction | null;
   name: string;
   alertType: AlertType | null;
+  source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
+  customGraphId: string | null;
   members: string[];
   slackWebhook: string;
   slackTemplateType: SlackTemplateType;
@@ -100,6 +111,8 @@ type DraftAction =
   | { type: "SET_ACTION"; value: TriggerAction }
   | { type: "SET_NAME"; value: string }
   | { type: "SET_ALERT_TYPE"; value: AlertType | null }
+  | { type: "SET_SOURCE"; value: ConditionSource }
+  | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
   | { type: "SET_MEMBERS"; value: string[] }
   | { type: "SET_SLACK_WEBHOOK"; value: string }
@@ -117,7 +130,9 @@ const INITIAL_DRAFT: AutomationDraft = {
   action: null,
   name: "",
   alertType: null,
+  source: "trace",
   filters: {},
+  customGraphId: null,
   members: [],
   slackWebhook: "",
   slackTemplateType: "string",
@@ -148,6 +163,14 @@ function reducer(state: AutomationDraft, action: DraftAction): AutomationDraft {
       return { ...state, name: action.value };
     case "SET_ALERT_TYPE":
       return { ...state, alertType: action.value };
+    case "SET_SOURCE":
+      // Switching source clears the conditions tied to the other source so
+      // we never persist stale filters next to a customGraphId or vice versa.
+      return action.value === "customGraph"
+        ? { ...state, source: "customGraph", filters: {} }
+        : { ...state, source: "trace", customGraphId: null };
+    case "SET_CUSTOM_GRAPH_ID":
+      return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
       return { ...state, filters: action.value };
     case "SET_MEMBERS":
@@ -187,6 +210,70 @@ function notifyChannel(draft: AutomationDraft): "email" | "slack" | null {
   return null;
 }
 
+interface DomainErrorShape {
+  kind: string;
+  meta: Record<string, unknown>;
+  httpStatus: number;
+}
+
+/**
+ * Reads the `domainError` payload the server attaches via `errorFormatter`
+ * (see `trpc.ts`). Falls back to a generic shape when the cause isn't one of
+ * our ADR-028 domain errors so the UI can still render *something* useful.
+ */
+function readDomainError(
+  err: TRPCClientErrorLike<{ errorShape: { data: { domainError?: DomainErrorShape | null } } }>,
+): DomainErrorShape | null {
+  // tRPC v10: error.data.domainError when our errorFormatter ran.
+  const data = (err as { data?: { domainError?: DomainErrorShape | null } })
+    .data;
+  return data?.domainError ?? null;
+}
+
+function explainDomainError(domain: DomainErrorShape): {
+  title: string;
+  description: string;
+} {
+  switch (domain.kind) {
+    case "template_validation_error": {
+      const field = String(domain.meta.field ?? "template");
+      const syntax = String(domain.meta.syntaxError ?? "Invalid Liquid syntax");
+      return { title: `Template "${field}" is invalid`, description: syntax };
+    }
+    case "recipient_not_in_team": {
+      const recipient = String(domain.meta.recipient ?? "Recipient");
+      const allowed = Array.isArray(domain.meta.teamEmails)
+        ? (domain.meta.teamEmails as string[])
+        : [];
+      return {
+        title: "Recipient is not in the team",
+        description: `${recipient} can't receive notifications. Pick from: ${allowed.slice(0, 3).join(", ")}${allowed.length > 3 ? "…" : ""}`,
+      };
+    }
+    case "missing_slack_webhook":
+      return {
+        title: "Slack webhook missing",
+        description: "Paste a Slack incoming webhook URL in the Configuration step.",
+      };
+    case "missing_annotator":
+      return {
+        title: "Annotator missing",
+        description: "Add at least one annotator to the queue.",
+      };
+    case "test_fire_unavailable": {
+      const channel = String(domain.meta.channel ?? "destination");
+      return {
+        title: "Can't test-fire yet",
+        description: `Configure the ${channel} destination first.`,
+      };
+    }
+    case "project_not_found":
+      return { title: "Project not found", description: "" };
+    default:
+      return { title: "Could not save automation", description: "" };
+  }
+}
+
 function templatesFromDraft(draft: AutomationDraft) {
   return {
     emailSubjectTemplate: draft.emailSubject.usingDefault ? null : draft.emailSubject.value,
@@ -215,6 +302,12 @@ function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
   return Object.values(filters).some(
     (v) => v && (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0),
   );
+}
+
+function conditionsAreSet(draft: AutomationDraft): boolean {
+  return draft.source === "customGraph"
+    ? draft.customGraphId !== null
+    : filtersAreSet(draft.filters);
 }
 
 function configIsComplete(draft: AutomationDraft): boolean {
@@ -272,6 +365,7 @@ export function AutomationDrawer({
         ? (JSON.parse(t.filters) as Record<string, TriggerFilterValue>)
         : {};
     const { sanitized } = sanitizeTriggerFilters(filtersRaw);
+    const hasCustomGraph = !!t.customGraphId;
     dispatch({
       type: "HYDRATE",
       value: {
@@ -279,6 +373,8 @@ export function AutomationDrawer({
         action: t.action as TriggerAction,
         name: t.name,
         alertType: t.alertType,
+        source: hasCustomGraph ? "customGraph" : "trace",
+        customGraphId: t.customGraphId,
         filters: sanitized as Partial<Record<FilterField, FilterParam>>,
         members: Array.isArray(params.members) ? (params.members as string[]) : [],
         slackWebhook:
@@ -368,7 +464,7 @@ export function AutomationDrawer({
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
 
-  const conditionsSet = filtersAreSet(draft.filters);
+  const conditionsSet = conditionsAreSet(draft);
   const configComplete = configIsComplete(draft);
   const canSave = conditionsSet && configComplete;
 
@@ -398,13 +494,18 @@ export function AutomationDrawer({
                 : "Posted to the Slack webhook.",
             meta: { closable: true },
           }),
-        onError: (err) =>
+        onError: (err) => {
+          const domain = readDomainError(err);
+          const { title, description } = domain
+            ? explainDomainError(domain)
+            : { title: "Test fire failed", description: err.message };
           toaster.create({
-            title: "Test fire failed",
+            title,
             type: "error",
-            description: err.message,
+            description: description || err.message,
             meta: { closable: true },
-          }),
+          });
+        },
       },
     );
   }, [channel, draft, projectId, testFire]);
@@ -419,7 +520,8 @@ export function AutomationDrawer({
         action: draft.action,
         alertType: draft.alertType ?? undefined,
         message: null,
-        filters: draft.filters,
+        filters: draft.source === "customGraph" ? {} : draft.filters,
+        customGraphId: draft.source === "customGraph" ? draft.customGraphId : null,
         actionParams: actionParamsFromDraft(draft),
         templates: templatesFromDraft(draft),
       },
@@ -435,10 +537,14 @@ export function AutomationDrawer({
         },
         onError: (err) => {
           if (isHandledByGlobalHandler(err)) return;
+          const domain = readDomainError(err);
+          const { title, description } = domain
+            ? explainDomainError(domain)
+            : { title: "Could not save automation", description: err.message };
           toaster.create({
-            title: "Could not save automation",
+            title,
             type: "error",
-            description: err.message,
+            description: description || err.message,
             meta: { closable: true },
           });
         },
@@ -469,7 +575,7 @@ export function AutomationDrawer({
                 title="When (conditions)"
                 summary={
                   conditionsSet
-                    ? summariseFilters(draft.filters)
+                    ? summariseConditions(draft)
                     : "Click to choose when this fires"
                 }
                 complete={conditionsSet}
@@ -542,9 +648,17 @@ export function AutomationDrawer({
 
       <FiltersSecondaryDrawer
         open={section === "filters"}
+        source={draft.source}
         filters={draft.filters}
-        onSave={(filters) => {
-          dispatch({ type: "SET_FILTERS", value: filters });
+        customGraphId={draft.customGraphId}
+        projectId={projectId}
+        onSave={({ source, filters, customGraphId }) => {
+          dispatch({ type: "SET_SOURCE", value: source });
+          if (source === "trace") {
+            dispatch({ type: "SET_FILTERS", value: filters });
+          } else {
+            dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
+          }
           setSection(null);
         }}
         onCancel={() => setSection(null)}
@@ -567,6 +681,38 @@ export function AutomationDrawer({
         onDone={() => setSection(null)}
       />
     </>
+  );
+}
+
+function SourceCard({
+  active,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      as="button"
+      flex="1"
+      textAlign="left"
+      padding={3}
+      borderRadius="md"
+      border="1px solid"
+      borderColor={active ? "orange.400" : "border"}
+      bg={active ? "orange.50" : "bg"}
+      _dark={{ bg: active ? "orange.900" : "bg" }}
+      onClick={onClick}
+    >
+      <Text fontWeight="semibold">{title}</Text>
+      <Text textStyle="xs" color="fg.muted" mt={1}>
+        {description}
+      </Text>
+    </Box>
   );
 }
 
@@ -686,10 +832,13 @@ function TypeInline({
   );
 }
 
-function summariseFilters(
-  filters: Partial<Record<FilterField, FilterParam>>,
-): string {
-  const keys = Object.keys(filters);
+function summariseConditions(draft: AutomationDraft): string {
+  if (draft.source === "customGraph") {
+    return draft.customGraphId
+      ? `Custom graph alert (${draft.customGraphId.slice(0, 12)}…)`
+      : "Custom graph (none selected)";
+  }
+  const keys = Object.keys(draft.filters);
   if (keys.length === 0) return "No conditions yet";
   return `${keys.length} condition${keys.length === 1 ? "" : "s"}: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "…" : ""}`;
 }
@@ -711,29 +860,52 @@ function configurationSummary(draft: AutomationDraft): string {
 
 // ---------- Filters secondary drawer ----------
 
+interface FiltersDrawerResult {
+  source: ConditionSource;
+  filters: Partial<Record<FilterField, FilterParam>>;
+  customGraphId: string | null;
+}
+
 function FiltersSecondaryDrawer({
   open,
+  source,
   filters,
+  customGraphId,
+  projectId,
   onSave,
   onCancel,
 }: {
   open: boolean;
+  source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
-  onSave: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  customGraphId: string | null;
+  projectId: string;
+  onSave: (result: FiltersDrawerResult) => void;
   onCancel: () => void;
 }) {
+  const [localSource, setLocalSource] = useState<ConditionSource>(source);
   const [local, setLocal] = useState(filters);
+  const [localCustomGraphId, setLocalCustomGraphId] = useState<string | null>(
+    customGraphId,
+  );
   const [codeMode, setCodeMode] = useState(false);
   const [code, setCode] = useState(JSON.stringify(filters, null, 2));
   const [codeError, setCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
+      setLocalSource(source);
       setLocal(filters);
+      setLocalCustomGraphId(customGraphId);
       setCode(JSON.stringify(filters, null, 2));
       setCodeError(null);
     }
-  }, [open, filters]);
+  }, [open, source, filters, customGraphId]);
+
+  const graphs = api.graphs.getAll.useQuery(
+    { projectId },
+    { enabled: open && localSource === "customGraph" && !!projectId },
+  );
 
   const onToggle = (toCode: boolean) => {
     if (toCode) setCode(JSON.stringify(local, null, 2));
@@ -757,6 +929,14 @@ function FiltersSecondaryDrawer({
   };
 
   const apply = () => {
+    if (localSource === "customGraph") {
+      onSave({
+        source: "customGraph",
+        filters: {},
+        customGraphId: localCustomGraphId,
+      });
+      return;
+    }
     if (codeMode) {
       try {
         const parsed = JSON.parse(code);
@@ -766,12 +946,16 @@ function FiltersSecondaryDrawer({
           return;
         }
         const { sanitized } = sanitizeTriggerFilters(result.data);
-        onSave(sanitized as Partial<Record<FilterField, FilterParam>>);
+        onSave({
+          source: "trace",
+          filters: sanitized as Partial<Record<FilterField, FilterParam>>,
+          customGraphId: null,
+        });
       } catch {
         setCodeError("Invalid JSON syntax");
       }
     } else {
-      onSave(local);
+      onSave({ source: "trace", filters: local, customGraphId: null });
     }
   };
 
@@ -792,17 +976,67 @@ function FiltersSecondaryDrawer({
             </Button>
             <Heading size="md">Conditions</Heading>
             <Spacer />
-            <Text textStyle="sm" color="fg.muted">
-              Code
-            </Text>
-            <Switch
-              checked={codeMode}
-              onCheckedChange={({ checked }) => onToggle(checked)}
-            />
+            {localSource === "trace" ? (
+              <>
+                <Text textStyle="sm" color="fg.muted">
+                  Code
+                </Text>
+                <Switch
+                  checked={codeMode}
+                  onCheckedChange={({ checked }) => onToggle(checked)}
+                />
+              </>
+            ) : null}
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          {codeMode ? (
+          <Box mb={4}>
+            <Text textStyle="xs" fontWeight="semibold" color="fg.muted" mb={2}>
+              Source
+            </Text>
+            <HStack gap={2}>
+              <SourceCard
+                active={localSource === "trace"}
+                title="Trace data"
+                description="Match on incoming traces using filter fields."
+                onClick={() => setLocalSource("trace")}
+              />
+              <SourceCard
+                active={localSource === "customGraph"}
+                title="Custom graph"
+                description="Fire when a custom-graph alert threshold is crossed."
+                onClick={() => setLocalSource("customGraph")}
+              />
+            </HStack>
+          </Box>
+          {localSource === "customGraph" ? (
+            <VStack align="stretch" gap={2}>
+              <Field.Root>
+                <Field.Label>Custom graph</Field.Label>
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    value={localCustomGraphId ?? ""}
+                    onChange={(e) =>
+                      setLocalCustomGraphId(e.target.value || null)
+                    }
+                  >
+                    <option value="">Select a graph…</option>
+                    {(graphs.data ?? []).map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name ?? g.id}
+                        {g.trigger ? " — already automated" : ""}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Field.Root>
+              <Text textStyle="xs" color="fg.muted">
+                The automation fires when this custom graph's alert threshold
+                is crossed. Configure thresholds from the analytics view.
+              </Text>
+            </VStack>
+          ) : codeMode ? (
             <VStack align="stretch" gap={2}>
               <Box
                 border="1px solid"
@@ -815,12 +1049,18 @@ function FiltersSecondaryDrawer({
                 <MonacoEditor
                   height="100%"
                   language="json"
+                  path={CONDITIONS_MODEL_URI}
                   value={code}
                   theme="monokai"
                   beforeMount={(monaco: Monaco) => {
                     monaco.editor.defineTheme(
                       "monokai",
                       monokaiTheme as Parameters<typeof monaco.editor.defineTheme>[1],
+                    );
+                    registerJsonSchema(
+                      monaco,
+                      CONDITIONS_MODEL_URI,
+                      CONDITIONS_JSON_SCHEMA,
                     );
                   }}
                   onChange={(v: string | undefined) => setCode(v ?? "{}")}

@@ -7,7 +7,8 @@ import {
 } from "~/server/event-sourcing/outbox/templating/defaults";
 import {
   EXAMPLE_MATCHES,
-  TEMPLATE_VARIABLE_PATHS,
+  TEMPLATE_VARIABLES,
+  type VariableInfo,
 } from "~/server/event-sourcing/outbox/templating/exampleContext";
 import { renderTriggerEmail } from "~/server/event-sourcing/outbox/templating/renderEmail";
 import {
@@ -20,6 +21,12 @@ import {
   type TemplateContext,
 } from "~/server/event-sourcing/outbox/templating/templateContext";
 import { validateLiquid } from "~/server/event-sourcing/outbox/templating/validate";
+import {
+  TemplateValidationError,
+  TestFireUnavailableError,
+} from "./errors";
+
+export { TemplateValidationError, TestFireUnavailableError };
 
 export type TemplateChannel = "email" | "slack";
 
@@ -67,8 +74,9 @@ export interface TemplateDefaults {
 
 export interface TemplateScaffold {
   defaults: TemplateDefaults;
-  /** Dotted variable paths a template can reference (editor autocomplete). */
-  variables: string[];
+  /** Rich variable info — path + type + description — for autocomplete and the
+   *  variable reference panel. */
+  variables: VariableInfo[];
   /** The example data preview renders against, for the author to inspect. */
   example: TemplateContext;
 }
@@ -98,25 +106,6 @@ export interface TestFireResult {
   usedDefault: boolean;
   missingVariables: string[];
   errors: string[];
-}
-
-/** A template column failed `validateLiquid` (or an invalid Slack type). */
-export class TemplateValidationError extends Error {
-  name = "TemplateValidationError" as const;
-  constructor(
-    readonly field: keyof TemplateDraft,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-/** Test fire has nothing to deliver to (no email recipient / Slack webhook). */
-export class TestFireUnavailableError extends Error {
-  name = "TestFireUnavailableError" as const;
-  constructor(message: string) {
-    super(message);
-  }
 }
 
 const LIQUID_TEMPLATE_COLUMNS = [
@@ -150,7 +139,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
   ) {
     throw new TemplateValidationError(
       "slackTemplateType",
-      `Invalid Slack template type "${draft.slackTemplateType}"`,
+      `Invalid Slack template type "${draft.slackTemplateType}". Allowed: ${SLACK_TEMPLATE_TYPES.join(", ")}.`,
     );
   }
   for (const column of LIQUID_TEMPLATE_COLUMNS) {
@@ -192,7 +181,7 @@ export class TriggerTemplateService {
         slackString: DEFAULT_SLACK_TEMPLATE,
         slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
       },
-      variables: TEMPLATE_VARIABLE_PATHS,
+      variables: TEMPLATE_VARIABLES,
       example: this.context(PLACEHOLDER_IDENTITY, project),
     };
   }
@@ -260,6 +249,7 @@ export class TriggerTemplateService {
     if (channel === "email") {
       if (recipients.length === 0) {
         throw new TestFireUnavailableError(
+          "email",
           "This automation has no email recipients to test-fire to.",
         );
       }
@@ -285,6 +275,7 @@ export class TriggerTemplateService {
 
     if (!webhook) {
       throw new TestFireUnavailableError(
+        "slack",
         "This automation has no Slack webhook to test-fire to.",
       );
     }

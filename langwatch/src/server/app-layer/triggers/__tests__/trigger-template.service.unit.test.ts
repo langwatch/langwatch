@@ -85,9 +85,10 @@ describe("TriggerTemplateService", () => {
       const scaffold = service.getScaffold({ project: PROJECT });
 
       expect(scaffold.defaults.emailSubject).toMatch(/Trigger/);
-      expect(scaffold.variables).toContain("trigger.name");
+      expect(scaffold.variables.map((v) => v.path)).toContain("trigger.name");
+      expect(scaffold.variables.map((v) => v.path)).toContain("match.trace.url");
       expect(scaffold.example.project.slug).toBe("acme");
-      expect(scaffold.example.matches.length).toBeGreaterThan(0);
+      expect(scaffold.example.match).not.toBeNull();
     });
   });
 

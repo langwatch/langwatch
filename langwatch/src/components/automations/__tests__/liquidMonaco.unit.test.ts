@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { TEMPLATE_VARIABLE_PATHS } from "~/server/event-sourcing/outbox/templating/exampleContext";
+import { TEMPLATE_VARIABLES } from "~/server/event-sourcing/outbox/templating/exampleContext";
 import { detectUnknownVariables } from "../liquidMonaco";
 
-const VARS = TEMPLATE_VARIABLE_PATHS;
+const VARS = TEMPLATE_VARIABLES;
 
 describe("detectUnknownVariables", () => {
   describe("when a referenced variable root is known", () => {

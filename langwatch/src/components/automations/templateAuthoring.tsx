@@ -11,7 +11,15 @@ import {
   type MonacoTextModel,
   registerLiquidLanguage,
   validateLiquidModel,
+  type VariableInfo,
 } from "./liquidMonaco";
+import {
+  SLACK_BLOCK_KIT_JSON_SCHEMA,
+  SLACK_BLOCK_KIT_MODEL_URI,
+  registerJsonSchema,
+} from "./monacoSchemas";
+
+export type { VariableInfo };
 
 /**
  * Building blocks shared by every notification config stage (email subject,
@@ -85,13 +93,19 @@ export function LiquidEditor({
   value,
   onChange,
   variables,
+  language = LIQUID_LANGUAGE_ID,
   height = "200px",
 }: {
   value: string;
   onChange: (value: string) => void;
-  variables: string[];
+  variables: VariableInfo[];
+  /** "liquid" (default) for regular templates, "json" for slack block_kit
+   *  (which carries Liquid inside string values; structural JSON is validated
+   *  against the Slack Block Kit schema). */
+  language?: string;
   height?: string;
 }) {
+  const isLiquid = language === LIQUID_LANGUAGE_ID;
   const monacoRef = useRef<Monaco | null>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
   const changeSubscription = useRef<{ dispose: () => void } | null>(null);
@@ -110,7 +124,8 @@ export function LiquidEditor({
     monacoRef.current = monaco;
     const model = editor.getModel();
     modelRef.current = model;
-    if (model) validateLiquidModel(monaco, model, variables);
+    if (isLiquid && model) validateLiquidModel(monaco, model, variables);
+    if (!isLiquid) return;
     changeSubscription.current = editor.onDidChangeModelContent(() => {
       const current = editor.getModel();
       if (current) validateLiquidModel(monaco, current, variables);
@@ -128,12 +143,21 @@ export function LiquidEditor({
     >
       <MonacoEditor
         height="100%"
-        language={LIQUID_LANGUAGE_ID}
+        language={language}
+        path={isLiquid ? undefined : SLACK_BLOCK_KIT_MODEL_URI}
         value={value}
         theme="monokai"
         beforeMount={(monaco: Monaco) => {
           defineMonokai(monaco);
-          registerLiquidLanguage(monaco, variables);
+          if (isLiquid) {
+            registerLiquidLanguage(monaco, variables);
+          } else {
+            registerJsonSchema(
+              monaco,
+              SLACK_BLOCK_KIT_MODEL_URI,
+              SLACK_BLOCK_KIT_JSON_SCHEMA,
+            );
+          }
         }}
         onMount={onMount}
         onChange={(next: string | undefined) => onChange(next ?? "")}
@@ -143,7 +167,7 @@ export function LiquidEditor({
   );
 }
 
-export function VariableReference({ variables }: { variables: string[] }) {
+export function VariableReference({ variables }: { variables: VariableInfo[] }) {
   return (
     <Box
       border="1px solid"
@@ -152,24 +176,38 @@ export function VariableReference({ variables }: { variables: string[] }) {
       padding={3}
       bg="bg.subtle"
     >
-      <Text textStyle="xs" fontWeight="semibold" color="fg.muted" mb={2}>
-        Available variables — iterate matches with{" "}
-        <Text as="span" fontFamily="mono">
-          {"{% for m in matches %}"}
-        </Text>
+      <Text textStyle="xs" fontWeight="semibold" color="fg.muted" mb={1}>
+        Available variables
       </Text>
       <Text textStyle="xs" color="fg.muted" mb={2}>
-        On <strong>immediate</strong> cadence, <Text as="span" fontFamily="mono">matches</Text> holds one entry per
-        fire. On a <strong>digest</strong> cadence, it holds N entries (one per matched trace
-        in the window); <Text as="span" fontFamily="mono">digest.count</Text> gives the size.
+        On <strong>immediate</strong> cadence (today), every fire surfaces the
+        matched trace under <Text as="span" fontFamily="mono">match.*</Text>. A
+        future <strong>digest</strong> cadence will additionally expose{" "}
+        <Text as="span" fontFamily="mono">matches[]</Text> for iteration;{" "}
+        <Text as="span" fontFamily="mono">digest.count</Text> reports the size.
       </Text>
-      <HStack wrap="wrap" gap={1}>
+      <VStack align="stretch" gap={1}>
         {variables.map((variable) => (
-          <Badge key={variable} size="sm" fontFamily="mono" colorPalette="gray">
-            {variable}
-          </Badge>
+          <HStack
+            key={variable.path}
+            gap={2}
+            align="baseline"
+            title={variable.description}
+          >
+            <Badge size="sm" fontFamily="mono" colorPalette="gray">
+              {variable.path}
+            </Badge>
+            <Text textStyle="xs" color="fg.muted" fontFamily="mono">
+              {variable.type}
+            </Text>
+            {variable.description ? (
+              <Text textStyle="xs" color="fg.muted" lineClamp={1}>
+                — {variable.description}
+              </Text>
+            ) : null}
+          </HStack>
         ))}
-      </HStack>
+      </VStack>
     </Box>
   );
 }

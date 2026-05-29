@@ -22,6 +22,8 @@ export function makeMatch(
 export function makeContext(
   overrides: Partial<TemplateContext> = {},
 ): TemplateContext {
+  const matches = overrides.matches ?? [makeMatch()];
+  const match = overrides.match ?? matches[0] ?? null;
   return {
     trigger: {
       id: "trg_1",
@@ -34,8 +36,9 @@ export function makeContext(
       slug: "acme",
       url: "https://app.langwatch.ai/acme",
     },
-    digest: { count: 1, windowStart: null, windowEnd: null },
-    matches: [makeMatch()],
+    digest: { count: matches.length, windowStart: null, windowEnd: null },
+    match,
+    matches,
     ...overrides,
   };
 }
