@@ -1,19 +1,15 @@
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { nanoid } from "nanoid";
-
 import { env } from "../../env.mjs";
-import { createS3Client } from "../storage";
 import { createLogger } from "../../utils/logger/server";
+import {
+  STAGED_PAYLOAD_HEADER,
+  deleteStagedObject,
+  safeUrlHost,
+  stagePayloadToS3,
+} from "../s3/stagePayload";
 
 const logger = createLogger("langwatch:langevals:stagedFetch");
 
 const STAGING_PREFIX = "langevals-staging";
-const STAGED_HEADER = "X-Payload-S3-URL";
 
 /**
  * Which langevals call path we're making. Drives:
@@ -114,9 +110,9 @@ export async function stagedLangevalsFetch(
   }
 
   const ttlSeconds = env.LANGEVALS_STAGING_TTL_SECONDS;
-  const { s3Client, s3Bucket, key, stagedUrl } = await stagePayload({
+  const { s3Client, s3Bucket, key, stagedUrl } = await stagePayloadToS3({
     projectId,
-    kind,
+    keyPrefix: `${STAGING_PREFIX}/${projectId}/${kind}`,
     serialized,
     ttlSeconds,
   });
@@ -145,7 +141,7 @@ export async function stagedLangevalsFetch(
       headers: {
         ...headers,
         "Content-Type": "application/json",
-        [STAGED_HEADER]: stagedUrl,
+        [STAGED_PAYLOAD_HEADER]: stagedUrl,
       },
     });
   } finally {
@@ -156,82 +152,6 @@ export async function stagedLangevalsFetch(
     // bedrock keys) so we don't want them lingering. A bucket lifecycle
     // rule on the langevals-staging/ prefix is the orphan/crash fallback
     // for the failure paths where this delete can't run.
-    await deleteStagedObject({ s3Client, s3Bucket, key, projectId, kind });
-  }
-}
-
-interface StagePayloadInput {
-  projectId: string;
-  kind: LangevalsCallKind;
-  serialized: Buffer;
-  ttlSeconds: number;
-}
-
-interface StagedObject {
-  s3Client: Awaited<ReturnType<typeof createS3Client>>["s3Client"];
-  s3Bucket: string;
-  key: string;
-  stagedUrl: string;
-}
-
-async function stagePayload(input: StagePayloadInput): Promise<StagedObject> {
-  const { projectId, kind, serialized, ttlSeconds } = input;
-
-  const { s3Client, s3Bucket } = await createS3Client(projectId);
-  const key = `${STAGING_PREFIX}/${projectId}/${kind}/${Date.now()}-${nanoid()}.json`;
-
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: s3Bucket,
-      Key: key,
-      Body: serialized,
-      ContentType: "application/json",
-    }),
-  );
-
-  logger.debug(
-    { projectId, kind, bucket: s3Bucket, key, bytes: serialized.byteLength },
-    "uploaded staged payload to S3",
-  );
-
-  const stagedUrl = await getSignedUrl(
-    s3Client,
-    new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
-    { expiresIn: ttlSeconds },
-  );
-
-  return { s3Client, s3Bucket, key, stagedUrl };
-}
-
-async function deleteStagedObject(args: {
-  s3Client: StagedObject["s3Client"];
-  s3Bucket: string;
-  key: string;
-  projectId: string;
-  kind: LangevalsCallKind;
-}): Promise<void> {
-  const { s3Client, s3Bucket, key, projectId, kind } = args;
-  try {
-    await s3Client.send(
-      new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),
-    );
-    logger.debug(
-      { projectId, kind, bucket: s3Bucket, key },
-      "deleted staged payload from S3 after use",
-    );
-  } catch (error) {
-    // Non-fatal: the lifecycle rule on langevals-staging/ will reap it.
-    logger.warn(
-      { projectId, kind, bucket: s3Bucket, key, error },
-      "failed to delete staged payload from S3 (lifecycle rule will reap it)",
-    );
-  }
-}
-
-function safeUrlHost(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return "<invalid-url>";
+    await deleteStagedObject({ s3Client, s3Bucket, key, projectId });
   }
 }

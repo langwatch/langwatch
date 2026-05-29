@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -59,7 +58,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		body, err := io.ReadAll(r.Body)
+		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",
@@ -101,7 +100,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 //     StudioClientEvent union sent by langwatch/src/server/workflows/
 //     runWorkflow.ts):
 //     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
-//      "payload":{trace_id, workflow, inputs?, origin?, ...}}
+//     "payload":{trace_id, workflow, inputs?, origin?, ...}}
 //
 //  2. Flat envelope (used by tests + manual curl):
 //     {trace_id, workflow, inputs?, origin?, project_id?}
@@ -375,7 +374,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		body, err := io.ReadAll(r.Body)
+		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",
