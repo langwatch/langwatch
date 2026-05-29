@@ -12,7 +12,7 @@ from ...models.post_api_prompts_by_id_sync_response_400 import PostApiPromptsByI
 from ...models.post_api_prompts_by_id_sync_response_401 import PostApiPromptsByIdSyncResponse401
 from ...models.post_api_prompts_by_id_sync_response_422 import PostApiPromptsByIdSyncResponse422
 from ...models.post_api_prompts_by_id_sync_response_500 import PostApiPromptsByIdSyncResponse500
-from ...types import UNSET, Response, Unset
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
@@ -88,8 +88,11 @@ def _build_response(
     | PostApiPromptsByIdSyncResponse422
     | PostApiPromptsByIdSyncResponse500
 ]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
     return Response(
-        status_code=HTTPStatus(response.status_code),
+        status_code=safe_http_status(response.status_code),
         content=response.content,
         headers=response.headers,
         parsed=_parse_response(client=client, response=response),
