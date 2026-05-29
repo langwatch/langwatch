@@ -25,7 +25,16 @@ export function IdentityFields() {
         />
       </Field.Root>
       <Field.Root width="180px">
-        <Field.Label>Alert type</Field.Label>
+        <Field.Label>
+          Alert type{" "}
+          <Field.RequiredIndicator
+            fallback={
+              <span style={{ fontSize: "0.7em", opacity: 0.6 }}>
+                (optional)
+              </span>
+            }
+          />
+        </Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
             value={draft.alertType ?? ""}

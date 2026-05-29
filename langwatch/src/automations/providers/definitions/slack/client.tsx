@@ -1,5 +1,4 @@
 import {
-  Box,
   Field,
   HStack,
   Input,
@@ -7,20 +6,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { SiSlack } from "react-icons/si";
+import { PreviewStatusIcon } from "~/features/automations/components/PreviewStatusIcon";
+import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
 import {
-  ExampleData,
   FieldHeader,
   LiquidEditor,
-  PreviewWarnings,
-  SlackPreview as SlackPreviewView,
-  VariableReference,
 } from "~/features/automations/editors/templateAuthoring";
 import {
   DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_SLACK_TEMPLATE,
+  filterVariablesForCadence,
 } from "~/features/automations/templates/scaffold";
 import type {
   ConfigFormProps,
@@ -100,6 +99,10 @@ function SlackConfigForm({
     ? templateDefault
     : slice.template.value;
   const slackPreview = ctx.preview;
+  const variables = useMemo(
+    () => filterVariablesForCadence(ctx.variables, "immediate"),
+    [ctx.variables],
+  );
 
   return (
     <VStack align="stretch" gap={4}>
@@ -140,6 +143,7 @@ function SlackConfigForm({
         }
         usingDefault={slice.template.usingDefault}
         onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
+        trailing={<VariableInfoIcon variables={variables} />}
       />
       {/* Block Kit templates are JSON whose string values contain Liquid.
           We use the custom `liquid-json` Monaco language so the editor
@@ -148,7 +152,7 @@ function SlackConfigForm({
           and runs the JSON language service on the synthetic text so the
           author still gets in-editor schema markers. */}
       <LiquidEditor
-        variables={ctx.variables}
+        variables={variables}
         height="320px"
         language={isBlockKit ? LIQUID_JSON_LANGUAGE_ID : undefined}
         value={templateValue}
@@ -163,22 +167,15 @@ function SlackConfigForm({
         }
       />
 
-      <Box border="1px solid" borderColor="border" borderRadius="md" padding={3}>
-        <Text textStyle="sm" fontWeight="semibold" mb={2}>
+      <HStack gap={2}>
+        <Text textStyle="sm" fontWeight="semibold">
           Preview
         </Text>
-        <PreviewWarnings data={slackPreview} />
-        {slackPreview ? (
-          <SlackPreviewView payload={slackPreview.payload} />
-        ) : (
-          <Text color="fg.muted" textStyle="sm">
-            Edit a template to preview.
-          </Text>
-        )}
-      </Box>
-
-      <VariableReference variables={ctx.variables} />
-      <ExampleData example={ctx.example} />
+        <PreviewStatusIcon
+          preview={slackPreview}
+          loading={ctx.previewLoading}
+        />
+      </HStack>
     </VStack>
   );
 }

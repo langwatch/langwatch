@@ -368,6 +368,11 @@ export function clearLiquidMarkers(
 const SCHEMA_MARKER_OWNER = "liquid-json-schema";
 const registeredSchemas = new Map<string, object>();
 
+function basenameOfUri(uri: string): string {
+  const slash = uri.lastIndexOf("/");
+  return slash === -1 ? uri : uri.slice(slash + 1);
+}
+
 /** Map real-model URI → shadow-model URI, populated by `setupLiquidJsonSchema`.
  *  The completion + hover bridges below look up the shadow for a `liquid-json`
  *  model and forward to Monaco's JSON worker. */
@@ -597,7 +602,10 @@ export function setupLiquidJsonSchema(params: {
     allowComments: false,
     schemas: Array.from(registeredSchemas.entries()).map(([uri, s]) => ({
       uri: `inmemory://schemas/${encodeURIComponent(uri)}.schema.json`,
-      fileMatch: [uri],
+      // Match by basename glob — Monaco normalises the model URI internally
+      // and an exact-string `file:///...` match was unreliable across
+      // versions. The basename is unique per editor (caller's responsibility).
+      fileMatch: [`*${basenameOfUri(uri)}`],
       schema: s,
     })),
   });

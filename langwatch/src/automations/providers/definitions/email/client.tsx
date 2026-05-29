@@ -2,15 +2,17 @@ import { Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "~/utils/api";
+import { PreviewStatusIcon } from "~/features/automations/components/PreviewStatusIcon";
+import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import {
-  EmailPreview as EmailPreviewView,
-  ExampleData,
   FieldHeader,
   LiquidEditor,
-  PreviewWarnings,
-  VariableReference,
 } from "~/features/automations/editors/templateAuthoring";
-import { DEFAULT_EMAIL_BODY_TEMPLATE, DEFAULT_EMAIL_SUBJECT_TEMPLATE } from "~/features/automations/templates/scaffold";
+import {
+  DEFAULT_EMAIL_BODY_TEMPLATE,
+  DEFAULT_EMAIL_SUBJECT_TEMPLATE,
+  filterVariablesForCadence,
+} from "~/features/automations/templates/scaffold";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -147,6 +149,12 @@ function EmailConfigForm({
     : slice.body.value;
 
   const emailPreview = ctx.preview;
+  // Immediate is the only live cadence — filter variables so authors only see
+  // what's actually populated for the dispatch path they're configuring.
+  const variables = useMemo(
+    () => filterVariablesForCadence(ctx.variables, "immediate"),
+    [ctx.variables],
+  );
 
   return (
     <VStack align="stretch" gap={4}>
@@ -232,9 +240,10 @@ function EmailConfigForm({
         label="Subject"
         usingDefault={slice.subject.usingDefault}
         onReset={() => onChange({ ...slice, subject: EMPTY_FIELD })}
+        trailing={<VariableInfoIcon variables={variables} />}
       />
       <LiquidEditor
-        variables={ctx.variables}
+        variables={variables}
         height="56px"
         value={subjectValue}
         onChange={(value) =>
@@ -245,9 +254,10 @@ function EmailConfigForm({
         label="Body (Markdown + Liquid)"
         usingDefault={slice.body.usingDefault}
         onReset={() => onChange({ ...slice, body: EMPTY_FIELD })}
+        trailing={<VariableInfoIcon variables={variables} />}
       />
       <LiquidEditor
-        variables={ctx.variables}
+        variables={variables}
         height="280px"
         value={bodyValue}
         onChange={(value) =>
@@ -255,25 +265,15 @@ function EmailConfigForm({
         }
       />
 
-      <Box border="1px solid" borderColor="border" borderRadius="md" padding={3}>
-        <Text textStyle="sm" fontWeight="semibold" mb={2}>
+      <HStack gap={2}>
+        <Text textStyle="sm" fontWeight="semibold">
           Preview
         </Text>
-        <PreviewWarnings data={emailPreview} />
-        {emailPreview ? (
-          <EmailPreviewView
-            subject={emailPreview.subject}
-            html={emailPreview.html}
-          />
-        ) : (
-          <Text color="fg.muted" textStyle="sm">
-            Edit a template to preview.
-          </Text>
-        )}
-      </Box>
-
-      <VariableReference variables={ctx.variables} />
-      <ExampleData example={ctx.example} />
+        <PreviewStatusIcon
+          preview={emailPreview}
+          loading={ctx.previewLoading}
+        />
+      </HStack>
     </VStack>
   );
 }

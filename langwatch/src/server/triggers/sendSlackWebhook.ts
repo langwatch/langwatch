@@ -92,13 +92,13 @@ export const sendSlackWebhook = async ({
   const alertIcon = (alertType: AlertType | null) => {
     switch (alertType) {
       case AlertTypeEnum.INFO:
-        return ":information_source:";
+        return "ℹ️";
       case AlertTypeEnum.WARNING:
-        return ":warning:";
+        return "⚠️";
       case AlertTypeEnum.CRITICAL:
-        return ":red_circle:";
+        return "🔴";
       default:
-        return ":bell:";
+        return "🔔";
     }
   };
 
