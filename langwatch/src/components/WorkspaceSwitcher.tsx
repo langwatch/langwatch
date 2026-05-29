@@ -401,7 +401,7 @@ function SwitcherItem({
           e.preventDefault();
         }}
       >
-        <HStack gap={3} width="full" alignItems="start" paddingY={1}>
+        <HStack gap={3} width="full" alignItems="start" paddingY={0.5}>
           <Box paddingTop="2px">
             {entry.kind === "project" ? (
               <ProjectAvatar name={entry.label} />
