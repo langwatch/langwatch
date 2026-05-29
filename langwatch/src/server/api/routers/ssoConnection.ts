@@ -6,7 +6,7 @@ import {
   requireEnterprisePlan,
 } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
-import { SsoConnectionService } from "~/server/sso/ssoConnection.service";
+import { getApp } from "~/server/app-layer/app";
 import { validateOidcDiscovery } from "~/server/sso/oidcDiscovery";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -19,7 +19,7 @@ const ssoConnectionProcedure = protectedProcedure
 
 export const ssoConnectionRouter = createTRPCRouter({
   list: ssoConnectionProcedure.query(async ({ ctx, input }) => {
-    const service = SsoConnectionService.create(ctx.prisma);
+    const service = getApp().ssoConnection;
     const connections = await service.listConnections({
       organizationId: input.organizationId,
     });
@@ -48,7 +48,7 @@ export const ssoConnectionRouter = createTRPCRouter({
   getById: ssoConnectionProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       const connection = await service.getConnection({
         id: input.id,
         organizationId: input.organizationId,
@@ -113,7 +113,7 @@ export const ssoConnectionRouter = createTRPCRouter({
         }
       }
 
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       const connection = await service.createConnection({
         organizationId: input.organizationId,
         domain: input.domain,
@@ -176,7 +176,7 @@ export const ssoConnectionRouter = createTRPCRouter({
       }
 
       const { id, organizationId, ...updates } = input;
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       await service.updateConnection({
         id,
         organizationId,
@@ -188,7 +188,7 @@ export const ssoConnectionRouter = createTRPCRouter({
   delete: ssoConnectionProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       await service.deleteConnection({
         id: input.id,
         organizationId: input.organizationId,
@@ -199,7 +199,7 @@ export const ssoConnectionRouter = createTRPCRouter({
   verifyDomain: ssoConnectionProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       return service.verifyDomain({
         id: input.id,
         organizationId: input.organizationId,
@@ -209,7 +209,7 @@ export const ssoConnectionRouter = createTRPCRouter({
   toggleEnforcement: ssoConnectionProcedure
     .input(z.object({ id: z.string(), ssoEnforced: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       await service.toggleEnforcement({
         id: input.id,
         organizationId: input.organizationId,
@@ -230,7 +230,7 @@ export const ssoConnectionRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const service = SsoConnectionService.create(ctx.prisma);
+      const service = getApp().ssoConnection;
       return service.listScimLogs({
         organizationId: input.organizationId,
         statusFilter: input.statusFilter,

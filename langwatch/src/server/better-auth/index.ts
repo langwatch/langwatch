@@ -20,7 +20,6 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { extractEmailDomain } from "./sso";
-import { isEnterpriseTier } from "../api/enterprise";
 import { getApp } from "../app-layer/app";
 import { checkSsoEnforcement } from "./sso-enforcement";
 
@@ -545,83 +544,48 @@ export const auth = betterAuth({
       ) {
         try {
           const body = ctx.body as { email?: string } | undefined;
-          const email = body?.email;
-          if (email && typeof email === "string") {
-            const domain = extractEmailDomain(email);
-            if (domain) {
-              // Phase 1: check Organization.ssoProvider (legacy)
-              const org = await prisma.organization.findUnique({
-                where: { ssoDomain: domain },
-                select: { id: true, ssoProvider: true },
-              });
-
-              // Phase 2: check SsoConnection with ssoEnforced
-              const ssoConnection = await prisma.ssoConnection.findFirst({
-                where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
-                select: { organizationId: true },
-              });
-
-              let enforcedOrgId = ssoConnection?.organizationId ?? (org?.ssoProvider ? org.id : null);
-
-              // Login-time license revalidation: if the org's enterprise
-              // license expired, silently degrade SSO enforcement so users
-              // aren't locked out.
-              if (enforcedOrgId) {
+          await checkSsoEnforcement({
+            email: body?.email,
+            path: url,
+            deps: {
+              findOrgByDomain: (domain) =>
+                prisma.organization.findUnique({
+                  where: { ssoDomain: domain },
+                  select: { id: true, ssoProvider: true },
+                }),
+              findEnforcedSsoConnection: (domain) =>
+                prisma.ssoConnection.findFirst({
+                  where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
+                  select: { organizationId: true },
+                }),
+              getActivePlanType: async (organizationId) => {
                 try {
-                  const plan = await getApp().planProvider.getActivePlan({
-                    organizationId: enforcedOrgId,
-                  });
-                  if (!isEnterpriseTier(plan.type)) {
-                    enforcedOrgId = null;
-                  }
+                  const plan = await getApp().planProvider.getActivePlan({ organizationId });
+                  return plan.type;
                 } catch {
-                  enforcedOrgId = null;
+                  return null;
                 }
-              }
-
-              if (enforcedOrgId && matches("/sign-in/email")) {
-                // Sole-owner escape hatch: if the user is the only
-                // active ADMIN, allow password login to prevent lockout
-                // during IdP outages.
-                const user = await prisma.user.findFirst({
+              },
+              findUserByEmail: (email) =>
+                prisma.user.findFirst({
                   where: { email },
                   select: { id: true },
-                });
-
-                if (user) {
-                  const activeAdminCount = await prisma.organizationUser.count({
-                    where: {
-                      organizationId: enforcedOrgId,
-                      role: "ADMIN",
-                      user: { deactivatedAt: null },
-                    },
-                  });
-
-                  const userIsAdmin = await prisma.organizationUser.findFirst({
-                    where: {
-                      organizationId: enforcedOrgId,
-                      userId: user.id,
-                      role: "ADMIN",
-                    },
-                    select: { userId: true },
-                  });
-
-                  if (userIsAdmin && activeAdminCount === 1) {
-                    // Sole owner — allow password login as escape hatch
-                    return;
-                  }
-                }
-              }
-
-              if (enforcedOrgId) {
-                throw APIError.from("FORBIDDEN", {
-                  code: "SSO_ENFORCED",
-                  message:
-                    "Your organization requires SSO login. Please use your identity provider to sign in.",
-                });
-              }
-            }
-          }
+                }),
+              countActiveAdmins: (organizationId) =>
+                prisma.organizationUser.count({
+                  where: {
+                    organizationId,
+                    role: "ADMIN",
+                    user: { deactivatedAt: null },
+                  },
+                }),
+              findUserAdmin: ({ userId, organizationId }) =>
+                prisma.organizationUser.findFirst({
+                  where: { organizationId, userId, role: "ADMIN" },
+                  select: { userId: true },
+                }),
+            },
+          });
         } catch (e) {
           if (e instanceof APIError) throw e;
           logger.error({ err: e }, "Failed to check SSO enforcement on credential endpoint");

@@ -24,8 +24,7 @@ import {
   generateState,
   parseStateCookie,
 } from "~/server/sso/ssoOAuth";
-import { SsoConnectionService } from "~/server/sso/ssoConnection.service";
-import { SsoAuthService } from "~/server/sso/ssoAuth.service";
+import { getApp } from "~/server/app-layer/app";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -174,8 +173,7 @@ secured.access(authPolicy()).get("/auth/sso/:domain", async (c) => {
   const isSecure = env.NEXTAUTH_URL.startsWith("https");
 
   try {
-    const connectionService = SsoConnectionService.create(prisma);
-    const connection = await connectionService.getVerifiedConnectionByDomain({ domain });
+    const connection = await getApp().ssoConnection.getVerifiedConnectionByDomain({ domain });
 
     if (!connection) {
       throw new Error(`No verified SSO connection for domain ${domain}`);
@@ -242,8 +240,7 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
   const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
 
   try {
-    const connectionService = SsoConnectionService.create(prisma);
-    const connection = await connectionService.getVerifiedConnectionByDomain({ domain });
+    const connection = await getApp().ssoConnection.getVerifiedConnectionByDomain({ domain });
 
     if (!connection) {
       throw new Error(`No verified SSO connection for domain ${domain}`);
@@ -255,8 +252,7 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
       callbackUrl,
     });
 
-    const ssoAuthService = SsoAuthService.create(prisma);
-    const result = await ssoAuthService.handleSsoCallback({
+    const result = await getApp().ssoAuth.handleSsoCallback({
       userInfo,
       provider,
       organizationId: connection.organizationId,

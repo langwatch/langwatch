@@ -108,6 +108,11 @@ import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient"
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
+import { SsoConnectionService } from "../sso/ssoConnection.service";
+import { SsoAuthService } from "../sso/ssoAuth.service";
+import { ScimService } from "../scim/scim.service";
+import { ScimGroupService } from "../scim/scim-group.service";
+import { ScimTokenService } from "../scim/scim-token.service";
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { SuiteRunStateRepositoryClickHouse, SuiteRunStateRepositoryMemory } from "../event-sourcing/pipelines/suite-run-processing/repositories";
@@ -525,6 +530,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       : null,
   };
 
+  const ssoConnection = SsoConnectionService.create(prisma);
+  const ssoAuth = SsoAuthService.create(prisma);
+  const scim = ScimService.create(prisma);
+  const scimGroups = ScimGroupService.create(prisma);
+  const scimTokens = ScimTokenService.create(prisma);
+
   return initializeApp({
     config,
     broadcast,
@@ -547,6 +558,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     notifications,
     nurturing,
     usageLimits,
+    ssoConnection,
+    ssoAuth,
+    scim,
+    scimGroups,
+    scimTokens,
     commands,
     ops,
     _eventSourcing: es,
@@ -642,6 +658,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
+    ssoConnection: SsoConnectionService.create(testPrisma),
+    ssoAuth: SsoAuthService.create(testPrisma),
+    scim: ScimService.create(testPrisma),
+    scimGroups: ScimGroupService.create(testPrisma),
+    scimTokens: ScimTokenService.create(testPrisma),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
       eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
