@@ -16,6 +16,8 @@ import {
   internalSecret,
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
+import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ScimGroupService } from "~/server/scim/scim-group.service";
 import { ScimService } from "~/server/scim/scim.service";
 import { ScimTokenService } from "~/server/scim/scim-token.service";
@@ -72,6 +74,17 @@ async function requireAuth(c: Context): Promise<string | null> {
   }
 
   return result.organizationId;
+}
+
+async function requireEnterprise(
+  c: Context,
+  organizationId: string,
+): Promise<Response | null> {
+  const plan = await getApp().planProvider.getActivePlan({ organizationId });
+  if (!isEnterpriseTier(plan.type)) {
+    return scimError(c, 403, "SCIM provisioning requires an Enterprise plan");
+  }
+  return null;
 }
 
 async function parseJsonBody(c: Context): Promise<unknown | null> {
@@ -275,6 +288,8 @@ secured.access(SCIM_POLICY).get("/Users", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const scimService = ScimService.create(prisma);
 
@@ -297,6 +312,8 @@ secured.access(SCIM_POLICY).post("/Users", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const scimService = ScimService.create(prisma);
 
@@ -327,6 +344,8 @@ secured.access(SCIM_POLICY).get("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
   const scimService = ScimService.create(prisma);
@@ -345,6 +364,8 @@ secured.access(SCIM_POLICY).put("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
   const scimService = ScimService.create(prisma);
@@ -377,6 +398,8 @@ secured.access(SCIM_POLICY).patch("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
   const scimService = ScimService.create(prisma);
@@ -409,6 +432,8 @@ secured.access(SCIM_POLICY).delete("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
   const scimService = ScimService.create(prisma);
@@ -429,6 +454,8 @@ secured.access(SCIM_POLICY).get("/Groups", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const service = ScimGroupService.create(prisma);
 
@@ -453,6 +480,8 @@ secured.access(SCIM_POLICY).post("/Groups", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const service = ScimGroupService.create(prisma);
 
@@ -483,6 +512,8 @@ secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -509,6 +540,8 @@ secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -540,6 +573,8 @@ secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -571,6 +606,8 @@ secured.access(SCIM_POLICY).delete("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
   const result = await ScimGroupService.create(prisma).deleteGroup({

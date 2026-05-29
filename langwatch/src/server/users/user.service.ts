@@ -119,6 +119,11 @@ export class UserService {
     return user;
   }
 
+  async revokeAllSessions({ id }: { id: string }): Promise<void> {
+    await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+    await this.cliTokenRevocation.revokeForUser({ userId: id });
+  }
+
   async reactivate({ id }: { id: string }): Promise<User> {
     return this.prisma.user.update({ where: { id }, data: { deactivatedAt: null } });
   }

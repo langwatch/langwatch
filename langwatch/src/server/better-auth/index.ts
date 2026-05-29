@@ -19,6 +19,7 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { extractEmailDomain } from "./sso";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -513,17 +514,11 @@ export const auth = betterAuth({
    */
   hooks: {
     before: async (ctx) => {
+      const url = ctx.request?.url ?? "";
+      const matches = (suffix: string) =>
+        url.endsWith(suffix) || url.includes(`${suffix}?`);
+
       if (env.NEXTAUTH_PROVIDER !== "email") {
-        const url = ctx.request?.url ?? "";
-        // The request URL is the FULL URL after Next.js routing, so we
-        // check for suffix matches on the BetterAuth endpoint paths.
-        const matches = (suffix: string) =>
-          url.endsWith(suffix) || url.includes(`${suffix}?`);
-        // All endpoints that mutate or read credential state and are
-        // NOT gated by `emailAndPassword.enabled` at the handler level.
-        // We defense-in-depth these in cloud mode to prevent bypasses
-        // of the iter-26 revokeOtherSessionsForUser wiring and any
-        // other cloud-mode invariants our application layer expects.
         if (
           matches("/change-password") ||
           matches("/set-password") ||
@@ -538,6 +533,35 @@ export const auth = betterAuth({
             message:
               "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
           });
+        }
+      }
+
+      if (
+        env.NEXTAUTH_PROVIDER === "email" &&
+        (matches("/sign-in/email") || matches("/request-password-reset"))
+      ) {
+        try {
+          const body = ctx.body as { email?: string } | undefined;
+          const email = body?.email;
+          if (email && typeof email === "string") {
+            const domain = extractEmailDomain(email);
+            if (domain) {
+              const org = await prisma.organization.findUnique({
+                where: { ssoDomain: domain },
+                select: { ssoProvider: true },
+              });
+              if (org?.ssoProvider) {
+                throw APIError.from("FORBIDDEN", {
+                  code: "SSO_ENFORCED",
+                  message:
+                    "Your organization requires SSO login. Please use your identity provider to sign in.",
+                });
+              }
+            }
+          }
+        } catch (e) {
+          if (e instanceof APIError) throw e;
+          logger.error({ err: e }, "Failed to check SSO enforcement on credential endpoint");
         }
       }
     },

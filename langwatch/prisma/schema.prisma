@@ -172,6 +172,8 @@ model OrganizationUser {
   /// id belongs to this org. See cost-centers.feature.
   costCenterId String?
 
+  scimManaged  Boolean              @default(false)
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
