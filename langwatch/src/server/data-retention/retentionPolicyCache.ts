@@ -1,77 +1,57 @@
-import type { PrismaClient } from "@prisma/client";
 import { TtlCache } from "../utils/ttlCache";
-import type { RetentionPolicy, RetentionCategory } from "./retentionPolicy.schema";
-import { retentionPolicySchema } from "./retentionPolicy.schema";
-import { resolveRetentionDays } from "./resolveRetentionDays";
+import { resolveScopeChain } from "../scopes/resolveScopeChain";
+import type { RetentionCategory, ResolvedRetention } from "./retentionPolicy.schema";
+import { resolveRetention, type RetentionRow } from "./resolveRetentionDays";
 import type { RetentionPolicyResolver } from "./retentionPolicyResolver";
+import type { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repository";
 
-interface CachedRetentionData {
-  projectPolicy: RetentionPolicy | null;
-  orgPolicy: RetentionPolicy | null;
-  resolved: RetentionPolicy;
-}
-
+/**
+ * Caches the resolved per-category retention for a project so the ingestion
+ * hot path doesn't re-walk the PROJECT → TEAM → ORGANIZATION cascade on every
+ * event. Keyed by projectId; invalidated whenever a policy at any tier in the
+ * project's cascade changes (the writer invalidates affected projects).
+ *
+ * Row-fetching is delegated to the repository so the scope-chain query has a
+ * single definition shared with the policy service — the cache only adds the
+ * TTL layer on top.
+ */
 export class RetentionPolicyCache implements RetentionPolicyResolver {
-  private readonly cache: TtlCache<CachedRetentionData>;
+  private readonly cache: TtlCache<ResolvedRetention | null>;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly repository: DataRetentionPolicyRepository) {
     this.cache = new TtlCache(60_000, "retention-policy:");
   }
 
-  async resolve(tenantId: string): Promise<RetentionPolicy | null> {
-    const data = await this.loadPolicies(tenantId);
-    return data.resolved;
+  async resolve(projectId: string): Promise<ResolvedRetention | null> {
+    const cached = await this.cache.get(projectId);
+    if (cached !== undefined) return cached;
+
+    const resolved = await this.loadResolved(projectId);
+    await this.cache.set(projectId, resolved);
+    return resolved;
   }
 
   async getRetentionDays(
-    tenantId: string,
+    projectId: string,
     category: RetentionCategory,
   ): Promise<number> {
-    const data = await this.loadPolicies(tenantId);
-    return data.resolved[category] ?? 0;
+    const resolved = await this.resolve(projectId);
+    return resolved?.[category] ?? 0;
   }
 
-  invalidate(tenantId: string): void {
-    this.cache.delete(tenantId).catch(() => {});
+  invalidate(projectId: string): void {
+    this.cache.delete(projectId).catch(() => {});
   }
 
-  private async loadPolicies(tenantId: string): Promise<CachedRetentionData> {
-    const cached = await this.cache.get(tenantId);
-    if (cached) return cached;
+  private async loadResolved(
+    projectId: string,
+  ): Promise<ResolvedRetention | null> {
+    const ctx = await this.repository.getProjectScopeContext(projectId);
+    if (!ctx) return null;
 
-    const project = await this.prisma.project.findFirst({
-      where: { id: tenantId },
-      select: {
-        retentionPolicy: true,
-        team: {
-          select: {
-            organization: {
-              select: { defaultRetentionPolicy: true },
-            },
-          },
-        },
-      },
-    });
-
-    const projectPolicy = parseRetentionPolicy(project?.retentionPolicy);
-    const orgPolicy = parseRetentionPolicy(
-      project?.team?.organization?.defaultRetentionPolicy,
-    );
-
-    const resolved: RetentionPolicy = {
-      traces: resolveRetentionDays({ category: "traces", projectRetentionPolicy: projectPolicy, orgDefaultRetentionPolicy: orgPolicy }),
-      scenarios: resolveRetentionDays({ category: "scenarios", projectRetentionPolicy: projectPolicy, orgDefaultRetentionPolicy: orgPolicy }),
-      experiments: resolveRetentionDays({ category: "experiments", projectRetentionPolicy: projectPolicy, orgDefaultRetentionPolicy: orgPolicy }),
-    };
-
-    const result: CachedRetentionData = { projectPolicy, orgPolicy, resolved };
-    await this.cache.set(tenantId, result);
-    return result;
+    const rows = (await this.repository.findForProjectChain(
+      ctx,
+    )) as RetentionRow[];
+    return resolveRetention({ rows, chain: resolveScopeChain(ctx) });
   }
-}
-
-function parseRetentionPolicy(raw: unknown): RetentionPolicy | null {
-  if (raw == null) return null;
-  const parsed = retentionPolicySchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }

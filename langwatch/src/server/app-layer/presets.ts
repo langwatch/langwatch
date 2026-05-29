@@ -346,12 +346,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
-  const retentionPolicyCache = new RetentionPolicyCache(prisma);
-
   const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
   const dataRetentionPolicyService = new DataRetentionPolicyService(
     dataRetentionPolicyRepo,
     retentionPolicyCache,
+    prisma,
   );
   const pinnedTraceRepo = new PinnedTraceRepository(prisma);
   const pinnedTraceService = new PinnedTraceService(pinnedTraceRepo);
@@ -613,7 +613,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
-  const testRetentionPolicyCache = new RetentionPolicyCache(testPrisma);
+  const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
+  const testRetentionPolicyCache = new RetentionPolicyCache(
+    testRetentionPolicyRepo,
+  );
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -743,7 +746,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
-      policy: new DataRetentionPolicyService(new DataRetentionPolicyRepository(testPrisma), testRetentionPolicyCache),
+      policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache, testPrisma),
       pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),

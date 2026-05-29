@@ -1,49 +1,89 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission, checkOrganizationPermission } from "../rbac";
+import { authorizeInResolver, checkProjectPermission } from "../rbac";
 import { getApp } from "~/server/app-layer/app";
+import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
+import { SCOPE_TIERS } from "~/server/scopes/scope.types";
 import {
-  retentionPolicySchema,
+  retentionCategorySchema,
+  retentionDaysSchema,
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
+import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
+import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
+
+const scopeInput = z.object({
+  scopeType: z.enum(SCOPE_TIERS),
+  scopeId: z.string().min(1),
+});
 
 export const dataRetentionRouter = createTRPCRouter({
-  getProjectPolicy: protectedProcedure
+  /**
+   * The retention settings snapshot for a project: effective per-category
+   * retention, the readable override rules, and the writable scopes for the
+   * chip picker. Read access is project:view; the snapshot RBAC-filters what
+   * it returns.
+   */
+  getRules: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      return getApp().dataRetention.policy.getProjectPolicy({
-        projectId: input.projectId,
-      });
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      return getRetentionPolicySnapshot(ctx, { projectId: input.projectId });
     }),
 
-  updateProjectPolicy: protectedProcedure
+  /**
+   * Set one category's retention at one scope. Authorizes manage on the target
+   * scope (organization:manage / team:manage / project:update) — a project
+   * admin cannot push a policy up to the org.
+   */
+  setForScope: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-        retentionPolicy: retentionPolicySchema.nullable(),
+        scope: scopeInput,
+        category: retentionCategorySchema,
+        retentionDays: retentionDaysSchema,
       }),
     )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
-      await getApp().dataRetention.policy.updateProjectPolicy({
-        projectId: input.projectId,
-        retentionPolicy: input.retentionPolicy,
-      });
+    .use(authorizeInResolver)
+    .mutation(async ({ input, ctx }) => {
+      await assertCanManageScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
+      try {
+        return await getApp().dataRetention.policy.setForScope({
+          scope: input.scope,
+          category: input.category as RetentionCategory,
+          retentionDays: input.retentionDays,
+        });
+      } catch (error) {
+        if (error instanceof ScopeTargetNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
 
-  updateOrgPolicy: protectedProcedure
+  /** Remove one category's override at one scope; the next tier then applies. */
+  removeForScope: protectedProcedure
     .input(
       z.object({
-        organizationId: z.string(),
-        defaultRetentionPolicy: retentionPolicySchema.nullable(),
+        projectId: z.string(),
+        scope: scopeInput,
+        category: retentionCategorySchema,
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input }) => {
-      await getApp().dataRetention.policy.updateOrgPolicy({
-        organizationId: input.organizationId,
-        defaultRetentionPolicy: input.defaultRetentionPolicy,
+    .use(authorizeInResolver)
+    .mutation(async ({ input, ctx }) => {
+      await assertCanManageScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
+      await getApp().dataRetention.policy.removeForScope({
+        scope: input.scope,
+        category: input.category as RetentionCategory,
       });
     }),
 
@@ -51,8 +91,8 @@ export const dataRetentionRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        category: z.enum(["traces", "scenarios", "experiments"]),
-        newRetentionDays: z.number().int().min(30),
+        category: retentionCategorySchema,
+        newRetentionDays: retentionDaysSchema,
       }),
     )
     .use(checkProjectPermission("project:update"))

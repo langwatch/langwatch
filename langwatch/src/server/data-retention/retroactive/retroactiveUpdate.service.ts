@@ -11,8 +11,10 @@ export interface MutationProgress {
   mutationId: string;
   table: string;
   isDone: boolean;
+  // Parts still pending for this mutation. ClickHouse's system.mutations
+  // exposes only the remaining count (parts_to_do), not a total or done
+  // count, so progress is shown as "N parts remaining" counting down to 0.
   partsToDo: number;
-  partsDone: number;
   createTime: string;
   category: RetentionCategory | null;
 }
@@ -103,7 +105,6 @@ export class RetroactiveUpdateService {
       table: r.table,
       isDone: r.isDone === 1,
       partsToDo: r.partsToDo,
-      partsDone: 0,
       createTime: r.createTime,
       category: RETENTION_TABLE_CATEGORY_MAP[r.table] ?? null,
     }));
@@ -164,7 +165,6 @@ export class RetroactiveUpdateService {
       table: r.table,
       isDone: r.isDone === 1,
       partsToDo: r.partsToDo,
-      partsDone: 0,
       createTime: r.createTime,
       category: RETENTION_TABLE_CATEGORY_MAP[r.table] ?? null,
     }));

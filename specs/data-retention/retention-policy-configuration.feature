@@ -1,44 +1,69 @@
 Feature: Data retention policy configuration
   As a paid customer
-  I want to configure how long my observability data is kept
+  I want to configure how long my observability data is kept, at the
+  organization, team, or project level
   So that I can manage storage costs and comply with data governance policies
+  without re-entering the same rule in every project
+
+  # Retention is a scoped resource (ADR-021): an override is set for one
+  # category at one scope (organization, team, or project), and a project
+  # resolves the most-specific override that applies to it, walking
+  # PROJECT -> TEAM -> ORGANIZATION. With no override anywhere in that chain,
+  # data is kept indefinitely. Categories resolve independently, so a project
+  # can keep traces for 90 days while scenarios inherit the team rule and
+  # experiments inherit the organization rule.
 
   Background:
-    Given the organization has a SEAT_EVENT plan
-    And the organization has a project
+    Given an organization "acme" with a team "platform" and a project "web-app" under that team
 
-  Scenario: Organization sets default retention policy
-    When the organization admin sets default retention to 30 days for all categories
-    Then the organization defaultRetentionPolicy is saved as {"traces": 30, "scenarios": 30, "experiments": 30}
-    And all projects without a project-level override inherit this default
+  Scenario: A project with no override keeps data indefinitely
+    Given no retention override exists for the organization, the team, or the project
+    When retention is resolved for project "web-app"
+    Then every category is kept indefinitely
 
-  Scenario: Project overrides organization default
-    Given the organization default retention is 30 days for all categories
-    When the project admin sets project retention to 90 days for traces
-    Then the project retentionPolicy is saved as {"traces": 90, "scenarios": null, "experiments": null}
-    And trace data for this project uses 90-day retention
-    And scenario data for this project inherits the 30-day org default
-    And experiment data for this project inherits the 30-day org default
+  Scenario: An organization override applies to every project in the org
+    Given an organization-level traces retention of 30 days for "acme"
+    When retention is resolved for project "web-app"
+    Then traces for "web-app" are kept for 30 days
 
-  Scenario: Resolution order falls through to indefinite
-    Given the organization has no defaultRetentionPolicy set
-    And the project has no retentionPolicy set
-    Then data is stamped with _retention_days = 0
-    And data is kept indefinitely
+  Scenario: A project override beats an organization override
+    Given an organization-level traces retention of 30 days for "acme"
+    And a project-level traces retention of 90 days for "web-app"
+    When retention is resolved for project "web-app"
+    Then traces for "web-app" are kept for 90 days
+
+  Scenario: A team override sits between organization and project
+    Given an organization-level traces retention of 30 days for "acme"
+    And a team-level traces retention of 60 days for "platform"
+    When retention is resolved for project "web-app"
+    Then traces for "web-app" are kept for 60 days
+
+  Scenario: Categories resolve independently across tiers
+    Given a project-level traces retention of 90 days for "web-app"
+    And a team-level scenarios retention of 60 days for "platform"
+    And an organization-level experiments retention of 30 days for "acme"
+    When retention is resolved for project "web-app"
+    Then traces for "web-app" are kept for 90 days
+    And scenarios for "web-app" are kept for 60 days
+    And experiments for "web-app" are kept for 30 days
 
   Scenario: Minimum retention enforced at 30 days
-    When the admin attempts to set retention to 15 days for traces
+    When an admin attempts to set traces retention to 15 days at any scope
     Then the request is rejected with a validation error
-    And the error indicates minimum retention is 30 days
+    And the error indicates the minimum retention is 30 days
 
-  Scenario: Per-category retention with mixed values
-    When the admin sets retention to {"traces": 90, "scenarios": 30, "experiments": null}
-    Then trace data uses 90-day retention
-    And scenario data uses 30-day retention
-    And experiment data is kept indefinitely
+  Scenario: Removing a project override falls back to the next tier
+    Given an organization-level traces retention of 60 days for "acme"
+    And a project-level traces retention of 90 days for "web-app"
+    When the project admin removes the project-level traces override
+    Then traces for "web-app" are kept for 60 days from the organization rule
 
-  Scenario: Clearing project override restores org default
-    Given the organization default retention is 60 days for all categories
-    And the project has a 90-day override for traces
-    When the project admin clears the project retention policy
-    Then trace data for this project uses 60-day retention from the org default
+  Scenario: A project admin cannot set an organization-wide override
+    Given a user who can manage project "web-app" but not the organization
+    When that user attempts to set an organization-level traces retention
+    Then the request is rejected as forbidden
+
+  Scenario: An override is anchored to a single organization
+    When an admin sets a team-level traces retention for "platform"
+    Then the override is anchored to the organization that owns "platform"
+    And it can never apply to a project in another organization

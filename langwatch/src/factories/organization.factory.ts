@@ -3,7 +3,7 @@ import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
 export const organizationFactory = Factory.define<
-  Omit<Organization, "stripeCustomerId" | "currency" | "signupData" | "defaultRetentionPolicy">
+  Omit<Organization, "stripeCustomerId" | "currency" | "signupData">
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Organization ${sequence}`,

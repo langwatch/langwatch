@@ -1,5 +1,5 @@
 import type { TenantId } from "../domain/tenantId";
-import type { RetentionPolicy } from "../../data-retention/retentionPolicy.schema";
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 
 /**
  * Context passed to projection stores for both fold and map projections.
@@ -16,5 +16,5 @@ export interface ProjectionStoreContext {
   key?: string;
 
   /** Resolved retention policy for the tenant. Absent = indefinite (0). */
-  retentionPolicy?: RetentionPolicy | null;
+  retentionPolicy?: ResolvedRetention | null;
 }

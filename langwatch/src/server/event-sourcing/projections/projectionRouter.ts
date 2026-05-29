@@ -35,7 +35,7 @@ import { MapProjectionExecutor } from "./mapProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
-import type { RetentionPolicy } from "../../data-retention/retentionPolicy.schema";
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 
 /**
  * Default cap on how many same-aggregate fold events are coalesced into one
@@ -939,7 +939,7 @@ export class ProjectionRouter<
     return !reactor.options.runIn.includes(this.processRole);
   }
 
-  private async resolveRetention(tenantId: unknown): Promise<RetentionPolicy | null> {
+  private async resolveRetention(tenantId: unknown): Promise<ResolvedRetention | null> {
     if (!this.retentionPolicyResolver) return null;
     return this.retentionPolicyResolver.resolve(String(tenantId));
   }

@@ -6,12 +6,12 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-// Omit Json? fields — Prisma's output type (JsonValue | null) is structurally
+// Omit the Json field — Prisma's output type (JsonValue | null) is structurally
 // incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).
-// Excluding them lets the factory output be spread directly into prisma.*.create()
+// Excluding it lets the factory output be spread directly into prisma.*.create()
 // while Prisma applies the column default (NULL).
 export const projectFactory = Factory.define<
-  Omit<Project, "retentionPolicy" | "personalFeatures">
+  Omit<Project, "personalFeatures">
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,

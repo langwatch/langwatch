@@ -281,7 +281,6 @@ model Organization {
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
   userIngestionBindings  UserIngestionBinding[]
-  defaultRetentionPolicy Json?
 
   @@index([ssoProvider])
 }
@@ -411,7 +410,6 @@ model Project {
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
-  retentionPolicy          Json?
   pinnedTraces             PinnedTrace[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -1114,6 +1112,34 @@ model PinnedTrace {
 
     @@unique([projectId, traceId])
     @@index([projectId])
+}
+
+enum RetentionPolicyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A data-retention override for one category at one scope. Single-scope-per-row
+// (ADR-021): the row applies at exactly one scope, identified inline by
+// (scopeType, scopeId), anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> indefinite (no row = keep forever), per
+// category, so an org admin can set a retention once and have it apply to every
+// project that has no closer override. One row per (scope, category): each row
+// holds a single category's day count, so categories cascade independently.
+model RetentionPolicy {
+  id             String                   @id @default(nanoid())
+  organizationId String
+  scopeType      RetentionPolicyScopeType
+  scopeId        String
+  category       String
+  retentionDays  Int
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId, category])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
 }
 
 enum CustomLLMModelCostScopeType {

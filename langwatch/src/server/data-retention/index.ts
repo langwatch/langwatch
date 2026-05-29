@@ -1,6 +1,14 @@
-export { retentionPolicySchema, RETENTION_CATEGORIES, RETENTION_TABLE_CATEGORY_MAP, RETENTION_MANAGED_TABLES } from "./retentionPolicy.schema";
-export type { RetentionPolicy, RetentionCategory } from "./retentionPolicy.schema";
-export { resolveRetentionDays } from "./resolveRetentionDays";
+export {
+  retentionDaysSchema,
+  retentionCategorySchema,
+  RETENTION_CATEGORIES,
+  RETENTION_TABLE_CATEGORY_MAP,
+  RETENTION_MANAGED_TABLES,
+  MIN_RETENTION_DAYS,
+} from "./retentionPolicy.schema";
+export type { RetentionCategory, ResolvedRetention } from "./retentionPolicy.schema";
+export { resolveRetention } from "./resolveRetentionDays";
+export type { RetentionRow } from "./resolveRetentionDays";
 export { RetentionPolicyCache } from "./retentionPolicyCache";
 export type { RetentionPolicyResolver } from "./retentionPolicyResolver";
 export { PinnedTraceService } from "./pinning/pinnedTrace.service";

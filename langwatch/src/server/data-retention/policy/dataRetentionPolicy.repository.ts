@@ -1,77 +1,139 @@
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
-import type { RetentionPolicy } from "../retentionPolicy.schema";
+import type { PrismaClient, RetentionPolicy } from "@prisma/client";
+import type { ScopeAssignment } from "~/server/scopes/scope.types";
+import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
+import type { RetentionCategory } from "../retentionPolicy.schema";
 
-export interface ProjectPolicyResult {
-  projectPolicy: RetentionPolicy | null;
-  orgPolicy: RetentionPolicy | null;
+export interface ProjectScopeContext {
+  organizationId: string;
+  teamId: string;
+  projectId: string;
 }
 
+/**
+ * Repository for the scoped `RetentionPolicy` table (ADR-021 inline
+ * single-scope-per-row). All reads are bounded by `organizationId` + a
+ * `(scopeType, scopeId)` predicate so the tenancy guard is satisfied; all
+ * writes carry the resolved owning `organizationId`.
+ */
 export class DataRetentionPolicyRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findProjectPolicy({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<ProjectPolicyResult> {
+  /**
+   * Resolve a project's `(organizationId, teamId, projectId)` triple, the
+   * input every scope query needs. Returns null for a project with no team
+   * (personal-account edge — retention scoping needs an org anchor).
+   */
+  async getProjectScopeContext(
+    projectId: string,
+  ): Promise<ProjectScopeContext | null> {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId },
-      select: {
-        retentionPolicy: true,
-        team: {
-          select: {
-            organization: {
-              select: { defaultRetentionPolicy: true },
-            },
-          },
-        },
-      },
+      select: { teamId: true, team: { select: { organizationId: true } } },
     });
-
+    if (!project?.team) return null;
     return {
-      projectPolicy: (project?.retentionPolicy as RetentionPolicy | null) ?? null,
-      orgPolicy: (project?.team?.organization?.defaultRetentionPolicy as RetentionPolicy | null) ?? null,
+      organizationId: project.team.organizationId,
+      teamId: project.teamId,
+      projectId,
     };
   }
 
-  async updateProjectPolicy({
-    projectId,
-    retentionPolicy,
-  }: {
-    projectId: string;
-    retentionPolicy: RetentionPolicy | null;
-  }): Promise<void> {
-    await this.prisma.project.update({
-      where: { id: projectId },
-      data: {
-        retentionPolicy: retentionPolicy ?? Prisma.JsonNull,
+  /**
+   * Every retention row in the project's PROJECT → TEAM → ORGANIZATION
+   * cascade. The caller resolves the cascade; this returns the raw rows so the
+   * resolver and the grouped read can both consume them.
+   */
+  async findForProjectChain(
+    ctx: ProjectScopeContext,
+  ): Promise<RetentionPolicy[]> {
+    const chain = resolveScopeChain(ctx);
+    return this.prisma.retentionPolicy.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        OR: chain.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
       },
     });
   }
 
-  async updateOrgPolicy({
+  /**
+   * Every retention row anywhere in the organization. Used by the settings
+   * page to render the full override landscape; the service filters to the
+   * scopes the caller can read.
+   */
+  async findAllInOrganization(
+    organizationId: string,
+  ): Promise<RetentionPolicy[]> {
+    return this.prisma.retentionPolicy.findMany({
+      where: { organizationId },
+    });
+  }
+
+  async upsertForScope({
     organizationId,
-    defaultRetentionPolicy,
+    scope,
+    category,
+    retentionDays,
   }: {
     organizationId: string;
-    defaultRetentionPolicy: RetentionPolicy | null;
-  }): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: {
-        defaultRetentionPolicy: defaultRetentionPolicy ?? Prisma.JsonNull,
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): Promise<RetentionPolicy> {
+    return this.prisma.retentionPolicy.upsert({
+      where: {
+        scopeType_scopeId_category: {
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+          category,
+        },
+      },
+      update: { retentionDays, organizationId },
+      create: {
+        organizationId,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+        category,
+        retentionDays,
       },
     });
   }
 
-  async findProjectIdsByOrganization({
-    organizationId,
+  async deleteForScope({
+    scope,
+    category,
   }: {
-    organizationId: string;
-  }): Promise<string[]> {
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+  }): Promise<void> {
+    await this.prisma.retentionPolicy.deleteMany({
+      where: {
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+        category,
+      },
+    });
+  }
+
+  async findById(id: string): Promise<RetentionPolicy | null> {
+    return this.prisma.retentionPolicy.findUnique({ where: { id } });
+  }
+
+  /**
+   * Project ids whose resolved retention could change when a row at `scope`
+   * is written or removed — i.e. every project the scope's cascade reaches.
+   * ORGANIZATION → all projects in the org; TEAM → all projects in the team;
+   * PROJECT → that one project. Drives cache invalidation.
+   */
+  async findAffectedProjectIds(scope: ScopeAssignment): Promise<string[]> {
+    if (scope.scopeType === "PROJECT") {
+      return [scope.scopeId];
+    }
+    const where =
+      scope.scopeType === "TEAM"
+        ? { teamId: scope.scopeId }
+        : { team: { organizationId: scope.scopeId } };
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
+      where,
       select: { id: true },
     });
     return projects.map((p) => p.id);

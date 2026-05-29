@@ -1,23 +1,38 @@
 import { z } from "zod";
 
-const retentionCategorySchema = z.number().int().min(30).nullable();
+/**
+ * The minimum retention any override may set. Below this, ClickHouse TTL churn
+ * and the orphan sweep stop being worth the storage saved.
+ */
+export const MIN_RETENTION_DAYS = 30;
 
-export const retentionPolicySchema = z.object({
-  traces: retentionCategorySchema,
-  scenarios: retentionCategorySchema,
-  experiments: retentionCategorySchema,
-});
-
-export type RetentionPolicy = z.infer<typeof retentionPolicySchema>;
-
-export type RetentionCategory = keyof RetentionPolicy;
+/**
+ * A single override's day count. `null` is not a valid stored value — a row
+ * either exists with a concrete day count or it does not exist (and the next
+ * tier in the cascade applies). Indefinite retention is the absence of any row.
+ */
+export const retentionDaysSchema = z.number().int().min(MIN_RETENTION_DAYS);
 
 export const RETENTION_CATEGORIES = [
   "traces",
   "scenarios",
   "experiments",
-] as const satisfies readonly RetentionCategory[];
+] as const;
 
+export type RetentionCategory = (typeof RETENTION_CATEGORIES)[number];
+
+export const retentionCategorySchema = z.enum(RETENTION_CATEGORIES);
+
+/**
+ * The fully-resolved retention for a project: a concrete day count per
+ * category (0 = indefinite, the cascade fell through to no override).
+ */
+export type ResolvedRetention = Record<RetentionCategory, number>;
+
+/**
+ * Which ClickHouse table belongs to which retention category. Drives both the
+ * TTL reconciler and the per-category storage breakdown.
+ */
 export const RETENTION_TABLE_CATEGORY_MAP: Record<string, RetentionCategory> = {
   event_log: "traces",
   stored_spans: "traces",
@@ -33,5 +48,5 @@ export const RETENTION_TABLE_CATEGORY_MAP: Record<string, RetentionCategory> = {
 };
 
 export const RETENTION_MANAGED_TABLES = Object.keys(
-  RETENTION_TABLE_CATEGORY_MAP
+  RETENTION_TABLE_CATEGORY_MAP,
 );
