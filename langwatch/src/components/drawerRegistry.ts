@@ -30,6 +30,7 @@ import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
+import { EditTriggerTemplatesDrawer } from "./EditTriggerTemplatesDrawer";
 import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 // Online Evaluations (Monitors) drawers
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
@@ -90,6 +91,7 @@ export const drawers = {
   uploadCSV: UploadCSVModal,
   addOrEditDataset: AddOrEditDatasetDrawer,
   editAutomationFilter: EditAutomationFilterDrawer,
+  editTriggerTemplates: EditTriggerTemplatesDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   customGraphAlert: AlertDrawer,

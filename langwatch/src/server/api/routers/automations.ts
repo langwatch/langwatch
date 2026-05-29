@@ -4,6 +4,11 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
+import {
+  TemplateValidationError,
+  TestFireUnavailableError,
+  TriggerNotFoundError,
+} from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
   sanitizeTriggerFilters,
@@ -13,6 +18,30 @@ import {
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
+
+const templatePatchSchema = z.object({
+  slackTemplateType: z.string().nullable().optional(),
+  slackTemplate: z.string().nullable().optional(),
+  emailSubjectTemplate: z.string().nullable().optional(),
+  emailBodyTemplate: z.string().nullable().optional(),
+});
+
+function toTemplateTRPCError(err: unknown): TRPCError {
+  if (err instanceof TRPCError) return err;
+  if (err instanceof TriggerNotFoundError) {
+    return new TRPCError({ code: "NOT_FOUND", message: err.message });
+  }
+  if (
+    err instanceof TemplateValidationError ||
+    err instanceof TestFireUnavailableError
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message: err.message });
+  }
+  return new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: err instanceof Error ? err.message : "Unexpected error",
+  });
+}
 
 export const automationRouter = createTRPCRouter({
   create: protectedProcedure
@@ -287,5 +316,74 @@ export const automationRouter = createTRPCRouter({
       await getApp().triggers.invalidate(input.projectId);
 
       return trigger;
+    }),
+  getTemplates: protectedProcedure
+    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => {
+      try {
+        return await getApp().triggerTemplates.getTemplates(
+          input.triggerId,
+          input.projectId,
+        );
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+    }),
+  saveTemplates: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        projectId: z.string(),
+        patch: templatePatchSchema,
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ input }) => {
+      try {
+        await getApp().triggerTemplates.saveTemplates({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+          patch: input.patch,
+        });
+        return { success: true };
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+    }),
+  previewTemplate: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        projectId: z.string(),
+        channel: z.enum(["email", "slack"]),
+        draft: templatePatchSchema,
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .mutation(async ({ input }) => {
+      try {
+        return await getApp().triggerTemplates.renderPreview({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+          channel: input.channel,
+          draft: input.draft,
+        });
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+    }),
+  testFireTemplate: protectedProcedure
+    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ input }) => {
+      try {
+        return await getApp().triggerTemplates.testFire({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+        });
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
     }),
 });

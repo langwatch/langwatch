@@ -383,6 +383,23 @@ function Automations() {
                                 </Box>
                               </Menu.Item>
                             )}
+                            {(trigger.action === "SEND_EMAIL" ||
+                              trigger.action === "SEND_SLACK_MESSAGE") && (
+                              <Menu.Item
+                                value="templates"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openDrawer("editTriggerTemplates", {
+                                    automationId: trigger.id,
+                                  });
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Bell size={14} />
+                                  Customize Templates
+                                </Box>
+                              </Menu.Item>
+                            )}
                             <Menu.Item
                               value="edit"
                               onClick={(event) => {

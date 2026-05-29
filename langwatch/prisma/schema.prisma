@@ -698,6 +698,13 @@ model Trigger {
   message       String?
   deleted       Boolean       @default(false)
   alertType     AlertType?
+  // Customer-authored Liquid notification templates (see ADR-026). NULL on any
+  // column means "render with the framework default", so existing triggers are
+  // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
+  slackTemplateType    String?
+  slackTemplate        String?
+  emailSubjectTemplate String?
+  emailBodyTemplate    String?
   TriggerSent   TriggerSent[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
