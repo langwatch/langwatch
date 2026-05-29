@@ -171,6 +171,69 @@ describe("experimentResultsCommand()", () => {
     });
   });
 
+  describe("given a run still in progress", () => {
+    describe("when invoked in table mode", () => {
+      it("prints a partial-results banner", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({ runId: "run_1" });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).toContain("Run status: running");
+        expect(printed).toContain("partial results");
+      });
+    });
+
+    describe("when format is json", () => {
+      it("omits the banner so the payload stays machine-readable", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({
+          runId: "run_1",
+          options: { format: "json" },
+        });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).not.toContain("Run status:");
+      });
+    });
+  });
+
+  describe("given a non-terminal run with zero rows", () => {
+    describe("when the run was interrupted", () => {
+      it("does not tell the user to wait for more rows", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({ runId: "interrupted" });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).toContain("interrupted");
+        expect(printed).not.toContain("No rows matched the filter");
+        expect(printed).not.toContain("still in progress");
+      });
+    });
+  });
+
   describe("given the API call fails", () => {
     describe("when the run is missing", () => {
       it("exits with code 1", async () => {

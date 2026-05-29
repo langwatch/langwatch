@@ -1563,9 +1563,15 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_experiment_status",
-    "Check the status of an experiment run. Returns progress and summary when completed.",
+    "Check the status of an experiment run (running, completed, stopped, or interrupted) plus its progress. Works for both platform-run and SDK-logged experiments; pass experimentSlug for SDK runs or runs older than 24h.",
     {
       runId: z.string().describe("The run ID returned from platform_run_experiment"),
+      experimentSlug: z
+        .string()
+        .optional()
+        .describe(
+          "Experiment slug — required for SDK-logged runs and runs older than 24h (the Redis run-state they would otherwise be read from is absent/expired). Use platform_experiment_list_runs to find the slug.",
+        ),
     },
     withToolLogging("platform_experiment_status", async (params) => {
       requireApiKey();
@@ -1626,7 +1632,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_experiment_results",
-    "Fetch per-row results for a completed experiment run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
+    "Fetch per-row results for an experiment run so you can debug evaluator scores and missed rows. Serves partial results for runs that are still running or were interrupted (it does not require a completed run), with the run status noted in the output. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
     {
       runId: z
         .string()

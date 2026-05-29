@@ -6,6 +6,10 @@ import {
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
+import {
+  deriveRunStatus,
+  isTerminalStatus,
+} from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
@@ -90,9 +94,20 @@ export const experimentResultsCommand = async ({
       runId,
       experimentSlug,
     });
+    const runStatus = deriveRunStatus(results.timestamps);
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
+
+    if (!isTerminalStatus(runStatus) && format !== "json") {
+      console.log(
+        chalk.yellow(
+          runStatus === "interrupted"
+            ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
+            : `Run status: running. These are partial results; more rows may appear later.`,
+        ),
+      );
+    }
 
     // Group evaluations by target-scoped row key.
     const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
@@ -149,7 +164,21 @@ export const experimentResultsCommand = async ({
     }
 
     if (rows.length === 0) {
-      console.log(chalk.gray("No rows matched the filter."));
+      if (filter === "failed") {
+        console.log(chalk.gray("No rows matched the filter."));
+      } else if (runStatus === "running") {
+        console.log(
+          chalk.gray(
+            "No rows recorded yet. The run is still in progress; run this again shortly.",
+          ),
+        );
+      } else if (runStatus === "interrupted") {
+        console.log(
+          chalk.gray("No rows were recorded before the run was interrupted."),
+        );
+      } else {
+        console.log(chalk.gray("No rows recorded for this run."));
+      }
       return;
     }
 

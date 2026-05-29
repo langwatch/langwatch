@@ -1,31 +1,102 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 
+const statusColor = (status: string) =>
+  status === "completed"
+    ? chalk.green
+    : status === "failed" || status === "interrupted"
+      ? chalk.red
+      : status === "running"
+        ? chalk.yellow
+        : chalk.gray;
+
+// SDK-logged runs (langwatch.experiment + evaluation.log) never populate the
+// Redis run-state that GET /runs/:runId reads, so that endpoint 404s for them.
+// Their data lives only in ClickHouse, reachable through the results endpoint,
+// so we derive the status from there. experimentSlug is required because runId
+// is not unique across experiments once the Redis run-state expires.
+const statusFromResults = async ({
+  service,
+  runId,
+  experimentSlug,
+}: {
+  service: ExperimentsApiService;
+  runId: string;
+  experimentSlug: string;
+}): Promise<{
+  runId: string;
+  status: string;
+  progress: number;
+  total: number;
+  startedAt?: number;
+  finishedAt?: number;
+  stoppedAt?: number;
+} | null> => {
+  try {
+    const results = await service.getRunResults({ runId, experimentSlug });
+    return {
+      runId,
+      status: deriveRunStatus(results.timestamps),
+      progress: results.progress ?? results.dataset.length,
+      total: results.total ?? results.dataset.length,
+      startedAt: results.timestamps.createdAt,
+      finishedAt: results.timestamps.finishedAt ?? undefined,
+      stoppedAt: results.timestamps.stoppedAt ?? undefined,
+    };
+  } catch (error) {
+    // Only a genuine "no such run" is a fallback miss. Real 5xx / auth /
+    // network errors must propagate so they aren't masked as not-found.
+    const message = error instanceof Error ? error.message : String(error);
+    if (/404|not found/i.test(message)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
 export const experimentStatusCommand = async (
   runId: string,
-  options?: { format?: string },
+  options?: { format?: string; experiment?: string },
 ): Promise<void> => {
   checkApiKey();
 
   const service = new ExperimentsApiService();
+  const experimentSlug = options?.experiment?.trim();
   const spinner = ora(`Checking run status "${runId}"...`).start();
 
   try {
-    const status = await service.getRunStatus(runId);
+    let status: {
+      runId?: string;
+      status: string;
+      progress: number;
+      total: number;
+      startedAt?: number;
+      finishedAt?: number;
+      stoppedAt?: number;
+      summary?: {
+        completedCells?: number;
+        failedCells?: number;
+        duration?: number;
+        runUrl?: string;
+      };
+    };
 
-    const statusColor =
-      status.status === "completed"
-        ? chalk.green
-        : status.status === "failed"
-          ? chalk.red
-          : status.status === "running"
-            ? chalk.yellow
-            : chalk.gray;
+    try {
+      status = await service.getRunStatus(runId);
+    } catch (error) {
+      const fallback = experimentSlug
+        ? await statusFromResults({ service, runId, experimentSlug })
+        : null;
+      if (!fallback) throw error;
+      status = fallback;
+    }
 
-    spinner.succeed(`Run ${chalk.cyan(runId)}: ${statusColor(status.status)}`);
+    const color = statusColor(status.status);
+    spinner.succeed(`Run ${chalk.cyan(runId)}: ${color(status.status)}`);
 
     if (options?.format === "json") {
       console.log(JSON.stringify(status, null, 2));
@@ -33,7 +104,7 @@ export const experimentStatusCommand = async (
     }
 
     console.log();
-    console.log(`  ${chalk.gray("Status:")}   ${statusColor(status.status)}`);
+    console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
     console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
 
     if (status.startedAt) {
@@ -41,6 +112,9 @@ export const experimentStatusCommand = async (
     }
     if (status.finishedAt) {
       console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
+    }
+    if (status.stoppedAt) {
+      console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
     }
 
     if (status.summary) {
