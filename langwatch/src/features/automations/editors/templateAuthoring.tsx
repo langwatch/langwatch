@@ -11,6 +11,7 @@ import {
   LIQUID_LANGUAGE_ID,
   type MonacoTextModel,
   registerLiquidLanguage,
+  setupLiquidJsonSchema,
   validateLiquidModel,
   type VariableInfo,
 } from "./liquidMonaco";
@@ -92,15 +93,22 @@ export function LiquidEditor({
   variables,
   language = LIQUID_LANGUAGE_ID,
   height = "200px",
+  jsonSchema,
+  jsonSchemaShadowUri,
 }: {
   value: string;
   onChange: (value: string) => void;
   variables: VariableInfo[];
-  /** "liquid" (default) for regular templates, "json" for slack block_kit
-   *  (which carries Liquid inside string values; structural JSON is validated
-   *  against the Slack Block Kit schema). */
+  /** "liquid" (default) for regular templates, "liquid-json" for slack
+   *  block_kit (JSON whose string values carry Liquid). */
   language?: string;
   height?: string;
+  /** Optional JSON Schema to validate the source against. Liquid spans are
+   *  stripped to same-length placeholders before validation, so any markers
+   *  Monaco's JSON service produces map back 1:1 onto the editor. Pass with
+   *  `jsonSchemaShadowUri` — a stable per-editor URI. */
+  jsonSchema?: object;
+  jsonSchemaShadowUri?: string;
 }) {
   const isLiquid =
     language === LIQUID_LANGUAGE_ID || language === LIQUID_JSON_LANGUAGE_ID;
@@ -108,10 +116,12 @@ export function LiquidEditor({
   const monacoRef = useRef<Monaco | null>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
   const changeSubscription = useRef<{ dispose: () => void } | null>(null);
+  const schemaSubscription = useRef<{ dispose: () => void } | null>(null);
 
   useEffect(
     () => () => {
       changeSubscription.current?.dispose();
+      schemaSubscription.current?.dispose();
       if (monacoRef.current && modelRef.current) {
         clearLiquidMarkers(monacoRef.current, modelRef.current);
       }
@@ -129,6 +139,14 @@ export function LiquidEditor({
       const current = editor.getModel();
       if (current) validateLiquidModel(monaco, current, variables);
     });
+    if (jsonSchema && jsonSchemaShadowUri && model) {
+      schemaSubscription.current = setupLiquidJsonSchema({
+        monaco,
+        realModel: model,
+        schema: jsonSchema,
+        shadowUri: jsonSchemaShadowUri,
+      });
+    }
   };
 
   return (

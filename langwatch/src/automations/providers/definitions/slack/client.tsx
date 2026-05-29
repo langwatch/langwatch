@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { SiSlack } from "react-icons/si";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
+import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
 import {
   ExampleData,
   FieldHeader,
@@ -142,10 +143,10 @@ function SlackConfigForm({
       />
       {/* Block Kit templates are JSON whose string values contain Liquid.
           We use the custom `liquid-json` Monaco language so the editor
-          tokenizes both: JSON brackets / strings / numbers and Liquid
-          `{{ }}` / `{% %}` expressions. JSON Schema validation is
-          intentionally off (no language service in liquid-json); the
-          server-side renderer is the source of truth for structure. */}
+          tokenizes both, and we pass the Block Kit schema down — the
+          editor pre-substitutes Liquid spans with same-length placeholders
+          and runs the JSON language service on the synthetic text so the
+          author still gets in-editor schema markers. */}
       <LiquidEditor
         variables={ctx.variables}
         height="320px"
@@ -153,6 +154,12 @@ function SlackConfigForm({
         value={templateValue}
         onChange={(value) =>
           onChange({ ...slice, template: { value, usingDefault: false } })
+        }
+        jsonSchema={isBlockKit ? SLACK_BLOCK_KIT_JSON_SCHEMA : undefined}
+        jsonSchemaShadowUri={
+          isBlockKit
+            ? "file:///automation/slack-block-kit-shadow.json"
+            : undefined
         }
       />
 

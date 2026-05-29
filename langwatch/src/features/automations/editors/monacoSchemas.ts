@@ -45,6 +45,127 @@ export const CONDITIONS_JSON_SCHEMA = {
   },
 } as const;
 
+/** Slack Block Kit subset matching the server-side allowlist (ADR-026):
+ *  section, divider, context, header, image. Liquid expressions inside string
+ *  values are not validated by JSON Schema — that is intentional. */
+export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
+  $schema: "http://json-schema.org/draft-07/schema#",
+  title: "Slack Block Kit (allowlisted subset)",
+  type: "array",
+  items: {
+    oneOf: [
+      {
+        title: "section",
+        type: "object",
+        required: ["type"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "section" },
+          block_id: { type: "string" },
+          text: {
+            type: "object",
+            required: ["type", "text"],
+            properties: {
+              type: { enum: ["mrkdwn", "plain_text"] },
+              text: { type: "string" },
+              emoji: { type: "boolean" },
+            },
+          },
+          fields: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["type", "text"],
+              properties: {
+                type: { enum: ["mrkdwn", "plain_text"] },
+                text: { type: "string" },
+              },
+            },
+          },
+          accessory: {
+            type: "object",
+            required: ["type"],
+            properties: {
+              type: { const: "image" },
+              image_url: { type: "string" },
+              alt_text: { type: "string" },
+            },
+          },
+        },
+      },
+      {
+        title: "divider",
+        type: "object",
+        required: ["type"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "divider" },
+          block_id: { type: "string" },
+        },
+      },
+      {
+        title: "context",
+        type: "object",
+        required: ["type", "elements"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "context" },
+          block_id: { type: "string" },
+          elements: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["type", "text"],
+              properties: {
+                type: { enum: ["mrkdwn", "plain_text"] },
+                text: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      {
+        title: "header",
+        type: "object",
+        required: ["type", "text"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "header" },
+          block_id: { type: "string" },
+          text: {
+            type: "object",
+            required: ["type", "text"],
+            properties: {
+              type: { const: "plain_text" },
+              text: { type: "string" },
+              emoji: { type: "boolean" },
+            },
+          },
+        },
+      },
+      {
+        title: "image",
+        type: "object",
+        required: ["type", "image_url", "alt_text"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "image" },
+          block_id: { type: "string" },
+          image_url: { type: "string" },
+          alt_text: { type: "string" },
+          title: {
+            type: "object",
+            properties: {
+              type: { const: "plain_text" },
+              text: { type: "string" },
+            },
+          },
+        },
+      },
+    ],
+  },
+} as const;
+
 const registered = new Map<string, object>();
 
 /**

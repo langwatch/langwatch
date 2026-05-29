@@ -1,4 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
+import { substituteLiquidForJsonValidation } from "./liquidJsonSubstitution";
 
 /**
  * Rich variable info the autocomplete uses: path + TypeScript-ish type +
@@ -351,3 +352,92 @@ export function clearLiquidMarkers(
 ): void {
   monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
 }
+
+const SCHEMA_MARKER_OWNER = "liquid-json-schema";
+const registeredSchemas = new Map<string, object>();
+
+/**
+ * Wires JSON Schema validation onto a `liquid-json` editor model. Liquid is
+ * not valid JSON, so we maintain a hidden "shadow" model with the same
+ * length-preserving content where Liquid spans are replaced by placeholders
+ * (`liquidJsonSubstitution`). Monaco's built-in JSON language service
+ * validates the shadow against the supplied schema; any markers it produces
+ * are mirrored onto the real model — positions are identical because the
+ * substitution preserves byte length and newline placement.
+ *
+ * Returns a `dispose` function: callers must invoke it on unmount, otherwise
+ * the shadow model leaks across editor mounts.
+ */
+export function setupLiquidJsonSchema(params: {
+  monaco: Monaco;
+  realModel: MonacoTextModel;
+  schema: object;
+  /** Stable file URI for the shadow model. Different editors must use
+   *  different URIs so their schemas don't collide. */
+  shadowUri: string;
+}): { dispose: () => void } {
+  const { monaco, realModel, schema, shadowUri } = params;
+
+  registeredSchemas.set(shadowUri, schema);
+  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+    validate: true,
+    allowComments: false,
+    schemas: Array.from(registeredSchemas.entries()).map(([uri, s]) => ({
+      uri: `inmemory://schemas/${encodeURIComponent(uri)}.schema.json`,
+      fileMatch: [uri],
+      schema: s,
+    })),
+  });
+  const shadowResource = monaco.Uri.parse(shadowUri);
+  // Re-mount safety: another instance with the same shadow URI may have left
+  // a model behind if it was disposed mid-update.
+  const existing = monaco.editor.getModel(shadowResource);
+  if (existing) existing.dispose();
+  const initial = substituteLiquidForJsonValidation(realModel.getValue());
+  const shadowModel = monaco.editor.createModel(
+    initial.substituted,
+    "json",
+    shadowResource,
+  );
+
+  const mirrorMarkers = () => {
+    const shadowMarkers = monaco.editor.getModelMarkers({
+      resource: shadowResource,
+    });
+    const mapped: Parameters<Monaco["editor"]["setModelMarkers"]>[2] =
+      shadowMarkers.map((m) => ({
+        severity: m.severity,
+        message: m.message,
+        startLineNumber: m.startLineNumber,
+        startColumn: m.startColumn,
+        endLineNumber: m.endLineNumber,
+        endColumn: m.endColumn,
+      }));
+    monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, mapped);
+  };
+
+  const onShadowMarkers = monaco.editor.onDidChangeMarkers((resources) => {
+    if (resources.some((r) => r.toString() === shadowResource.toString())) {
+      mirrorMarkers();
+    }
+  });
+
+  const onRealChange = realModel.onDidChangeContent(() => {
+    const next = substituteLiquidForJsonValidation(realModel.getValue());
+    shadowModel.setValue(next.substituted);
+  });
+
+  // Prime the mirror with the markers the JSON service emits on the first
+  // tick after model creation.
+  mirrorMarkers();
+
+  return {
+    dispose: () => {
+      onRealChange.dispose();
+      onShadowMarkers.dispose();
+      monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, []);
+      if (!shadowModel.isDisposed()) shadowModel.dispose();
+    },
+  };
+}
+
