@@ -22,7 +22,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Database, Mail, Send, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  CircleCheck,
+  CircleX,
+  Database,
+  Mail,
+  Send,
+  Users,
+} from "lucide-react";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { SiSlack } from "react-icons/si";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "~/hooks/useFilterParams";
@@ -64,6 +74,7 @@ import {
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
+  filtersAreSet,
   notifyChannel,
   reducer,
   summariseConditions,
@@ -101,7 +112,26 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 });
 
 const PREVIEW_DEBOUNCE_MS = 400;
+const MAX_TEST_HISTORY = 5;
 type Section = null | "filters" | "configuration";
+
+/**
+ * In-component record of a single test-fire press. Held in local state — the
+ * persistence layer for cross-session history is out of scope here (would need
+ * a backend table per ADR-029 outbox health work), but at least the operator
+ * can see the last few attempts they made in this session before they save.
+ */
+interface TestFireAttempt {
+  at: number;
+  channel: "email" | "slack";
+  status: "success" | "failure";
+  /** Filled on success. */
+  recipientCount?: number;
+  usedDefault?: boolean;
+  /** Filled on failure. */
+  errorTitle?: string;
+  errorDetail?: string;
+}
 
 export function AutomationDrawer({
   automationId,
@@ -247,6 +277,11 @@ export function AutomationDrawer({
   const configComplete = configIsComplete(draft);
   const canSave = conditionsSet && configComplete;
 
+  const [testHistory, setTestHistory] = useState<TestFireAttempt[]>([]);
+  const pushAttempt = useCallback((attempt: TestFireAttempt) => {
+    setTestHistory((prev) => [attempt, ...prev].slice(0, MAX_TEST_HISTORY));
+  }, []);
+
   const onTestFire = useCallback(() => {
     if (!channel || !projectId) return;
     testFire.mutate(
@@ -263,7 +298,14 @@ export function AutomationDrawer({
         webhook: channel === "slack" ? draft.slackWebhook : null,
       },
       {
-        onSuccess: (r) =>
+        onSuccess: (r) => {
+          pushAttempt({
+            at: Date.now(),
+            channel: r.channel,
+            status: "success",
+            recipientCount: r.recipientCount,
+            usedDefault: r.usedDefault,
+          });
           toaster.create({
             title: "Test fire sent",
             type: "success",
@@ -272,12 +314,20 @@ export function AutomationDrawer({
                 ? `Sent to ${r.recipientCount} recipient(s).`
                 : "Posted to the Slack webhook.",
             meta: { closable: true },
-          }),
+          });
+        },
         onError: (err) => {
           const domain = readDomainError(err);
           const { title, description } = domain
             ? explainDomainError(domain)
             : { title: "Test fire failed", description: err.message };
+          pushAttempt({
+            at: Date.now(),
+            channel,
+            status: "failure",
+            errorTitle: title,
+            errorDetail: description || err.message,
+          });
           toaster.create({
             title,
             type: "error",
@@ -287,7 +337,7 @@ export function AutomationDrawer({
         },
       },
     );
-  }, [channel, draft, projectId, testFire]);
+  }, [channel, draft, projectId, testFire, pushAttempt]);
 
   const onSave = useCallback(() => {
     if (!canSave || !draft.action) return;
@@ -383,26 +433,13 @@ export function AutomationDrawer({
               />
 
               {channel ? (
-                <HStack
-                  padding={3}
-                  borderRadius="md"
-                  border="1px solid"
-                  borderColor="border"
-                >
-                  <Text textStyle="sm" color="fg.muted">
-                    Send a banner-marked notification to the configured destination
-                    before saving.
-                  </Text>
-                  <Spacer />
-                  <Button
-                    onClick={onTestFire}
-                    loading={testFire.isLoading}
-                    disabled={!configComplete}
-                    variant="outline"
-                  >
-                    <Send size={14} /> Test fire
-                  </Button>
-                </HStack>
+                <TestFireSection
+                  channel={channel}
+                  configComplete={configComplete}
+                  history={testHistory}
+                  loading={testFire.isLoading}
+                  onFire={onTestFire}
+                />
               ) : null}
             </VStack>
           </Drawer.Body>
@@ -461,6 +498,110 @@ export function AutomationDrawer({
         onDone={() => setSection(null)}
       />
     </>
+  );
+}
+
+function TestFireSection({
+  channel,
+  configComplete,
+  history,
+  loading,
+  onFire,
+}: {
+  channel: "email" | "slack";
+  configComplete: boolean;
+  history: TestFireAttempt[];
+  loading: boolean;
+  onFire: () => void;
+}) {
+  const last = history[0];
+  const lastIsSuccess = last?.status === "success";
+  const borderColor = !last
+    ? "border"
+    : lastIsSuccess
+      ? "green.400"
+      : "red.400";
+  const bg = !last
+    ? "bg"
+    : lastIsSuccess
+      ? "green.50"
+      : "red.50";
+
+  return (
+    <Box
+      border="1px solid"
+      borderColor={borderColor}
+      borderRadius="md"
+      padding={3}
+      bg={bg}
+      _dark={{ bg: !last ? "bg" : lastIsSuccess ? "green.900" : "red.900" }}
+    >
+      <HStack align="start">
+        <VStack align="start" gap={0} flex="1" minWidth="0">
+          <HStack>
+            <Text fontWeight="semibold">Test fire</Text>
+            {last ? (
+              lastIsSuccess ? (
+                <CircleCheck size={14} color="var(--chakra-colors-green-500)" />
+              ) : (
+                <CircleX size={14} color="var(--chakra-colors-red-500)" />
+              )
+            ) : null}
+          </HStack>
+          <Text textStyle="sm" color="fg.muted" lineClamp={2}>
+            {last ? (
+              <>
+                Last attempt {formatTimeAgo(last.at)}
+                {lastIsSuccess
+                  ? ` — sent to ${last.recipientCount} ${
+                      channel === "email" ? "recipient" : "webhook"
+                    }${(last.recipientCount ?? 0) === 1 ? "" : "s"}`
+                  : ` — ${last.errorTitle ?? "failed"}`}
+              </>
+            ) : (
+              "Send a banner-marked notification to the configured destination before saving."
+            )}
+          </Text>
+        </VStack>
+        <Button
+          onClick={onFire}
+          loading={loading}
+          disabled={!configComplete}
+          variant="outline"
+          size="sm"
+        >
+          <Send size={14} /> Test fire
+        </Button>
+      </HStack>
+      {history.length > 1 ? (
+        <VStack align="stretch" gap={1} mt={3} pl={1}>
+          <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
+            Recent attempts
+          </Text>
+          {history.slice(1).map((attempt) => (
+            <HStack key={attempt.at} gap={2} align="start">
+              {attempt.status === "success" ? (
+                <Box pt="2px">
+                  <CircleCheck size={12} color="var(--chakra-colors-green-500)" />
+                </Box>
+              ) : (
+                <Box pt="2px">
+                  <CircleX size={12} color="var(--chakra-colors-red-500)" />
+                </Box>
+              )}
+              <Text textStyle="xs" minWidth="100px" color="fg.muted">
+                {formatTimeAgo(attempt.at)}
+              </Text>
+              <Text textStyle="xs" color="fg.muted" lineClamp={1}>
+                {attempt.status === "success"
+                  ? `${attempt.recipientCount} delivered${attempt.usedDefault ? " (default template)" : ""}`
+                  : (attempt.errorDetail ?? attempt.errorTitle ?? "failed")}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      ) : null}
+    </Box>
   );
 }
 

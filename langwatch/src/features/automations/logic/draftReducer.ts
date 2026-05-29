@@ -173,7 +173,7 @@ export function actionParamsFromDraft(draft: AutomationDraft) {
   }
 }
 
-function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
+export function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
   return Object.values(filters).some(
     (v) => v && (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0),
   );
