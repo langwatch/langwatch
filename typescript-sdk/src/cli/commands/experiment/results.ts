@@ -13,6 +13,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
+import { resolveRunId } from "./resolve-run";
 
 export type ExperimentResultsFilter = "failed" | "all";
 export type ExperimentResultsFormat = "table" | "json";
@@ -22,7 +23,7 @@ export interface ExperimentResultsOptions {
   evaluator?: string;
   format?: string;
   limit?: string;
-  experiment?: string;
+  runId?: string;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -67,10 +68,10 @@ const isFailedRow = ({
 };
 
 export const experimentResultsCommand = async ({
-  runId,
+  experimentSlug,
   options = {},
 }: {
-  runId: string;
+  experimentSlug: string;
   options?: ExperimentResultsOptions;
 }): Promise<void> => {
   checkApiKey();
@@ -84,12 +85,16 @@ export const experimentResultsCommand = async ({
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
   })();
   const evaluatorFilter = options.evaluator?.trim();
-  const experimentSlug = options.experiment?.trim();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Fetching results for run "${runId}"...`).start();
+  const spinner = ora(`Fetching results for "${experimentSlug}"...`).start();
 
   try {
+    const runId = await resolveRunId({
+      service,
+      experimentSlug,
+      runId: options.runId,
+    });
     const results: ExperimentRunResultsResponse = await service.getRunResults({
       runId,
       experimentSlug,
