@@ -135,6 +135,26 @@ export class ModelDefaultsRepository {
       );
     }
     const prisma = this.prisma as PrismaClient;
+    // Single-organization invariant (ADR-021): newly attached scopes must
+    // resolve to the same org the config is already anchored to. Otherwise this
+    // path could attach cross-org or orphaned scopes while organizationId stays
+    // pinned to the old tenant — the inconsistency create() now prevents.
+    if (params.toAdd.length > 0) {
+      const organizationId = await resolveSingleOrganizationForScopes(
+        prisma,
+        params.toAdd,
+        "model default config",
+      );
+      const existing = await prisma.modelDefaultConfig.findUnique({
+        where: { id: params.id },
+        select: { organizationId: true },
+      });
+      if (existing && existing.organizationId !== organizationId) {
+        throw new Error(
+          "Cannot update model default config: scopes must stay within the config's organization",
+        );
+      }
+    }
     await prisma.$transaction([
       prisma.modelDefaultConfig.update({
         where: { id: params.id },

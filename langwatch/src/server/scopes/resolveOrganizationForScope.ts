@@ -1,6 +1,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
+import type { ScopeTier } from "./scope.types";
+
 type Client = PrismaClient | Prisma.TransactionClient;
+
+type ScopeTarget = { scopeType: ScopeTier; scopeId: string };
 
 /**
  * Resolve the single organization a (scopeType, scopeId) target belongs to.
@@ -16,23 +20,34 @@ type Client = PrismaClient | Prisma.TransactionClient;
  */
 export async function resolveOrganizationForScope(
   client: Client,
-  scope: { scopeType: string; scopeId: string },
+  scope: ScopeTarget,
 ): Promise<string | null> {
-  if (scope.scopeType === "ORGANIZATION") {
-    return scope.scopeId;
+  switch (scope.scopeType) {
+    case "ORGANIZATION":
+      return scope.scopeId;
+    case "TEAM": {
+      const team = await client.team.findUnique({
+        where: { id: scope.scopeId },
+        select: { organizationId: true },
+      });
+      return team?.organizationId ?? null;
+    }
+    case "PROJECT": {
+      const project = await client.project.findUnique({
+        where: { id: scope.scopeId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      return project?.team.organizationId ?? null;
+    }
+    default:
+      // Guard against type-unsafe / widened callers: an unknown scope type
+      // must fail fast rather than silently resolving against the project table.
+      throw new Error(
+        `resolveOrganizationForScope: unsupported scope type ${String(
+          (scope as { scopeType: unknown }).scopeType,
+        )}`,
+      );
   }
-  if (scope.scopeType === "TEAM") {
-    const team = await client.team.findUnique({
-      where: { id: scope.scopeId },
-      select: { organizationId: true },
-    });
-    return team?.organizationId ?? null;
-  }
-  const project = await client.project.findUnique({
-    where: { id: scope.scopeId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  return project?.team.organizationId ?? null;
 }
 
 /**
@@ -45,7 +60,7 @@ export async function resolveOrganizationForScope(
  */
 export async function resolveSingleOrganizationForScopes(
   client: Client,
-  scopes: { scopeType: string; scopeId: string }[],
+  scopes: ScopeTarget[],
   resourceLabel: string,
 ): Promise<string> {
   if (scopes.length === 0) {

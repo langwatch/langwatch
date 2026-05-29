@@ -21,6 +21,7 @@ function createMockPrisma() {
   return {
     modelProvider: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -598,6 +599,40 @@ describe("ModelProviderRepository", () => {
 
         const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
         expect(updateCall.data.customKeys).toBeUndefined();
+      });
+    });
+
+    describe("when replacing scopes with a different organization", () => {
+      it("rejects the update so a credential can't be rebound across tenants", async () => {
+        (prisma.modelProvider.findUnique as any).mockResolvedValue({
+          organizationId: "org_existing",
+        });
+
+        await expect(
+          repository.update("mp_test123", "proj_test", {
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_other" }],
+          }),
+        ).rejects.toThrow(/organization/);
+        expect(prisma.modelProviderScope.deleteMany as any).not.toHaveBeenCalled();
+        expect(prisma.modelProviderScope.createMany as any).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when replacing scopes within the same organization", () => {
+      it("deletes and recreates the scope rows", async () => {
+        (prisma.modelProvider.findUnique as any).mockResolvedValue({
+          organizationId: "org_existing",
+        });
+        (prisma.modelProvider.update as any).mockResolvedValue(
+          createModelProvider(),
+        );
+
+        await repository.update("mp_test123", "proj_test", {
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_existing" }],
+        });
+
+        expect(prisma.modelProviderScope.deleteMany as any).toHaveBeenCalledTimes(1);
+        expect(prisma.modelProviderScope.createMany as any).toHaveBeenCalledTimes(1);
       });
     });
   });

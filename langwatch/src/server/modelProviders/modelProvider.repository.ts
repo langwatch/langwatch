@@ -247,6 +247,25 @@ export class ModelProviderRepository {
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
+        // Single-organization invariant (ADR-021): the replacement scope set
+        // must resolve to the same org the provider is already anchored to.
+        // Without this, swapping scopes could silently rebind the credential to
+        // another tenant while organizationId stays put — a multitenancy break,
+        // since provider visibility is driven from the scope table.
+        const organizationId = await resolveSingleOrganizationForScopes(
+          workingTx,
+          scopes,
+          "model provider",
+        );
+        const existing = await workingTx.modelProvider.findUnique({
+          where: { id },
+          select: { organizationId: true },
+        });
+        if (existing && existing.organizationId !== organizationId) {
+          throw new Error(
+            "Cannot update model provider: scopes must stay within the provider's organization",
+          );
+        }
         await workingTx.modelProviderScope.deleteMany({
           where: { modelProviderId: id },
         });
