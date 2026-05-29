@@ -1889,6 +1889,7 @@ describe("RBAC Integration Tests", () => {
           "evaluations:view",
           "datasets:view",
           "workflows:view",
+          "experiments:view",
           "prompts:view",
           "scenarios:view",
           "secrets:view",
