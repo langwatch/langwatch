@@ -128,12 +128,14 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Org/project already exists, skipping setup.");
   }
 
-  // Step 4: Navigate to the app root and confirm the authenticated shell.
-  // The root redirects to the signed-in landing (personal portal), so we
-  // confirm we did not bounce back to /auth and that the sidebar rendered.
-  // (The old "Home" link no longer exists in the personal-portal sidebar.)
-  console.log("Navigating to app root to confirm setup...");
-  await page.goto("/");
+  // Step 4: Confirm the authenticated shell on a settings page. We use
+  // /settings rather than the app root because root redirects to the
+  // trace-backed personal landing, whose data fetch can disturb the layout;
+  // /settings renders the same sidebar from Postgres alone. We confirm we did
+  // not bounce back to /auth and that the sidebar rendered. (The old "Home"
+  // link no longer exists in the personal-portal sidebar.)
+  console.log("Navigating to settings to confirm setup...");
+  await page.goto("/settings");
 
   try {
     await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
