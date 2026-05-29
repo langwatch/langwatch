@@ -33,6 +33,16 @@ export class SsoConnectionService {
     return this.repository.findEnforcedByDomain({ domain });
   }
 
+  async getRoleMappingByDomain({
+    domain,
+    organizationId,
+  }: {
+    domain: string;
+    organizationId: string;
+  }): Promise<{ roleMapping: unknown; defaultOrgRole: string } | null> {
+    return this.repository.findRoleMappingByDomain({ domain, organizationId });
+  }
+
   async listConnections({
     organizationId,
   }: {

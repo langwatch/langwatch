@@ -53,6 +53,19 @@ export class SsoConnectionRepository {
     });
   }
 
+  async findRoleMappingByDomain({
+    domain,
+    organizationId,
+  }: {
+    domain: string;
+    organizationId: string;
+  }): Promise<{ roleMapping: unknown; defaultOrgRole: string } | null> {
+    return this.prisma.ssoConnection.findFirst({
+      where: { domain, organizationId, verifiedAt: { not: null } },
+      select: { roleMapping: true, defaultOrgRole: true },
+    });
+  }
+
   async findAllByOrganization({
     organizationId,
   }: {

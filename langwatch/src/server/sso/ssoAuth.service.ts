@@ -150,6 +150,28 @@ export class SsoAuthService {
     });
   }
 
+  async findMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<{ role: OrganizationUserRole; scimManaged: boolean } | null> {
+    return this.repository.findMembership({ userId, organizationId });
+  }
+
+  async updateMembershipRole({
+    userId,
+    organizationId,
+    role,
+  }: {
+    userId: string;
+    organizationId: string;
+    role: OrganizationUserRole;
+  }): Promise<void> {
+    return this.repository.updateMembershipRole({ userId, organizationId, role });
+  }
+
   private async applyRoleMapping({
     userId,
     organizationId,

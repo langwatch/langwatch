@@ -323,60 +323,46 @@ export const beforeAccountCreate = async ({
  * email-mode deployments don't configure SSO.
  */
 const applySsoRoleMapping = async ({
-  prisma,
   userId,
   domain,
   organizationId,
 }: {
-  prisma: PrismaClient;
   userId: string;
   domain: string;
   organizationId: string;
 }): Promise<void> => {
-  const membership = await prisma.organizationUser.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
-    select: { scimManaged: true },
-  });
+  const membership = await getApp().ssoAuth.findMembership({ userId, organizationId });
 
   // SCIM is authoritative — never override SCIM-managed roles
   if (membership?.scimManaged) return;
 
-  const ssoConnection = await prisma.ssoConnection.findFirst({
-    where: { domain, organizationId, verifiedAt: { not: null } },
-    select: { roleMapping: true, defaultOrgRole: true },
-  });
+  const ssoConnection = await getApp().ssoConnection.getRoleMappingByDomain({ domain, organizationId });
   if (!ssoConnection) return;
 
   const roleMap = (ssoConnection.roleMapping ?? {}) as Record<string, unknown>;
-  const defaultRole = ssoConnection.defaultOrgRole;
+  const defaultRole = ssoConnection.defaultOrgRole as OrganizationUserRole;
 
   let resolvedRole: OrganizationUserRole = defaultRole;
-
-  // TODO: when IdP claims are available via @better-auth/sso callback,
-  // parse groupMappings and useRoleAttribute here. For now, apply
-  // defaultOrgRole from the SsoConnection.
 
   const groupMappings = (roleMap.groupMappings ?? []) as Array<{
     group: string;
     role: string;
   }>;
 
-  // If group mappings exist but we have no claims yet, use default
   if (groupMappings.length === 0 && !roleMap.useRoleAttribute) {
     resolvedRole = defaultRole;
   }
 
   if (!membership) return;
 
-  await prisma.organizationUser.update({
-    where: { userId_organizationId: { userId, organizationId } },
-    data: { role: resolvedRole },
-  });
+  if (resolvedRole !== membership.role) {
+    await getApp().ssoAuth.updateMembershipRole({ userId, organizationId, role: resolvedRole });
 
-  logger.info(
-    { userId, organizationId, role: resolvedRole },
-    "Applied SSO role mapping on first login",
-  );
+    logger.info(
+      { userId, organizationId, role: resolvedRole },
+      "Applied SSO role mapping on first login",
+    );
+  }
 };
 
 export const afterAccountCreate = async ({
@@ -416,7 +402,7 @@ export const afterAccountCreate = async ({
       accountId: account.accountId,
     });
 
-    await applySsoRoleMapping({ prisma, userId: user.id, domain, organizationId: org.id });
+    await applySsoRoleMapping({ userId: user.id, domain, organizationId: org.id });
   } catch (err) {
     logger.error(
       { err, userId: account.userId },

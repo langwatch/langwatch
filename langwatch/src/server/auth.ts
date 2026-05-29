@@ -4,6 +4,7 @@ import type { NextRequest } from "~/types/next-stubs";
 
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:auth");
@@ -139,10 +140,7 @@ export const getServerAuthSession = async (ctx: {
       if (ageMs > SSO_REAUTH_WINDOW_MS && result.user.email) {
         const domain = result.user.email.split("@")[1];
         if (domain) {
-          const enforced = await prisma.ssoConnection.findFirst({
-            where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
-            select: { id: true },
-          });
+          const enforced = await getApp().ssoConnection.getEnforcedConnectionByDomain({ domain });
           if (enforced) {
             logger.info(
               { sessionId: result.session.id, userId: result.user.id, domain },
