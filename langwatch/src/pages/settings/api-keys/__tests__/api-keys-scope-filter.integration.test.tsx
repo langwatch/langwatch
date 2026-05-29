@@ -497,9 +497,7 @@ describe("<ApiKeysSection /> scope filter", () => {
 
   describe("given the URL contains a stale scope param", () => {
     describe("when the referenced team no longer exists in the org graph", () => {
-      /**
-       * @scenario A stale URL pointing to a deleted scope falls back to "All you can see"
-       */
+      /** @scenario A stale URL pointing to a deleted scope falls back to "All you can see" */
       it("falls back to 'All you can see' and shows all keys without rendering 'undefined'", async () => {
         mockRouterQuery.scope = "TEAM:non-existent-id";
 

@@ -144,7 +144,11 @@ describe("given the token-created-snippets feature is implemented", () => {
         ...parsed.dependencies,
         ...parsed.devDependencies,
       });
-      const highlightLibPattern = /(highlight|prism|shiki|refractor|lowlight|tokenize|hljs)/i;
+      // Tight pattern: match common syntax-highlighter package names while
+      // excluding unrelated packages that share a substring (e.g. `prisma`,
+      // `@prisma/client`, `ra-data-simple-prisma` all contain "prism").
+      const highlightLibPattern =
+        /^(@?[^/]*shiki[^/]*|prismjs?|prism-react-renderer|highlight\.js|hljs|refractor|lowlight|react-syntax-highlighter)$/i;
       const highlightLibs = allDepNames
         .filter((name) => highlightLibPattern.test(name))
         .sort();

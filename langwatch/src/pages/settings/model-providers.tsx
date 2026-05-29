@@ -398,7 +398,7 @@ export default function ModelsPage() {
             with getAllForProject above, instead of waterfalling. */}
         <DefaultModelsSection
           filter={scopeFilter}
-          onFilterChange={setScopeFilter}
+          onFilterChange={handleScopeFilterChange}
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
           hierarchy={hierarchy}
