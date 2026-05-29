@@ -7,6 +7,7 @@
  * - src/pages/api/auth/logout.ts    (explicit cookie-clearing logout)
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
+import crypto from "crypto";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
@@ -15,6 +16,15 @@ import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
+import { createLogger } from "~/utils/logger/server";
+import {
+  buildAuthorizationUrl,
+  buildStateCookie,
+  clearStateCookie,
+  exchangeCodeForUser,
+  generateState,
+  parseStateCookie,
+} from "~/server/sso/ssoOAuth";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -150,6 +160,171 @@ const logoutHandler = async (c: Context) => {
 
 secured.access(authPolicy()).get("/auth/logout", logoutHandler);
 secured.access(authPolicy()).post("/auth/logout", logoutHandler);
+
+// ---------- GET /api/auth/sso/:domain ----------
+secured.access(authPolicy()).get("/auth/sso/:domain", async (c) => {
+  const domain = c.req.param("domain");
+  if (!domain) {
+    return c.json({ error: "Domain is required" }, 400);
+  }
+
+  const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
+  const state = generateState();
+  const isSecure = env.NEXTAUTH_URL.startsWith("https");
+
+  try {
+    const { url } = await buildAuthorizationUrl({
+      prisma,
+      domain,
+      callbackUrl,
+      state,
+    });
+
+    c.header(
+      "Set-Cookie",
+      buildStateCookie({ state, domain, secure: isSecure }),
+    );
+
+    return c.redirect(url, 302);
+  } catch (err) {
+    logger.error({ err, domain }, "Failed to initiate SSO login");
+    return c.redirect(
+      `/auth/signin?error=${encodeURIComponent("SSO configuration error. Contact your administrator.")}`,
+      302,
+    );
+  }
+});
+
+// ---------- GET /api/auth/sso/:domain/callback ----------
+secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
+  const domain = c.req.param("domain");
+  const code = c.req.query("code");
+  const returnedState = c.req.query("state");
+  const error = c.req.query("error");
+  const isSecure = env.NEXTAUTH_URL.startsWith("https");
+
+  c.header("Set-Cookie", clearStateCookie({ secure: isSecure }));
+
+  if (error) {
+    logger.warn({ domain, error }, "IdP returned error");
+    return c.redirect(
+      `/auth/signin?error=${encodeURIComponent("Identity provider denied the request.")}`,
+      302,
+    );
+  }
+
+  if (!code || !returnedState || !domain) {
+    return c.redirect(
+      `/auth/signin?error=${encodeURIComponent("Invalid SSO callback.")}`,
+      302,
+    );
+  }
+
+  const storedState = parseStateCookie(c.req.header("cookie"));
+  if (
+    !storedState ||
+    storedState.state !== returnedState ||
+    storedState.domain !== domain
+  ) {
+    return c.redirect(
+      `/auth/signin?error=${encodeURIComponent("Invalid SSO state — please try again.")}`,
+      302,
+    );
+  }
+
+  const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
+
+  try {
+    const { userInfo, provider } = await exchangeCodeForUser({
+      prisma,
+      domain,
+      code,
+      callbackUrl,
+    });
+
+    // Find or create the user + account, then create a session.
+    // This mirrors BetterAuth's genericOAuth flow but reads config from DB.
+    let user = await prisma.user.findFirst({
+      where: { email: userInfo.email },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: userInfo.email,
+          name:
+            userInfo.name ?? userInfo.email.split("@")[0] ?? "SSO User",
+          image: userInfo.picture ?? null,
+          emailVerified: true,
+        },
+      });
+    }
+
+    if (user.deactivatedAt) {
+      return c.redirect(
+        `/auth/signin?error=${encodeURIComponent("Your account has been deactivated.")}`,
+        302,
+      );
+    }
+
+    // Link or update the OAuth account
+    const existingAccount = await prisma.account.findFirst({
+      where: {
+        userId: user.id,
+        provider,
+        providerAccountId: userInfo.sub,
+      },
+    });
+
+    if (!existingAccount) {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          provider,
+          providerAccountId: userInfo.sub,
+          accountId: userInfo.sub,
+        },
+      });
+    }
+
+    // Create a session
+    const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await prisma.session.create({
+      data: {
+        sessionToken,
+        userId: user.id,
+        expires: expiresAt,
+        ipAddress:
+          c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+        userAgent: c.req.header("user-agent") ?? null,
+      },
+    });
+
+    // Set the session cookie (same format BetterAuth uses)
+    const cookieName = isSecure
+      ? "__Secure-better-auth.session_token"
+      : "better-auth.session_token";
+    const cookieParts = [
+      `${cookieName}=${sessionToken}`,
+      "Path=/",
+      "HttpOnly",
+      "SameSite=Lax",
+      `Max-Age=${30 * 24 * 60 * 60}`,
+    ];
+    if (isSecure) cookieParts.push("Secure");
+    c.header("Set-Cookie", cookieParts.join("; "), { append: true });
+
+    return c.redirect("/", 302);
+  } catch (err) {
+    logger.error({ err, domain }, "SSO callback failed");
+    return c.redirect(
+      `/auth/signin?error=${encodeURIComponent("SSO login failed. Please try again or contact your administrator.")}`,
+      302,
+    );
+  }
+});
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
 const betterAuthCatchAll = async (c: Context) => {
