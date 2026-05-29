@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { ScimTokenService } from "~/server/scim/scim-token.service";
+import { getApp } from "~/server/app-layer/app";
 
 const enterpriseScimProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
@@ -17,18 +17,10 @@ const enterpriseScimProcedure = protectedProcedure
 
 export const scimTokenRouter = createTRPCRouter({
   list: enterpriseScimProcedure
-    .query(async ({ ctx, input }) => {
-      const tokens = await ctx.prisma.scimToken.findMany({
-        where: { organizationId: input.organizationId },
-        select: {
-          id: true,
-          description: true,
-          createdAt: true,
-          lastUsedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
+    .query(async ({ input }) => {
+      return getApp().scimTokens.listByOrganization({
+        organizationId: input.organizationId,
       });
-      return tokens;
     }),
 
   generate: enterpriseScimProcedure
@@ -37,9 +29,8 @@ export const scimTokenRouter = createTRPCRouter({
         description: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      const tokenService = ScimTokenService.create(ctx.prisma);
-      return tokenService.generate({
+    .mutation(async ({ input }) => {
+      return getApp().scimTokens.generate({
         organizationId: input.organizationId,
         description: input.description,
       });
@@ -51,14 +42,11 @@ export const scimTokenRouter = createTRPCRouter({
         tokenId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.scimToken.delete({
-        where: {
-          id: input.tokenId,
-          organizationId: input.organizationId,
-        },
+    .mutation(async ({ input }) => {
+      await getApp().scimTokens.revoke({
+        id: input.tokenId,
+        organizationId: input.organizationId,
       });
       return { success: true };
     }),
-
 });

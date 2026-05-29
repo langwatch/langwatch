@@ -1,21 +1,18 @@
 import crypto from "crypto";
 import type { PrismaClient } from "@prisma/client";
+import { ScimTokenRepository } from "./scim-token.repository";
 
-/**
- * Manages SCIM bearer tokens: generation, hashing, and verification.
- * Each token is scoped to a single organization.
- */
 export class ScimTokenService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly repository: ScimTokenRepository;
+
+  constructor(prisma: PrismaClient) {
+    this.repository = ScimTokenRepository.create(prisma);
+  }
 
   static create(prisma: PrismaClient): ScimTokenService {
     return new ScimTokenService(prisma);
   }
 
-  /**
-   * Generates a new SCIM token for the given organization.
-   * Returns the plaintext token (shown once) and stores the SHA-256 hash.
-   */
   async generate({
     organizationId,
     description,
@@ -26,21 +23,15 @@ export class ScimTokenService {
     const token = crypto.randomBytes(32).toString("hex");
     const hashedToken = this.hashToken(token);
 
-    const scimToken = await this.prisma.scimToken.create({
-      data: {
-        organizationId,
-        hashedToken,
-        description: description ?? null,
-      },
+    const scimToken = await this.repository.create({
+      organizationId,
+      hashedToken,
+      description: description ?? null,
     });
 
     return { token, tokenId: scimToken.id };
   }
 
-  /**
-   * Verifies a bearer token and returns the associated organization ID.
-   * Updates lastUsedAt on successful verification.
-   */
   async verify({
     token,
   }: {
@@ -48,20 +39,40 @@ export class ScimTokenService {
   }): Promise<{ organizationId: string } | null> {
     const hashedToken = this.hashToken(token);
 
-    const scimToken = await this.prisma.scimToken.findFirst({
-      where: { hashedToken },
-    });
+    const scimToken = await this.repository.findByHashedToken({ hashedToken });
 
     if (!scimToken) {
       return null;
     }
 
-    await this.prisma.scimToken.update({
-      where: { id: scimToken.id },
-      data: { lastUsedAt: new Date() },
-    });
+    await this.repository.updateLastUsed({ id: scimToken.id });
 
     return { organizationId: scimToken.organizationId };
+  }
+
+  async listByOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<
+    Array<{
+      id: string;
+      description: string | null;
+      createdAt: Date;
+      lastUsedAt: Date | null;
+    }>
+  > {
+    return this.repository.findAllByOrganization({ organizationId });
+  }
+
+  async revoke({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    return this.repository.delete({ id, organizationId });
   }
 
   private hashToken(token: string): string {
