@@ -170,9 +170,9 @@ function AssignmentGuide() {
         description="A team cost center is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
       />
       <AssignmentLink
-        href="/settings"
+        href="/settings/teams"
         title="Projects"
-        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's cost center. Assign a project from its settings."
+        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's cost center. Assign each project from the teams page, next to its team."
       />
     </VStack>
   );
