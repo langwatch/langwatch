@@ -282,6 +282,7 @@ model Organization {
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
   userIngestionBindings  UserIngestionBinding[]
+  ssoConnections         SsoConnection[]
 
   @@index([ssoProvider])
 }
@@ -297,6 +298,55 @@ model ScimToken {
 
   @@index([organizationId])
   @@index([hashedToken])
+}
+
+model SsoConnection {
+  id                String               @id @default(nanoid())
+  organizationId    String
+  organization      Organization         @relation(fields: [organizationId], references: [id])
+
+  domain            String
+  verificationToken String               @unique @default(uuid())
+  verifiedAt        DateTime?
+
+  provider          String
+  clientId          String
+  clientSecretEnc   String
+  issuerUrl         String?
+  tenantId          String?
+
+  samlEntityId      String?
+  samlSsoUrl        String?
+  samlCertificate   String?              @db.Text
+
+  attributeMapping  Json?
+  roleMapping       Json?
+
+  ssoEnforced       Boolean              @default(false)
+  jitProvisioning   Boolean              @default(false)
+  defaultOrgRole    OrganizationUserRole @default(MEMBER)
+
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([organizationId])
+  @@index([domain])
+}
+
+model ScimRequestLog {
+  id               String   @id @default(nanoid())
+  organizationId   String
+  requestMethod    String
+  requestPath      String
+  requestHeaders   Json?
+  requestBody      Json?
+  responseStatus   Int
+  responseBody     Json?
+  identityProvider String?
+  durationMs       Int
+  createdAt        DateTime @default(now())
+
+  @@index([organizationId, createdAt])
 }
 
 enum PlanTypes {
