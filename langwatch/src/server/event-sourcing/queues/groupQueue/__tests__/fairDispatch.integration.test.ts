@@ -263,7 +263,7 @@ describe("work-conserving fair dispatch", () => {
         expect(inFlight.newcomer ?? 0).toBeGreaterThanOrEqual(8);
         expect(inFlight.incumbent).toBeLessThanOrEqual(12);
         // and the fleet stayed full throughout - nothing left idle
-        expect((inFlight.newcomer ?? 0) + inFlight.incumbent).toBe(20);
+        expect((inFlight.newcomer ?? 0) + (inFlight.incumbent ?? 0)).toBe(20);
       });
     });
   });
