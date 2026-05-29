@@ -219,7 +219,7 @@ async def test_example(example_file: str):
                 elif any(
                     error_indicator in str(e)
                     for error_indicator in [
-                        "The server had an error processing your request. Sorry about that!",  # OpenAI
+                        "The server had an error",  # OpenAI 500 (with or without "while processing")
                         # "Error code: 404",
                         # "This is a chat model and not supported in the v1/completions endpoint",
                         "Rate limit",

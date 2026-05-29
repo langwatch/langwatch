@@ -94,6 +94,14 @@ export const experimentStatusCommand = async (
     try {
       status = await service.getRunStatus(runId);
     } catch (error) {
+      // Only a missing Redis run-state warrants the ClickHouse fallback. Real
+      // 5xx / auth / network failures must propagate, otherwise a working
+      // results call would mask them as a healthy derived status.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/404|not found/i.test(message)) {
+        throw error;
+      }
+
       const fallback = await statusFromResults({
         service,
         runId,

@@ -11,7 +11,7 @@ Feature: CLI evaluation results command
   Scenario: User views the latest run of an experiment as a table
     Given an experiment whose latest run has several rows
     When I run `langwatch experiment results <experiment>`
-    Then the CLI resolves the latest run for that experiment
+    Then the CLI shows results from the most recent run of the experiment
     And the CLI prints a table with one row per dataset entry
     And each row shows the row index and the key evaluator scores
     And the table is truncated to the default row limit
@@ -21,7 +21,7 @@ Feature: CLI evaluation results command
   Scenario: User pins a specific run by id
     Given an experiment with more than one run
     When I run `langwatch experiment results <experiment> --run-id <runId>`
-    Then the CLI fetches that specific run instead of the latest
+    Then the CLI shows results from the run identified by the provided run id
     And the CLI exits with status 0
 
   @integration @unimplemented
