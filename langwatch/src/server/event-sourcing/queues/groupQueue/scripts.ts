@@ -237,11 +237,12 @@ end
  * keep W at the full budget and the newcomer would never be admitted (a stable
  * starvation behind a higher-priority incumbent, not a one-tick lag). We instead
  * treat any freshly-active tenant as a claimant that pulls a full fair share.
- * The window is several recompute intervals so a tenant that briefly goes quiet
- * is not dropped mid-burst; once it stops enqueueing AND drains, it ages out and
- * its reserved share is released. Interpolated into the Lua for one source.
+ * The window is several recompute intervals (= 8x RECONCILE_INTERVAL_MS, longer
+ * than the dynamic-cap TTL) so a tenant that briefly goes quiet is not dropped
+ * mid-burst; once it stops enqueueing AND drains, it ages out and its reserved
+ * share is released. Interpolated into the Lua for one source.
  */
-export const CLAIMANT_WINDOW_MS = 15000;
+export const CLAIMANT_WINDOW_MS = 8 * RECONCILE_INTERVAL_MS;
 
 // Lua helper for the DYNAMIC per-tenant cap (option C, 2026-05-29 follow-up to
 // the fixed soft cap). The hot path is unchanged — it still parks a group when
