@@ -11,6 +11,7 @@ Feature: ClickHouse analytics stays available under concurrent query load
   Background:
     Given a user is viewing analytics backed by ClickHouse
 
+  @unit @regression
   Scenario: A read rejected for transient overload is retried and succeeds
     Given ClickHouse rejects the first read with "Too many simultaneous queries"
     And the next read would succeed once a query slot frees
@@ -18,18 +19,21 @@ Feature: ClickHouse analytics stays available under concurrent query load
     Then the read is retried after a short backoff
     And the user receives the query result instead of an error
 
+  @unit @regression
   Scenario: A read that keeps failing transiently eventually surfaces the error
     Given ClickHouse rejects every read with a transient overload error
     When the analytics query runs
     Then the read is retried a bounded number of times with backoff
     And the error is surfaced only after retries are exhausted
 
+  @unit @regression
   Scenario: A read failing with a non-transient error fails fast
     Given ClickHouse rejects a read with a query syntax error
     When the analytics query runs
     Then the read is not retried
     And the error is surfaced immediately
 
+  @unit @regression
   Scenario: Live polling eases off when ClickHouse is overloaded
     Given the traces view is polling for new traces every few seconds
     When a poll fails because ClickHouse is overloaded
