@@ -24,17 +24,17 @@ import { useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   SsoConnectionModal,
-  type SsoConnection,
+  type SsoConnectionListItem,
 } from "~/components/settings/SsoConnectionModal";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
+import { toaster } from "~/components/ui/toaster";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-const MOCK_CONNECTIONS: SsoConnection[] = [];
+import { api } from "~/utils/api";
 
 const MOCK_SCIM_LOGS = [
   {
@@ -86,14 +86,62 @@ function SsoSettings() {
   const { organization } = useOrganizationTeamProject();
   const { isEnterprise } = useActivePlan();
 
-  const [connections, setConnections] =
-    useState<SsoConnection[]>(MOCK_CONNECTIONS);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingConnection, setEditingConnection] =
-    useState<SsoConnection | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<SsoConnection | null>(null);
+    useState<SsoConnectionListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<SsoConnectionListItem | null>(null);
   const [scimFilter, setScimFilter] = useState<ScimLogFilter>("all");
   const [scimSearch, setScimSearch] = useState("");
+
+  const connectionsQuery = api.ssoConnection.list.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id },
+  );
+
+  const createMutation = api.ssoConnection.create.useMutation({
+    onSuccess: () => {
+      void connectionsQuery.refetch();
+      setModalOpen(false);
+      setEditingConnection(null);
+      toaster.create({ title: "SSO connection created", type: "success" });
+    },
+    onError: (error) => {
+      toaster.create({ title: error.message, type: "error" });
+    },
+  });
+
+  const updateMutation = api.ssoConnection.update.useMutation({
+    onSuccess: () => {
+      void connectionsQuery.refetch();
+      setModalOpen(false);
+      setEditingConnection(null);
+      toaster.create({ title: "SSO connection updated", type: "success" });
+    },
+    onError: (error) => {
+      toaster.create({ title: error.message, type: "error" });
+    },
+  });
+
+  const deleteMutation = api.ssoConnection.delete.useMutation({
+    onSuccess: () => {
+      void connectionsQuery.refetch();
+      setDeleteTarget(null);
+      toaster.create({ title: "SSO connection deleted", type: "success" });
+    },
+    onError: (error) => {
+      toaster.create({ title: error.message, type: "error" });
+    },
+  });
+
+  const toggleMutation = api.ssoConnection.toggleEnforcement.useMutation({
+    onSuccess: () => {
+      void connectionsQuery.refetch();
+    },
+    onError: (error) => {
+      toaster.create({ title: error.message, type: "error" });
+    },
+  });
 
   if (!organization) return <SettingsLayout />;
 
@@ -120,22 +168,45 @@ function SsoSettings() {
     );
   }
 
-  const handleSave = (conn: SsoConnection) => {
-    setConnections((prev) => {
-      const idx = prev.findIndex((c) => c.id === conn.id);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = conn;
-        return updated;
-      }
-      return [...prev, conn];
-    });
-    setEditingConnection(null);
+  const connections = connectionsQuery.data ?? [];
+
+  const handleSave = (data: {
+    domain: string;
+    provider: string;
+    clientId: string;
+    clientSecret: string;
+    issuerUrl?: string | null;
+    tenantId?: string | null;
+    samlEntityId?: string | null;
+    samlSsoUrl?: string | null;
+    samlCertificate?: string | null;
+    attributeMapping?: Record<string, unknown> | null;
+    roleMapping?: Record<string, unknown> | null;
+    ssoEnforced?: boolean;
+    jitProvisioning?: boolean;
+    defaultOrgRole?: "ADMIN" | "MEMBER" | "EXTERNAL";
+  }) => {
+    if (editingConnection) {
+      const { clientSecret, ...rest } = data;
+      updateMutation.mutate({
+        organizationId: organization.id,
+        id: editingConnection.id,
+        ...rest,
+        ...(clientSecret ? { clientSecret } : {}),
+      });
+    } else {
+      createMutation.mutate({
+        organizationId: organization.id,
+        ...data,
+      });
+    }
   };
 
-  const handleDelete = (conn: SsoConnection) => {
-    setConnections((prev) => prev.filter((c) => c.id !== conn.id));
-    setDeleteTarget(null);
+  const handleDelete = (conn: SsoConnectionListItem) => {
+    deleteMutation.mutate({
+      organizationId: organization.id,
+      id: conn.id,
+    });
   };
 
   const filteredLogs = MOCK_SCIM_LOGS.filter((log) => {
@@ -185,12 +256,10 @@ function SsoSettings() {
                       <Table.Cell>{providerLabel(conn.provider)}</Table.Cell>
                       <Table.Cell>
                         <Badge
-                          colorPalette={
-                            conn.status === "active" ? "green" : "yellow"
-                          }
+                          colorPalette={conn.verifiedAt ? "green" : "yellow"}
                           size="sm"
                         >
-                          {conn.status === "active" ? "Active" : "Pending"}
+                          {conn.verifiedAt ? "Verified" : "Pending"}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
@@ -198,13 +267,11 @@ function SsoSettings() {
                           checked={conn.ssoEnforced}
                           size="sm"
                           onCheckedChange={(e) => {
-                            setConnections((prev) =>
-                              prev.map((c) =>
-                                c.id === conn.id
-                                  ? { ...c, ssoEnforced: e.checked }
-                                  : c,
-                              ),
-                            );
+                            toggleMutation.mutate({
+                              organizationId: organization.id,
+                              id: conn.id,
+                              ssoEnforced: e.checked,
+                            });
                           }}
                         />
                       </Table.Cell>
@@ -440,6 +507,7 @@ function SsoSettings() {
         }}
         onSave={handleSave}
         editingConnection={editingConnection}
+        saving={createMutation.isPending || updateMutation.isPending}
       />
 
       {/* Delete Confirmation */}
@@ -468,6 +536,7 @@ function SsoSettings() {
             <Button
               colorPalette="red"
               onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              loading={deleteMutation.isPending}
             >
               Delete
             </Button>

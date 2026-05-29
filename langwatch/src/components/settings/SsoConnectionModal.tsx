@@ -17,23 +17,30 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import type { RouterOutputs } from "~/utils/api";
 
-export interface SsoConnection {
-  id: string;
+export type SsoConnectionListItem =
+  RouterOutputs["ssoConnection"]["list"][number];
+
+interface FormState {
   domain: string;
   provider: string;
-  status: "pending" | "verified" | "active";
-  ssoEnforced: boolean;
-  jitProvisioning: boolean;
-  defaultRole: string;
-  verificationToken: string;
   clientId: string;
+  clientSecret: string;
   issuerUrl: string;
   tenantId: string;
+  samlEntityId: string;
+  samlSsoUrl: string;
+  samlCertificate: string;
+  ssoEnforced: boolean;
+  jitProvisioning: boolean;
+  defaultOrgRole: string;
+  verificationToken: string;
+  verifiedAt: Date | null;
   attributeMapping: {
     email: string;
     name: string;
@@ -97,31 +104,85 @@ function AdvancedSection({
   );
 }
 
-const DEFAULT_CONNECTION: SsoConnection = {
-  id: "",
-  domain: "",
-  provider: "okta",
-  status: "pending",
-  ssoEnforced: false,
-  jitProvisioning: false,
-  defaultRole: "MEMBER",
-  verificationToken: crypto.randomUUID(),
-  clientId: "",
-  issuerUrl: "",
-  tenantId: "",
-  attributeMapping: { email: "email", name: "name", groups: "groups", role: "role" },
-  roleMapping: {
-    defaultRole: "MEMBER",
-    useRoleAttribute: false,
-    groupMappings: [],
-  },
-};
+function defaultFormState(): FormState {
+  return {
+    domain: "",
+    provider: "okta",
+    clientId: "",
+    clientSecret: "",
+    issuerUrl: "",
+    tenantId: "",
+    samlEntityId: "",
+    samlSsoUrl: "",
+    samlCertificate: "",
+    ssoEnforced: false,
+    jitProvisioning: false,
+    defaultOrgRole: "MEMBER",
+    verificationToken: "",
+    verifiedAt: null,
+    attributeMapping: { email: "email", name: "name", groups: "groups", role: "role" },
+    roleMapping: {
+      defaultRole: "MEMBER",
+      useRoleAttribute: false,
+      groupMappings: [],
+    },
+  };
+}
+
+function connectionToForm(conn: SsoConnectionListItem): FormState {
+  const attrMap = (conn.attributeMapping ?? {}) as Record<string, string>;
+  const roleMap = (conn.roleMapping ?? {}) as Record<string, unknown>;
+
+  return {
+    domain: conn.domain,
+    provider: conn.provider,
+    clientId: conn.clientId,
+    clientSecret: "",
+    issuerUrl: conn.issuerUrl ?? "",
+    tenantId: conn.tenantId ?? "",
+    samlEntityId: conn.samlEntityId ?? "",
+    samlSsoUrl: conn.samlSsoUrl ?? "",
+    samlCertificate: "",
+    ssoEnforced: conn.ssoEnforced,
+    jitProvisioning: conn.jitProvisioning,
+    defaultOrgRole: conn.defaultOrgRole,
+    verificationToken: conn.verificationToken,
+    verifiedAt: conn.verifiedAt,
+    attributeMapping: {
+      email: attrMap.email ?? "email",
+      name: attrMap.name ?? "name",
+      groups: attrMap.groups ?? "groups",
+      role: attrMap.role ?? "role",
+    },
+    roleMapping: {
+      defaultRole: (roleMap.defaultRole as string) ?? "MEMBER",
+      useRoleAttribute: (roleMap.useRoleAttribute as boolean) ?? false,
+      groupMappings: (roleMap.groupMappings as Array<{ group: string; role: string }>) ?? [],
+    },
+  };
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: (connection: SsoConnection) => void;
-  editingConnection?: SsoConnection | null;
+  onSave: (data: {
+    domain: string;
+    provider: string;
+    clientId: string;
+    clientSecret: string;
+    issuerUrl?: string | null;
+    tenantId?: string | null;
+    samlEntityId?: string | null;
+    samlSsoUrl?: string | null;
+    samlCertificate?: string | null;
+    attributeMapping?: Record<string, unknown> | null;
+    roleMapping?: Record<string, unknown> | null;
+    ssoEnforced?: boolean;
+    jitProvisioning?: boolean;
+    defaultOrgRole?: "ADMIN" | "MEMBER" | "EXTERNAL";
+  }) => void;
+  editingConnection?: SsoConnectionListItem | null;
+  saving?: boolean;
 }
 
 export function SsoConnectionModal({
@@ -129,28 +190,45 @@ export function SsoConnectionModal({
   onClose,
   onSave,
   editingConnection,
+  saving,
 }: Props) {
-  const [conn, setConn] = useState<SsoConnection>(
-    editingConnection ?? { ...DEFAULT_CONNECTION, verificationToken: crypto.randomUUID() },
-  );
+  const [form, setForm] = useState<FormState>(defaultFormState);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isEditing = !!editingConnection;
 
-  const update = <K extends keyof SsoConnection>(
+  useEffect(() => {
+    if (open) {
+      setForm(
+        editingConnection
+          ? connectionToForm(editingConnection)
+          : defaultFormState(),
+      );
+      setConfirmOpen(false);
+    }
+  }, [open, editingConnection]);
+
+  const update = <K extends keyof FormState>(
     key: K,
-    value: SsoConnection[K],
-  ) => setConn((c) => ({ ...c, [key]: value }));
+    value: FormState[K],
+  ) => setForm((c) => ({ ...c, [key]: value }));
 
   const callbackUrl =
-    typeof window !== "undefined" && conn.domain
-      ? `${window.location.origin}/api/auth/sso/${conn.domain}`
+    typeof window !== "undefined" && form.domain
+      ? `${window.location.origin}/api/auth/sso/${form.domain}`
       : "";
 
   const handleSave = () => {
-    if (!conn.domain || !conn.clientId) {
+    if (!form.domain || !form.clientId) {
       toaster.create({
         title: "Please fill in all required fields",
+        type: "error",
+      });
+      return;
+    }
+    if (!isEditing && !form.clientSecret) {
+      toaster.create({
+        title: "Client secret is required",
         type: "error",
       });
       return;
@@ -160,12 +238,22 @@ export function SsoConnectionModal({
 
   const handleConfirm = () => {
     onSave({
-      ...conn,
-      id: conn.id || crypto.randomUUID(),
-      status: "active",
+      domain: form.domain,
+      provider: form.provider,
+      clientId: form.clientId,
+      clientSecret: form.clientSecret,
+      issuerUrl: form.issuerUrl || null,
+      tenantId: form.tenantId || null,
+      samlEntityId: form.samlEntityId || null,
+      samlSsoUrl: form.samlSsoUrl || null,
+      samlCertificate: form.samlCertificate || null,
+      attributeMapping: form.attributeMapping,
+      roleMapping: form.roleMapping,
+      ssoEnforced: form.ssoEnforced,
+      jitProvisioning: form.jitProvisioning,
+      defaultOrgRole: form.defaultOrgRole as "ADMIN" | "MEMBER" | "EXTERNAL",
     });
     setConfirmOpen(false);
-    onClose();
   };
 
   return (
@@ -192,14 +280,14 @@ export function SsoConnectionModal({
                 </Text>
                 <Input
                   placeholder="acme.com"
-                  value={conn.domain}
+                  value={form.domain}
                   disabled={isEditing}
                   onChange={(e) => update("domain", e.target.value)}
                 />
               </VStack>
 
               {/* Domain Verification */}
-              {conn.domain && (
+              {form.domain && form.verificationToken && (
                 <Box
                   borderWidth="1px"
                   borderColor="border.muted"
@@ -212,16 +300,10 @@ export function SsoConnectionModal({
                         Domain Verification
                       </Text>
                       <Badge
-                        colorPalette={
-                          conn.status === "verified" || conn.status === "active"
-                            ? "green"
-                            : "yellow"
-                        }
+                        colorPalette={form.verifiedAt ? "green" : "yellow"}
                         size="sm"
                       >
-                        {conn.status === "verified" || conn.status === "active"
-                          ? "Verified"
-                          : "Pending"}
+                        {form.verifiedAt ? "Verified" : "Pending"}
                       </Badge>
                     </HStack>
                     <Text fontSize="xs" color="fg.muted">
@@ -251,16 +333,16 @@ export function SsoConnectionModal({
                               Value
                             </Text>
                             <Text fontSize="sm" fontFamily="mono">
-                              langwatch-verify={conn.verificationToken}
+                              langwatch-verify={form.verificationToken}
                             </Text>
                           </VStack>
                           <CopyButton
-                            value={`langwatch-verify=${conn.verificationToken}`}
+                            value={`langwatch-verify=${form.verificationToken}`}
                           />
                         </HStack>
                       </VStack>
                     </Box>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" disabled>
                       Verify Domain
                     </Button>
                   </VStack>
@@ -274,7 +356,7 @@ export function SsoConnectionModal({
                 </Text>
                 <NativeSelect.Root size="sm" width="full">
                   <NativeSelect.Field
-                    value={conn.provider}
+                    value={form.provider}
                     onChange={(e) => update("provider", e.target.value)}
                   >
                     {PROVIDERS.map((p) => (
@@ -288,7 +370,7 @@ export function SsoConnectionModal({
               </VStack>
 
               {/* Callback URL */}
-              {conn.domain && (
+              {form.domain && (
                 <Box bg="bg.subtle" borderRadius="sm" padding={3}>
                   <HStack justify="space-between">
                     <VStack align="start" gap={0}>
@@ -312,65 +394,79 @@ export function SsoConnectionModal({
                   </Text>
                   <Input
                     placeholder="your-client-id"
-                    value={conn.clientId}
+                    value={form.clientId}
                     onChange={(e) => update("clientId", e.target.value)}
                   />
                 </VStack>
 
                 <VStack align="start" gap={1} width="full">
                   <Text fontSize="sm" fontWeight="medium">
-                    Client Secret *
+                    Client Secret {isEditing ? "(leave blank to keep)" : "*"}
                   </Text>
                   <Input
                     type="password"
-                    placeholder="your-client-secret"
+                    placeholder={
+                      isEditing
+                        ? "Leave blank to keep existing secret"
+                        : "your-client-secret"
+                    }
+                    value={form.clientSecret}
+                    onChange={(e) => update("clientSecret", e.target.value)}
                   />
                 </VStack>
 
-                {(conn.provider === "okta" ||
-                  conn.provider === "custom-oidc") && (
+                {(form.provider === "okta" ||
+                  form.provider === "custom-oidc") && (
                   <VStack align="start" gap={1} width="full">
                     <Text fontSize="sm" fontWeight="medium">
                       Issuer URL *
                     </Text>
                     <Input
                       placeholder={
-                        conn.provider === "okta"
+                        form.provider === "okta"
                           ? "https://your-org.okta.com"
                           : "https://your-idp.example.com"
                       }
-                      value={conn.issuerUrl}
+                      value={form.issuerUrl}
                       onChange={(e) => update("issuerUrl", e.target.value)}
                     />
                   </VStack>
                 )}
 
-                {conn.provider === "azure-ad" && (
+                {form.provider === "azure-ad" && (
                   <VStack align="start" gap={1} width="full">
                     <Text fontSize="sm" fontWeight="medium">
                       Tenant ID *
                     </Text>
                     <Input
                       placeholder="your-tenant-id"
-                      value={conn.tenantId}
+                      value={form.tenantId}
                       onChange={(e) => update("tenantId", e.target.value)}
                     />
                   </VStack>
                 )}
 
-                {conn.provider === "custom-saml" && (
+                {form.provider === "custom-saml" && (
                   <>
                     <VStack align="start" gap={1} width="full">
                       <Text fontSize="sm" fontWeight="medium">
                         SAML Entity ID *
                       </Text>
-                      <Input placeholder="https://idp.example.com/metadata" />
+                      <Input
+                        placeholder="https://idp.example.com/metadata"
+                        value={form.samlEntityId}
+                        onChange={(e) => update("samlEntityId", e.target.value)}
+                      />
                     </VStack>
                     <VStack align="start" gap={1} width="full">
                       <Text fontSize="sm" fontWeight="medium">
                         SSO URL *
                       </Text>
-                      <Input placeholder="https://idp.example.com/sso" />
+                      <Input
+                        placeholder="https://idp.example.com/sso"
+                        value={form.samlSsoUrl}
+                        onChange={(e) => update("samlSsoUrl", e.target.value)}
+                      />
                     </VStack>
                     <VStack align="start" gap={1} width="full">
                       <Text fontSize="sm" fontWeight="medium">
@@ -379,6 +475,10 @@ export function SsoConnectionModal({
                       <Textarea
                         placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                         rows={4}
+                        value={form.samlCertificate}
+                        onChange={(e) =>
+                          update("samlCertificate", e.target.value)
+                        }
                       />
                     </VStack>
                   </>
@@ -405,7 +505,7 @@ export function SsoConnectionModal({
                     </Text>
                   </VStack>
                   <Switch
-                    checked={conn.ssoEnforced}
+                    checked={form.ssoEnforced}
                     onCheckedChange={(e) => update("ssoEnforced", e.checked)}
                   />
                 </HStack>
@@ -417,7 +517,7 @@ export function SsoConnectionModal({
                     </Text>
                   </VStack>
                   <Switch
-                    checked={conn.jitProvisioning}
+                    checked={form.jitProvisioning}
                     onCheckedChange={(e) =>
                       update("jitProvisioning", e.checked)
                     }
@@ -427,12 +527,12 @@ export function SsoConnectionModal({
                   <Text fontSize="sm">Default role</Text>
                   <NativeSelect.Root size="sm">
                     <NativeSelect.Field
-                      value={conn.defaultRole}
-                      onChange={(e) => update("defaultRole", e.target.value)}
+                      value={form.defaultOrgRole}
+                      onChange={(e) => update("defaultOrgRole", e.target.value)}
                     >
                       <option value="ADMIN">Admin</option>
                       <option value="MEMBER">Member</option>
-                      <option value="VIEWER">Viewer</option>
+                      <option value="EXTERNAL">External</option>
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />
                   </NativeSelect.Root>
@@ -460,9 +560,9 @@ export function SsoConnectionModal({
                       </Text>
                       <Input
                         size="sm"
-                        value={conn.attributeMapping[key]}
+                        value={form.attributeMapping[key]}
                         onChange={(e) =>
-                          setConn((c) => ({
+                          setForm((c) => ({
                             ...c,
                             attributeMapping: {
                               ...c.attributeMapping,
@@ -489,9 +589,9 @@ export function SsoConnectionModal({
                     </Text>
                     <NativeSelect.Root size="sm" width="160px">
                       <NativeSelect.Field
-                        value={conn.roleMapping.defaultRole}
+                        value={form.roleMapping.defaultRole}
                         onChange={(e) =>
-                          setConn((c) => ({
+                          setForm((c) => ({
                             ...c,
                             roleMapping: {
                               ...c.roleMapping,
@@ -502,15 +602,15 @@ export function SsoConnectionModal({
                       >
                         <option value="ADMIN">Admin</option>
                         <option value="MEMBER">Member</option>
-                        <option value="VIEWER">Viewer</option>
+                        <option value="EXTERNAL">External</option>
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
                   </HStack>
                   <Switch
-                    checked={conn.roleMapping.useRoleAttribute}
+                    checked={form.roleMapping.useRoleAttribute}
                     onCheckedChange={(e) =>
-                      setConn((c) => ({
+                      setForm((c) => ({
                         ...c,
                         roleMapping: {
                           ...c.roleMapping,
@@ -524,19 +624,19 @@ export function SsoConnectionModal({
                     </Text>
                   </Switch>
 
-                  {!conn.roleMapping.useRoleAttribute && (
+                  {!form.roleMapping.useRoleAttribute && (
                     <VStack gap={2} align="stretch">
                       <Text fontSize="sm" fontWeight="medium">
                         Group to Role Mappings
                       </Text>
-                      {conn.roleMapping.groupMappings.map((mapping, i) => (
+                      {form.roleMapping.groupMappings.map((mapping, i) => (
                         <HStack key={i}>
                           <Input
                             size="sm"
                             placeholder="IdP Group Name"
                             value={mapping.group}
                             onChange={(e) =>
-                              setConn((c) => {
+                              setForm((c) => {
                                 const mappings = [
                                   ...c.roleMapping.groupMappings,
                                 ];
@@ -558,7 +658,7 @@ export function SsoConnectionModal({
                             <NativeSelect.Field
                               value={mapping.role}
                               onChange={(e) =>
-                                setConn((c) => {
+                                setForm((c) => {
                                   const mappings = [
                                     ...c.roleMapping.groupMappings,
                                   ];
@@ -578,7 +678,7 @@ export function SsoConnectionModal({
                             >
                               <option value="ADMIN">Admin</option>
                               <option value="MEMBER">Member</option>
-                              <option value="VIEWER">Viewer</option>
+                              <option value="EXTERNAL">External</option>
                             </NativeSelect.Field>
                             <NativeSelect.Indicator />
                           </NativeSelect.Root>
@@ -587,7 +687,7 @@ export function SsoConnectionModal({
                             size="xs"
                             colorPalette="red"
                             onClick={() =>
-                              setConn((c) => ({
+                              setForm((c) => ({
                                 ...c,
                                 roleMapping: {
                                   ...c.roleMapping,
@@ -607,7 +707,7 @@ export function SsoConnectionModal({
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          setConn((c) => ({
+                          setForm((c) => ({
                             ...c,
                             roleMapping: {
                               ...c.roleMapping,
@@ -632,7 +732,11 @@ export function SsoConnectionModal({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleSave}>
+            <Button
+              colorPalette="blue"
+              onClick={handleSave}
+              loading={saving}
+            >
               Save
             </Button>
           </Dialog.Footer>
@@ -649,13 +753,13 @@ export function SsoConnectionModal({
         <Dialog.Content bg="bg" maxWidth="480px">
           <Dialog.Header>
             <Dialog.Title>
-              Activate SSO for @{conn.domain}?
+              Activate SSO for @{form.domain}?
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
           <Dialog.Body>
             <Text fontSize="sm">
-              Every user with an <strong>@{conn.domain}</strong> email will be
+              Every user with an <strong>@{form.domain}</strong> email will be
               redirected to your identity provider on sign-in. Password and
               social login will be blocked for this domain.
             </Text>
@@ -664,7 +768,11 @@ export function SsoConnectionModal({
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleConfirm}>
+            <Button
+              colorPalette="blue"
+              onClick={handleConfirm}
+              loading={saving}
+            >
               Activate SSO
             </Button>
           </Dialog.Footer>
