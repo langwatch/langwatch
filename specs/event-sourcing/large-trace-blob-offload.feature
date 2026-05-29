@@ -51,13 +51,17 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # Track 1 — fold cache leanness (Redis / event-loop relief)
   # ===========================================================================
 
-  @e2e @track1 @unimplemented
-  # Bound implicitly: the dispatch interposition replaces over-threshold IO
-  # attribute values with a 64 KB preview before the projection queue, so the
-  # fold cache is naturally bounded. RedisCachedFoldStore.toCacheable continues
-  # to strip non-IO ephemera (events[], spanCosts, accumulated attributes).
-  # Add a direct cache-size measurement test under
-  # langwatch/src/server/event-sourcing/projections/__tests__/ to bind this.
+  @e2e @track1
+  # Bound by redisCachedFoldStore.unit.test.ts — the @scenario annotation on
+  # "given a toCacheable projection and a fold state carrying a 1 MB output"
+  # asserts cached entry length < 1 MB and computedOutput is null in cache,
+  # while the inner ClickHouse store still receives the full state.
+  # Two complementary mechanisms enforce the bound:
+  #   1. The dispatch interposition replaces over-threshold IO attribute values
+  #      with a 64 KB preview before the projection queue, so the fold cache is
+  #      naturally bounded at the input boundary.
+  #   2. RedisCachedFoldStore.toCacheable on traceSummary.foldProjection strips
+  #      computedOutput from the cached shape (CH still gets the full state).
   Scenario: Folding a trace with a 1 MB output keeps the Redis cache entry lean
     Given a trace whose span carries a 1 MB output value
     When all spans of the trace are folded into the trace summary
