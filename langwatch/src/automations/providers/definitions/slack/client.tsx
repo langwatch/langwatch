@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { SiSlack } from "react-icons/si";
+import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import {
   ExampleData,
   FieldHeader,
@@ -140,13 +141,15 @@ function SlackConfigForm({
         onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
       />
       {/* Block Kit templates are JSON whose string values contain Liquid.
-          Using `language="json"` would flag every `{{ var }}` / `{% if %}`
-          as a JSON syntax error, drowning the editor in red. Keep the
-          editor in Liquid mode — Liquid highlighting + autocomplete work,
-          and structural Block Kit validation runs server-side at render. */}
+          We use the custom `liquid-json` Monaco language so the editor
+          tokenizes both: JSON brackets / strings / numbers and Liquid
+          `{{ }}` / `{% %}` expressions. JSON Schema validation is
+          intentionally off (no language service in liquid-json); the
+          server-side renderer is the source of truth for structure. */}
       <LiquidEditor
         variables={ctx.variables}
         height="320px"
+        language={isBlockKit ? LIQUID_JSON_LANGUAGE_ID : undefined}
         value={templateValue}
         onChange={(value) =>
           onChange({ ...slice, template: { value, usingDefault: false } })

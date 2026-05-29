@@ -7,17 +7,13 @@ import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import { Link } from "~/components/ui/link";
 import {
   clearLiquidMarkers,
+  LIQUID_JSON_LANGUAGE_ID,
   LIQUID_LANGUAGE_ID,
   type MonacoTextModel,
   registerLiquidLanguage,
   validateLiquidModel,
   type VariableInfo,
 } from "./liquidMonaco";
-import {
-  SLACK_BLOCK_KIT_JSON_SCHEMA,
-  SLACK_BLOCK_KIT_MODEL_URI,
-  registerJsonSchema,
-} from "./monacoSchemas";
 import { useMonacoTheme } from "./useMonacoTheme";
 
 export type { VariableInfo };
@@ -106,7 +102,8 @@ export function LiquidEditor({
   language?: string;
   height?: string;
 }) {
-  const isLiquid = language === LIQUID_LANGUAGE_ID;
+  const isLiquid =
+    language === LIQUID_LANGUAGE_ID || language === LIQUID_JSON_LANGUAGE_ID;
   const theme = useMonacoTheme();
   const monacoRef = useRef<Monaco | null>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
@@ -146,20 +143,11 @@ export function LiquidEditor({
       <MonacoEditor
         height="100%"
         language={language}
-        path={isLiquid ? undefined : SLACK_BLOCK_KIT_MODEL_URI}
         value={value}
         theme={theme}
         beforeMount={(monaco: Monaco) => {
           defineMonokai(monaco);
-          if (isLiquid) {
-            registerLiquidLanguage(monaco, variables);
-          } else {
-            registerJsonSchema(
-              monaco,
-              SLACK_BLOCK_KIT_MODEL_URI,
-              SLACK_BLOCK_KIT_JSON_SCHEMA,
-            );
-          }
+          registerLiquidLanguage(monaco, variables);
         }}
         onMount={onMount}
         onChange={(next: string | undefined) => onChange(next ?? "")}

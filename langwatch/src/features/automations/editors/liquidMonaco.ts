@@ -26,6 +26,12 @@ export type MonacoTextModel = Parameters<
 >[0];
 
 export const LIQUID_LANGUAGE_ID = "liquid";
+/** Hybrid JSON + Liquid: full JSON tokenization (strings, brackets, numbers,
+ *  keywords) plus Liquid output / tag spans. Used by the Slack Block Kit
+ *  editor so `{{ var }}` / `{% if %}` don't read as JSON syntax errors. No
+ *  semantic JSON validation — the server-side renderer validates structure
+ *  after Liquid substitutes. */
+export const LIQUID_JSON_LANGUAGE_ID = "liquid-json";
 const MARKER_OWNER = "liquid-variables";
 
 const KEYWORDS = new Set([
@@ -97,6 +103,70 @@ export function registerLiquidLanguage(
         ],
       },
     });
+
+    monaco.languages.register({ id: LIQUID_JSON_LANGUAGE_ID });
+    monaco.languages.setLanguageConfiguration(LIQUID_JSON_LANGUAGE_ID, {
+      brackets: [
+        ["{", "}"],
+        ["[", "]"],
+      ],
+      autoClosingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: '"', close: '"' },
+        { open: "{{", close: " }}" },
+        { open: "{%", close: " %}" },
+      ],
+      surroundingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: '"', close: '"' },
+      ],
+    });
+    monaco.languages.setMonarchTokensProvider(LIQUID_JSON_LANGUAGE_ID, {
+      defaultToken: "",
+      tokenPostfix: ".liquid-json",
+      keywords: ["true", "false", "null"],
+      tokenizer: {
+        root: [
+          [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
+          [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
+          [/[{}\[\]]/, "@brackets"],
+          [/[,:]/, "delimiter"],
+          [/"/, { token: "string.quote", next: "@string" }],
+          [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+\-]?\d+)?/, "number"],
+          [
+            /[a-zA-Z_]\w*/,
+            { cases: { "@keywords": "keyword", "@default": "" } },
+          ],
+          [/\s+/, "white"],
+        ],
+        string: [
+          [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
+          [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
+          [/[^"\\{]+/, "string"],
+          [/\\(?:[\\"/bfnrt]|u[0-9A-Fa-f]{4})/, "string.escape"],
+          [/\\/, "string"],
+          [/\{/, "string"],
+          [/"/, { token: "string.quote", next: "@pop" }],
+        ],
+        liquidOutput: [
+          [/\}\}/, { token: "delimiter.liquid", next: "@pop" }],
+          [/\|/, "operator.liquid"],
+          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+          [/[^}]/, ""],
+        ],
+        liquidTag: [
+          [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
+          [
+            /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
+            "keyword.liquid",
+          ],
+          [/[a-zA-Z_][\w.]*/, "variable.liquid"],
+          [/[^%]/, ""],
+        ],
+      },
+    });
     languageRegistered = true;
   }
 
@@ -153,20 +223,9 @@ export function registerLiquidLanguage(
       },
     };
 
-    monaco.languages.registerCompletionItemProvider(
-      LIQUID_LANGUAGE_ID,
-      completionProvider,
-    );
-    // Also register for `json` so authoring a Slack Block Kit template (which
-    // mounts under language=json) still gets `{{ trigger.name }}` autocomplete
-    // — the suggestions are namespaced by `{{`/`{%` triggers, so they don't
-    // overwhelm the regular JSON completions outside Liquid expressions.
-    monaco.languages.registerCompletionItemProvider(
-      "json",
-      completionProvider,
-    );
-
-    monaco.languages.registerHoverProvider(LIQUID_LANGUAGE_ID, {
+    const hoverProvider: Parameters<
+      Monaco["languages"]["registerHoverProvider"]
+    >[1] = {
       provideHover: (model, position) => {
         const word = model.getWordAtPosition(position);
         if (!word) return null;
@@ -181,7 +240,12 @@ export function registerLiquidLanguage(
           ],
         };
       },
-    });
+    };
+
+    for (const id of [LIQUID_LANGUAGE_ID, LIQUID_JSON_LANGUAGE_ID]) {
+      monaco.languages.registerCompletionItemProvider(id, completionProvider);
+      monaco.languages.registerHoverProvider(id, hoverProvider);
+    }
 
     providersRegistered = true;
   }
