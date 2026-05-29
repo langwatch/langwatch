@@ -102,7 +102,12 @@ export class SecuredApp<E extends Env> {
    * required argument — there is no way to obtain the verb methods without it.
    */
   access(policy: AccessPolicy): SecuredVerbs<E> {
-    const chain = policy.kind === "public" ? [] : this.strategy.chainFor(policy);
+    // `public` and `handlerManaged` apply no builder chain: the route is either
+    // intentionally open or authenticates inside its own handler.
+    const chain =
+      policy.kind === "public" || policy.kind === "handlerManaged"
+        ? []
+        : this.strategy.chainFor(policy);
 
     const bind = (method: HttpVerb | "head") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
@@ -235,16 +240,19 @@ export function createOrgApp<Extra extends object = Record<never, never>>(args: 
  */
 export function createServiceApp<E extends Env = Env>(args: {
   basePath: string;
-  verifySecret: MiddlewareHandler;
+  verifySecret?: MiddlewareHandler;
 }): SecuredApp<E> {
   const strategy: AuthStrategy = {
     scope: "service",
     chainFor(policy) {
       switch (policy.kind) {
         case "internal":
-          return [args.verifySecret];
         case "anyAuthenticated":
-          return [args.verifySecret];
+          // A builder-applied secret check is only used when verifySecret is
+          // provided. Legacy routes that validate the secret inside the handler
+          // pass no verifySecret and still declare internalSecret(...) for the
+          // registry; the chain is then empty.
+          return args.verifySecret ? [args.verifySecret] : [];
         default:
           return unsupported("service", policy);
       }

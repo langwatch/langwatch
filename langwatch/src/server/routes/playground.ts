@@ -8,9 +8,7 @@
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { env } from "~/env.mjs";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
@@ -24,11 +22,11 @@ import type { NextRequestShim as any } from "./types";
 
 const errorCache: Record<string, any> = {};
 
-export const app = new Hono().basePath("/api");
-app.use(tracerMiddleware({ name: "playground" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api" });
 
-app.post("/playground", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/playground", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -151,3 +149,5 @@ app.post("/playground", async (c) => {
     throw e;
   }
 });
+
+export const app = secured.hono;

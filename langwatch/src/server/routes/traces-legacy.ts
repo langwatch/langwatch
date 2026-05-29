@@ -9,7 +9,6 @@
  * - src/pages/api/thread/[id].ts
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -33,10 +32,13 @@ import {
   apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
+const AUTH_REASON = "project API key / public share resolved in-handler";
+
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
  * Authenticates via the unified PAT + legacy-key path and enforces the given
@@ -79,7 +81,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 // ---------- GET /api/trace/:id ----------
-app.get("/trace/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -153,7 +155,7 @@ app.get("/trace/:id", async (c) => {
 });
 
 // ---------- POST /api/trace/:id/share ----------
-app.post("/trace/:id/share", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -173,7 +175,7 @@ app.post("/trace/:id/share", async (c) => {
 });
 
 // ---------- POST /api/trace/:id/unshare ----------
-app.post("/trace/:id/unshare", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/unshare", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -217,7 +219,7 @@ const paramsSchema = getAllForProjectInput
     llmMode: z.boolean().optional().default(false),
   });
 
-app.post("/trace/search", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/search", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -309,7 +311,7 @@ app.post("/trace/search", async (c) => {
 });
 
 // ---------- GET /api/thread/:id ----------
-app.get("/thread/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -330,3 +332,5 @@ app.get("/thread/:id", async (c) => {
   markUsed();
   return c.json({ traces });
 });
+
+export const app = secured.hono;

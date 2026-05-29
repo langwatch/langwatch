@@ -4,6 +4,7 @@ export {
   anyAuthenticated,
   publicEndpoint,
   internalSecret,
+  handlerManagedAuth,
   describeAccessPolicy,
 } from "./access-policy";
 export {

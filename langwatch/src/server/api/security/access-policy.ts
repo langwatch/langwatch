@@ -22,7 +22,8 @@ export type AccessPolicy =
   | { readonly kind: "permission"; readonly permission: Permission }
   | { readonly kind: "anyAuthenticated" }
   | { readonly kind: "public"; readonly reason: string }
-  | { readonly kind: "internal"; readonly reason: string };
+  | { readonly kind: "internal"; readonly reason: string }
+  | { readonly kind: "handlerManaged"; readonly reason: string };
 
 /**
  * Require a specific RBAC permission at the app's scope. The secured app
@@ -61,6 +62,20 @@ export function internalSecret(reason: string): AccessPolicy {
   return { kind: "internal", reason };
 }
 
+/**
+ * The route authenticates and authorizes WITHIN its handler (legacy pattern:
+ * in-handler API-key resolution, `getServerAuthSession`, signature checks, or
+ * a framework like tRPC/BetterAuth that runs its own per-request RBAC). The
+ * builder applies no auth chain; `reason` documents how the handler enforces
+ * access so the route is still a reviewable registry entry rather than an
+ * unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)`
+ * strategy when the auth can be expressed as middleware.
+ */
+export function handlerManagedAuth(reason: string): AccessPolicy {
+  assertReason(reason, "handlerManagedAuth");
+  return { kind: "handlerManaged", reason };
+}
+
 function assertReason(reason: string, fn: string): void {
   if (typeof reason !== "string" || reason.trim().length === 0) {
     throw new Error(`${fn}() requires a non-empty reason describing why the route needs no RBAC credential`);
@@ -78,5 +93,7 @@ export function describeAccessPolicy(policy: AccessPolicy): string {
       return `public — ${policy.reason}`;
     case "internal":
       return `internal — ${policy.reason}`;
+    case "handlerManaged":
+      return `handler-managed — ${policy.reason}`;
   }
 }

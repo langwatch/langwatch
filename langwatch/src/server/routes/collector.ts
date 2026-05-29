@@ -1,11 +1,8 @@
 import crypto from "node:crypto";
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { loggerMiddleware } from "../../app/api/middleware/logger";
-import { tracerMiddleware } from "../../app/api/middleware/tracer";
 import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
 import { getApp } from "../app-layer/app";
 import { evaluationNameAutoslug } from "../background/workers/collector/evaluationNameAutoslug";
@@ -34,18 +31,15 @@ import {
   extractCredentials,
   apiKeyCeilingDenialResponse,
 } from "../api-key/auth-middleware";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
-
-// Middleware
-app.use(tracerMiddleware({ name: "langwatch.collector" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api" });
 
 // POST /api/collector
-app.post(
+secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post(
   "/collector",
   bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
   async (c) => {
@@ -656,3 +650,5 @@ app.post(
     });
   },
 );
+
+export const app = secured.hono;

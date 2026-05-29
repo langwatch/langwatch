@@ -10,12 +10,10 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { zValidator } from "@hono/zod-validator";
 import { generateText } from "ai";
-import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
@@ -35,13 +33,13 @@ import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 
-export const app = new Hono().basePath("/api/workflows");
-app.use(tracerMiddleware({ name: "workflows" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/workflows" });
 
 // ── POST /code-completion ────────────────────────────────────────────
 
-app.post("/code-completion", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/code-completion", async (c) => {
   const body = await c.req.json();
 
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -118,7 +116,9 @@ app.post("/code-completion", async (c) => {
 
 // ── POST /post_event ─────────────────────────────────────────────────
 
-app.post(
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post(
   "/post_event",
   zValidator(
     "json",
@@ -259,3 +259,5 @@ app.post(
     });
   },
 );
+
+export const app = secured.hono;

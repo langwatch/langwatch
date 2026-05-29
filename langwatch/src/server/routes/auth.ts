@@ -8,21 +8,29 @@
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
 import { env } from "~/env.mjs";
+import {
+  createServiceApp,
+  publicEndpoint,
+} from "~/server/api/security";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:auth");
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
+
+const authPolicy = () =>
+  publicEndpoint(
+    "BetterAuth session/OAuth handshake; framework manages its own session",
+  );
 
 // ---------- POST /api/auth/validate ----------
-app.post("/auth/validate", async (c) => {
+secured.access(authPolicy()).post("/auth/validate", async (c) => {
   const authToken = c.req.header("x-auth-token");
 
   if (!authToken) {
@@ -41,7 +49,7 @@ app.post("/auth/validate", async (c) => {
 });
 
 // ---------- GET /api/auth/session ----------
-app.get("/auth/session", async (c) => {
+secured.access(authPolicy()).get("/auth/session", async (c) => {
   c.header("Cache-Control", "no-store, must-revalidate");
 
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -148,11 +156,11 @@ const logoutHandler = async (c: Context) => {
   }
 };
 
-app.get("/auth/logout", logoutHandler);
-app.post("/auth/logout", logoutHandler);
+secured.access(authPolicy()).get("/auth/logout", logoutHandler);
+secured.access(authPolicy()).post("/auth/logout", logoutHandler);
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
-app.all("/auth/*", async (c) => {
+const betterAuthCatchAll = async (c: Context) => {
   // Origin gate for state-changing requests
   if (
     !isAllowedAuthOrigin({
@@ -170,7 +178,11 @@ app.all("/auth/*", async (c) => {
 
   // BetterAuth's auth.handler is fetch-compatible (Request => Response)
   return auth.handler(c.req.raw);
-});
+};
+
+for (const verb of ["get", "post", "put", "patch", "delete"] as const) {
+  secured.access(authPolicy())[verb]("/auth/*", betterAuthCatchAll);
+}
 
 function extractCookie(cookieHeader: string, name: string): string | null {
   const match = cookieHeader
@@ -179,3 +191,5 @@ function extractCookie(cookieHeader: string, name: string): string | null {
     .find((cookie) => cookie.startsWith(`${name}=`));
   return match ? match.slice(name.length + 1) : null;
 }
+
+export const app = secured.hono;
