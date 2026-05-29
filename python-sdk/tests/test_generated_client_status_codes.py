@@ -9,7 +9,6 @@ Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pu
 """
 
 from http import HTTPStatus
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
