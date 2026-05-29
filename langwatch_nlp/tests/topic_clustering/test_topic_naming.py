@@ -51,8 +51,8 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
 
             assert len(topic_names) == 2
             print("\n\ntopic_names", topic_names, "\n\n")
-            assert type(topic_names[0]) == str
-            assert type(topic_names[1]) == str
+            assert isinstance(topic_names[0], str)
+            assert isinstance(topic_names[1], str)
 
             topic_names, _cost = improve_similar_names(
                 litellm_params={
@@ -70,8 +70,8 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
 
             assert len(topic_names) == 2
             print("\n\nimproved topic_names", topic_names, "\n\n")
-            assert type(topic_names[0]) == str
-            assert type(topic_names[1]) == str
+            assert isinstance(topic_names[0], str)
+            assert isinstance(topic_names[1], str)
         except Exception as error:
             _skip_if_transient_provider_error(error)
             raise
