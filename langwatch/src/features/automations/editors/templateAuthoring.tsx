@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef } from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import dynamic from "~/utils/compat/next-dynamic";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
-import { Link } from "../ui/link";
+import { Link } from "~/components/ui/link";
 import {
   clearLiquidMarkers,
   LIQUID_LANGUAGE_ID,
@@ -18,6 +18,7 @@ import {
   SLACK_BLOCK_KIT_MODEL_URI,
   registerJsonSchema,
 } from "./monacoSchemas";
+import { useMonacoTheme } from "./useMonacoTheme";
 
 export type { VariableInfo };
 
@@ -106,6 +107,7 @@ export function LiquidEditor({
   height?: string;
 }) {
   const isLiquid = language === LIQUID_LANGUAGE_ID;
+  const theme = useMonacoTheme();
   const monacoRef = useRef<Monaco | null>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
   const changeSubscription = useRef<{ dispose: () => void } | null>(null);
@@ -139,14 +141,14 @@ export function LiquidEditor({
       borderRadius="md"
       overflow="hidden"
       height={height}
-      background="#272822"
+      background={theme === "monokai" ? "#272822" : "white"}
     >
       <MonacoEditor
         height="100%"
         language={language}
         path={isLiquid ? undefined : SLACK_BLOCK_KIT_MODEL_URI}
         value={value}
-        theme="monokai"
+        theme={theme}
         beforeMount={(monaco: Monaco) => {
           defineMonokai(monaco);
           if (isLiquid) {

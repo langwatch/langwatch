@@ -100,7 +100,9 @@ export function registerLiquidLanguage(
   }
 
   if (!providersRegistered) {
-    monaco.languages.registerCompletionItemProvider(LIQUID_LANGUAGE_ID, {
+    const completionProvider: Parameters<
+      Monaco["languages"]["registerCompletionItemProvider"]
+    >[1] = {
       triggerCharacters: [".", " ", "{", "%"],
       provideCompletionItems: (model, position) => {
         const lineUntil = model
@@ -148,18 +150,34 @@ export function registerLiquidLanguage(
 
         return { suggestions: [...variableItems, ...snippets] };
       },
-    });
+    };
+
+    monaco.languages.registerCompletionItemProvider(
+      LIQUID_LANGUAGE_ID,
+      completionProvider,
+    );
+    // Also register for `json` so authoring a Slack Block Kit template (which
+    // mounts under language=json) still gets `{{ trigger.name }}` autocomplete
+    // — the suggestions are namespaced by `{{`/`{%` triggers, so they don't
+    // overwhelm the regular JSON completions outside Liquid expressions.
+    monaco.languages.registerCompletionItemProvider(
+      "json",
+      completionProvider,
+    );
 
     monaco.languages.registerHoverProvider(LIQUID_LANGUAGE_ID, {
       provideHover: (model, position) => {
         const word = model.getWordAtPosition(position);
         if (!word) return null;
         const match = knownVariables.find(
-          (variable) => rootOf(variable) === word.word,
+          (variable) => rootOf(variable.path) === word.word,
         );
         if (!match) return null;
         return {
-          contents: [{ value: `Template variable root \`${word.word}\`` }],
+          contents: [
+            { value: `**${match.path}** — \`${match.type}\`` },
+            ...(match.description ? [{ value: match.description }] : []),
+          ],
         };
       },
     });

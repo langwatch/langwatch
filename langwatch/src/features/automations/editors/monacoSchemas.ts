@@ -12,9 +12,12 @@ import type { Monaco } from "@monaco-editor/react";
  * every registration.
  */
 
-export const CONDITIONS_MODEL_URI = "inmemory://automation/conditions.json";
+// `file:///` URIs make Monaco's JSON language service pick the schemas up
+// reliably; `inmemory://` URIs hit edge cases in the parser depending on the
+// Monaco version. The model path on the editor mounts to these exact URIs.
+export const CONDITIONS_MODEL_URI = "file:///automation/conditions.json";
 export const SLACK_BLOCK_KIT_MODEL_URI =
-  "inmemory://automation/slack-block-kit.json";
+  "file:///automation/slack-block-kit.json";
 
 /** Permissive shape mirroring `triggerFiltersPermissiveSchema` server-side:
  *  filter values are either an array of strings, or a nested object whose

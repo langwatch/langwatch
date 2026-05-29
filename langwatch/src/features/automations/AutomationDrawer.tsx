@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Field,
@@ -15,16 +14,15 @@ import {
 import { AlertType, TriggerAction } from "@prisma/client";
 import type { Monaco } from "@monaco-editor/react";
 import dynamic from "~/utils/compat/next-dynamic";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
-  ArrowLeft,
-  Check,
-  Database,
-  Mail,
-  Pencil,
-  Send,
-  Users,
-} from "lucide-react";
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { ArrowLeft, Check, Database, Mail, Send, Users } from "lucide-react";
 import { SiSlack } from "react-icons/si";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "~/hooks/useFilterParams";
@@ -39,7 +37,6 @@ import {
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import type { TRPCClientErrorLike } from "@trpc/client";
 import {
   EmailPreview,
   ExampleData,
@@ -48,22 +45,42 @@ import {
   PreviewWarnings,
   SlackPreview,
   VariableReference,
-  type FieldDraft,
-} from "./automations/templateAuthoring";
+  type VariableInfo,
+} from "./editors/templateAuthoring";
 import {
   CONDITIONS_JSON_SCHEMA,
   CONDITIONS_MODEL_URI,
-  SLACK_BLOCK_KIT_JSON_SCHEMA,
-  SLACK_BLOCK_KIT_MODEL_URI,
   registerJsonSchema,
-} from "./automations/monacoSchemas";
-import { DatasetSelector } from "./datasets/DatasetSelector";
-import { FieldsFilters } from "./filters/FieldsFilters";
-import { HorizontalFormControl } from "./HorizontalFormControl";
-import { Drawer } from "./ui/drawer";
-import { Switch } from "./ui/switch";
-import { toaster } from "./ui/toaster";
-import { AddParticipants } from "./traces/AddParticipants";
+} from "./editors/monacoSchemas";
+import { useMonacoTheme } from "./editors/useMonacoTheme";
+import {
+  ACTION_LABEL,
+  type AutomationDraft,
+  type ConditionSource,
+  type DraftAction,
+  EMPTY_FIELD,
+  INITIAL_DRAFT,
+  actionParamsFromDraft,
+  conditionsAreSet,
+  configIsComplete,
+  configurationSummary,
+  notifyChannel,
+  reducer,
+  summariseConditions,
+  templatesFromDraft,
+  type SlackTemplateType,
+} from "./logic/draftReducer";
+import {
+  explainDomainError,
+  readDomainError,
+} from "./logic/errorExplainer";
+import { DatasetSelector } from "~/components/datasets/DatasetSelector";
+import { FieldsFilters } from "~/components/filters/FieldsFilters";
+import { HorizontalFormControl } from "~/components/HorizontalFormControl";
+import { Drawer } from "~/components/ui/drawer";
+import { Switch } from "~/components/ui/switch";
+import { toaster } from "~/components/ui/toaster";
+import { AddParticipants } from "~/components/traces/AddParticipants";
 
 /**
  * Staged automation authoring drawer (ADR-028). The main drawer is a list of
@@ -83,246 +100,8 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
-type SlackTemplateType = "string" | "block_kit";
-type ConditionSource = "trace" | "customGraph";
-
-interface AutomationDraft {
-  action: TriggerAction | null;
-  name: string;
-  alertType: AlertType | null;
-  source: ConditionSource;
-  filters: Partial<Record<FilterField, FilterParam>>;
-  customGraphId: string | null;
-  members: string[];
-  slackWebhook: string;
-  slackTemplateType: SlackTemplateType;
-  slackTemplate: FieldDraft;
-  emailSubject: FieldDraft;
-  emailBody: FieldDraft;
-  datasetId: string;
-  datasetMapping: {
-    mapping: Record<string, { source: string; key: string; subkey: string }>;
-    expansions: string[];
-  };
-  annotators: { id: string; name: string }[];
-}
-
-type DraftAction =
-  | { type: "SET_ACTION"; value: TriggerAction }
-  | { type: "SET_NAME"; value: string }
-  | { type: "SET_ALERT_TYPE"; value: AlertType | null }
-  | { type: "SET_SOURCE"; value: ConditionSource }
-  | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
-  | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
-  | { type: "SET_MEMBERS"; value: string[] }
-  | { type: "SET_SLACK_WEBHOOK"; value: string }
-  | { type: "SET_SLACK_TYPE"; value: SlackTemplateType }
-  | { type: "SET_SLACK_TEMPLATE"; value: FieldDraft }
-  | { type: "SET_EMAIL_SUBJECT"; value: FieldDraft }
-  | { type: "SET_EMAIL_BODY"; value: FieldDraft }
-  | { type: "SET_DATASET_ID"; value: string }
-  | { type: "SET_ANNOTATORS"; value: { id: string; name: string }[] }
-  | { type: "HYDRATE"; value: AutomationDraft };
-
-const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
-
-const INITIAL_DRAFT: AutomationDraft = {
-  action: null,
-  name: "",
-  alertType: null,
-  source: "trace",
-  filters: {},
-  customGraphId: null,
-  members: [],
-  slackWebhook: "",
-  slackTemplateType: "string",
-  slackTemplate: EMPTY_FIELD,
-  emailSubject: EMPTY_FIELD,
-  emailBody: EMPTY_FIELD,
-  datasetId: "",
-  datasetMapping: { mapping: {}, expansions: [] },
-  annotators: [],
-};
-
-function reducer(state: AutomationDraft, action: DraftAction): AutomationDraft {
-  switch (action.type) {
-    case "HYDRATE":
-      return action.value;
-    case "SET_ACTION":
-      // Action change resets the destination-specific config but keeps the
-      // identity, conditions, and templates that may still be relevant.
-      return {
-        ...state,
-        action: action.value,
-        members: [],
-        slackWebhook: "",
-        datasetId: "",
-        annotators: [],
-      };
-    case "SET_NAME":
-      return { ...state, name: action.value };
-    case "SET_ALERT_TYPE":
-      return { ...state, alertType: action.value };
-    case "SET_SOURCE":
-      // Switching source clears the conditions tied to the other source so
-      // we never persist stale filters next to a customGraphId or vice versa.
-      return action.value === "customGraph"
-        ? { ...state, source: "customGraph", filters: {} }
-        : { ...state, source: "trace", customGraphId: null };
-    case "SET_CUSTOM_GRAPH_ID":
-      return { ...state, customGraphId: action.value };
-    case "SET_FILTERS":
-      return { ...state, filters: action.value };
-    case "SET_MEMBERS":
-      return { ...state, members: action.value };
-    case "SET_SLACK_WEBHOOK":
-      return { ...state, slackWebhook: action.value };
-    case "SET_SLACK_TYPE":
-      // Reset slackTemplate to "using default" so the new type's default
-      // shows in the editor rather than a stale string-for-block_kit blob.
-      return { ...state, slackTemplateType: action.value, slackTemplate: EMPTY_FIELD };
-    case "SET_SLACK_TEMPLATE":
-      return { ...state, slackTemplate: action.value };
-    case "SET_EMAIL_SUBJECT":
-      return { ...state, emailSubject: action.value };
-    case "SET_EMAIL_BODY":
-      return { ...state, emailBody: action.value };
-    case "SET_DATASET_ID":
-      return { ...state, datasetId: action.value };
-    case "SET_ANNOTATORS":
-      return { ...state, annotators: action.value };
-  }
-}
-
-const ACTION_LABEL: Record<TriggerAction, string> = {
-  [TriggerAction.SEND_SLACK_MESSAGE]: "Slack",
-  [TriggerAction.SEND_EMAIL]: "Email",
-  [TriggerAction.ADD_TO_DATASET]: "Add to dataset",
-  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: "Add to annotation queue",
-};
-
 const PREVIEW_DEBOUNCE_MS = 400;
 type Section = null | "filters" | "configuration";
-
-function notifyChannel(draft: AutomationDraft): "email" | "slack" | null {
-  if (draft.action === TriggerAction.SEND_EMAIL) return "email";
-  if (draft.action === TriggerAction.SEND_SLACK_MESSAGE) return "slack";
-  return null;
-}
-
-interface DomainErrorShape {
-  kind: string;
-  meta: Record<string, unknown>;
-  httpStatus: number;
-}
-
-/**
- * Reads the `domainError` payload the server attaches via `errorFormatter`
- * (see `trpc.ts`). Falls back to a generic shape when the cause isn't one of
- * our ADR-028 domain errors so the UI can still render *something* useful.
- */
-function readDomainError(
-  err: TRPCClientErrorLike<{ errorShape: { data: { domainError?: DomainErrorShape | null } } }>,
-): DomainErrorShape | null {
-  // tRPC v10: error.data.domainError when our errorFormatter ran.
-  const data = (err as { data?: { domainError?: DomainErrorShape | null } })
-    .data;
-  return data?.domainError ?? null;
-}
-
-function explainDomainError(domain: DomainErrorShape): {
-  title: string;
-  description: string;
-} {
-  switch (domain.kind) {
-    case "template_validation_error": {
-      const field = String(domain.meta.field ?? "template");
-      const syntax = String(domain.meta.syntaxError ?? "Invalid Liquid syntax");
-      return { title: `Template "${field}" is invalid`, description: syntax };
-    }
-    case "recipient_not_in_team": {
-      const recipient = String(domain.meta.recipient ?? "Recipient");
-      const allowed = Array.isArray(domain.meta.teamEmails)
-        ? (domain.meta.teamEmails as string[])
-        : [];
-      return {
-        title: "Recipient is not in the team",
-        description: `${recipient} can't receive notifications. Pick from: ${allowed.slice(0, 3).join(", ")}${allowed.length > 3 ? "…" : ""}`,
-      };
-    }
-    case "missing_slack_webhook":
-      return {
-        title: "Slack webhook missing",
-        description: "Paste a Slack incoming webhook URL in the Configuration step.",
-      };
-    case "missing_annotator":
-      return {
-        title: "Annotator missing",
-        description: "Add at least one annotator to the queue.",
-      };
-    case "test_fire_unavailable": {
-      const channel = String(domain.meta.channel ?? "destination");
-      return {
-        title: "Can't test-fire yet",
-        description: `Configure the ${channel} destination first.`,
-      };
-    }
-    case "project_not_found":
-      return { title: "Project not found", description: "" };
-    default:
-      return { title: "Could not save automation", description: "" };
-  }
-}
-
-function templatesFromDraft(draft: AutomationDraft) {
-  return {
-    emailSubjectTemplate: draft.emailSubject.usingDefault ? null : draft.emailSubject.value,
-    emailBodyTemplate: draft.emailBody.usingDefault ? null : draft.emailBody.value,
-    slackTemplate: draft.slackTemplate.usingDefault ? null : draft.slackTemplate.value,
-    slackTemplateType: draft.slackTemplate.usingDefault ? null : draft.slackTemplateType,
-  };
-}
-
-function actionParamsFromDraft(draft: AutomationDraft) {
-  switch (draft.action) {
-    case TriggerAction.SEND_EMAIL:
-      return { members: draft.members };
-    case TriggerAction.SEND_SLACK_MESSAGE:
-      return { slackWebhook: draft.slackWebhook };
-    case TriggerAction.ADD_TO_DATASET:
-      return { datasetId: draft.datasetId, datasetMapping: draft.datasetMapping };
-    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
-      return { annotators: draft.annotators };
-    default:
-      return {};
-  }
-}
-
-function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
-  return Object.values(filters).some(
-    (v) => v && (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0),
-  );
-}
-
-function conditionsAreSet(draft: AutomationDraft): boolean {
-  return draft.source === "customGraph"
-    ? draft.customGraphId !== null
-    : filtersAreSet(draft.filters);
-}
-
-function configIsComplete(draft: AutomationDraft): boolean {
-  if (!draft.action || draft.name.trim().length === 0) return false;
-  switch (draft.action) {
-    case TriggerAction.SEND_EMAIL:
-      return draft.members.length > 0;
-    case TriggerAction.SEND_SLACK_MESSAGE:
-      return draft.slackWebhook.trim().length > 0;
-    case TriggerAction.ADD_TO_DATASET:
-      return draft.datasetId.length > 0;
-    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
-      return draft.annotators.length > 0;
-  }
-}
 
 export function AutomationDrawer({
   automationId,
@@ -666,6 +445,7 @@ export function AutomationDrawer({
 
       <ConfigurationSecondaryDrawer
         open={section === "configuration"}
+        scaffoldLoaded={!!scaffold.data}
         draft={draft}
         dispatch={dispatch}
         variables={variables}
@@ -729,31 +509,35 @@ function SectionRow({
   disabled?: boolean;
   onEdit: () => void;
 }) {
+  // The whole row is the click target; the explicit "Edit" button is gone per
+  // user feedback. A completed section picks up a distinct border so the eye
+  // can scan the main view for what still needs filling in.
   return (
     <HStack
+      as="button"
+      type="button"
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor="border"
+      borderColor={complete ? "green.400" : "border"}
+      bg={complete ? "green.50" : "bg"}
+      _dark={{ bg: complete ? "green.900" : "bg" }}
       opacity={disabled ? 0.6 : 1}
+      cursor={disabled ? "not-allowed" : "pointer"}
+      onClick={disabled ? undefined : onEdit}
+      _hover={disabled ? undefined : { borderColor: complete ? "green.500" : "orange.400" }}
+      width="full"
+      textAlign="left"
     >
       <VStack align="start" gap={0} flex="1" minWidth="0">
         <HStack>
           <Text fontWeight="semibold">{title}</Text>
-          {complete ? <Check size={14} color="green" /> : null}
+          {complete ? <Check size={14} color="var(--chakra-colors-green-500)" /> : null}
         </HStack>
         <Text textStyle="sm" color="fg.muted" lineClamp={2}>
           {summary}
         </Text>
       </VStack>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onEdit}
-        disabled={disabled}
-      >
-        <Pencil size={14} /> Edit
-      </Button>
     </HStack>
   );
 }
@@ -832,32 +616,6 @@ function TypeInline({
   );
 }
 
-function summariseConditions(draft: AutomationDraft): string {
-  if (draft.source === "customGraph") {
-    return draft.customGraphId
-      ? `Custom graph alert (${draft.customGraphId.slice(0, 12)}…)`
-      : "Custom graph (none selected)";
-  }
-  const keys = Object.keys(draft.filters);
-  if (keys.length === 0) return "No conditions yet";
-  return `${keys.length} condition${keys.length === 1 ? "" : "s"}: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "…" : ""}`;
-}
-
-function configurationSummary(draft: AutomationDraft): string {
-  if (!draft.action) return "Choose a type first";
-  const name = draft.name || "(unnamed)";
-  switch (draft.action) {
-    case TriggerAction.SEND_EMAIL:
-      return `${name} → email to ${draft.members.length} recipient(s)`;
-    case TriggerAction.SEND_SLACK_MESSAGE:
-      return `${name} → Slack webhook${draft.slackWebhook ? " set" : " (not set)"}`;
-    case TriggerAction.ADD_TO_DATASET:
-      return `${name} → dataset ${draft.datasetId || "(not chosen)"}`;
-    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
-      return `${name} → ${draft.annotators.length} annotator(s)`;
-  }
-}
-
 // ---------- Filters secondary drawer ----------
 
 interface FiltersDrawerResult {
@@ -891,6 +649,7 @@ function FiltersSecondaryDrawer({
   const [codeMode, setCodeMode] = useState(false);
   const [code, setCode] = useState(JSON.stringify(filters, null, 2));
   const [codeError, setCodeError] = useState<string | null>(null);
+  const conditionsEditorTheme = useMonacoTheme();
 
   useEffect(() => {
     if (open) {
@@ -1044,14 +803,14 @@ function FiltersSecondaryDrawer({
                 borderRadius="md"
                 overflow="hidden"
                 height="500px"
-                background="#272822"
+                background={conditionsEditorTheme === "monokai" ? "#272822" : "white"}
               >
                 <MonacoEditor
                   height="100%"
                   language="json"
                   path={CONDITIONS_MODEL_URI}
                   value={code}
-                  theme="monokai"
+                  theme={conditionsEditorTheme}
                   beforeMount={(monaco: Monaco) => {
                     monaco.editor.defineTheme(
                       "monokai",
@@ -1115,6 +874,7 @@ function FiltersSecondaryDrawer({
 
 function ConfigurationSecondaryDrawer({
   open,
+  scaffoldLoaded,
   draft,
   dispatch,
   variables,
@@ -1130,9 +890,13 @@ function ConfigurationSecondaryDrawer({
   onDone,
 }: {
   open: boolean;
+  /** When false, defaults haven't arrived yet — render a spinner instead of
+   *  the editors so they don't mount with empty values that the user then
+   *  has to refresh away. */
+  scaffoldLoaded: boolean;
   draft: AutomationDraft;
   dispatch: React.Dispatch<DraftAction>;
-  variables: string[];
+  variables: VariableInfo[];
   preview:
     | (
         | {
@@ -1181,6 +945,12 @@ function ConfigurationSecondaryDrawer({
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
+          {!scaffoldLoaded ? (
+            <HStack padding={6} color="fg.muted" gap={3}>
+              <Spinner size="sm" />
+              <Text>Loading default templates…</Text>
+            </HStack>
+          ) : (
           <VStack align="stretch" gap={4}>
             <IdentityFields draft={draft} dispatch={dispatch} />
             {draft.action === TriggerAction.SEND_EMAIL && (
@@ -1219,6 +989,7 @@ function ConfigurationSecondaryDrawer({
               <AnnotationQueueConfig draft={draft} dispatch={dispatch} />
             )}
           </VStack>
+          )}
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">
@@ -1288,7 +1059,7 @@ function EmailConfig({
 }: {
   draft: AutomationDraft;
   dispatch: React.Dispatch<DraftAction>;
-  variables: string[];
+  variables: VariableInfo[];
   preview:
     | {
         channel: "email";
@@ -1319,75 +1090,76 @@ function EmailConfig({
   );
 
   return (
-    <HStack align="stretch" gap={4}>
-      <VStack align="stretch" gap={3} flex="1" minWidth="0">
-        <Field.Root>
-          <Field.Label>Recipients</Field.Label>
-          <VStack align="stretch" gap={1}>
-            {memberEmails.length === 0 ? (
-              <Text color="fg.muted" textStyle="sm">
-                No team members found.
-              </Text>
-            ) : (
-              memberEmails.map((email) => (
-                <HStack key={email}>
-                  <input
-                    type="checkbox"
-                    checked={draft.members.includes(email)}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...draft.members, email]
-                        : draft.members.filter((m) => m !== email);
-                      dispatch({ type: "SET_MEMBERS", value: next });
-                    }}
-                  />
-                  <Text>{email}</Text>
-                </HStack>
-              ))
-            )}
-          </VStack>
-        </Field.Root>
-        <FieldHeader
-          label="Subject"
-          usingDefault={draft.emailSubject.usingDefault}
-          onReset={() =>
-            dispatch({ type: "SET_EMAIL_SUBJECT", value: EMPTY_FIELD })
-          }
-        />
-        <LiquidEditor
-          variables={variables}
-          height="56px"
-          value={subjectValue}
-          onChange={(value) =>
-            dispatch({
-              type: "SET_EMAIL_SUBJECT",
-              value: { value, usingDefault: false },
-            })
-          }
-        />
-        <FieldHeader
-          label="Body (Markdown + Liquid)"
-          usingDefault={draft.emailBody.usingDefault}
-          onReset={() =>
-            dispatch({ type: "SET_EMAIL_BODY", value: EMPTY_FIELD })
-          }
-        />
-        <LiquidEditor
-          variables={variables}
-          height="240px"
-          value={bodyValue}
-          onChange={(value) =>
-            dispatch({
-              type: "SET_EMAIL_BODY",
-              value: { value, usingDefault: false },
-            })
-          }
-        />
-        <VariableReference variables={variables} />
-        {example ? <ExampleData example={example} /> : null}
-      </VStack>
-      <VStack align="stretch" gap={2} flex="1" minWidth="0">
-        <HStack>
+    <VStack align="stretch" gap={4}>
+      <Field.Root>
+        <Field.Label>Recipients</Field.Label>
+        <VStack align="stretch" gap={1}>
+          {memberEmails.length === 0 ? (
+            <Text color="fg.muted" textStyle="sm">
+              No team members found.
+            </Text>
+          ) : (
+            memberEmails.map((email) => (
+              <HStack key={email}>
+                <input
+                  type="checkbox"
+                  checked={draft.members.includes(email)}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                      ? [...draft.members, email]
+                      : draft.members.filter((m) => m !== email);
+                    dispatch({ type: "SET_MEMBERS", value: next });
+                  }}
+                />
+                <Text>{email}</Text>
+              </HStack>
+            ))
+          )}
+        </VStack>
+      </Field.Root>
+      <FieldHeader
+        label="Subject"
+        usingDefault={draft.emailSubject.usingDefault}
+        onReset={() =>
+          dispatch({ type: "SET_EMAIL_SUBJECT", value: EMPTY_FIELD })
+        }
+      />
+      <LiquidEditor
+        variables={variables}
+        height="56px"
+        value={subjectValue}
+        onChange={(value) =>
+          dispatch({
+            type: "SET_EMAIL_SUBJECT",
+            value: { value, usingDefault: false },
+          })
+        }
+      />
+      <FieldHeader
+        label="Body (Markdown + Liquid)"
+        usingDefault={draft.emailBody.usingDefault}
+        onReset={() =>
+          dispatch({ type: "SET_EMAIL_BODY", value: EMPTY_FIELD })
+        }
+      />
+      <LiquidEditor
+        variables={variables}
+        height="280px"
+        value={bodyValue}
+        onChange={(value) =>
+          dispatch({
+            type: "SET_EMAIL_BODY",
+            value: { value, usingDefault: false },
+          })
+        }
+      />
+      <Box
+        border="1px solid"
+        borderColor="border"
+        borderRadius="md"
+        padding={3}
+      >
+        <HStack mb={2}>
           <Text textStyle="sm" fontWeight="semibold">
             Preview
           </Text>
@@ -1401,8 +1173,10 @@ function EmailConfig({
             Edit a template to preview.
           </Text>
         )}
-      </VStack>
-    </HStack>
+      </Box>
+      <VariableReference variables={variables} />
+      {example ? <ExampleData example={example} /> : null}
+    </VStack>
   );
 }
 
@@ -1417,7 +1191,7 @@ function SlackConfig({
 }: {
   draft: AutomationDraft;
   dispatch: React.Dispatch<DraftAction>;
-  variables: string[];
+  variables: VariableInfo[];
   preview:
     | {
         channel: "slack";
@@ -1433,74 +1207,69 @@ function SlackConfig({
 }) {
   const isBlockKit = draft.slackTemplateType === "block_kit";
   return (
-    <HStack align="stretch" gap={4}>
-      <VStack align="stretch" gap={3} flex="1" minWidth="0">
-        <Field.Root>
-          <Field.Label>Slack webhook URL</Field.Label>
-          <Input
-            value={draft.slackWebhook}
+    <VStack align="stretch" gap={4}>
+      <Field.Root>
+        <Field.Label>Slack webhook URL</Field.Label>
+        <Input
+          value={draft.slackWebhook}
+          onChange={(e) =>
+            dispatch({ type: "SET_SLACK_WEBHOOK", value: e.target.value })
+          }
+          placeholder="https://hooks.slack.com/services/..."
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Message type</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={draft.slackTemplateType}
             onChange={(e) =>
-              dispatch({ type: "SET_SLACK_WEBHOOK", value: e.target.value })
+              dispatch({
+                type: "SET_SLACK_TYPE",
+                value: e.target.value as SlackTemplateType,
+              })
             }
-            placeholder="https://hooks.slack.com/services/..."
-          />
-        </Field.Root>
-        <Field.Root>
-          <Field.Label>Message type</Field.Label>
-          <NativeSelect.Root>
-            <NativeSelect.Field
-              value={draft.slackTemplateType}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_SLACK_TYPE",
-                  value: e.target.value as SlackTemplateType,
-                })
-              }
-            >
-              <option value="string">Plain text</option>
-              <option value="block_kit">Block Kit (JSON)</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </Field.Root>
-        <FieldHeader
-          label={
-            isBlockKit
-              ? "Block Kit template (JSON + Liquid in strings)"
-              : "Message template (Liquid)"
-          }
-          usingDefault={draft.slackTemplate.usingDefault}
-          onReset={() =>
-            dispatch({ type: "SET_SLACK_TEMPLATE", value: EMPTY_FIELD })
-          }
-        />
-        <LiquidEditor
-          variables={variables}
-          height="280px"
-          language={isBlockKit ? "json" : undefined}
-          value={slackValue}
-          onChange={(value) =>
-            dispatch({
-              type: "SET_SLACK_TEMPLATE",
-              value: { value, usingDefault: false },
-            })
-          }
-        />
-        <VariableReference variables={variables} />
-        {example ? <ExampleData example={example} /> : null}
-      </VStack>
-      <VStack align="stretch" gap={2} flex="1" minWidth="0">
-        <HStack>
+          >
+            <option value="string">Plain text</option>
+            <option value="block_kit">Block Kit (JSON)</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+      <FieldHeader
+        label={
+          isBlockKit
+            ? "Block Kit template (JSON + Liquid in strings)"
+            : "Message template (Liquid)"
+        }
+        usingDefault={draft.slackTemplate.usingDefault}
+        onReset={() =>
+          dispatch({ type: "SET_SLACK_TEMPLATE", value: EMPTY_FIELD })
+        }
+      />
+      <LiquidEditor
+        variables={variables}
+        height="320px"
+        language={isBlockKit ? "json" : undefined}
+        value={slackValue}
+        onChange={(value) =>
+          dispatch({
+            type: "SET_SLACK_TEMPLATE",
+            value: { value, usingDefault: false },
+          })
+        }
+      />
+      <Box
+        border="1px solid"
+        borderColor="border"
+        borderRadius="md"
+        padding={3}
+      >
+        <HStack mb={2}>
           <Text textStyle="sm" fontWeight="semibold">
             Preview
           </Text>
           {previewLoading ? <Spinner size="xs" /> : null}
-          <Spacer />
-          {isBlockKit ? (
-            <Badge size="sm" colorPalette="orange">
-              Liquid is rendered before JSON.parse
-            </Badge>
-          ) : null}
         </HStack>
         <PreviewWarnings data={preview} />
         {preview ? (
@@ -1510,8 +1279,10 @@ function SlackConfig({
             Edit a template to preview.
           </Text>
         )}
-      </VStack>
-    </HStack>
+      </Box>
+      <VariableReference variables={variables} />
+      {example ? <ExampleData example={example} /> : null}
+    </VStack>
   );
 }
 

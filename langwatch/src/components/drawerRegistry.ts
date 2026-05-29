@@ -13,7 +13,7 @@ import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { AutomationDrawer } from "./AutomationDrawer";
+import { AutomationDrawer } from "~/features/automations/AutomationDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
