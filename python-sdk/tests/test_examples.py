@@ -219,7 +219,10 @@ async def test_example(example_file: str):
                 elif any(
                     error_indicator in str(e)
                     for error_indicator in [
-                        "The server had an error",  # OpenAI 500 (with or without "while processing")
+                        # Provider-side 5xx (OpenAI and Azure both tag these with a
+                        # "server_error" type, regardless of the human-readable message).
+                        "server_error",
+                        "The server had an error",  # OpenAI 500 prose variant
                         # "Error code: 404",
                         # "This is a chat model and not supported in the v1/completions endpoint",
                         "Rate limit",
