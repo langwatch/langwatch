@@ -73,7 +73,7 @@ try {
       try {
         await import(`/assets/${name}`);
       } catch (e) {
-        errs.push(`${name}: ${e?.message ?? String(e)}`);
+        errs.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     return errs;
