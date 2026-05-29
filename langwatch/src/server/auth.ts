@@ -115,7 +115,7 @@ export const getServerAuthSession = async (ctx: {
     // existing impersonate endpoint + UI banner keep working unchanged.
     const dbSession = await prisma.session.findUnique({
       where: { id: result.session.id },
-      select: { impersonating: true },
+      select: { impersonating: true, ssoAuthenticatedAt: true },
     });
 
     // Fail closed when BetterAuth returns a cached session but the DB row
@@ -131,6 +131,27 @@ export const getServerAuthSession = async (ctx: {
         "BetterAuth returned a cached session that no longer exists in the DB; treating it as revoked",
       );
       return null;
+    }
+
+    const SSO_REAUTH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+    if (dbSession.ssoAuthenticatedAt) {
+      const ageMs = Date.now() - dbSession.ssoAuthenticatedAt.getTime();
+      if (ageMs > SSO_REAUTH_WINDOW_MS && result.user.email) {
+        const domain = result.user.email.split("@")[1];
+        if (domain) {
+          const enforced = await prisma.ssoConnection.findFirst({
+            where: { domain, ssoEnforced: true, verifiedAt: { not: null } },
+            select: { id: true },
+          });
+          if (enforced) {
+            logger.info(
+              { sessionId: result.session.id, userId: result.user.id, domain },
+              "SSO session older than 7 days — forcing re-authentication",
+            );
+            return null;
+          }
+        }
+      }
     }
 
     const impersonating = dbSession.impersonating as

@@ -48,11 +48,12 @@ model Session {
   userId        String
   expires       DateTime
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  impersonating Json?
-  ipAddress     String?
-  userAgent     String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  impersonating      Json?
+  ipAddress          String?
+  userAgent          String?   @db.Text
+  ssoAuthenticatedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
 
   @@index([userId])
 }

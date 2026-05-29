@@ -296,6 +296,7 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
         sessionToken,
         userId: user.id,
         expires: expiresAt,
+        ssoAuthenticatedAt: new Date(),
         ipAddress:
           c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
         userAgent: c.req.header("user-agent") ?? null,
