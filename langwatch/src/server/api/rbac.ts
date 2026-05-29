@@ -108,6 +108,51 @@ export type Resource = (typeof Resources)[keyof typeof Resources];
  */
 export type Permission = `${Resource}:${Action}`;
 
+/**
+ * Resources that only exist at the organization tier — there is no team- or
+ * project-scoped meaning for them (the AI Governance family plus the
+ * organization resource itself). Org-tier authority comes only from an
+ * ORGANIZATION-scoped RoleBinding; a TEAM- or PROJECT-scoped binding must
+ * never grant a permission on one of these, even via a custom role that lists
+ * it. This is the defense the scope-chain resolvers apply so a custom role
+ * misconfigured below the org tier can't escalate to organization:manage,
+ * governance:manage, anomalyRules:manage, and so on (ADR-021).
+ *
+ * Gateway + core resources (virtualKeys, gatewayBudgets, datasets, workflows,
+ * …) are deliberately NOT here: they are legitimately accessible at team and
+ * project scope, so team/project bindings may grant them.
+ */
+const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
+  Resources.ORGANIZATION,
+  Resources.GOVERNANCE,
+  Resources.INGESTION_SOURCES,
+  Resources.ANOMALY_RULES,
+  Resources.COMPLIANCE_EXPORT,
+  Resources.ACTIVITY_MONITOR,
+  Resources.AI_TOOLS,
+]);
+
+/** True when the permission targets an organization-tier-only resource. */
+export function isOrgExclusivePermission(permission: Permission): boolean {
+  const resource = permission.split(":")[0] as Resource;
+  return ORG_EXCLUSIVE_RESOURCES.has(resource);
+}
+
+/**
+ * Whether a binding at `scopeType` may grant `permission`. Org-exclusive
+ * permissions require an ORGANIZATION-scoped binding; everything else is
+ * grantable at any scope. Both the tRPC resolver (`checkPermissionFromBindings`)
+ * and the gateway resolver (`checkRoleBindingPermission`) gate on this so the
+ * rule holds no matter which path evaluates the binding.
+ */
+export function bindingScopeCanGrant(
+  scopeType: RoleBindingScopeType,
+  permission: Permission,
+): boolean {
+  if (scopeType === RoleBindingScopeType.ORGANIZATION) return true;
+  return !isOrgExclusivePermission(permission);
+}
+
 // ============================================================================
 // ROLE DEFINITIONS
 // ============================================================================
@@ -711,6 +756,11 @@ async function checkPermissionFromBindings({
     });
 
     if (!teamUser) return false;
+    // Legacy team membership is a TEAM-scoped grant, so it can't confer an
+    // org-exclusive permission even through a custom role (ADR-021).
+    if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+      return false;
+    }
     return resolveBindingPermission(
       { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
       organizationRole,
@@ -721,6 +771,10 @@ async function checkPermissionFromBindings({
 
   // Union permissions across ALL matching bindings — permitted if any grants it
   for (const binding of bindings) {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021).
+    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
     // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
     // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
@@ -991,6 +1045,13 @@ export async function hasOrganizationPermission(
   // personal workspace. A personal team's legitimate ADMIN power is
   // team-scoped and flows through its TEAM-scoped RoleBinding, never this
   // org-wide union.
+  // The team-membership union below is a TEAM-scoped grant applied to an
+  // org-level check; org-exclusive permissions (organization:* / governance
+  // family) are never conferred through it — only an ORGANIZATION-scoped
+  // binding can (ADR-021). Gateway/audit resources stay grantable here.
+  if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+    return false;
+  }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
     where: { userId, team: { organizationId, isPersonal: false } },
     select: { role: true, assignedRoleId: true },
@@ -1110,6 +1171,9 @@ export async function batchScopePermissions(
     customRoleId: string | null;
     scopeType: RoleBindingScopeType;
   }): boolean => {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021).
+    if (!bindingScopeCanGrant(binding.scopeType, args.permission)) return false;
     if (binding.customRoleId) {
       const custom = customRoleById.get(binding.customRoleId);
       if (custom) {

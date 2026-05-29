@@ -142,6 +142,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         name: "openai",
         provider: "openai",
         enabled: true,
+        organizationId: ORG_ID,
         customKeys: {},
         scopes: {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],

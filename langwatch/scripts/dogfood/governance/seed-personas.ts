@@ -194,6 +194,7 @@ export async function runSeedPersonas(
           name: "OpenAI",
           provider: "openai",
           enabled: true,
+          organizationId: org.id,
           // customKeys is an AES-GCM encrypted JSON blob, not a plain
           // object. config.materialiser decrypts and pick()s
           // OPENAI_API_KEY before handing it to the gateway. Empty {}

@@ -2,7 +2,7 @@ import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@p
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
-import { resolveOrganizationForScope } from "../scopes/resolveOrganizationForScope";
+import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
 
@@ -187,12 +187,16 @@ export class ModelProviderRepository {
         ? data.scopes
         : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
 
-    // Single-organization anchor (ADR-021): every scope resolves to the same
-    // org, so the page-context project's org is authoritative.
-    const organizationId = await resolveOrganizationForScope(client, {
-      scopeType: "PROJECT",
-      scopeId: data.projectId,
-    });
+    // Single-organization anchor (ADR-021): every scope this provider attaches
+    // to must resolve to the same org. Resolve them all and reject a mixed or
+    // unresolvable set, so a caller can't slip in scopes from another org under
+    // one anchor. The column is NOT NULL, so an unresolvable scope is a hard
+    // error.
+    const organizationId = await resolveSingleOrganizationForScopes(
+      client,
+      scopes,
+      "model provider",
+    );
 
     return client.modelProvider.create({
       data: {
@@ -200,7 +204,7 @@ export class ModelProviderRepository {
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
-        organizationId: organizationId ?? undefined,
+        organizationId,
         customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
         customModels: data.customModels as Prisma.InputJsonValue | undefined,
         customEmbeddingsModels: data.customEmbeddingsModels as
@@ -243,6 +247,25 @@ export class ModelProviderRepository {
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
+        // Single-organization invariant (ADR-021): the replacement scope set
+        // must resolve to the same org the provider is already anchored to.
+        // Without this, swapping scopes could silently rebind the credential to
+        // another tenant while organizationId stays put — a multitenancy break,
+        // since provider visibility is driven from the scope table.
+        const organizationId = await resolveSingleOrganizationForScopes(
+          workingTx,
+          scopes,
+          "model provider",
+        );
+        const existing = await workingTx.modelProvider.findUnique({
+          where: { id },
+          select: { organizationId: true },
+        });
+        if (existing && existing.organizationId !== organizationId) {
+          throw new Error(
+            "Cannot update model provider: scopes must stay within the provider's organization",
+          );
+        }
         await workingTx.modelProviderScope.deleteMany({
           where: { modelProviderId: id },
         });

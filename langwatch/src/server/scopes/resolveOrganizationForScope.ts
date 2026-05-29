@@ -1,6 +1,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
+import type { ScopeTier } from "./scope.types";
+
 type Client = PrismaClient | Prisma.TransactionClient;
+
+type ScopeTarget = { scopeType: ScopeTier; scopeId: string };
 
 /**
  * Resolve the single organization a (scopeType, scopeId) target belongs to.
@@ -16,21 +20,62 @@ type Client = PrismaClient | Prisma.TransactionClient;
  */
 export async function resolveOrganizationForScope(
   client: Client,
-  scope: { scopeType: string; scopeId: string },
+  scope: ScopeTarget,
 ): Promise<string | null> {
-  if (scope.scopeType === "ORGANIZATION") {
-    return scope.scopeId;
+  switch (scope.scopeType) {
+    case "ORGANIZATION":
+      return scope.scopeId;
+    case "TEAM": {
+      const team = await client.team.findUnique({
+        where: { id: scope.scopeId },
+        select: { organizationId: true },
+      });
+      return team?.organizationId ?? null;
+    }
+    case "PROJECT": {
+      const project = await client.project.findUnique({
+        where: { id: scope.scopeId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      return project?.team.organizationId ?? null;
+    }
+    default:
+      // Guard against type-unsafe / widened callers: an unknown scope type
+      // must fail fast rather than silently resolving against the project table.
+      throw new Error(
+        `resolveOrganizationForScope: unsupported scope type ${String(
+          (scope as { scopeType: unknown }).scopeType,
+        )}`,
+      );
   }
-  if (scope.scopeType === "TEAM") {
-    const team = await client.team.findUnique({
-      where: { id: scope.scopeId },
-      select: { organizationId: true },
-    });
-    return team?.organizationId ?? null;
+}
+
+/**
+ * Resolve the single organization a set of scope targets all belong to, for
+ * resources anchored to one org (ADR-021). Every scope must resolve, and they
+ * must all resolve to the same organization; otherwise we'd persist scope rows
+ * that disagree with the row's organizationId anchor. Throws on an empty,
+ * unresolvable, or cross-organization set. `resourceLabel` is woven into the
+ * error message (e.g. "model provider").
+ */
+export async function resolveSingleOrganizationForScopes(
+  client: Client,
+  scopes: ScopeTarget[],
+  resourceLabel: string,
+): Promise<string> {
+  if (scopes.length === 0) {
+    throw new Error(
+      `Cannot create ${resourceLabel}: at least one scope is required to resolve an organization`,
+    );
   }
-  const project = await client.project.findUnique({
-    where: { id: scope.scopeId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  return project?.team.organizationId ?? null;
+  const resolved = await Promise.all(
+    scopes.map((scope) => resolveOrganizationForScope(client, scope)),
+  );
+  const organizationId = resolved[0];
+  if (!organizationId || resolved.some((orgId) => orgId !== organizationId)) {
+    throw new Error(
+      `Cannot create ${resourceLabel}: all scopes must resolve to the same organization`,
+    );
+  }
+  return organizationId;
 }
