@@ -82,6 +82,38 @@ describe("guardOrganizationId — original three models preserved", () => {
       ).rejects.toThrow(/requires an 'organizationId'/);
     });
   });
+
+  describe("when upserting a CustomRole whose create payload omits organizationId", () => {
+    it("THROWS — upsert's create branch is held to the same anchor invariant", async () => {
+      await expect(
+        runGuard({
+          model: "CustomRole",
+          action: "upsert",
+          args: {
+            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
+            create: { name: "auditor", permissions: [] },
+            update: {},
+          },
+        }),
+      ).rejects.toThrow(/requires an 'organizationId' in the create payload/);
+    });
+  });
+
+  describe("when upserting a CustomRole with organizationId in the create payload", () => {
+    it("does NOT throw — both the where and the create payload are anchored", async () => {
+      await expect(
+        runGuard({
+          model: "CustomRole",
+          action: "upsert",
+          args: {
+            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
+            create: { organizationId: "org_1", name: "auditor", permissions: [] },
+            update: {},
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
 });
 
 describe("guardOrganizationId — bare queries throw", () => {
@@ -98,7 +130,7 @@ describe("guardOrganizationId — bare queries throw", () => {
   });
 
   describe("when running findMany on Group with a non-tenancy filter only", () => {
-    it("THROWS — slug-only without organizationId is unbounded", async () => {
+    it("THROWS — a scimSource filter without organizationId is unbounded", async () => {
       await expect(
         runGuard({
           model: "Group",

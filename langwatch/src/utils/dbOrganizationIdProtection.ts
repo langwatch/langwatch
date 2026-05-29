@@ -246,6 +246,17 @@ const _guardOrganizationId = ({
       `The ${action} action on the ${model} model requires an 'organizationId', row id, or model-specific tenancy key in the where clause`,
     );
   }
+
+  // upsert also writes a create payload when the row is absent, so hold it to
+  // the same "every create declares its owning organization" invariant.
+  if (action === "upsert") {
+    const createData = params.args?.create;
+    if (!createData || typeof createData.organizationId !== "string") {
+      throw new Error(
+        `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
+      );
+    }
+  }
 };
 
 export const guardOrganizationId: Prisma.Middleware = async (params, next) => {
