@@ -242,7 +242,10 @@ export function AutomationDrawer({
     upsert.mutate(
       {
         projectId,
-        triggerId: automationId,
+        // Omit triggerId entirely on create — Zod's `.optional()` accepts a
+        // missing key cleanly, but `triggerId: undefined` round-trips
+        // inconsistently through superjson depending on tRPC version.
+        ...(automationId ? { triggerId: automationId } : {}),
         name: draft.name,
         action: draft.action,
         alertType: draft.alertType ?? undefined,

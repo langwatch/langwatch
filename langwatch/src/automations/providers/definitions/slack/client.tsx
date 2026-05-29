@@ -139,10 +139,14 @@ function SlackConfigForm({
         usingDefault={slice.template.usingDefault}
         onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
       />
+      {/* Block Kit templates are JSON whose string values contain Liquid.
+          Using `language="json"` would flag every `{{ var }}` / `{% if %}`
+          as a JSON syntax error, drowning the editor in red. Keep the
+          editor in Liquid mode — Liquid highlighting + autocomplete work,
+          and structural Block Kit validation runs server-side at render. */}
       <LiquidEditor
         variables={ctx.variables}
         height="320px"
-        language={isBlockKit ? "json" : undefined}
         value={templateValue}
         onChange={(value) =>
           onChange({ ...slice, template: { value, usingDefault: false } })
