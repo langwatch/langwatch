@@ -13,11 +13,25 @@ import {
 } from "@aws-sdk/client-lambda";
 import { env } from "../../../env.mjs";
 import { TtlCache } from "../../../server/utils/ttlCache";
+import {
+  STAGED_PAYLOAD_HEADER,
+  deleteStagedObject,
+  stagePayloadToS3,
+  type StagedObject,
+} from "../../../server/s3/stagePayload";
 import { createLogger } from "../../../utils/logger/server";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
+
+/** S3 key prefix for staged studio invoke payloads (separate from the
+ *  langevals-staging prefix so bucket lifecycle rules can target each). */
+const STUDIO_STAGING_PREFIX = "studio-staging";
+
+/** Fallback staging threshold when LANGEVALS_STAGING_THRESHOLD_BYTES is unset.
+ *  Sits below the 6 MB Lambda invoke cap with margin for the invoke envelope. */
+const STUDIO_INVOKE_STAGING_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /**
  * Strip secrets from a studio event before passing to error reporters.
@@ -515,16 +529,23 @@ export const invokeLambda = async (
     path?: string;
     /** Extra headers merged after the defaults (e.g. X-LangWatch-Origin). */
     headers?: Record<string, string>;
+    /** When true, an oversized invoke body is offloaded to S3 and replaced
+     *  with an X-Payload-S3-URL header so it doesn't hit the 6 MB Lambda
+     *  invoke cap. Only set this for receivers that fetch the header (the Go
+     *  engine — services/nlpgo/adapters/httpapi/staged_payload.go). The legacy
+     *  Python handler does not, so leave it false there. */
+    supportsStaging?: boolean;
   } = {},
 ): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const path = options.path ?? "/studio/execute";
-  const payload = {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
+    ...(options.headers ?? {}),
+  };
+  const payload: { body: string; headers: Record<string, string> } = {
     body: JSON.stringify(event),
-    headers: {
-      "Content-Type": "application/json",
-      ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
-      ...(options.headers ?? {}),
-    },
+    headers,
   };
 
   // Check if we should use the new dynamic Lambda approach
@@ -533,6 +554,39 @@ export const invokeLambda = async (
 
     // Get the project-specific Lambda ARN
     const functionArn = await getProjectLambdaArn(projectId);
+
+    // A synchronous Lambda invoke caps the request body at 6 MB, so a heavy
+    // dataset row (a multi-megabyte conversation) fails before our code runs
+    // with "Request must be smaller than 6291456 bytes". When the receiver
+    // can fetch a presigned URL, offload the oversized body to S3 and invoke
+    // with an empty body + the staged header instead. The object is deleted
+    // once the response stream completes.
+    let stagedInvoke: StagedObject | null = null;
+    let invokePayload = payload;
+    if (options.supportsStaging) {
+      const bodyBytes = Buffer.byteLength(payload.body, "utf-8");
+      const threshold =
+        env.LANGEVALS_STAGING_THRESHOLD_BYTES ?? STUDIO_INVOKE_STAGING_THRESHOLD_BYTES;
+      if (bodyBytes > threshold) {
+        stagedInvoke = await stagePayloadToS3({
+          projectId,
+          keyPrefix: `${STUDIO_STAGING_PREFIX}/${projectId}`,
+          serialized: Buffer.from(payload.body, "utf-8"),
+          ttlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
+        });
+        logger.info(
+          { projectId, path, bodyBytes, thresholdBytes: threshold },
+          "staged oversized studio invoke payload via presigned S3 URL",
+        );
+        invokePayload = {
+          body: "",
+          headers: {
+            ...payload.headers,
+            [STAGED_PAYLOAD_HEADER]: stagedInvoke.stagedUrl,
+          },
+        };
+      }
+    }
 
     const command = new InvokeWithResponseStreamCommand({
       FunctionName: functionArn,
@@ -544,13 +598,16 @@ export const invokeLambda = async (
             method: "POST",
           },
         },
-        ...payload,
+        ...invokePayload,
       }),
     });
 
     const { EventStream } = await lambda.send(command);
 
     if (!EventStream) {
+      if (stagedInvoke) {
+        await deleteStagedObject({ ...stagedInvoke, projectId });
+      }
       throw new Error("No payload received from Lambda");
     }
 
@@ -647,6 +704,15 @@ export const invokeLambda = async (
         } catch (error) {
           logger.error({ error }, "failed to run workflow stream");
           controller.error(error);
+        } finally {
+          // The Go engine has fetched the staged payload during request
+          // handling by the time the stream completes, so the object is no
+          // longer needed. Staged bodies carry customer trace data and
+          // provider credentials, so delete promptly rather than relying on
+          // the bucket lifecycle rule (the orphan/crash fallback).
+          if (stagedInvoke) {
+            await deleteStagedObject({ ...stagedInvoke, projectId });
+          }
         }
       },
     });

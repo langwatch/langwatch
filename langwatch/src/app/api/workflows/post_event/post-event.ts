@@ -53,6 +53,9 @@ export const studioBackendPostEvent = async ({
     reader = await invokeLambda(projectId, message, s3CacheKey, {
       path: goEnabled ? "/go/studio/execute" : "/studio/execute",
       headers: goEnabled ? { "X-LangWatch-Origin": "workflow" } : undefined,
+      // Only the Go engine fetches the X-Payload-S3-URL header; the legacy
+      // Python handler inlines the body, so staging is gated to the Go path.
+      supportsStaging: goEnabled,
     });
   } catch (error) {
     if (
