@@ -171,7 +171,7 @@ describe("FeatureFlagService", () => {
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).toHaveBeenCalledWith(PRODUCT_FLAG, {
           distinctId: "user-1",
-          defaultValue: false,
+          defaultValue: true,
         });
       });
     });
