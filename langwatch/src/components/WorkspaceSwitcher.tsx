@@ -14,6 +14,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "./ui/menu";
 import { Link } from "./ui/link";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { Tooltip } from "./ui/tooltip";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 
@@ -302,34 +303,11 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                             }}
                           />
                           {team.canCreateProject && onCreateProjectForTeam && (
-                            // No Tooltip wrapper here: Ark Menu auto-moves
-                            // focus into the dropdown when it opens, and a
-                            // Tooltip around a focusable child opens itself
-                            // on focus (Zag tooltip has no openOnFocus={false}
-                            // escape hatch). That made the "Create project"
-                            // tooltip visible-by-default on switcher mount.
-                            // The icon's meaning is clear from the team-row
-                            // context and aria-label covers screen readers.
-                            <IconButton
-                              aria-label={`Create project in ${team.label}`}
-                              size="xs"
-                              variant="ghost"
-                              position="absolute"
-                              right={2}
-                              top="50%"
-                              transform="translateY(-50%)"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                setOpen(false);
-                                onCreateProjectForTeam({
-                                  teamId: team.teamId,
-                                  orgId: team.orgId,
-                                });
-                              }}
-                            >
-                              <Plus size={14} />
-                            </IconButton>
+                            <TeamCreateProjectButton
+                              team={team}
+                              onCreateProjectForTeam={onCreateProjectForTeam}
+                              setOpen={setOpen}
+                            />
                           )}
                         </Box>
                         {teamProjects.length > 0 && (
@@ -492,5 +470,64 @@ function SwitcherItem({
         </VStack>
       </Link>
     </Menu.Item>
+  );
+}
+
+/**
+ * Per-team "+" button with a controlled "Create project" tooltip.
+ *
+ * Tooltip visibility is owned by local state and only flips on pointer
+ * enter / leave. Ark Menu auto-moves focus into the dropdown when it
+ * opens, which would otherwise trip Zag's focus-opens-tooltip behavior
+ * (the underlying machine has no `openOnFocus={false}` knob); passing a
+ * no-op `onOpenChange` shorts out Zag's internal open transitions, and
+ * the explicit `onFocus` reset is belt-and-braces against any path that
+ * still tries to flip us open from focus.
+ */
+function TeamCreateProjectButton({
+  team,
+  onCreateProjectForTeam,
+  setOpen,
+}: {
+  team: Extract<WorkspaceSwitcherEntry, { kind: "team" }>;
+  onCreateProjectForTeam: NonNullable<
+    WorkspaceSwitcherProps["onCreateProjectForTeam"]
+  >;
+  setOpen: (open: boolean) => void;
+}) {
+  const [tipOpen, setTipOpen] = React.useState(false);
+  return (
+    <Tooltip
+      content="Create project"
+      open={tipOpen}
+      onOpenChange={() => {
+        /* controlled — ignore Zag's hover / focus transitions */
+      }}
+    >
+      <IconButton
+        aria-label={`Create project in ${team.label}`}
+        size="xs"
+        variant="ghost"
+        position="absolute"
+        right={2}
+        top="50%"
+        transform="translateY(-50%)"
+        onMouseEnter={() => setTipOpen(true)}
+        onMouseLeave={() => setTipOpen(false)}
+        onFocus={() => setTipOpen(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setTipOpen(false);
+          setOpen(false);
+          onCreateProjectForTeam({
+            teamId: team.teamId,
+            orgId: team.orgId,
+          });
+        }}
+      >
+        <Plus size={14} />
+      </IconButton>
+    </Tooltip>
   );
 }

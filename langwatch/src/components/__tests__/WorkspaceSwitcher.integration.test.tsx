@@ -3,7 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import {
@@ -208,17 +208,46 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
-      // The IconButton itself must still be reachable (aria-label only).
+      // The IconButton itself must still be reachable (aria-label).
       expect(
         await screen.findByRole("button", {
           name: /create project in acme engineering/i,
         }),
       ).toBeInTheDocument();
-      // But no visible "Create project" tooltip text may be rendered. A
-      // Tooltip wrapper around the + button auto-opened on switcher mount
-      // because Ark Menu roves focus into the dropdown and Zag's tooltip
-      // has no openOnFocus={false} escape hatch — see WorkspaceSwitcher.tsx.
+      // The tooltip is controlled; Ark Menu's focus rove must not flip it
+      // open. (Pre-fix the Tooltip auto-opened because Zag opens on focus
+      // and has no openOnFocus={false} knob — see WorkspaceSwitcher.tsx.)
       expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The "Create project" tooltip still appears on actual pointer hover */
+    it("shows the tooltip on pointer hover and hides it on leave", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+
+      await user.hover(addButton);
+      expect(
+        await screen.findByText("Create project"),
+      ).toBeInTheDocument();
+
+      await user.unhover(addButton);
+      await waitFor(() => {
+        expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+      });
     });
   });
 
