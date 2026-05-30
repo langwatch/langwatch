@@ -219,13 +219,19 @@ export function CompactEmailPreview({
       <Text fontWeight="medium" textStyle="sm">
         {subject}
       </Text>
+      {/* Native vertical resize so the author can pull the preview taller
+          when the body content overruns the default. Drag the bottom-right
+          corner. We expose a sensible default + a min height so the iframe
+          doesn't collapse to nothing. */}
       <Box
         border="1px solid"
         borderColor="border"
         borderRadius="md"
         overflow="hidden"
-        height="200px"
+        height="220px"
+        minHeight="120px"
         bg="white"
+        css={{ resize: "vertical" }}
       >
         <iframe
           srcDoc={html}
@@ -256,12 +262,16 @@ export function CompactSlackPreview({
 
   return (
     <VStack align="stretch" gap={2}>
+      {/* Vertically resizable so a long Block Kit preview can be pulled up
+          to fit instead of pushing the editor off-screen. */}
       <Box
         bg="bg.subtle"
         borderRadius="md"
         padding={3}
-        maxHeight="240px"
+        height="200px"
+        minHeight="100px"
         overflowY="auto"
+        css={{ resize: "vertical" }}
       >
         {"text" in payload ? (
           <Text whiteSpace="pre-wrap" textStyle="sm">

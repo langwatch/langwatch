@@ -1,4 +1,4 @@
-import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { SiSlack } from "react-icons/si";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
@@ -107,36 +107,27 @@ function SlackConfigForm({
           placeholder="https://hooks.slack.com/services/..."
         />
       </Field.Root>
-      <Field.Root>
-        <Field.Label>Message type</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={slice.templateType}
-            onChange={(e) =>
-              // Reset template to default when toggling type so the right
-              // default shows in the editor.
-              onChange({
-                ...slice,
-                templateType: e.target.value as SlackTemplateType,
-                template: EMPTY_FIELD,
-              })
-            }
-          >
-            <option value="string">Plain text</option>
-            <option value="block_kit">Block Kit (JSON)</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </Field.Root>
       <FieldHeader
-        label={
-          isBlockKit
-            ? "Block Kit template (JSON + Liquid in strings)"
-            : "Message template (Liquid)"
-        }
+        label="Message template"
         usingDefault={slice.template.usingDefault}
         onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
-        trailing={<VariableInfoIcon variables={variables} />}
+        trailing={
+          <HStack gap={2}>
+            <MessageTypeToggle
+              value={slice.templateType}
+              onChange={(next) =>
+                // Reset template to default when toggling type so the right
+                // default shows in the editor.
+                onChange({
+                  ...slice,
+                  templateType: next,
+                  template: EMPTY_FIELD,
+                })
+              }
+            />
+            <VariableInfoIcon variables={variables} />
+          </HStack>
+        }
       />
       {/* Block Kit templates are JSON whose string values contain Liquid.
           We use the custom `liquid-json` Monaco language so the editor
@@ -162,6 +153,47 @@ function SlackConfigForm({
 
       {slackPreview ? <CompactSlackPreview payload={slackPreview.payload} /> : null}
     </VStack>
+  );
+}
+
+/**
+ * Compact two-state segmented control for "plain text" vs "block_kit".
+ * Lives inside the template field header so we don't burn a full row on a
+ * binary choice — saves vertical space in a drawer that already crams a
+ * webhook input, the editor, and the preview.
+ */
+function MessageTypeToggle({
+  value,
+  onChange,
+}: {
+  value: SlackTemplateType;
+  onChange: (next: SlackTemplateType) => void;
+}) {
+  return (
+    <HStack
+      gap={0}
+      border="1px solid"
+      borderColor="border"
+      borderRadius="md"
+      padding="2px"
+    >
+      <Button
+        size="2xs"
+        variant={value === "string" ? "solid" : "ghost"}
+        colorPalette={value === "string" ? "orange" : undefined}
+        onClick={() => onChange("string")}
+      >
+        Text
+      </Button>
+      <Button
+        size="2xs"
+        variant={value === "block_kit" ? "solid" : "ghost"}
+        colorPalette={value === "block_kit" ? "orange" : undefined}
+        onClick={() => onChange("block_kit")}
+      >
+        Block Kit
+      </Button>
+    </HStack>
   );
 }
 

@@ -30,6 +30,7 @@ export function makeContext(
       name: "High latency",
       message: "Investigate latency spike",
       alertType: "WARNING",
+      editUrl: "https://app.langwatch.ai/acme/automations?edit=trg_1",
     },
     project: {
       name: "Acme",

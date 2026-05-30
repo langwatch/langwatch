@@ -28,6 +28,11 @@ export interface TemplateTriggerVars {
   name: string;
   message: string;
   alertType: AlertType | null;
+  /** Deep link to the automation's edit page — `{{ project.url }}/automations`
+   *  with a query param the page expands to open the drawer in edit mode.
+   *  Used by the default email footer ("Click to edit this automation") so
+   *  authors don't have to remember the URL shape. */
+  editUrl: string;
 }
 
 export interface TemplateProjectVars {
@@ -107,7 +112,10 @@ export function buildTemplateContext({
   matches,
   window,
 }: {
-  trigger: TemplateTriggerVars;
+  /** Caller-supplied trigger vars *without* `editUrl` — we derive it here
+   *  from `baseHost` + project slug + trigger id so the template author
+   *  doesn't need to assemble a URL by hand. */
+  trigger: Omit<TemplateTriggerVars, "editUrl">;
   project: { name: string; slug: string };
   baseHost: string;
   matches: TemplateMatchInput[];
@@ -128,12 +136,16 @@ export function buildTemplateContext({
     },
     evaluation: match.evaluation ?? null,
   }));
+  const projectUrl = `${baseHost}/${project.slug}`;
   return {
-    trigger,
+    trigger: {
+      ...trigger,
+      editUrl: `${projectUrl}/automations?edit=${trigger.id}`,
+    },
     project: {
       name: project.name,
       slug: project.slug,
-      url: `${baseHost}/${project.slug}`,
+      url: projectUrl,
     },
     digest: {
       count: matches.length,

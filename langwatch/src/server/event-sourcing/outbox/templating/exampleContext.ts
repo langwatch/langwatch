@@ -66,6 +66,11 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
     description: "Severity label, or null if unset.",
   },
   {
+    path: "trigger.editUrl",
+    type: "string",
+    description: "Deep link to this automation's edit page.",
+  },
+  {
     path: "project.name",
     type: "string",
     description: "Human-readable project name.",
