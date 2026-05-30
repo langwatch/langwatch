@@ -225,7 +225,7 @@ export function SsoConnectionModal({
 
   const callbackUrl =
     typeof window !== "undefined" && form.domain
-      ? `${window.location.origin}/api/auth/sso/${form.domain}`
+      ? `${window.location.origin}/api/auth/sso/${form.domain}/callback`
       : "";
 
   const handleSave = () => {

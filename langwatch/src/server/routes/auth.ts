@@ -8,6 +8,7 @@
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
 import type { Context } from "hono";
+import { setSignedCookie } from "hono/cookie";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
@@ -260,6 +261,7 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
         defaultOrgRole: connection.defaultOrgRole,
         roleMapping: connection.roleMapping as Record<string, unknown> | null,
       },
+      jitProvisioning: connection.jitProvisioning,
       ipAddress:
         c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
       userAgent: c.req.header("user-agent") ?? null,
@@ -269,18 +271,20 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
       return c.redirect(result.redirectTo, 302);
     }
 
-    const cookieName = isSecure
-      ? "__Secure-better-auth.session_token"
-      : "better-auth.session_token";
-    const cookieParts = [
-      `${cookieName}=${result.sessionToken}`,
-      "Path=/",
-      "HttpOnly",
-      "SameSite=Lax",
-      `Max-Age=${30 * 24 * 60 * 60}`,
-    ];
-    if (isSecure) cookieParts.push("Secure");
-    c.header("Set-Cookie", cookieParts.join("; "), { append: true });
+    await setSignedCookie(
+      c,
+      "better-auth.session_token",
+      result.sessionToken,
+      env.NEXTAUTH_SECRET,
+      {
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+        maxAge: 30 * 24 * 60 * 60,
+        secure: isSecure,
+        prefix: isSecure ? "secure" : undefined,
+      },
+    );
 
     return c.redirect("/", 302);
   } catch (err) {

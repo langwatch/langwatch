@@ -48,6 +48,7 @@ export class SsoAuthService {
     provider,
     organizationId,
     roleMappingConfig,
+    jitProvisioning,
     ipAddress,
     userAgent,
   }: {
@@ -55,6 +56,7 @@ export class SsoAuthService {
     provider: string;
     organizationId: string;
     roleMappingConfig: RoleMappingConfig;
+    jitProvisioning: boolean;
     ipAddress: string | null;
     userAgent: string | null;
   }): Promise<SsoLoginResult> {
@@ -63,6 +65,14 @@ export class SsoAuthService {
     });
 
     if (!user) {
+      if (!jitProvisioning) {
+        return {
+          sessionToken: "",
+          expiresAt: new Date(),
+          redirectTo: `/auth/signin?error=${encodeURIComponent("Your account is not provisioned. Contact your administrator.")}`,
+        };
+      }
+
       user = await this.repository.createUser({
         email: userInfo.email,
         name: userInfo.name ?? userInfo.email.split("@")[0] ?? "SSO User",
@@ -104,6 +114,30 @@ export class SsoAuthService {
           accountId: userInfo.sub,
         },
       });
+    }
+
+    const membership = await this.repository.findMembership({
+      userId: user.id,
+      organizationId,
+    });
+
+    if (!membership && jitProvisioning) {
+      await this.repository.createMembership({
+        userId: user.id,
+        organizationId,
+        role: roleMappingConfig.defaultOrgRole,
+      });
+
+      logger.info(
+        { userId: user.id, organizationId, role: roleMappingConfig.defaultOrgRole },
+        "JIT-provisioned org membership via SSO",
+      );
+    } else if (!membership) {
+      return {
+        sessionToken: "",
+        expiresAt: new Date(),
+        redirectTo: `/auth/signin?error=${encodeURIComponent("You are not a member of this organization. Contact your administrator.")}`,
+      };
     }
 
     await this.applyRoleMapping({

@@ -64,7 +64,6 @@ export class SsoAuthRepository {
         userId,
         provider,
         providerAccountId,
-        accountId: providerAccountId,
       },
     });
   }
@@ -104,6 +103,20 @@ export class SsoAuthRepository {
     return this.prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
       select: { role: true, scimManaged: true },
+    });
+  }
+
+  async createMembership({
+    userId,
+    organizationId,
+    role,
+  }: {
+    userId: string;
+    organizationId: string;
+    role: OrganizationUserRole;
+  }): Promise<void> {
+    await this.prisma.organizationUser.create({
+      data: { userId, organizationId, role },
     });
   }
 
