@@ -1,4 +1,4 @@
-import { Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
+import { type OrganizationUserRole, Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
 import { APIError } from "better-auth/api";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -322,6 +322,49 @@ export const beforeAccountCreate = async ({
  * Credential accounts (providerId = "credential") skip this entirely — on-prem
  * email-mode deployments don't configure SSO.
  */
+const applySsoRoleMapping = async ({
+  userId,
+  domain,
+  organizationId,
+}: {
+  userId: string;
+  domain: string;
+  organizationId: string;
+}): Promise<void> => {
+  const membership = await getApp().ssoAuth.findMembership({ userId, organizationId });
+
+  // SCIM is authoritative — never override SCIM-managed roles
+  if (membership?.scimManaged) return;
+
+  const ssoConnection = await getApp().ssoConnection.getRoleMappingByDomain({ domain, organizationId });
+  if (!ssoConnection) return;
+
+  const roleMap = (ssoConnection.roleMapping ?? {}) as Record<string, unknown>;
+  const defaultRole = ssoConnection.defaultOrgRole as OrganizationUserRole;
+
+  let resolvedRole: OrganizationUserRole = defaultRole;
+
+  const groupMappings = (roleMap.groupMappings ?? []) as Array<{
+    group: string;
+    role: string;
+  }>;
+
+  if (groupMappings.length === 0 && !roleMap.useRoleAttribute) {
+    resolvedRole = defaultRole;
+  }
+
+  if (!membership) return;
+
+  if (resolvedRole !== membership.role) {
+    await getApp().ssoAuth.updateMembershipRole({ userId, organizationId, role: resolvedRole });
+
+    logger.info(
+      { userId, organizationId, role: resolvedRole },
+      "Applied SSO role mapping on first login",
+    );
+  }
+};
+
 export const afterAccountCreate = async ({
   prisma,
   account,
@@ -358,6 +401,8 @@ export const afterAccountCreate = async ({
       providerId: account.providerId,
       accountId: account.accountId,
     });
+
+    await applySsoRoleMapping({ userId: user.id, domain, organizationId: org.id });
   } catch (err) {
     logger.error(
       { err, userId: account.userId },

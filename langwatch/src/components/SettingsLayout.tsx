@@ -149,6 +149,9 @@ export default function SettingsLayout({
             )}
             <MenuLink href="/settings/authentication">Authentication</MenuLink>
             {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/sso">SSO</MenuLink>
+            )}
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
             {showEnterpriseNav && !isLiteMember && (

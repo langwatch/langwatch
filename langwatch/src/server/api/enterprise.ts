@@ -16,6 +16,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   ACTIVITY_MONITOR: "The activity monitor requires an Enterprise plan",
   INGESTION_SOURCES: "Ingestion sources require an Enterprise plan",
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
+  SSO: "SSO configuration requires an Enterprise plan",
 } as const;
 
 export function isEnterpriseTier(planType: string): boolean {

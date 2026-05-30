@@ -19,6 +19,9 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { extractEmailDomain } from "./sso";
+import { getApp } from "../app-layer/app";
+import { checkSsoEnforcement } from "./sso-enforcement";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -513,17 +516,11 @@ export const auth = betterAuth({
    */
   hooks: {
     before: async (ctx) => {
+      const url = ctx.request?.url ?? "";
+      const matches = (suffix: string) =>
+        url.endsWith(suffix) || url.includes(`${suffix}?`);
+
       if (env.NEXTAUTH_PROVIDER !== "email") {
-        const url = ctx.request?.url ?? "";
-        // The request URL is the FULL URL after Next.js routing, so we
-        // check for suffix matches on the BetterAuth endpoint paths.
-        const matches = (suffix: string) =>
-          url.endsWith(suffix) || url.includes(`${suffix}?`);
-        // All endpoints that mutate or read credential state and are
-        // NOT gated by `emailAndPassword.enabled` at the handler level.
-        // We defense-in-depth these in cloud mode to prevent bypasses
-        // of the iter-26 revokeOtherSessionsForUser wiring and any
-        // other cloud-mode invariants our application layer expects.
         if (
           matches("/change-password") ||
           matches("/set-password") ||
@@ -538,6 +535,65 @@ export const auth = betterAuth({
             message:
               "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
           });
+        }
+      }
+
+      if (
+        env.NEXTAUTH_PROVIDER === "email" &&
+        (matches("/sign-in/email") || matches("/request-password-reset"))
+      ) {
+        try {
+          const body = ctx.body as { email?: string } | undefined;
+          await checkSsoEnforcement({
+            email: body?.email,
+            path: url,
+            deps: {
+              findOrgByDomain: (domain) =>
+                prisma.organization.findUnique({
+                  where: { ssoDomain: domain },
+                  select: { id: true, ssoProvider: true },
+                }),
+              findEnforcedSsoConnection: (domain) =>
+                getApp().ssoConnection.getEnforcedConnectionByDomain({ domain }),
+              getActivePlanType: async (organizationId) => {
+                try {
+                  const plan = await getApp().planProvider.getActivePlan({ organizationId });
+                  return plan.type;
+                } catch {
+                  return null;
+                }
+              },
+              isSoleAdmin: ({ email, organizationId }) =>
+                getApp().ssoAuth.isSoleAdminByEmail({ email, organizationId }),
+            },
+          });
+        } catch (e) {
+          if (e instanceof APIError) throw e;
+          logger.error({ err: e }, "Failed to check SSO enforcement on credential endpoint");
+        }
+      }
+
+      // Email change protection: block changes to/from SSO-enforced domains
+      if (env.NEXTAUTH_PROVIDER === "email" && matches("/change-email")) {
+        try {
+          const body = ctx.body as { newEmail?: string } | undefined;
+          const newEmail = body?.newEmail;
+          if (newEmail && typeof newEmail === "string") {
+            const newDomain = extractEmailDomain(newEmail);
+            if (newDomain) {
+              const enforced = await getApp().ssoConnection.getEnforcedConnectionByDomain({ domain: newDomain });
+              if (enforced) {
+                throw APIError.from("BAD_REQUEST", {
+                  code: "SSO_EMAIL_CHANGE_BLOCKED",
+                  message:
+                    "Cannot change email to an SSO-enforced domain. Use your identity provider.",
+                });
+              }
+            }
+          }
+        } catch (e) {
+          if (e instanceof APIError) throw e;
+          logger.error({ err: e }, "Failed to check SSO enforcement on email change");
         }
       }
     },

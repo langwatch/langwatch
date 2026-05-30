@@ -15,10 +15,8 @@ import {
   createServiceApp,
   internalSecret,
 } from "~/server/api/security";
-import { prisma } from "~/server/db";
-import { ScimGroupService } from "~/server/scim/scim-group.service";
-import { ScimService } from "~/server/scim/scim.service";
-import { ScimTokenService } from "~/server/scim/scim-token.service";
+import { getApp } from "~/server/app-layer/app";
+import { isEnterpriseTier } from "~/server/api/enterprise";
 import {
   isScimError,
   scimCreateGroupRequestSchema,
@@ -27,9 +25,12 @@ import {
   scimReplaceGroupRequestSchema,
 } from "~/server/scim/scim.types";
 
+
 const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
 
-const secured = createServiceApp({ basePath: "/api/scim/v2" });
+const secured = createServiceApp<{
+  Variables: { scimOrganizationId?: string };
+}>({ basePath: "/api/scim/v2" });
 
 const SCIM_POLICY = internalSecret("SCIM bearer token validated in-handler");
 
@@ -56,7 +57,7 @@ function scimJson(c: Context, data: unknown, status = 200) {
   });
 }
 
-async function requireAuth(c: Context): Promise<string | null> {
+async function requireAuth(c: Context<{ Variables: { scimOrganizationId?: string } }>): Promise<string | null> {
   const authHeader = c.req.header("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
@@ -64,14 +65,25 @@ async function requireAuth(c: Context): Promise<string | null> {
   }
 
   const token = authHeader.slice(7);
-  const tokenService = ScimTokenService.create(prisma);
-  const result = await tokenService.verify({ token });
+  const result = await getApp().scimTokens.verify({ token });
 
   if (!result) {
     return null;
   }
 
+  c.set("scimOrganizationId", result.organizationId);
   return result.organizationId;
+}
+
+async function requireEnterprise(
+  c: Context,
+  organizationId: string,
+): Promise<Response | null> {
+  const plan = await getApp().planProvider.getActivePlan({ organizationId });
+  if (!isEnterpriseTier(plan.type)) {
+    return scimError(c, 403, "SCIM provisioning requires an Enterprise plan");
+  }
+  return null;
 }
 
 async function parseJsonBody(c: Context): Promise<unknown | null> {
@@ -275,8 +287,10 @@ secured.access(SCIM_POLICY).get("/Users", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const filter = c.req.query("filter") ?? undefined;
   const startIndex = parseInt(c.req.query("startIndex") ?? "1", 10) || 1;
@@ -297,8 +311,10 @@ secured.access(SCIM_POLICY).post("/Users", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const body = await parseJsonBody(c);
   if (body === null) {
@@ -327,9 +343,11 @@ secured.access(SCIM_POLICY).get("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const result = await scimService.getUser({ id, organizationId });
 
@@ -345,9 +363,11 @@ secured.access(SCIM_POLICY).put("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const body = await parseJsonBody(c);
   if (body === null) {
@@ -377,9 +397,11 @@ secured.access(SCIM_POLICY).patch("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const body = await parseJsonBody(c);
   if (body === null) {
@@ -409,9 +431,11 @@ secured.access(SCIM_POLICY).delete("/Users/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
-  const scimService = ScimService.create(prisma);
+  const scimService = getApp().scim;
 
   const result = await scimService.deleteUser({ id, organizationId });
 
@@ -429,8 +453,10 @@ secured.access(SCIM_POLICY).get("/Groups", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
-  const service = ScimGroupService.create(prisma);
+  const service = getApp().scimGroups;
 
   const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
     .split(",")
@@ -453,8 +479,10 @@ secured.access(SCIM_POLICY).post("/Groups", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
-  const service = ScimGroupService.create(prisma);
+  const service = getApp().scimGroups;
 
   const body = await parseJsonBody(c);
   if (body === null) {
@@ -483,6 +511,8 @@ secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -491,7 +521,7 @@ secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const result = await ScimGroupService.create(prisma).getGroup({
+  const result = await getApp().scimGroups.getGroup({
     externalScimId: id,
     organizationId,
     excludeMembers: excludedAttributes.includes("members"),
@@ -509,6 +539,8 @@ secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -522,7 +554,7 @@ secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
     return scimError(c, 400, parsed.error.message);
   }
 
-  const result = await ScimGroupService.create(prisma).replaceGroup({
+  const result = await getApp().scimGroups.replaceGroup({
     externalScimId: id,
     organizationId,
     request: parsed.data,
@@ -540,6 +572,8 @@ secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
 
@@ -553,7 +587,7 @@ secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
     return scimError(c, 400, parsed.error.message);
   }
 
-  const result = await ScimGroupService.create(prisma).updateGroup({
+  const result = await getApp().scimGroups.updateGroup({
     externalScimId: id,
     organizationId,
     patchRequest: parsed.data,
@@ -571,9 +605,11 @@ secured.access(SCIM_POLICY).delete("/Groups/:id", async (c) => {
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
   }
+  const enterpriseError = await requireEnterprise(c, organizationId);
+  if (enterpriseError) return enterpriseError;
 
   const { id } = c.req.param();
-  const result = await ScimGroupService.create(prisma).deleteGroup({
+  const result = await getApp().scimGroups.deleteGroup({
     externalScimId: id,
     organizationId,
   });

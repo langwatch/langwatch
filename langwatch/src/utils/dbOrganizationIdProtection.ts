@@ -109,6 +109,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   RoutingPolicy: {},
   AiToolEntry: {},
   GatewayBudget: {},
+  SsoConnection: {},
 };
 
 /**
@@ -154,6 +155,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "GatewayCacheRule",
   "IngestionSource",
   "PromptTag",
+  "ScimRequestLog",
   "ScimToken",
   "Subscription",
   "UserIngestionBinding",

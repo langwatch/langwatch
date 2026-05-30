@@ -52,6 +52,7 @@ import { scimTokenRouter } from "./routers/scimToken";
 import { roleBindingRouter } from "./routers/roleBinding";
 import { apiKeyRouter } from "./routers/apiKey";
 import { groupRouter } from "./routers/group";
+import { ssoConnectionRouter } from "./routers/ssoConnection";
 import { userRouter } from "./routers/user";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
@@ -129,6 +130,7 @@ const coreRouters = {
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,
   group: groupRouter,
+  ssoConnection: ssoConnectionRouter,
   ops: opsRouter,
   storedObjects: storedObjectsRouter,
   virtualKeys: virtualKeysRouter,

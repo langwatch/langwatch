@@ -17,6 +17,7 @@ function createMockPrisma() {
     findMany: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
     delete: vi.fn().mockResolvedValue({}),
   };
   const mock = {
@@ -28,12 +29,15 @@ function createMockPrisma() {
     organizationUser,
     roleBinding,
     session: {
-      // UserService.deactivate (called from SCIM) revokes all sessions —
-      // mock the session model so the revocation succeeds with zero rows.
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn().mockImplementation((opsOrFn: unknown) => {
+      if (typeof opsOrFn === "function") {
+        return (opsOrFn as (tx: unknown) => Promise<unknown>)(mock);
+      }
+      return Promise.all(opsOrFn as unknown[]);
+    }),
   };
   return mock as unknown as Parameters<typeof ScimService.create>[0];
 }
@@ -107,6 +111,7 @@ describe("ScimService", () => {
 
   describe("createUser()", () => {
     describe("when the user does not exist", () => {
+      /** @scenario SCIM sets scimManaged on new user creation */
       it("creates a new user and adds them to the organization", async () => {
         const newUser = buildMockUser();
         (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -132,18 +137,27 @@ describe("ScimService", () => {
             userId: "user-1",
             organizationId: "org-1",
             role: "MEMBER",
+            scimManaged: true,
           },
         });
       });
     });
 
     describe("when the user already exists in the organization", () => {
-      it("returns a 409 SCIM error", async () => {
+      /** @scenario SCIM adopts existing non-SCIM membership */
+      it("adopts the existing membership as SCIM-managed", async () => {
         const existingUser = buildMockUser();
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existingUser);
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>)
+          .mockResolvedValueOnce(existingUser)
+          .mockResolvedValueOnce(existingUser);
         (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
+        });
+        (prisma.organizationUser.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+          scimManaged: true,
         });
 
         const result = await service.createUser({
@@ -154,8 +168,51 @@ describe("ScimService", () => {
           organizationId: "org-1",
         });
 
-        expect(result).toHaveProperty("status", "409");
-        expect(result).toHaveProperty("detail", "User already exists in this organization");
+        expect(prisma.organizationUser.update).toHaveBeenCalledWith({
+          where: { userId_organizationId: { userId: "user-1", organizationId: "org-1" } },
+          data: { scimManaged: true },
+        });
+        expect(result).toHaveProperty("id", "user-1");
+        expect(result).toHaveProperty("userName", "alice@acme.com");
+      });
+    });
+
+    describe("when the existing member is deactivated", () => {
+      /** @scenario SCIM reactivates deactivated user during adoption */
+      it("reactivates the user and marks the membership scimManaged", async () => {
+        const deactivatedUser = buildMockUser({ deactivatedAt: new Date() });
+        const reactivatedUser = buildMockUser({ deactivatedAt: null });
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>)
+          .mockResolvedValueOnce(deactivatedUser) // findByEmail
+          .mockResolvedValueOnce(reactivatedUser); // findById (reload)
+        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+        });
+        (prisma.organizationUser.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+          scimManaged: true,
+        });
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(reactivatedUser);
+
+        const result = await service.createUser({
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "alice@acme.com",
+          },
+          organizationId: "org-1",
+        });
+
+        expect(prisma.organizationUser.update).toHaveBeenCalledWith({
+          where: { userId_organizationId: { userId: "user-1", organizationId: "org-1" } },
+          data: { scimManaged: true },
+        });
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          data: { deactivatedAt: null },
+        });
+        expect(result).toHaveProperty("active", true);
       });
     });
 
@@ -163,8 +220,8 @@ describe("ScimService", () => {
       it("adds them to the organization", async () => {
         const existingUser = buildMockUser();
         (prisma.user.findUnique as ReturnType<typeof vi.fn>)
-          .mockResolvedValueOnce(existingUser) // findByEmail
-          .mockResolvedValueOnce(existingUser); // findById reload
+          .mockResolvedValueOnce(existingUser)
+          .mockResolvedValueOnce(existingUser);
         (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
         (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
@@ -182,6 +239,7 @@ describe("ScimService", () => {
             userId: "user-1",
             organizationId: "org-2",
             role: "MEMBER",
+            scimManaged: true,
           },
         });
       });
@@ -258,12 +316,14 @@ describe("ScimService", () => {
 
   describe("deleteUser()", () => {
     describe("when the user belongs to the organization", () => {
-      it("deactivates the user (soft delete)", async () => {
+      /** @scenario SCIM deleteUser atomically removes membership and deactivates user */
+      it("atomically removes membership and deactivates if no other orgs", async () => {
         const user = buildMockUser();
         (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
+        (prisma.organizationUser.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
         (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...user,
           deactivatedAt: new Date(),
@@ -275,9 +335,32 @@ describe("ScimService", () => {
         });
 
         expect(result).toBeNull();
+        expect(prisma.organizationUser.delete).toHaveBeenCalledWith({
+          where: { userId_organizationId: { userId: "user-1", organizationId: "org-1" } },
+        });
         expect(prisma.user.update).toHaveBeenCalledWith({
           where: { id: "user-1" },
           data: { deactivatedAt: expect.any(Date) },
+        });
+      });
+
+      /** @scenario SCIM deleteUser revokes sessions after deactivation */
+      it("revokes all sessions for the user after deactivation", async () => {
+        const user = buildMockUser();
+        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+        });
+        (prisma.organizationUser.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...user,
+          deactivatedAt: new Date(),
+        });
+
+        await service.deleteUser({ id: "user-1", organizationId: "org-1" });
+
+        expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+          where: { userId: "user-1" },
         });
       });
     });

@@ -1,5 +1,7 @@
 import {
+  Alert,
   Badge,
+  Box,
   Button,
   Card,
   createListCollection,
@@ -15,17 +17,42 @@ import {
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CopyInput } from "../../components/CopyInput";
+import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 
 function ScimSettings() {
   const { organization } = useOrganizationTeamProject();
+  const { isEnterprise } = useActivePlan();
 
   if (!organization) return <SettingsLayout />;
+
+  if (!isEnterprise) {
+    return (
+      <SettingsLayout>
+        <VStack gap={6} align="start" width="full">
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Enterprise Feature</Alert.Title>
+              <Alert.Description>
+                SCIM provisioning is available on Enterprise plans. Contact sales
+                to upgrade.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Box width="full">
+            <ContactSalesBlock />
+          </Box>
+        </VStack>
+      </SettingsLayout>
+    );
+  }
 
   return <ScimSettingsContent organizationId={organization.id} />;
 }

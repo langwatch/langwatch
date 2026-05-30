@@ -1,9 +1,8 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from "@prisma/client";
+import type { PrismaClient, User } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { generate } from "@langwatch/ksuid";
 import { UserService } from "../users/user.service";
 import { CostCenterService } from "@ee/governance/services/cost-center/costCenter.service";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { ScimRepository } from "./scim.repository";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimUser,
@@ -14,30 +13,21 @@ import {
   type ScimPatchRequest,
 } from "./scim.types";
 
-/**
- * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
- * All operations are scoped to an organization for multi-tenancy.
- */
 export class ScimService {
   private readonly userService: UserService;
   private readonly costCenterService: CostCenterService;
+  private readonly repository: ScimRepository;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(prisma: PrismaClient) {
     this.userService = UserService.create(prisma);
     this.costCenterService = CostCenterService.create(prisma);
+    this.repository = ScimRepository.create(prisma);
   }
 
   static create(prisma: PrismaClient): ScimService {
     return new ScimService(prisma);
   }
 
-  /**
-   * Apply the SCIM enterprise costCenter attribute to a membership. A
-   * non-empty name resolves (creating if absent) and assigns; an explicit
-   * empty/null value clears the assignment so spend rolls up under
-   * Unassigned. `undefined` means the attribute was not in this request, so
-   * the current assignment is left untouched.
-   */
   private async syncCostCenterFromScim({
     userId,
     organizationId,
@@ -70,11 +60,6 @@ export class ScimService {
     });
   }
 
-  /**
-   * Read the enterprise costCenter from a create/replace body. Returns
-   * `undefined` when the enterprise extension is absent so callers can tell
-   * "not provided" from "explicitly cleared".
-   */
   private costCenterFromRequest(
     request: ScimCreateUserRequest,
   ): string | null | undefined {
@@ -85,12 +70,6 @@ export class ScimService {
     return ext.costCenter ?? null;
   }
 
-  /**
-   * Read the enterprise costCenter from a PATCH operation, supporting both
-   * the schema-qualified path form (`...:User:costCenter`) and the
-   * value-object form. Returns `{ present: false }` when the op does not
-   * touch costCenter.
-   */
   private costCenterFromPatchOp(
     operation: ScimPatchOperation,
   ): { present: true; value: string | null } | { present: false } {
@@ -128,37 +107,39 @@ export class ScimService {
     const existingUser = await this.userService.findByEmail({ email });
 
     if (existingUser) {
-      const existingMembership =
-        await this.prisma.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: existingUser.id,
-              organizationId,
-            },
-          },
-        });
+      const existingMembership = await this.repository.findMembership({
+        userId: existingUser.id,
+        organizationId,
+      });
 
       if (existingMembership) {
-        return this.scimError({ status: "409", detail: "User already exists in this organization" });
+        await this.repository.adoptExistingMembership({
+          userId: existingUser.id,
+          organizationId,
+        });
+
+        if (existingUser.deactivatedAt) {
+          await this.userService.reactivate({ id: existingUser.id });
+        }
+
+        await this.syncCostCenterFromScim({
+          userId: existingUser.id,
+          organizationId,
+          costCenter: this.costCenterFromRequest(request),
+        });
+
+        const reloadedUser = await this.userService.findById({ id: existingUser.id });
+        if (!reloadedUser) {
+          return this.scimError({ status: "404", detail: "User not found" });
+        }
+        return this.toScimUser(reloadedUser);
       }
 
       try {
-        await this.prisma.organizationUser.create({
-          data: {
-            userId: existingUser.id,
-            organizationId,
-            role: "MEMBER",
-          },
-        });
-        await this.prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: existingUser.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: organizationId,
-          },
+        await this.repository.createMembership({
+          userId: existingUser.id,
+          organizationId,
+          scimManaged: true,
         });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
@@ -187,21 +168,10 @@ export class ScimService {
     const newUser = await this.userService.create({ name, email });
 
     try {
-      await this.prisma.organizationUser.create({
-        data: {
-          userId: newUser.id,
-          organizationId,
-          role: "MEMBER",
-        },
-      });
-      await this.prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: newUser.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await this.repository.createMembership({
+        userId: newUser.id,
+        organizationId,
+        scimManaged: true,
       });
     } catch (e) {
       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
@@ -226,14 +196,9 @@ export class ScimService {
     id: string;
     organizationId: string;
   }): Promise<ScimUser | ScimError> {
-    const membership = await this.prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: id,
-          organizationId,
-        },
-      },
-      include: { user: true },
+    const membership = await this.repository.findMembershipWithUser({
+      userId: id,
+      organizationId,
     });
 
     if (!membership) {
@@ -256,23 +221,12 @@ export class ScimService {
   }): Promise<ScimListResponse<ScimUser>> {
     const emailFilter = this.parseUserNameFilter(filter);
 
-    const whereClause: Record<string, unknown> = {
+    const { memberships, totalCount } = await this.repository.listMemberships({
       organizationId,
-    };
-
-    if (emailFilter) {
-      whereClause.user = { email: { equals: emailFilter, mode: 'insensitive' } };
-    }
-
-    const [memberships, totalCount] = await Promise.all([
-      this.prisma.organizationUser.findMany({
-        where: whereClause,
-        include: { user: true },
-        skip: startIndex - 1,
-        take: count,
-      }),
-      this.prisma.organizationUser.count({ where: whereClause }),
-    ]);
+      emailFilter: emailFilter ?? undefined,
+      skip: startIndex - 1,
+      take: count,
+    });
 
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -292,13 +246,9 @@ export class ScimService {
     organizationId: string;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser | ScimError> {
-    const membership = await this.prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: id,
-          organizationId,
-        },
-      },
+    const membership = await this.repository.findMembership({
+      userId: id,
+      organizationId,
     });
 
     if (!membership) {
@@ -342,13 +292,9 @@ export class ScimService {
     organizationId: string;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimUser | ScimError> {
-    const membership = await this.prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: id,
-          organizationId,
-        },
-      },
+    const membership = await this.repository.findMembership({
+      userId: id,
+      organizationId,
     });
 
     if (!membership) {
@@ -356,9 +302,6 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
-      // Enterprise costCenter can arrive via replace/add (set) or remove
-      // (clear), as a schema-qualified path or inside a value object, so it
-      // is handled before the replace-only profile logic below.
       const costCenterOp = this.costCenterFromPatchOp(operation);
       if (costCenterOp.present) {
         await this.syncCostCenterFromScim({
@@ -370,7 +313,6 @@ export class ScimService {
 
       if (operation.op !== "replace") continue;
 
-      // Handle path="active" with a scalar boolean value (e.g. Okta/Azure AD style)
       if (operation.path === "active") {
         if (operation.value === false || operation.value === "false") {
           await this.userService.deactivate({ id });
@@ -404,7 +346,6 @@ export class ScimService {
           updates.name = parts.join(" ");
         }
       } else if ("name.givenName" in value || "name.familyName" in value) {
-        // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
         const given = typeof value["name.givenName"] === "string" ? value["name.givenName"] : null;
         const family = typeof value["name.familyName"] === "string" ? value["name.familyName"] : null;
         const parts = [given, family].filter(Boolean);
@@ -432,28 +373,18 @@ export class ScimService {
     id: string;
     organizationId: string;
   }): Promise<ScimError | null> {
-    const membership = await this.prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: id,
-          organizationId,
-        },
-      },
+    const membership = await this.repository.findMembership({
+      userId: id,
+      organizationId,
     });
 
     if (!membership) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
-      }),
-      this.prisma.roleBinding.deleteMany({
-        where: { userId: id, organizationId },
-      }),
-    ]);
-    await this.userService.deactivate({ id });
+    await this.repository.deleteUserAtomically({ userId: id, organizationId });
+    await this.userService.revokeAllSessions({ id });
+
     return null;
   }
 
