@@ -19834,7 +19834,7 @@
       "delete": {
         "responses": {
           "200": {
-            "description": "Events deleted successfully",
+            "description": "Matching runs archived successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -19858,16 +19858,13 @@
             }
           },
           "400": {
-            "description": "Bad Request",
+            "description": "No scope provided — a batchRunId or scenarioSetId is required",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
-                    },
-                    "message": {
                       "type": "string"
                     }
                   },
@@ -19943,8 +19940,25 @@
           }
         },
         "operationId": "deleteApiScenario-events",
-        "parameters": [],
-        "description": "Delete all events"
+        "parameters": [
+          {
+            "in": "query",
+            "name": "batchRunId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenarioSetId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "description": "Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported."
       }
     },
     "/api/scenarios": {
