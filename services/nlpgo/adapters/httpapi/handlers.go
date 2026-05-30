@@ -150,8 +150,16 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// values for THIS node, not as Entry-node outputs — see
 		// langwatch/src/optimization_studio/hooks/useComponentExecution.ts.
 		// Absent for execute_flow / execute_evaluation.
-		NodeID    string `json:"node_id,omitempty"`
-		ProjectID string `json:"project_id,omitempty"`
+		NodeID string `json:"node_id,omitempty"`
+		// UntilNodeID scopes a flow run to the dependency path of the
+		// named node — Studio's "Run until here" gesture (Nodes.tsx
+		// per-node Play button → startWorkflowExecution({untilNodeId})
+		// → useWorkflowExecution.ts sends until_node_id on the event
+		// payload). Disconnected siblings + everything downstream of
+		// the target are trimmed in the planner (planner.WithUntilNode).
+		// Mirrors `ExecuteFlowPayload.until_node_id` on the Python side.
+		UntilNodeID string `json:"until_node_id,omitempty"`
+		ProjectID   string `json:"project_id,omitempty"`
 		// RunID is present only on execute_evaluation envelopes
 		// (langwatch/src/optimization_studio/hooks/useEvaluationExecution.ts).
 		// Plumbed through to the engine so evaluation_state_change events
@@ -208,6 +216,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		ProjectID:         inner.ProjectID,
 		ThreadID:          threadID,
 		NodeID:            inner.NodeID,
+		UntilNodeID:       inner.UntilNodeID,
 		APIKey:            peekWorkflowAPIKey(inner.Workflow),
 		WorkflowName:      peekWorkflowName(inner.Workflow),
 		Type:              peek.Type,

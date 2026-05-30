@@ -83,6 +83,42 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       Then the response status is 200
       And the result contains the expected sum
 
+  Rule: Disconnected and out-of-scope nodes never execute
+
+    # Python parity: studio/parser.py:605 find_reachable_nodes (full run)
+    # and studio/parser.py:531 find_path_until_node ("Run until here").
+    # Pre-fix the Go planner ran every zero-indegree node, so an LLM
+    # sitting on the canvas with no incoming edges executed itself and
+    # billed the user.
+
+    @unit @unimplemented
+    Scenario: a Signature node disconnected from Entry is not planned
+      Given a workflow with Entry -> Code -> End plus an extra Signature node with no incoming edges
+      When the planner builds the plan
+      Then the plan layers contain "Entry", "Code", and "End"
+      And the plan layers do not contain the disconnected Signature
+
+    @unit @unimplemented
+    Scenario: a disconnected sub-chain whose root is not reachable from Entry is skipped
+      Given a workflow with one chain rooted at Entry and a second chain whose root has no Entry edge
+      When the planner builds the plan
+      Then only the Entry-rooted chain's nodes appear in the plan
+      And no node from the floating chain appears in the plan
+
+    @unit @unimplemented
+    Scenario: "Run until here" trims downstream nodes and disconnected siblings
+      Given a workflow Entry -> A -> B -> C -> End plus a disconnected Signature
+      When the planner builds the plan with until_node_id "B"
+      Then the plan contains exactly "Entry", "A", and "B"
+      And C, End, and the disconnected Signature are not planned
+
+    @unit @unimplemented
+    Scenario: "Run until here" with an unknown target returns an UnknownNodeError
+      Given a workflow Entry -> Code -> End
+      When the planner builds the plan with until_node_id "does-not-exist"
+      Then the planner returns an UnknownNodeError naming the missing node id
+      And no plan is produced
+
   Rule: Streaming endpoint emits the documented event shapes
 
     @integration @unimplemented

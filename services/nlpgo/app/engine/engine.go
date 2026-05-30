@@ -106,6 +106,13 @@ type ExecuteRequest struct {
 	// outputs and propagate via edges. Mirrors Python's
 	// `ExecuteComponentPayload.node_id` (langwatch_nlp/studio/app.py).
 	NodeID string
+	// UntilNodeID, when non-empty, scopes the run to the backward
+	// dependency path of the named node — the Studio "Run until here"
+	// flow (Nodes.tsx wires Play → startWorkflowExecution({untilNodeId})).
+	// Mirrors Python's `ExecuteFlowPayload.until_node_id` consumed by
+	// `find_path_until_node` in studio/parser.py. Disconnected siblings
+	// + everything downstream of the target are trimmed from the plan.
+	UntilNodeID string
 	// Type is the StudioClientEvent discriminator. Routes the engine
 	// between the parallel state-event families Studio's reducer
 	// expects (`execution_state_change` for execute_flow,
@@ -182,7 +189,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		// workflow execution.
 		req.TraceID = traceID
 	}
-	plan, err := planner.New(req.Workflow)
+	plan, err := planner.New(req.Workflow, planOptionsFor(req)...)
 	if err != nil {
 		return nil, err
 	}
@@ -891,6 +898,17 @@ func (e *Engine) runCustom(ctx context.Context, req ExecuteRequest, node *dsl.No
 		}
 	}
 	return map[string]any{"value": res.Result}, nil
+}
+
+// planOptionsFor translates ExecuteRequest's run-shaping fields into the
+// planner's functional options. Keeps engine.go and stream.go from
+// diverging on which knobs reach the planner.
+func planOptionsFor(req ExecuteRequest) []planner.Option {
+	var opts []planner.Option
+	if req.UntilNodeID != "" {
+		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
+	}
+	return opts
 }
 
 // applyManualInputs primes runState with the inbound execute_component
