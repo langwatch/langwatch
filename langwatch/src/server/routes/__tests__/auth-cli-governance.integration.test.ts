@@ -80,7 +80,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
     // Override plan provider so org A + B get ENTERPRISE (existing tests
     // pin RBAC + tenancy, not license) and org C gets FREE (402 subdescribe).
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: async ({ organizationId }) =>
@@ -226,7 +226,7 @@ describe("GET /api/auth/cli/governance/*", () => {
     await prisma.organization.deleteMany({
       where: { id: { in: [ORG_A, ORG_B, ORG_C] } },
     });
-    resetApp();
+    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

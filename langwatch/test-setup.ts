@@ -31,6 +31,67 @@ afterAll(async () => {
     // Teardown-phase flush can throw once test env globals (URL/fetch) are
     // gone; the poller is already cleared by then, so swallow it.
   }
+
+  // Diagnostic: dump active event-loop handles AFTER the normal afterAll chain
+  // has run. Anything still here is what's keeping the fork from exiting and
+  // ultimately wedging the shard. The CI artifact stays small but surfaces
+  // the actual remote endpoint for each socket so the leaking connection can
+  // be identified by name (clickhouse host, redis host, postgres host, ...).
+  // Opt-out via DEBUG_OPEN_HANDLES=0 if needed.
+  if (process.env.DEBUG_OPEN_HANDLES !== "0") {
+    try {
+      // @ts-expect-error -- internal API, intentional
+      const handles = process._getActiveHandles?.() ?? [];
+      // @ts-expect-error -- internal API, intentional
+      const requests = process._getActiveRequests?.() ?? [];
+      if (handles.length > 0 || requests.length > 0) {
+        const describeSocket = (s: any): string => {
+          try {
+            const remote =
+              s.remoteAddress && s.remotePort
+                ? `${s.remoteAddress}:${s.remotePort}`
+                : undefined;
+            const local =
+              s.localAddress && s.localPort
+                ? `${s.localAddress}:${s.localPort}`
+                : undefined;
+            const fd = typeof s.fd === "number" ? s.fd : undefined;
+            const meta = [
+              remote ? `r=${remote}` : null,
+              local ? `l=${local}` : null,
+              fd != null ? `fd=${fd}` : null,
+            ]
+              .filter(Boolean)
+              .join(",");
+            return meta || "?";
+          } catch {
+            return "?";
+          }
+        };
+        const socketDetails: string[] = [];
+        const otherCounts: Record<string, number> = {};
+        for (const h of handles) {
+          const k = h?.constructor?.name ?? typeof h;
+          if (k === "Socket" || k === "TLSSocket") {
+            socketDetails.push(`${k}(${describeSocket(h)})`);
+          } else {
+            otherCounts[k] = (otherCounts[k] ?? 0) + 1;
+          }
+        }
+        const requestCounts: Record<string, number> = {};
+        for (const r of requests) {
+          const k = r?.constructor?.name ?? typeof r;
+          requestCounts[k] = (requestCounts[k] ?? 0) + 1;
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+          `[open-handles] handles=${handles.length} requests=${requests.length} | sockets=${JSON.stringify(socketDetails)} other=${JSON.stringify(otherCounts)} requests=${JSON.stringify(requestCounts)}`,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
 });
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.

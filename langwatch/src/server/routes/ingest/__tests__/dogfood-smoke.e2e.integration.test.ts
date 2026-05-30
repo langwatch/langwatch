@@ -106,8 +106,8 @@ vi.mock("~/server/app-layer/app", async () => {
   };
 });
 
-function configureApp(plan: PlanInfo) {
-  resetApp();
+async function configureApp(plan: PlanInfo) {
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
@@ -237,7 +237,7 @@ describe("end-to-end customer dogfood smoke (Phase 5 cross-lane)", () => {
   let orgB: SeededOrg | null = null;
 
   beforeAll(async () => {
-    configureApp(enterprisePlan);
+    await configureApp(enterprisePlan);
     const suffixA = nanoid(8);
     const suffixB = nanoid(8);
     orgA = await seedOrg(`a-${ns}-${suffixA}`);
@@ -247,7 +247,7 @@ describe("end-to-end customer dogfood smoke (Phase 5 cross-lane)", () => {
   afterAll(async () => {
     await deleteSeededOrg(orgA);
     await deleteSeededOrg(orgB);
-    resetApp();
+    await resetApp();
   });
 
   it("receiver: bearer for orgA hands the trace off to the gov-project pipeline", async () => {

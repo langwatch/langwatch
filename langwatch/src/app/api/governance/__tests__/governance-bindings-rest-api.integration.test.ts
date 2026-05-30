@@ -66,7 +66,7 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as unknown as

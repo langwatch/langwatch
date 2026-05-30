@@ -43,7 +43,7 @@ describe("Feature: Agent REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
     globalForApp.__langwatch_app = createTestApp({
@@ -128,7 +128,7 @@ describe("Feature: Agent REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   async function createAgent(overrides: {
