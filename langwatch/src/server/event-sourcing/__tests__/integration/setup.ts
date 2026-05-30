@@ -76,6 +76,46 @@ export async function setup(): Promise<void> {
  */
 export async function teardown(): Promise<void> {
   await stopTestContainers();
+  await closeAppRuntimeSingletons();
+}
+
+/**
+ * Closes the application-layer Prisma and Redis singletons that any test in
+ * the shard instantiated by importing the server modules. Without this, their
+ * open sockets keep the vitest worker process alive past the last test, the
+ * reporter never prints the summary line, and the CI step times out at the
+ * job cap.
+ *
+ * Dynamic-imported so the modules' top-level connection-bootstrap code runs
+ * only if/when a real test already pulled them in.
+ */
+async function closeAppRuntimeSingletons(): Promise<void> {
+  try {
+    const dbMod = await import("../../../db");
+    await Promise.race([
+      dbMod.prisma.$disconnect(),
+      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  } catch {
+    // No prisma client ever constructed, or already disconnected.
+  }
+  try {
+    const redisMod = await import("../../../redis");
+    const conn = redisMod.connection;
+    if (conn) {
+      await Promise.race([
+        Promise.resolve(conn.quit()).catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
+      try {
+        conn.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+  } catch {
+    // Redis was never instantiated in this shard, or already disconnected.
+  }
 }
 
 // Register global setup/teardown hooks
