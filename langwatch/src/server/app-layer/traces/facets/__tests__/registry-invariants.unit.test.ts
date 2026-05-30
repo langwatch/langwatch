@@ -210,3 +210,28 @@ describe("each query-builder facet", () => {
     },
   );
 });
+
+describe("Map-keys discovery facets", () => {
+  // Facets that discover the distinct keys of a `Map` column by exploding its
+  // `.keys` subcolumn. Probing the empty-map short-circuit against the whole
+  // Map (`length(<Map>)`) instead of `<Map>.keys` forces ClickHouse to read
+  // the heavy values column and trips MEMORY_LIMIT_EXCEEDED on busy tenants.
+  const MAP_KEY_FACETS: Array<{ key: string; map: string }> = [
+    { key: "spanAttributeKeys", map: "SpanAttributes" },
+    { key: "metadataKeys", map: "Attributes" },
+  ];
+
+  it.each(MAP_KEY_FACETS.map((f) => [f.key, f.map]))(
+    "[%s] keeps the empty-map filter on the keys subcolumn",
+    (key, map) => {
+      const def = FACET_REGISTRY.find((d) => d.key === key);
+      if (!def || def.kind !== "dynamic_keys") {
+        throw new Error(`expected ${key} to be a dynamic_keys facet`);
+      }
+      const { sql } = def.queryBuilder(baseCtx);
+      expect(sql).toContain(`length(${map}.keys)`);
+      // Bare `length(<Map>)` would materialise the values column.
+      expect(sql).not.toMatch(new RegExp(`length\\(${map}\\)`));
+    },
+  );
+});
