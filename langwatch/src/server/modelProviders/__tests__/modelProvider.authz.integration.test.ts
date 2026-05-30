@@ -571,6 +571,31 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           expect(stored?.rateLimitRpm).toBe(900);
         });
       });
+
+      describe("when the supplied id no longer resolves a row", () => {
+        /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
+        it("throws NOT_FOUND instead of falling through to create a new row", async () => {
+          const beforeCount = await prisma.modelProvider.count({
+            where: { projectId: projectAId, provider: "groq" },
+          });
+          await expect(
+            service().updateModelProvider(
+              {
+                id: `vanished-mp-${ns}`,
+                projectId: projectAId,
+                provider: "groq",
+                enabled: true,
+                customKeys: { GROQ_API_KEY: `sk-groq-${ns}` },
+              },
+              ctxFor(orgAdminUserId),
+            ),
+          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+          const afterCount = await prisma.modelProvider.count({
+            where: { projectId: projectAId, provider: "groq" },
+          });
+          expect(afterCount).toBe(beforeCount);
+        });
+      });
     });
 
     // =========================================================================

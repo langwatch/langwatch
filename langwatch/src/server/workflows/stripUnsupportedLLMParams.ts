@@ -94,11 +94,8 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
   );
   const { workflow } = opts;
   if (workflow.default_llm) {
-    Object.assign(
-      workflow.default_llm,
-      filterLLMNode(workflow.default_llm, customModelsByProvider),
-    );
-    pruneRemovedKeys(workflow.default_llm, customModelsByProvider);
+    const filtered = filterLLMNode(workflow.default_llm, customModelsByProvider);
+    replaceObjectContents(workflow.default_llm, filtered);
   }
   for (const node of workflow.nodes ?? []) {
     const data = node.data;
@@ -117,23 +114,6 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
         const filtered = filterLLMNode(value, customModelsByProvider);
         replaceObjectContents(value, filtered);
       }
-    }
-  }
-}
-
-/**
- * Drop keys from `target` that the filter removed. Object.assign alone
- * keeps stale keys; we need explicit deletion so the serialized payload
- * matches the filter's output.
- */
-function pruneRemovedKeys(
-  target: LLMLike,
-  customModelsByProvider: CustomModelsByProvider,
-): void {
-  const filtered = filterLLMNode(target, customModelsByProvider);
-  for (const key of Object.keys(target)) {
-    if (!(key in filtered)) {
-      delete target[key];
     }
   }
 }

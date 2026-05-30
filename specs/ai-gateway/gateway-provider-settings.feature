@@ -110,6 +110,15 @@ Feature: AI Gateway — Provider settings cohesion
     And the same check holds for `rateLimitTpm`, `rateLimitRpd`,
       `fallbackPriorityGlobal`, and `providerConfig`
 
+  @integration
+  Scenario: Update of a vanished id surfaces NOT_FOUND instead of silently creating
+    Given I am an organization admin in "acme"
+    When I send `updateModelProvider({ id: "vanished-id", projectId, provider: "groq", enabled: true, customKeys: {...} })`
+      for a row that was concurrently deleted or is not visible from the
+      project
+    Then the service rejects with NOT_FOUND
+    And no new ModelProvider row is created in the caller's project
+
   # ============================================================================
   # Dispatch-side stripping of unsupported sampling params
   # ============================================================================

@@ -485,6 +485,18 @@ export class ModelProviderService {
     // a user adds a second instance of the same provider type.
     const existingProvider = await this.findExistingProvider(id, projectId);
 
+    // When the caller supplied an `id` but no row resolves, the target
+    // row was concurrently deleted or is not visible from this project.
+    // Falling through to createNew would silently produce a brand-new
+    // row in the caller's project instead of erroring; surface
+    // NOT_FOUND so the client can refetch and retry.
+    if (id && !existingProvider) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
     // When neither is given, defer to the create/update defaults.
