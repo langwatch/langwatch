@@ -34,16 +34,13 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel
     fileParallelism: false,
-    // Use worker threads instead of forked child processes. The forks pool
-    // wedged shard 4 of 6 on every run after the last test passed: dumps
-    // showed the fork had no application-level handles left (handle-walker
-    // unref took care of the redis singleton, coverage and json reporter
-    // were ruled out as the cause), but vitest main never received the
-    // fork-exit signal and sat for the full timeout cap. Threads use the
-    // standard Worker exit event, which vitest main detects directly,
-    // and the worker's lifecycle is in-process so the cross-process IPC
-    // race that pinned forks doesn't apply.
-    pool: "threads",
+    // Use forked child processes. We briefly tried pool: "threads" to
+    // sidestep the post-test shard 4 wedge, but threads exposes a panic
+    // in @prisma/client/query-engine-node-api when the client gets
+    // constructed inside a worker-thread context (engine.rs:166 "Failed
+    // to deserialize constructor options"). The wedge in forks is
+    // handled by a hard-floor process.exit timer in globalSetup.ts.
+    pool: "forks",
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },
