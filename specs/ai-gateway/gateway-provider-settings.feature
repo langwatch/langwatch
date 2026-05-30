@@ -96,6 +96,20 @@ Feature: AI Gateway — Provider settings cohesion
     And no separate "Save Advanced" button is rendered
 
   # ============================================================================
+  # Dispatch-side stripping of unsupported sampling params
+  # ============================================================================
+
+  @integration
+  Scenario: Stale top_p is stripped when the model does not support it
+    Given a custom Bedrock model "us.anthropic.claude-haiku-4-5" with
+      supportedParameters=["temperature"]
+    And a saved prompt-config blob whose llm carries a stale top_p=1.0
+    When the workflow dispatches through studioBackendPostEvent
+    Then the request that reaches nlpgo carries temperature but NOT top_p
+    And Bedrock no longer returns "temperature and top_p cannot both be
+      specified for this model"
+
+  # ============================================================================
   # Advanced (Gateway) tab — fields formerly on GatewayProviderCredential
   # ============================================================================
 
