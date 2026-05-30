@@ -177,6 +177,12 @@ export class ModelProviderRepository {
        * at `projectId`, matching the legacy iter-107 behavior.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      rotationPolicy?: "MANUAL";
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
@@ -211,6 +217,26 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
+        ...(data.rateLimitRpm !== undefined && {
+          rateLimitRpm: data.rateLimitRpm,
+        }),
+        ...(data.rateLimitTpm !== undefined && {
+          rateLimitTpm: data.rateLimitTpm,
+        }),
+        ...(data.rateLimitRpd !== undefined && {
+          rateLimitRpd: data.rateLimitRpd,
+        }),
+        ...(data.fallbackPriorityGlobal !== undefined && {
+          fallbackPriorityGlobal: data.fallbackPriorityGlobal,
+        }),
+        ...(data.rotationPolicy !== undefined && {
+          rotationPolicy: data.rotationPolicy,
+        }),
+        ...(data.providerConfig !== undefined && {
+          providerConfig: (data.providerConfig ?? undefined) as
+            | Prisma.InputJsonValue
+            | undefined,
+        }),
         scopes: {
           create: scopes.map((scope) => ({
             id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
@@ -239,11 +265,17 @@ export class ModelProviderRepository {
        * inserted; when omitted the scope set is untouched.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      rotationPolicy?: "MANUAL";
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
     const encryptedKeys = this.encryptCustomKeys(data.customKeys);
-    const { scopes, ...rest } = data;
+    const { scopes, providerConfig, ...rest } = data;
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
@@ -288,6 +320,11 @@ export class ModelProviderRepository {
           customEmbeddingsModels: data.customEmbeddingsModels as
             | Prisma.InputJsonValue
             | undefined,
+          ...(providerConfig !== undefined && {
+            providerConfig: (providerConfig ?? undefined) as
+              | Prisma.InputJsonValue
+              | undefined,
+          }),
         },
         include: { scopes: true },
       });

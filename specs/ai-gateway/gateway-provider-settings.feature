@@ -63,6 +63,39 @@ Feature: AI Gateway — Provider settings cohesion
     And a span event "provider_disabled_for_vk" fires on each affected VK
 
   # ============================================================================
+  # Advanced (Gateway) section — single Save, collapsed by default, FF-gated
+  # ============================================================================
+
+  @integration
+  Scenario: Advanced (Gateway) is hidden when the AI gateway feature flag is off
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is disabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    Then the "Advanced (Gateway)" accordion is not rendered
+    And the drawer's basic fields and Save button remain interactive
+
+  @integration
+  Scenario: Advanced (Gateway) renders as a collapsed accordion when the flag is on
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is enabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    Then the "Advanced (Gateway)" accordion is rendered collapsed
+    And the rate-limit, fallback priority, and provider config inputs are hidden
+      until I expand the accordion
+
+  @integration
+  Scenario: Single Save persists basic credentials and advanced gateway fields together
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is enabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    And I expand the "Advanced (Gateway)" accordion
+    And I set rateLimitRpm=600 and providerConfig={"region":"us-east-1"}
+    And I click the drawer's "Save" button
+    Then one `api.modelProvider.update` mutation fires carrying both the basic
+      and advanced fields
+    And no separate "Save Advanced" button is rendered
+
+  # ============================================================================
   # Advanced (Gateway) tab — fields formerly on GatewayProviderCredential
   # ============================================================================
 

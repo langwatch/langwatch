@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, Project } from "@prisma/client";
+import type { PrismaClient, Project } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -60,6 +60,16 @@ export type UpdateModelProviderInput = {
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
+  /**
+   * Advanced gateway settings, persisted on the same ModelProvider row
+   * as the basic fields so the drawer's single Save covers both.
+   */
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  rotationPolicy?: "MANUAL";
+  providerConfig?: Record<string, unknown> | null;
 };
 
 export type DeleteModelProviderInput = {
@@ -67,6 +77,39 @@ export type DeleteModelProviderInput = {
   projectId: string;
   provider: string;
 };
+
+type AdvancedGatewayInput = {
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  rotationPolicy?: "MANUAL";
+  providerConfig?: Record<string, unknown> | null;
+};
+
+function pickAdvancedFields(input: AdvancedGatewayInput): {
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  rotationPolicy?: "MANUAL";
+  providerConfig?: Record<string, unknown> | null;
+} {
+  const out: AdvancedGatewayInput = {};
+  if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
+  if (input.rateLimitTpm !== undefined) out.rateLimitTpm = input.rateLimitTpm;
+  if (input.rateLimitRpd !== undefined) out.rateLimitRpd = input.rateLimitRpd;
+  if (input.fallbackPriorityGlobal !== undefined) {
+    out.fallbackPriorityGlobal = input.fallbackPriorityGlobal;
+  }
+  if (input.rotationPolicy !== undefined) {
+    out.rotationPolicy = input.rotationPolicy;
+  }
+  if (input.providerConfig !== undefined) {
+    out.providerConfig = input.providerConfig;
+  }
+  return out;
+}
 
 /**
  * Service layer for ModelProvider business logic.
@@ -86,84 +129,6 @@ export class ModelProviderService {
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
     return new ModelProviderService(prisma, repository);
-  }
-
-  /**
-   * Advanced gateway settings (rate limits, fallback priority, rotation
-   * policy, provider config) for a single ModelProvider.
-   *
-   * Authorizes by the provider's own scope set, not a caller-supplied
-   * organization id: a provider id alone is not proof of ownership.
-   * Unreadable rows surface as NOT_FOUND so ids can't be enumerated
-   * across tenants; the write then requires manage on every scope the
-   * provider is attached to (fail-closed, same contract as create/update).
-   */
-  async updateAdvancedSettings(
-    ctx: AuthzContext,
-    input: {
-      id: string;
-      rateLimitRpm?: number | null;
-      rateLimitTpm?: number | null;
-      rateLimitRpd?: number | null;
-      fallbackPriorityGlobal?: number | null;
-      rotationPolicy?: "MANUAL";
-      providerConfig?: Record<string, unknown> | null;
-    },
-  ) {
-    const provider = await this.prisma.modelProvider.findUnique({
-      where: { id: input.id },
-      select: { id: true, scopes: { select: { scopeType: true, scopeId: true } } },
-    });
-    const scopes = (provider?.scopes ?? []) as {
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }[];
-    if (!provider || !(await canReadAnyScope(ctx, scopes))) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found.",
-      });
-    }
-    await assertCanManageAllScopes(ctx, scopes);
-
-    return this.prisma.modelProvider.update({
-      where: { id: input.id },
-      data: {
-        ...(input.rateLimitRpm !== undefined && {
-          rateLimitRpm: input.rateLimitRpm,
-        }),
-        ...(input.rateLimitTpm !== undefined && {
-          rateLimitTpm: input.rateLimitTpm,
-        }),
-        ...(input.rateLimitRpd !== undefined && {
-          rateLimitRpd: input.rateLimitRpd,
-        }),
-        ...(input.fallbackPriorityGlobal !== undefined && {
-          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-        }),
-        ...(input.rotationPolicy !== undefined && {
-          rotationPolicy: input.rotationPolicy,
-        }),
-        ...(input.providerConfig !== undefined && {
-          providerConfig: (input.providerConfig ?? undefined) as
-            | Prisma.InputJsonValue
-            | undefined,
-        }),
-      },
-      select: {
-        id: true,
-        rateLimitRpm: true,
-        rateLimitTpm: true,
-        rateLimitRpd: true,
-        fallbackPriorityGlobal: true,
-        rotationPolicy: true,
-        providerConfig: true,
-        healthStatus: true,
-        circuitOpenedAt: true,
-        lastHealthCheckAt: true,
-        disabledAt: true,
-      },
-    });
   }
 
   /**
@@ -494,7 +459,22 @@ export class ModelProviderService {
       extraHeaders,
       defaultModel,
       name,
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      rotationPolicy,
+      providerConfig,
     } = input;
+
+    const advanced = {
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      rotationPolicy,
+      providerConfig,
+    };
 
     // Validate provider exists
     if (!(provider in modelProviders)) {
@@ -545,6 +525,7 @@ export class ModelProviderService {
             customModels: customModels ?? [],
             customEmbeddingsModels: customEmbeddingsModels ?? [],
             extraHeaders: extraHeaders ?? [],
+            advanced,
           },
           validatedKeys,
           customKeysProvided,
@@ -561,6 +542,7 @@ export class ModelProviderService {
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
+            advanced,
           },
           validatedKeys,
           customKeysProvided,
@@ -1018,6 +1000,7 @@ export class ModelProviderService {
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -1045,6 +1028,7 @@ export class ModelProviderService {
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
+        ...pickAdvancedFields(data.advanced),
       },
       tx,
     );
@@ -1060,6 +1044,7 @@ export class ModelProviderService {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       scopes?: ScopeInput[];
+      advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -1077,6 +1062,7 @@ export class ModelProviderService {
         scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
+        ...pickAdvancedFields(data.advanced),
       },
       tx,
     );
