@@ -130,37 +130,53 @@ describe("fetchTracesFromClickHouse integration", () => {
     });
   });
 
-  describe("when the newest traces have empty input", () => {
+  describe("when a full page of the newest traces has empty input", () => {
     // The page is selected by recency alone, so empty-input traces still
-    // occupy page slots. The cursor must track the page boundary (including
-    // those rows) so pagination doesn't stall before older eligible traces —
-    // the regression CodeRabbit flagged when the empty filter lived in SQL.
+    // occupy page slots. With a *full* page (2000) of empty-input traces, the
+    // older input-bearing traces sit beyond the page boundary and are only
+    // reachable if the cursor advances by the page boundary rather than the
+    // (here empty) filtered result. This is the cursor-stall regression
+    // CodeRabbit flagged from when the empty filter lived in SQL.
     const EMPTY_TENANT = "topic-fetch-empty-test";
+    const OLDER_WITH_INPUT = 20;
 
     beforeAll(async () => {
       const input = JSON.stringify("hello world");
-      // The 20 newest traces have empty input; the older 20 carry input.
+      // 2000 newest traces have empty input; the next 20 (older) carry input.
       await insertRows(
         ch,
-        Array.from({ length: 40 }, (_, i) =>
-          traceRow(EMPTY_TENANT, i, i < 20 ? "" : input),
+        Array.from({ length: 2000 + OLDER_WITH_INPUT }, (_, i) =>
+          traceRow(EMPTY_TENANT, i, i < 2000 ? "" : input),
         ),
       );
-    }, 60_000);
+    }, 120_000);
 
     afterAll(async () => {
       await cleanupTestData(EMPTY_TENANT);
     });
 
-    it("advances the cursor past empty-input traces to reach older ones", async () => {
-      const res = await fetchTracesFromClickHouse(ch, EMPTY_TENANT, false, [], []);
+    it("advances the cursor past a full empty page to reach older traces", async () => {
+      const page1 = await fetchTracesFromClickHouse(ch, EMPTY_TENANT, false, [], []);
 
-      // Only the 20 input-bearing traces are clustered...
-      expect(res.traces).toHaveLength(20);
-      // ...but pagination accounts for the whole page (incl. the 20 empties),
-      // so the cursor reaches the oldest trace and clustering won't stall.
-      expect(res.returnedCount).toBe(40);
-      expect(res.lastSort?.[1]).toBe(`${EMPTY_TENANT}-trace-000039`);
+      // Page 1 is a full page of empty-input traces: nothing to cluster, but
+      // the cursor must still track the page boundary (the 2000th trace).
+      expect(page1.traces).toHaveLength(0);
+      expect(page1.returnedCount).toBe(2000);
+      expect(page1.lastSort?.[1]).toBe(`${EMPTY_TENANT}-trace-001999`);
+
+      // Page 2, seeked from that cursor, reaches the older input-bearing
+      // traces that the pre-fix SQL filter would have stranded.
+      const page2 = await fetchTracesFromClickHouse(
+        ch,
+        EMPTY_TENANT,
+        false,
+        [],
+        [],
+        page1.lastSort!,
+      );
+      expect(page2.traces).toHaveLength(OLDER_WITH_INPUT);
+      expect(page2.traces.every((t) => t.input.length > 0)).toBe(true);
+      expect(page2.traces[0]?.trace_id).toBe(`${EMPTY_TENANT}-trace-002000`);
     });
   });
 });
