@@ -77,6 +77,33 @@ export async function setup(): Promise<void> {
 export async function teardown(): Promise<void> {
   await stopTestContainers();
   await closeAppRuntimeSingletons();
+  armForceExitFallback();
+}
+
+/**
+ * After every file's teardown, schedule a hard process.exit(0) ten seconds
+ * out and replace any prior schedule. While files are still running, the
+ * next file's teardown clears this one and arms a new one, so the timer
+ * never fires mid-shard. On the LAST file of the shard there is no next
+ * teardown to clear it; ten seconds after the last file completes its
+ * teardown the timer fires and the worker exits, which lets vitest's
+ * reporter print the summary line.
+ *
+ * The timer is left ref'd on purpose: when nothing else is keeping the
+ * loop alive the runtime will still wait the full ten seconds, but that
+ * is a small tax in exchange for never wedging the shard at the timeout
+ * cap. The cost only applies to the last file of each shard.
+ */
+let forceExitTimer: ReturnType<typeof setTimeout> | undefined;
+function armForceExitFallback(): void {
+  if (forceExitTimer) clearTimeout(forceExitTimer);
+  forceExitTimer = setTimeout(() => {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[teardown] force-exit fallback firing — last-file teardown reached its idle window",
+    );
+    process.exit(0);
+  }, 10_000);
 }
 
 /**
