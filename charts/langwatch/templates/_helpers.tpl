@@ -286,8 +286,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if $gw.chartManaged }}
   {{- $gwSecrets := $gw.secrets | default dict }}
   {{- $existingName := $gwSecrets.existingSecretName }}
+  {{- $autogenNames := .Values.autogen.secretNames | default dict }}
+  {{- $autogenGatewayAuth := $autogenNames.gatewayAuth | default "" }}
   {{- if and (not .Values.autogen.enabled) (empty $existingName) }}
     {{- $errors = append $errors "gateway.chartManaged is true but neither autogen.enabled nor gateway.secrets.existingSecretName is configured. Either enable autogen (dev), point gateway.secrets.existingSecretName at an out-of-band Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET (production), or set gateway.chartManaged: false." }}
+  {{- end }}
+  {{/* Both langwatch-app and the gateway pod mount the SAME Secret (the
+       app reads LW_GATEWAY_INTERNAL_SECRET from gateway.secrets.existing-
+       SecretName; the gateway pod reads its own LW_GATEWAY_* from the same
+       Secret). A name mismatch silently creates one Secret and boots pods
+       against another — fail fast at render. */}}
+  {{- if and .Values.autogen.enabled $autogenGatewayAuth $existingName (ne $autogenGatewayAuth $existingName) }}
+    {{- $errors = append $errors (printf "autogen.secretNames.gatewayAuth (%s) must match gateway.secrets.existingSecretName (%s); the chart materialises the former while both langwatch-app and the gateway pod mount the latter." $autogenGatewayAuth $existingName) }}
   {{- end }}
 
   {{/* Trigger of the postmortem's Bifrost OTEL recursion outage: gateway

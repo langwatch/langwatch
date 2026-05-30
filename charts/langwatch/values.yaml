@@ -1565,14 +1565,24 @@ gateway:
   controlPlane:
     baseUrl: http://langwatch-app:5560
 
-  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Must be created out-of-band (terraform / external-secrets) and shared with langwatch-app's env. The umbrella chart does NOT materialise it.
+  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Shared between langwatch-app and the gateway pod. When autogen.enabled is true the umbrella chart materialises this Secret on first install and reuses the values on subsequent renders via lookup; when autogen.enabled is false (production default), the Secret must be created out-of-band (terraform, external-secrets, SealedSecrets, vault-agent, kubectl create) before `helm install` runs.
   secrets:
     existingSecretName: langwatch-gateway-auth
 
-  ## @param gateway.otel.endpoint [string, default: http://langwatch-app:5560/api/otel] OTLP/HTTP ingest URL the gateway exports spans to. In-cluster default targets langwatch-app. Point at an external collector (Honeycomb / Datadog OTLP receiver / Grafana Agent) if you already have one. Leave empty to disable gateway trace export entirely.
-  ## @param gateway.otel.authExistingSecretName [string, default: ""] Name of a Secret carrying the X-Auth-Token attached to every OTLP span export. Production path — rotate the token by rotating the Secret. Required when endpoint points at /api/otel; the ingest rejects unauthenticated spans with 401.
+  # Trace export is OFF by default to keep the chart safe to install
+  # without out-of-band auth-token plumbing. Earlier defaults pointed
+  # at /api/otel without an auth token — the 401 storm from that
+  # combination is the postmortem 2026-05-21 trigger that crashed the
+  # gateway pod via the Bifrost startupErrorHandler recursion (fixed
+  # in main since pkg/otelsetup PR #4112). To send gateway spans to
+  # langwatch-app, set both endpoint AND authExistingSecretName. To
+  # send to an external collector (Honeycomb / Datadog OTLP / Grafana
+  # Agent / etc.), set endpoint and provide whatever auth that
+  # collector requires.
+  ## @param gateway.otel.endpoint [string, default: ""] OTLP/HTTP ingest URL the gateway exports spans to. Empty disables trace export entirely. Point at langwatch-app:5560/api/otel (with authExistingSecretName) or an external collector.
+  ## @param gateway.otel.authExistingSecretName [string, default: ""] Name of a Secret carrying the X-Auth-Token attached to every OTLP span export. Required when endpoint points at /api/otel; the ingest rejects unauthenticated spans with 401.
   ## @param gateway.otel.authSecretKey [string, default: token] Key inside `otel.authExistingSecretName` holding the token.
   otel:
-    endpoint: http://langwatch-app:5560/api/otel
+    endpoint: ""
     authExistingSecretName: ""
     authSecretKey: token
