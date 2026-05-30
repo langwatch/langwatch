@@ -73,7 +73,7 @@ describe.skip("organizationRouter member role validation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    resetApp();
+    await resetApp();
 
     // Wire App singleton with permissive PlanProvider mock values.
     globalForApp.__langwatch_app = createTestApp({
@@ -121,7 +121,7 @@ describe.skip("organizationRouter member role validation", () => {
   });
 
   afterEach(() => {
-    resetApp();
+    await resetApp();
   });
 
   describe("updateTeamMemberRole", () => {

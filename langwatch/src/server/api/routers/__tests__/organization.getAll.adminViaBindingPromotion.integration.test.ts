@@ -121,7 +121,7 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     const safeDelete = async (fn: () => Promise<unknown>) => {
       try {
         await fn();

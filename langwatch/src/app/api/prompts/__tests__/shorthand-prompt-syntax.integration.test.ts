@@ -32,7 +32,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi

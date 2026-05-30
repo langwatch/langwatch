@@ -42,7 +42,7 @@ describe.skip("Evaluations V3 Endpoints", () => {
   const createdExperimentIds: string[] = [];
 
   beforeAll(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp();
 
     const user = await getTestUser();
@@ -63,7 +63,7 @@ describe.skip("Evaluations V3 Endpoints", () => {
         where: { id: { in: createdExperimentIds }, projectId },
       });
     }
-    resetApp();
+    await resetApp();
   });
 
   describe("saveEvaluationsV3", () => {

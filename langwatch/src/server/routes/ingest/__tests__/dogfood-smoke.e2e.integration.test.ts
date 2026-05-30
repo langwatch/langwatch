@@ -107,7 +107,7 @@ vi.mock("~/server/app-layer/app", async () => {
 });
 
 function configureApp(plan: PlanInfo) {
-  resetApp();
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
@@ -247,7 +247,7 @@ describe("end-to-end customer dogfood smoke (Phase 5 cross-lane)", () => {
   afterAll(async () => {
     await deleteSeededOrg(orgA);
     await deleteSeededOrg(orgB);
-    resetApp();
+    await resetApp();
   });
 
   it("receiver: bearer for orgA hands the trace off to the gov-project pipeline", async () => {

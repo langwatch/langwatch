@@ -35,7 +35,7 @@ describe("Feature: Dataset REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
     globalForApp.__langwatch_app = createTestApp({
@@ -124,7 +124,7 @@ describe("Feature: Dataset REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   // Helper to create a dataset directly via Prisma

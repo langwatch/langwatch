@@ -35,7 +35,7 @@ describe("Feature: Dashboard REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -123,7 +123,7 @@ describe("Feature: Dashboard REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   async function createDashboard(overrides: {

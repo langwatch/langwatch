@@ -48,7 +48,7 @@ describe("Prompts API", () => {
   beforeEach(async () => {
     // Initialize the test App container so middleware that depends on it
     // (resource-limit, license-enforcement) can run.
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi

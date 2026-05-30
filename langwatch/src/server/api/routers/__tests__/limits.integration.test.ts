@@ -88,11 +88,11 @@ describe("Limits Router Integration", () => {
   });
 
   afterEach(() => {
-    resetApp();
+    await resetApp();
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -115,7 +115,7 @@ describe("Limits Router Integration", () => {
         free: false,
         maxMessagesPerMonth: 1000,
       });
-      resetApp();
+      await resetApp();
       globalForApp.__langwatch_app = createTestApp({
         usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
         planProvider: PlanProviderService.create({

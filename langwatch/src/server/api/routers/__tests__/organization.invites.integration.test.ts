@@ -228,7 +228,7 @@ describe("Organization Invites Integration", () => {
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
 
     // Re-wire App singleton with fresh mock values
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
@@ -237,7 +237,7 @@ describe("Organization Invites Integration", () => {
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
 
     // Cleanup all test data
     await prisma.organizationInvite.deleteMany({
