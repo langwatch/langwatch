@@ -129,6 +129,34 @@ export const EditModelProviderForm = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
+  // Stable seed for the advanced draft. Memoizing on the underlying
+  // values means the reset effect below only re-fires when one of the
+  // five gateway fields actually changes — even if `provider` itself
+  // re-references for unrelated reasons.
+  const advancedSeed = useMemo(
+    () => ({
+      rateLimitRpm:
+        (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+      rateLimitTpm:
+        (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+      rateLimitRpd:
+        (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+      fallbackPriorityGlobal:
+        (provider as { fallbackPriorityGlobal?: number | null })
+          .fallbackPriorityGlobal ?? null,
+      providerConfig: (provider as { providerConfig?: unknown })
+        .providerConfig,
+    }),
+    [
+      (provider as { rateLimitRpm?: number | null }).rateLimitRpm,
+      (provider as { rateLimitTpm?: number | null }).rateLimitTpm,
+      (provider as { rateLimitRpd?: number | null }).rateLimitRpd,
+      (provider as { fallbackPriorityGlobal?: number | null })
+        .fallbackPriorityGlobal,
+      (provider as { providerConfig?: unknown }).providerConfig,
+    ],
+  );
+
   // Reset advanced draft when the loaded provider row changes (drawer
   // opened, multi-instance switch, etc.). Skipped when the gateway flag
   // is off so we never spread defaults into the payload from a hidden
@@ -139,32 +167,9 @@ export const EditModelProviderForm = ({
       setAdvancedJsonError(null);
       return;
     }
-    setAdvancedDraft(
-      draftFromProvider({
-        rateLimitRpm:
-          (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-        rateLimitTpm:
-          (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-        rateLimitRpd:
-          (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
-        fallbackPriorityGlobal:
-          (provider as { fallbackPriorityGlobal?: number | null })
-            .fallbackPriorityGlobal ?? null,
-        providerConfig: (provider as { providerConfig?: unknown })
-          .providerConfig,
-      }),
-    );
+    setAdvancedDraft(draftFromProvider(advancedSeed));
     setAdvancedJsonError(null);
-  }, [
-    gatewayMenuEnabled,
-    (provider as { id?: string }).id,
-    (provider as { rateLimitRpm?: number | null }).rateLimitRpm,
-    (provider as { rateLimitTpm?: number | null }).rateLimitTpm,
-    (provider as { rateLimitRpd?: number | null }).rateLimitRpd,
-    (provider as { fallbackPriorityGlobal?: number | null })
-      .fallbackPriorityGlobal,
-    (provider as { providerConfig?: unknown }).providerConfig,
-  ]);
+  }, [gatewayMenuEnabled, advancedSeed]);
 
   const getAdvancedPayload = useCallback(() => {
     if (!gatewayMenuEnabled) return null;

@@ -181,7 +181,6 @@ export class ModelProviderRepository {
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
       fallbackPriorityGlobal?: number | null;
-      rotationPolicy?: "MANUAL";
       providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
@@ -229,9 +228,6 @@ export class ModelProviderRepository {
         ...(data.fallbackPriorityGlobal !== undefined && {
           fallbackPriorityGlobal: data.fallbackPriorityGlobal,
         }),
-        ...(data.rotationPolicy !== undefined && {
-          rotationPolicy: data.rotationPolicy,
-        }),
         ...(data.providerConfig !== undefined && {
           providerConfig: (data.providerConfig ?? undefined) as
             | Prisma.InputJsonValue
@@ -269,7 +265,6 @@ export class ModelProviderRepository {
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
       fallbackPriorityGlobal?: number | null;
-      rotationPolicy?: "MANUAL";
       providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,

@@ -68,7 +68,6 @@ export type UpdateModelProviderInput = {
   rateLimitTpm?: number | null;
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
-  rotationPolicy?: "MANUAL";
   providerConfig?: Record<string, unknown> | null;
 };
 
@@ -83,27 +82,16 @@ type AdvancedGatewayInput = {
   rateLimitTpm?: number | null;
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
-  rotationPolicy?: "MANUAL";
   providerConfig?: Record<string, unknown> | null;
 };
 
-function pickAdvancedFields(input: AdvancedGatewayInput): {
-  rateLimitRpm?: number | null;
-  rateLimitTpm?: number | null;
-  rateLimitRpd?: number | null;
-  fallbackPriorityGlobal?: number | null;
-  rotationPolicy?: "MANUAL";
-  providerConfig?: Record<string, unknown> | null;
-} {
+function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
   if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
   if (input.rateLimitTpm !== undefined) out.rateLimitTpm = input.rateLimitTpm;
   if (input.rateLimitRpd !== undefined) out.rateLimitRpd = input.rateLimitRpd;
   if (input.fallbackPriorityGlobal !== undefined) {
     out.fallbackPriorityGlobal = input.fallbackPriorityGlobal;
-  }
-  if (input.rotationPolicy !== undefined) {
-    out.rotationPolicy = input.rotationPolicy;
   }
   if (input.providerConfig !== undefined) {
     out.providerConfig = input.providerConfig;
@@ -463,7 +451,6 @@ export class ModelProviderService {
       rateLimitTpm,
       rateLimitRpd,
       fallbackPriorityGlobal,
-      rotationPolicy,
       providerConfig,
     } = input;
 
@@ -472,9 +459,14 @@ export class ModelProviderService {
       rateLimitTpm,
       rateLimitRpd,
       fallbackPriorityGlobal,
-      rotationPolicy,
       providerConfig,
     };
+    const hasAdvancedWrite =
+      rateLimitRpm !== undefined ||
+      rateLimitTpm !== undefined ||
+      rateLimitRpd !== undefined ||
+      fallbackPriorityGlobal !== undefined ||
+      providerConfig !== undefined;
 
     // Validate provider exists
     if (!(provider in modelProviders)) {
@@ -508,6 +500,23 @@ export class ModelProviderService {
     // cannot silently rebind a credential the caller can't see.
     if (ctx && scopes) {
       await assertCanManageAllScopes(ctx, scopes);
+    }
+
+    // Advanced (Gateway) writes also require manage on every scope the
+    // existing row is bound to — not just the project the caller is in.
+    // Matches the previous `updateAdvancedSettings` contract: a project
+    // admin must not nudge rate limits on a credential that's also
+    // bound to its parent org/team without manage there. The basic
+    // update path keeps its existing semantics (project:update gate
+    // only) so this PR doesn't tighten unrelated writes.
+    if (ctx && hasAdvancedWrite && existingProvider) {
+      await assertCanManageAllScopes(
+        ctx,
+        existingProvider.scopes.map((s) => ({
+          scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+          scopeId: s.scopeId,
+        })),
+      );
     }
 
     return await this.prisma.$transaction(async (tx) => {

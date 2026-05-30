@@ -145,7 +145,6 @@ export const modelProviderRouter = createTRPCRouter({
         rateLimitTpm: z.number().int().min(0).nullable().optional(),
         rateLimitRpd: z.number().int().min(0).nullable().optional(),
         fallbackPriorityGlobal: z.number().int().nullable().optional(),
-        rotationPolicy: z.enum(["MANUAL"]).optional(),
         providerConfig: z.object({}).passthrough().nullable().optional(),
       }),
     )
@@ -174,7 +173,6 @@ export const modelProviderRouter = createTRPCRouter({
           rateLimitTpm: input.rateLimitTpm,
           rateLimitRpd: input.rateLimitRpd,
           fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-          rotationPolicy: input.rotationPolicy,
           providerConfig: input.providerConfig as
             | Record<string, unknown>
             | null

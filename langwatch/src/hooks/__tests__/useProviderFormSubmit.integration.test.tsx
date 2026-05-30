@@ -122,10 +122,19 @@ function buildSnapshot(overrides: Partial<FormSnapshot> = {}): FormSnapshot {
   };
 }
 
-function renderSubmitHook({ snapshot }: { snapshot: FormSnapshot }) {
+function renderSubmitHook({
+  snapshot,
+  getAdvancedPayload,
+}: {
+  snapshot: FormSnapshot;
+  getAdvancedPayload?: Parameters<
+    typeof useProviderFormSubmit
+  >[0]["getAdvancedPayload"];
+}) {
   return renderHook(() =>
     useProviderFormSubmit({
       getFormSnapshot: () => snapshot,
+      getAdvancedPayload,
     }),
   );
 }
@@ -465,6 +474,64 @@ describe("useProviderFormSubmit()", () => {
           AZURE_OPENAI_ENDPOINT: "https://example.openai.azure.com",
         });
       });
+    });
+  });
+
+  describe("given the parent form opts out of the advanced payload (FF off)", () => {
+    /** @scenario Advanced (Gateway) is hidden when the AI gateway feature flag is off */
+    it("submits without any advanced fields when getAdvancedPayload returns null", async () => {
+      const snapshot = buildSnapshot({
+        useAsDefaultProvider: false,
+        projectDefaultModel: null,
+        projectTopicClusteringModel: null,
+      });
+      const { result } = renderSubmitHook({
+        snapshot,
+        getAdvancedPayload: () => null,
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+      expect(payload).toBeDefined();
+      expect(payload).not.toHaveProperty("rateLimitRpm");
+      expect(payload).not.toHaveProperty("rateLimitTpm");
+      expect(payload).not.toHaveProperty("rateLimitRpd");
+      expect(payload).not.toHaveProperty("fallbackPriorityGlobal");
+      expect(payload).not.toHaveProperty("providerConfig");
+    });
+  });
+
+  describe("given the parent form provides an advanced payload (FF on)", () => {
+    /** @scenario Single Save persists basic credentials and advanced gateway fields together */
+    it("spreads the advanced fields into the same update mutation", async () => {
+      const snapshot = buildSnapshot({
+        useAsDefaultProvider: false,
+        projectDefaultModel: null,
+        projectTopicClusteringModel: null,
+      });
+      const { result } = renderSubmitHook({
+        snapshot,
+        getAdvancedPayload: () => ({
+          rateLimitRpm: 600,
+          rateLimitTpm: null,
+          rateLimitRpd: null,
+          fallbackPriorityGlobal: 1,
+          providerConfig: { region: "us-east-1" },
+        }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+      expect(payload?.rateLimitRpm).toBe(600);
+      expect(payload?.rateLimitTpm).toBeNull();
+      expect(payload?.fallbackPriorityGlobal).toBe(1);
+      expect(payload?.providerConfig).toEqual({ region: "us-east-1" });
     });
   });
 });
