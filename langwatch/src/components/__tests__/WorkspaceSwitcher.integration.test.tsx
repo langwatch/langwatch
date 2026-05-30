@@ -220,6 +220,31 @@ describe("WorkspaceSwitcher", () => {
       expect(screen.queryByText("Create project")).not.toBeInTheDocument();
     });
 
+    /** @scenario The "+" button is not in the menu's auto-focus reach on dropdown open */
+    it("does not auto-focus the + button when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      // tabIndex=-1 takes it out of the menu's initial focus. Ark Menu's
+      // auto-focus would otherwise land here because the "+" sits next
+      // to (not inside) a Menu.Item, competing for first focus and
+      // showing a visible ring on every menu open.
+      expect(addButton).toHaveAttribute("tabindex", "-1");
+      expect(addButton).not.toHaveFocus();
+    });
+
     /** @scenario The "Create project" tooltip still appears on actual pointer hover */
     it("shows the tooltip on pointer hover and hides it on leave", async () => {
       const user = userEvent.setup();

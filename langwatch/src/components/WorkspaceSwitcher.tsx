@@ -512,6 +512,15 @@ function TeamCreateProjectButton({
         right={2}
         top="50%"
         transform="translateY(-50%)"
+        // Out of the menu's focus reach. Ark Menu auto-focuses the first
+        // focusable child of Menu.Content on open; since this button sits
+        // next to (not inside) a Menu.Item, it competes for that initial
+        // focus and ends up with the visible ring on every menu open.
+        // tabIndex=-1 takes it out of natural tab order so the menu's
+        // initial focus lands on the first Menu.Item (the team link).
+        // Click still works; the team page has its own create-project
+        // affordance for keyboard-only users.
+        tabIndex={-1}
         onMouseEnter={() => setTipOpen(true)}
         onMouseLeave={() => setTipOpen(false)}
         onFocus={() => setTipOpen(false)}
