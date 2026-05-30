@@ -34,14 +34,16 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel
     fileParallelism: false,
-    // Run integration files in forked child processes (vs the unit pool's
-    // `vmThreads`) so each worker is force-killed on file exit. With vmThreads
-    // a single un-`unref`'d timer or unclosed client in any file makes the
-    // whole shard wait forever under --coverage (which awaits a graceful
-    // worker exit instead of force-killing the pool); forks side-step that
-    // class of hang entirely. The startup cost is a few hundred ms per file,
-    // which is dwarfed by integration tests' actual work.
-    pool: "forks",
+    // Use worker threads instead of forked child processes. The forks pool
+    // wedged shard 4 of 6 on every run after the last test passed: dumps
+    // showed the fork had no application-level handles left (handle-walker
+    // unref took care of the redis singleton, coverage and json reporter
+    // were ruled out as the cause), but vitest main never received the
+    // fork-exit signal and sat for the full timeout cap. Threads use the
+    // standard Worker exit event, which vitest main detects directly,
+    // and the worker's lifecycle is in-process so the cross-process IPC
+    // race that pinned forks doesn't apply.
+    pool: "threads",
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },

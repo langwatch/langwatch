@@ -245,7 +245,8 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
           pnpm test:integration --shard=${{ matrix.shard }}/6 \
-            --reporter=default
+            --coverage --coverage.reporter=lcov --coverage.reporter=text \
+            --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract test failures
         if: failure()
