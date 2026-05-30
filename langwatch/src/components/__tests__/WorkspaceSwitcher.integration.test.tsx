@@ -3,7 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import {
@@ -192,6 +192,87 @@ describe("WorkspaceSwitcher", () => {
       expect(
         screen.queryByRole("button", { name: /create project in/i }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The "Create project" tooltip never auto-opens on switcher mount */
+    it("does not show a visible 'Create project' tooltip when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The IconButton itself must still be reachable (aria-label).
+      expect(
+        await screen.findByRole("button", {
+          name: /create project in acme engineering/i,
+        }),
+      ).toBeInTheDocument();
+      // The tooltip is controlled; Ark Menu's focus rove must not flip it
+      // open. (Pre-fix the Tooltip auto-opened because Zag opens on focus
+      // and has no openOnFocus={false} knob — see WorkspaceSwitcher.tsx.)
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The "+" button is not auto-focused on dropdown open */
+    it("does not auto-focus the + button when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      // tabIndex=-1 takes it out of the menu's initial focus. Ark Menu's
+      // auto-focus would otherwise land here because the "+" sits next
+      // to (not inside) a Menu.Item, competing for first focus and
+      // showing a visible ring on every menu open.
+      expect(addButton).toHaveAttribute("tabindex", "-1");
+      expect(addButton).not.toHaveFocus();
+    });
+
+    /** @scenario The "Create project" tooltip still appears on actual pointer hover */
+    it("shows the tooltip on pointer hover and hides it on leave", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+
+      await user.hover(addButton);
+      expect(
+        await screen.findByText("Create project"),
+      ).toBeInTheDocument();
+
+      await user.unhover(addButton);
+      await waitFor(() => {
+        expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+      });
     });
   });
 
