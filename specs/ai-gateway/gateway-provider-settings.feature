@@ -91,8 +91,8 @@ Feature: AI Gateway — Provider settings cohesion
     And I expand the "Advanced (Gateway)" accordion
     And I set rateLimitRpm=600 and providerConfig={"region":"us-east-1"}
     And I click the drawer's "Save" button
-    Then one `api.modelProvider.update` mutation fires carrying both the basic
-      and advanced fields
+    Then the drawer closes after a single save round-trip
+    And the row's rate limit AND credentials reflect the new values
     And no separate "Save Advanced" button is rendered
 
   # ============================================================================

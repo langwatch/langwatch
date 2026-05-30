@@ -1,4 +1,5 @@
-import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@prisma/client";
+import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
@@ -229,9 +230,14 @@ export class ModelProviderRepository {
           fallbackPriorityGlobal: data.fallbackPriorityGlobal,
         }),
         ...(data.providerConfig !== undefined && {
-          providerConfig: (data.providerConfig ?? undefined) as
-            | Prisma.InputJsonValue
-            | undefined,
+          // Explicit null on the input clears the column (Prisma.JsonNull
+          // writes DB null to a Json? field). Bare `null` is rejected by
+          // InputJsonValue, and `?? undefined` would silently turn a
+          // "clear me" into a no-op.
+          providerConfig:
+            data.providerConfig === null
+              ? Prisma.JsonNull
+              : (data.providerConfig as Prisma.InputJsonValue),
         }),
         scopes: {
           create: scopes.map((scope) => ({
@@ -316,9 +322,10 @@ export class ModelProviderRepository {
             | Prisma.InputJsonValue
             | undefined,
           ...(providerConfig !== undefined && {
-            providerConfig: (providerConfig ?? undefined) as
-              | Prisma.InputJsonValue
-              | undefined,
+            providerConfig:
+              providerConfig === null
+                ? Prisma.JsonNull
+                : (providerConfig as Prisma.InputJsonValue),
           }),
         },
         include: { scopes: true },

@@ -246,7 +246,10 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
         expect(visible).toHaveLength(0);
       });
 
-      /** @scenario Single Save persists basic credentials and advanced gateway fields together */
+      // Render-side surface for the single-Save scenario. Wire-level
+      // assertion (the payload actually carries basic + advanced
+      // together) lives in `useProviderFormSubmit.integration.test.tsx`
+      // and binds the same scenario name.
       it("renders only one Save button (no separate Save Advanced)", () => {
         expect(screen.queryByText(/save advanced/i)).toBeNull();
         const saveButtons = screen.getAllByRole("button", {
