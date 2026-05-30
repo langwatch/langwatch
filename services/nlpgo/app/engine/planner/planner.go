@@ -159,7 +159,8 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 
 	// 1. Duplicate ids.
 	nodeIDs := make(map[string]dsl.ComponentType, len(w.Nodes))
-	for _, n := range w.Nodes {
+	for i := range w.Nodes {
+		n := &w.Nodes[i]
 		if _, exists := nodeIDs[n.ID]; exists {
 			return nil, &DuplicateNodeError{NodeID: n.ID}
 		}
@@ -169,7 +170,8 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 	// 2. Retired + unsupported kinds. Retired comes first so a workflow
 	// that has both a retired node and an unsupported one gets the more
 	// actionable error.
-	for _, n := range w.Nodes {
+	for i := range w.Nodes {
+		n := &w.Nodes[i]
 		if msg, retired := retiredKinds[n.Type]; retired {
 			return nil, &RetiredNodeKindError{NodeID: n.ID, Kind: n.Type, Message: msg}
 		}
@@ -283,7 +285,8 @@ func findCycle(nodes []dsl.Node, children map[string][]string) []string {
 		color[id] = black
 		return nil
 	}
-	for _, n := range nodes {
+	for i := range nodes {
+		n := &nodes[i]
 		if color[n.ID] == white {
 			if cycle := dfs(n.ID); cycle != nil {
 				return cycle
@@ -302,7 +305,8 @@ func findCycle(nodes []dsl.Node, children map[string][]string) []string {
 func layerize(nodes []dsl.Node, children, parents map[string][]string, allowed map[string]bool) [][]string {
 	indegree := make(map[string]int, len(nodes))
 	remaining := 0
-	for _, n := range nodes {
+	for i := range nodes {
+		n := &nodes[i]
 		if allowed != nil && !allowed[n.ID] {
 			continue
 		}
@@ -324,7 +328,8 @@ func layerize(nodes []dsl.Node, children, parents map[string][]string, allowed m
 		// Collect zero-indegree nodes preserving the input order so the
 		// emitted plan is deterministic regardless of map iteration.
 		var layer []string
-		for _, n := range nodes {
+		for i := range nodes {
+			n := &nodes[i]
 			if _, exists := indegree[n.ID]; !exists {
 				continue
 			}
@@ -364,9 +369,9 @@ func layerize(nodes []dsl.Node, children, parents map[string][]string, allowed m
 // Mirrors langwatch_nlp/studio/parser.py:605 `find_reachable_nodes`.
 func reachableFromEntry(nodes []dsl.Node, children map[string][]string) map[string]bool {
 	entryID := ""
-	for _, n := range nodes {
-		if n.Type == dsl.ComponentEntry {
-			entryID = n.ID
+	for i := range nodes {
+		if nodes[i].Type == dsl.ComponentEntry {
+			entryID = nodes[i].ID
 			break
 		}
 	}

@@ -6,8 +6,8 @@
 //   - `agent_type=http`     → delegates to the HTTP-block executor.
 //   - `agent_type=code`     → delegates to the code-block executor.
 //   - `agent_type=workflow` → POST {api_host}/api/workflows/{workflow_id}/run
-//                             (this file). Mirrors langwatch_nlp's
-//                             dspy/custom_node.py CustomNode.
+//     (this file). Mirrors langwatch_nlp's
+//     dspy/custom_node.py CustomNode.
 //
 // HTTP and code modes are thin re-uses of existing block executors and
 // will be wired by the engine's block dispatcher; this file owns only the
@@ -111,7 +111,9 @@ func (e *HTTPError) Error() string {
 
 // MissingResultError signals that the upstream returned 200 but the body
 // did not contain a `result` field. Mirrors CustomNode.forward's:
-//   if "result" not in result: raise Exception(json.dumps(result))
+//
+//	if "result" not in result: raise Exception(json.dumps(result))
+//
 // — preserving the Python behavior where any unexpected upstream shape
 // surfaces as an error rather than a silently-empty success.
 type MissingResultError struct {

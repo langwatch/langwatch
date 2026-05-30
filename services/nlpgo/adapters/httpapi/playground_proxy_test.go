@@ -109,7 +109,7 @@ func TestPlaygroundProxy_NonStreamingChatCompletions_ForwardsBodyAndCredential(t
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
 	}
@@ -186,7 +186,7 @@ func TestPlaygroundProxy_NonReasoningModelBodyForwardedByteForByte(t *testing.T)
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
 	}
@@ -224,7 +224,7 @@ func TestPlaygroundProxy_ReasoningModelMigratesMaxTokensToCompletion(t *testing.
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
 	}
@@ -266,7 +266,7 @@ func TestPlaygroundProxy_StreamingDeltasFlushAsTheyArrive(t *testing.T) {
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
@@ -317,7 +317,7 @@ func TestPlaygroundProxy_MissingProviderHeader_400(t *testing.T) {
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 400 {
+	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
 	if fake.called != 0 {
@@ -387,8 +387,8 @@ func TestFilterPassthroughHeaders_StripsConnectionNominatedHeaders(t *testing.T)
 	in.Set("Connection", "X-Hop-By-Hop, Trailer-Test")
 	in.Set("X-Hop-By-Hop", "should-be-stripped")
 	in.Set("Trailer-Test", "should-be-stripped-too")
-	in.Set("Accept", "application/json") // canonical pass-through
-	in.Set("Authorization", "Bearer x")  // explicit deny
+	in.Set("Accept", "application/json")  // canonical pass-through
+	in.Set("Authorization", "Bearer x")   // explicit deny
 	in.Set("X-LangWatch-Trace-Id", "tid") // pass-through
 	in.Set("x-litellm-model", "leak")     // explicit deny
 
@@ -444,7 +444,7 @@ func TestPlaygroundProxy_PassthroughForwardsHTTPShapeToDispatcher(t *testing.T) 
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
 	}
@@ -493,12 +493,12 @@ func TestPlaygroundProxy_PassthroughForwardsHTTPShapeToDispatcher(t *testing.T) 
 
 func TestPlaygroundProxy_PathClassification(t *testing.T) {
 	cases := map[string]domain.RequestType{
-		"/go/proxy/v1/chat/completions":                 domain.RequestTypeChat,
-		"/go/proxy/v1/messages":                         domain.RequestTypeMessages,
-		"/go/proxy/v1/embeddings":                       domain.RequestTypeEmbeddings,
-		"/go/proxy/v1/responses":                        domain.RequestTypeResponses,
-		"/go/proxy/v1beta/models/gemini-2.0-flash:run":  domain.RequestTypePassthrough,
-		"/go/proxy/v1/some/unknown/path":                domain.RequestTypePassthrough,
+		"/go/proxy/v1/chat/completions":                domain.RequestTypeChat,
+		"/go/proxy/v1/messages":                        domain.RequestTypeMessages,
+		"/go/proxy/v1/embeddings":                      domain.RequestTypeEmbeddings,
+		"/go/proxy/v1/responses":                       domain.RequestTypeResponses,
+		"/go/proxy/v1beta/models/gemini-2.0-flash:run": domain.RequestTypePassthrough,
+		"/go/proxy/v1/some/unknown/path":               domain.RequestTypePassthrough,
 	}
 	for path, want := range cases {
 		got, _ := classifyPath(path)
@@ -530,7 +530,7 @@ func TestPlaygroundProxy_NilDispatcherFallsBackTo501(t *testing.T) {
 	}
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 500 {
+	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500 from the fall-back stub", resp.StatusCode)
 	}
 	var env map[string]any

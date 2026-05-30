@@ -102,7 +102,7 @@ func (m *Manager) Start(ctx context.Context) error {
 		m.mu.Unlock()
 		return errors.New("uvicornchild: already started")
 	}
-	cmd := exec.Command(m.opts.Command, m.opts.Args...) //nolint:gosec // command is operator-configured
+	cmd := exec.CommandContext(ctx, m.opts.Command, m.opts.Args...) //nolint:gosec // command is operator-configured
 	cmd.Env = append(cmd.Environ(), m.opts.Env...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Stdout = newLogWriter(m.opts.Logger, "uvicorn_stdout")

@@ -705,8 +705,8 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	// final result panel. The Studio expects the same field names the
 	// Python EvaluationResultWithMetadata produces.
 	out := map[string]any{
-		"status":   res.Status,
-		"details":  res.Details,
+		"status":  res.Status,
+		"details": res.Details,
 	}
 	if res.Score != nil {
 		out["score"] = *res.Score
@@ -747,7 +747,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 //   - http     → reuse the HTTP-block executor with the agent's URL/method/etc.
 //   - code     → reuse the code-block executor with the agent's `code`.
 //   - workflow → call the LangWatch app's /api/workflows/<id>[/<version>]/run
-//                via the agentblock.WorkflowRunner.
+//     via the agentblock.WorkflowRunner.
 func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
@@ -928,13 +928,13 @@ func applyManualInputs(state *runState, req ExecuteRequest) {
 // runState aggregates per-node outputs and tracks the first error
 // observed. It is the engine's equivalent of WorkflowState.execution.
 type runState struct {
-	mu          sync.Mutex
-	nodes       map[string]*dsl.Node
-	outputs     map[string]map[string]any
-	states      map[string]*NodeState
-	firstError  *NodeError
-	endNodeID   string
-	totalCost   float64
+	mu         sync.Mutex
+	nodes      map[string]*dsl.Node
+	outputs    map[string]map[string]any
+	states     map[string]*NodeState
+	firstError *NodeError
+	endNodeID  string
+	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
 	// per Studio's wire convention.
@@ -1071,7 +1071,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 	}
 	if ctxErr != nil {
 		res.Status = "error"
-		res.Error = &NodeError{Type: "context_cancelled", Message: ctxErr.Error()}
+		res.Error = &NodeError{Type: "context_canceled", Message: ctxErr.Error()}
 		return res
 	}
 	if state.firstError != nil {

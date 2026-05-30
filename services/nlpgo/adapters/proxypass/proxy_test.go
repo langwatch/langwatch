@@ -42,7 +42,7 @@ func TestReverseProxy_SSE_StreamsChunksUnbuffered(t *testing.T) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
 		flusher, ok := w.(http.Flusher)
-		require.True(t, ok, "test upstream must support flushing")
+		assert.True(t, ok, "test upstream must support flushing")
 		for _, c := range chunks {
 			_, _ = w.Write([]byte(c))
 			flusher.Flush()

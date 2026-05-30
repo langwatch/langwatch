@@ -3,7 +3,6 @@ package httpblock_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -23,14 +22,14 @@ func TestRenderTemplate_StringEscaping(t *testing.T) {
 	})
 	assert.Empty(t, warns)
 	// json.Marshal will escape both quotes and the newline.
-	assert.Equal(t, `{"x":"hello \"world\"\n"}`, out)
+	assert.JSONEq(t, `{"x":"hello \"world\"\n"}`, out)
 }
 
 func TestRenderTemplate_ArrayEmbedding(t *testing.T) {
 	out, _ := httpblock.RenderTemplate(`{"ids": {{ ids }}}`, map[string]any{
 		"ids": []any{float64(1), float64(2), float64(3)},
 	})
-	assert.Equal(t, `{"ids": [1,2,3]}`, out)
+	assert.JSONEq(t, `{"ids": [1,2,3]}`, out)
 }
 
 func TestRenderTemplate_NestedPath(t *testing.T) {
@@ -42,7 +41,7 @@ func TestRenderTemplate_NestedPath(t *testing.T) {
 
 func TestRenderTemplate_MissingVariableEmitsWarning(t *testing.T) {
 	out, warns := httpblock.RenderTemplate("{{ ghost }}", map[string]any{})
-	assert.Equal(t, "", out)
+	assert.Empty(t, out)
 	require.Len(t, warns, 1)
 	assert.Contains(t, warns[0], "ghost")
 }
@@ -82,7 +81,7 @@ func TestExtractJSONPath_NoMatch(t *testing.T) {
 	data := map[string]any{"present": "value"}
 	_, err := httpblock.ExtractJSONPath(data, "$.missing")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, httpblock.ErrNoMatch))
+	assert.ErrorIs(t, err, httpblock.ErrNoMatch)
 }
 
 func TestExtractJSONPath_NumericIndex(t *testing.T) {
@@ -92,7 +91,7 @@ func TestExtractJSONPath_NumericIndex(t *testing.T) {
 	}
 	got, err := httpblock.ExtractJSONPath(data, "$[1].id")
 	require.NoError(t, err)
-	assert.Equal(t, float64(2), got)
+	assert.InDelta(t, 2.0, got, 1e-9)
 }
 
 func TestSSRF_BlocksLoopback(t *testing.T) {
@@ -139,11 +138,11 @@ func TestSSRF_DNSResolutionToPrivate(t *testing.T) {
 func TestExecute_HappyPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		require.Equal(t, "POST", r.Method)
-		require.Equal(t, "Bearer tok-abc", r.Header.Get("Authorization"))
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "Bearer tok-abc", r.Header.Get("Authorization"))
 		var got map[string]any
-		require.NoError(t, json.Unmarshal(body, &got))
-		require.Equal(t, "ping", got["q"])
+		assert.NoError(t, json.Unmarshal(body, &got))
+		assert.Equal(t, "ping", got["q"])
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"result":"pong"}`)
 	}))
@@ -169,7 +168,7 @@ func TestExecute_HappyPath(t *testing.T) {
 func TestExecute_TimeoutAbortsRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
@@ -190,7 +189,7 @@ func TestExecute_TimeoutAbortsRequest(t *testing.T) {
 
 func TestExecute_NonSuccessStatusReturnsUpstreamError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(503)
+		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = io.WriteString(w, `{"err":"boom"}`)
 	}))
 	defer srv.Close()
@@ -205,14 +204,14 @@ func TestExecute_NonSuccessStatusReturnsUpstreamError(t *testing.T) {
 	})
 	require.Error(t, err)
 	var ue *httpblock.UpstreamError
-	require.True(t, errors.As(err, &ue))
+	require.ErrorAs(t, err, &ue)
 	assert.Equal(t, 503, ue.Status)
 	assert.Contains(t, string(ue.Body), "boom")
 }
 
 func TestExecute_ApiKeyAuth(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "secret-123", r.Header.Get("X-API-Key"))
+		assert.Equal(t, "secret-123", r.Header.Get("X-API-Key"))
 		_, _ = io.WriteString(w, `{}`)
 	}))
 	defer srv.Close()
@@ -256,7 +255,7 @@ func TestExecute_BlocksSSRF(t *testing.T) {
 		Method: "GET",
 	})
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
+	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
 
 // TestSafeDialer_BlocksPrivateIPAtDialTime simulates the DNS-rebinding
@@ -271,7 +270,7 @@ func TestSafeDialer_BlocksPrivateIPAtDialTime(t *testing.T) {
 	})
 	_, err := dial(context.Background(), "tcp", "rebound.example:80")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked),
+	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
 		"expected ErrSSRFBlocked, got %v", err)
 }
 
@@ -283,7 +282,7 @@ func TestSafeDialer_BlocksMetadataIPAtDialTime(t *testing.T) {
 	})
 	_, err := dial(context.Background(), "tcp", "imds-bait.example:80")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
+	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
 
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
@@ -291,7 +290,7 @@ func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
 	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})
 	_, err := dial(context.Background(), "tcp", "10.0.0.1:80")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
+	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
 
 // TestExecute_TruncatedBodySurfacesError proves a partial-read on a
@@ -322,7 +321,7 @@ func TestExecute_TruncatedBodySurfacesError(t *testing.T) {
 }
 
 // TestExecute_TruncatesResponseAtMaxBytes proves the configured cap
-// is honoured (Options.MaxResponseBytes was previously documented but
+// is honored (Options.MaxResponseBytes was previously documented but
 // not wired — every response was capped at the hard-coded 4 MiB).
 func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
 	payload := make([]byte, 1024)
@@ -347,7 +346,7 @@ func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	// Response is non-JSON so executor falls back to string output.
-	assert.Equal(t, 64, len(res.UpstreamBody),
+	assert.Len(t, res.UpstreamBody, 64,
 		"expected MaxResponseBytes to truncate at 64, got %d", len(res.UpstreamBody))
 }
 

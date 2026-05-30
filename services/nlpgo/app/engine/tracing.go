@@ -6,13 +6,13 @@
 //
 // Span shape matches the Python langwatch_nlp engine:
 //   - name:                node.Data.Name (or node.ID fallback) — e.g.
-//                          "v1" for an LLM Call named v1. Mirrors Python's
-//                          DSPy autotracking which names spans by the
-//                          generated wrapper-module class name. Earlier
-//                          revisions used the literal "execute_component"
-//                          for every node, which surfaced 3 identical
-//                          spans in the Studio drawer for a 3-node
-//                          workflow (rchaves dogfood 2026-05-14).
+//     "v1" for an LLM Call named v1. Mirrors Python's
+//     DSPy autotracking which names spans by the
+//     generated wrapper-module class name. Earlier
+//     revisions used the literal "execute_component"
+//     for every node, which surfaced 3 identical
+//     spans in the Studio drawer for a 3-node
+//     workflow (rchaves dogfood 2026-05-14).
 //   - langwatch.span.type: "component"                (== Python's optional_langwatch_trace type)
 //   - langwatch.input:     JSON-encoded inputs map    (reserved attr; flips Studio output_source from inferred → explicit)
 //   - langwatch.output:    JSON-encoded outputs map   (reserved attr; same as above)
@@ -65,6 +65,7 @@ const (
 // — LLM call, code execution, HTTP request, evaluator dispatch,
 // sub-workflow run.
 func nodeEmitsSpan(kind dsl.ComponentType) bool {
+	//nolint:exhaustive // intentional default-to-true: only no-op pass-through kinds suppress the span.
 	switch kind {
 	case dsl.ComponentEntry, dsl.ComponentEnd, dsl.ComponentPromptingTechnique:
 		return false
@@ -107,6 +108,7 @@ func startNodeSpan(ctx context.Context, node *dsl.Node, req ExecuteRequest) (con
 	if req.Origin != "" {
 		attrs = append(attrs, attribute.String("langwatch.origin", req.Origin))
 	}
+	//nolint:spancheck // caller (engine.runLayer) owns the span lifecycle and ends it via endNodeSpan.
 	return tracer.Start(ctx, nodeSpanName(node),
 		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(attrs...),
@@ -192,6 +194,7 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 	if v, ok := encodeJSONAttr(messages); ok {
 		attrs = append(attrs, attribute.String("langwatch.input", v))
 	}
+	//nolint:spancheck // caller owns the span lifecycle and ends it via endLLMSpan.
 	return tracer.Start(ctx, displayModel,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attrs...),

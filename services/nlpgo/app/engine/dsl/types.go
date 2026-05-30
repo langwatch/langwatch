@@ -35,14 +35,14 @@ const (
 
 // Field is a parameter / input / output declaration on a component.
 type Field struct {
-	Identifier string         `json:"identifier"`
-	Type       FieldType      `json:"type"`
-	Optional   *bool          `json:"optional,omitempty"`
+	Identifier string          `json:"identifier"`
+	Type       FieldType       `json:"type"`
+	Optional   *bool           `json:"optional,omitempty"`
 	Value      json.RawMessage `json:"value,omitempty"`
-	Desc       *string        `json:"desc,omitempty"`
-	Prefix     *string        `json:"prefix,omitempty"`
-	Hidden     *bool          `json:"hidden,omitempty"`
-	JSONSchema map[string]any `json:"json_schema,omitempty"`
+	Desc       *string         `json:"desc,omitempty"`
+	Prefix     *string         `json:"prefix,omitempty"`
+	Hidden     *bool           `json:"hidden,omitempty"`
+	JSONSchema map[string]any  `json:"json_schema,omitempty"`
 }
 
 // ExecutionStatus mirrors the Python ExecutionStatus enum.
@@ -137,6 +137,8 @@ type NodeDataset struct {
 // EntrySelection is `Optional[str] | int` on the Python side. We carry
 // the raw value and expose typed accessors so callers don't have to
 // switch on `any`.
+//
+//nolint:recvcheck // UnmarshalJSON requires pointer receiver; read-only helpers (MarshalJSON, AsInt, AsString, IsSet) stay value-receiver so callers can use the type by value.
 type EntrySelection struct {
 	raw json.RawMessage
 }
@@ -266,10 +268,10 @@ type Component struct {
 	// version (user edited inline without persisting); base configId / handle /
 	// versionMetadata stay populated so the trace-UI can still surface
 	// "Open in Prompts" with "(unsaved edits)" appended.
-	PromptConfigID  *string                 `json:"configId,omitempty"`
-	PromptHandle    *string                 `json:"handle,omitempty"`
-	VersionMetadata *PromptVersionMetadata  `json:"versionMetadata,omitempty"`
-	PromptDraft     *bool                   `json:"promptDraft,omitempty"`
+	PromptConfigID  *string                `json:"configId,omitempty"`
+	PromptHandle    *string                `json:"handle,omitempty"`
+	VersionMetadata *PromptVersionMetadata `json:"versionMetadata,omitempty"`
+	PromptDraft     *bool                  `json:"promptDraft,omitempty"`
 }
 
 // PromptVersionMetadata mirrors signatureComponentSchema.versionMetadata
@@ -340,22 +342,22 @@ type WorkflowState struct {
 // schema 1:1 so JSON produced by the Python service deserializes here
 // without any massaging.
 type Workflow struct {
-	APIKey          string         `json:"api_key"`
-	WorkflowID      string         `json:"workflow_id"`
-	ProjectID       *string        `json:"project_id,omitempty"`
-	ExperimentID    *string        `json:"experiment_id,omitempty"`
-	SpecVersion     string         `json:"spec_version"`
-	Name            string         `json:"name"`
-	Icon            string         `json:"icon"`
-	Description     string         `json:"description"`
-	Version         string         `json:"version"`
-	DefaultLLM      *LLMConfig     `json:"default_llm,omitempty"`
-	Nodes           []Node         `json:"nodes"`
-	Edges           []Edge         `json:"edges"`
-	State           WorkflowState  `json:"state"`
-	TemplateAdapter string         `json:"template_adapter"`
-	EnableTracing   *bool          `json:"enable_tracing,omitempty"`
-	WorkflowType    *string        `json:"workflow_type,omitempty"`
+	APIKey          string            `json:"api_key"`
+	WorkflowID      string            `json:"workflow_id"`
+	ProjectID       *string           `json:"project_id,omitempty"`
+	ExperimentID    *string           `json:"experiment_id,omitempty"`
+	SpecVersion     string            `json:"spec_version"`
+	Name            string            `json:"name"`
+	Icon            string            `json:"icon"`
+	Description     string            `json:"description"`
+	Version         string            `json:"version"`
+	DefaultLLM      *LLMConfig        `json:"default_llm,omitempty"`
+	Nodes           []Node            `json:"nodes"`
+	Edges           []Edge            `json:"edges"`
+	State           WorkflowState     `json:"state"`
+	TemplateAdapter string            `json:"template_adapter"`
+	EnableTracing   *bool             `json:"enable_tracing,omitempty"`
+	WorkflowType    *string           `json:"workflow_type,omitempty"`
 	Secrets         map[string]string `json:"secrets,omitempty"`
 }
 

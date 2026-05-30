@@ -1,7 +1,6 @@
 package planner_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +79,7 @@ func TestPlan_DetectsCycle(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var cyc *planner.CycleError
-	require.True(t, errors.As(err, &cyc))
+	require.ErrorAs(t, err, &cyc)
 	// Cycle includes all three nodes, with the entry node repeated at the end.
 	assert.Contains(t, cyc.Cycle, "A")
 	assert.Contains(t, cyc.Cycle, "B")
@@ -95,7 +94,7 @@ func TestPlan_DetectsSelfLoop(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var cyc *planner.CycleError
-	require.True(t, errors.As(err, &cyc))
+	require.ErrorAs(t, err, &cyc)
 	assert.Equal(t, []string{"A", "A"}, cyc.Cycle)
 }
 
@@ -107,7 +106,7 @@ func TestPlan_RejectsUnknownEdgeEndpoint(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var unk *planner.UnknownNodeError
-	require.True(t, errors.As(err, &unk))
+	require.ErrorAs(t, err, &unk)
 	assert.Equal(t, "ghost", unk.NodeID)
 	assert.Equal(t, "e1", unk.Edge)
 }
@@ -122,7 +121,7 @@ func TestPlan_RejectsDuplicateNodeID(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var dup *planner.DuplicateNodeError
-	require.True(t, errors.As(err, &dup))
+	require.ErrorAs(t, err, &dup)
 	assert.Equal(t, "A", dup.NodeID)
 }
 
@@ -142,7 +141,7 @@ func TestPlan_RejectsUnsupportedNodeKind(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var unsup *planner.UnsupportedNodeKindError
-	require.True(t, errors.As(err, &unsup))
+	require.ErrorAs(t, err, &unsup)
 	assert.Equal(t, "Future", unsup.NodeID)
 	assert.Equal(t, futureKind, unsup.Kind)
 }
@@ -158,7 +157,7 @@ func TestPlan_RejectsRetiredKindRetriever(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var ret *planner.RetiredNodeKindError
-	require.True(t, errors.As(err, &ret), "want RetiredNodeKindError, got %T: %v", err, err)
+	require.ErrorAs(t, err, &ret, "want RetiredNodeKindError, got %T: %v", err, err)
 	assert.Equal(t, "Retriever", ret.NodeID)
 	assert.Equal(t, dsl.ComponentRetriever, ret.Kind)
 	assert.Contains(t, ret.Message, "retired")
@@ -232,7 +231,7 @@ func TestPlan_RetiredTakesPriorityOverUnsupported(t *testing.T) {
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var ret *planner.RetiredNodeKindError
-	assert.True(t, errors.As(err, &ret), "expected retired error to win, got %T: %v", err, err)
+	assert.ErrorAs(t, err, &ret, "expected retired error to win, got %T: %v", err, err)
 }
 
 func TestPlan_StableLayerOrdering(t *testing.T) {
@@ -358,7 +357,7 @@ func TestPlan_WithUntilNode_UnknownTargetErrors(t *testing.T) {
 	_, err := planner.New(disconnectedWorkflow(), planner.WithUntilNode("does-not-exist"))
 	require.Error(t, err)
 	var une *planner.UnknownNodeError
-	require.True(t, errors.As(err, &une), "expected UnknownNodeError, got %T", err)
+	require.ErrorAs(t, err, &une, "expected UnknownNodeError, got %T", err)
 	assert.Equal(t, "does-not-exist", une.NodeID)
 }
 

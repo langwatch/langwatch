@@ -41,7 +41,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 			"message": "invalid_workflow: " + err.Error(),
 		}}
 		close(ch)
-		return ch, nil
+		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	ctx = withWorkflowAPIKey(ctx, wf)
 	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
@@ -63,7 +63,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 		ch := make(chan app.WorkflowStreamEvent, 1)
 		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
 		close(ch)
-		return ch, nil
+		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	out := make(chan app.WorkflowStreamEvent, 16)
 	go func() {
@@ -83,7 +83,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
 	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
 	if err != nil {
-		return &app.WorkflowResult{
+		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 			Status: "error",
 			Error: &app.WorkflowError{
 				Type:    "invalid_workflow",
@@ -108,7 +108,7 @@ func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*a
 		DatasetEntry:      req.DatasetEntry,
 	})
 	if err != nil {
-		return &app.WorkflowResult{
+		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 			Status: "error",
 			Error: &app.WorkflowError{
 				Type:    "engine_error",

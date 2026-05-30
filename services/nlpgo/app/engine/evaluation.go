@@ -20,7 +20,7 @@ import (
 // random_state behavior — we don't need cryptographic randomness here
 // since the goal is "same seed → same shuffle for re-runnable evals".
 func newDeterministicRand(seed int64) *mathrand.Rand {
-	return mathrand.New(mathrand.NewSource(seed))
+	return mathrand.New(mathrand.NewSource(seed)) //nolint:gosec // evaluation row shuffle RNG is reproducibility-keyed, not security-sensitive
 }
 
 // evalLogResultsClient posts an evaluation batch to the LangWatch

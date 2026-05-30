@@ -101,14 +101,14 @@ type Request struct {
 // Result is the executor's parsed output. Mirrors the Python
 // EvaluationResultWithMetadata shape so engine output is consumer-stable.
 type Result struct {
-	Status   string         // "processed" | "skipped" | "error"
-	Score    *float64       // nil when not produced
-	Passed   *bool          // nil when not produced
-	Details  string         // free-text explanation; non-empty on skipped/error
-	Label    string         // optional category label
-	Cost     *Money         // nil when not produced
-	Inputs   map[string]any // echo of Data, useful for trace surfacing
-	Duration time.Duration  // wall-clock; sender-side measurement
+	Status   string          // "processed" | "skipped" | "error"
+	Score    *float64        // nil when not produced
+	Passed   *bool           // nil when not produced
+	Details  string          // free-text explanation; non-empty on skipped/error
+	Label    string          // optional category label
+	Cost     *Money          // nil when not produced
+	Inputs   map[string]any  // echo of Data, useful for trace surfacing
+	Duration time.Duration   // wall-clock; sender-side measurement
 	Raw      json.RawMessage // full upstream body for diagnostics
 }
 

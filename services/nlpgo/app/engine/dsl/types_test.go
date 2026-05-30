@@ -215,7 +215,7 @@ func TestRoundTripFullWorkflow(t *testing.T) {
 	original, err := dsl.ParseWorkflow([]byte(fullWorkflowJSON))
 	require.NoError(t, err)
 
-	encoded, err := json.Marshal(original)
+	encoded, err := json.Marshal(original) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
 
 	roundTripped, err := dsl.ParseWorkflow(encoded)
@@ -223,9 +223,9 @@ func TestRoundTripFullWorkflow(t *testing.T) {
 
 	// Marshaling both and comparing the bytes catches any field
 	// ordering or nullability drift.
-	originalBytes, err := json.Marshal(original)
+	originalBytes, err := json.Marshal(original) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
-	rtBytes, err := json.Marshal(roundTripped)
+	rtBytes, err := json.Marshal(roundTripped) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
 	assert.JSONEq(t, string(originalBytes), string(rtBytes))
 }

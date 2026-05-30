@@ -3,17 +3,17 @@
 // pluggable app.GatewayClient.
 //
 // The LLM block in Sarah's engine talks to this executor. The executor:
-//   1. parses provider+model from the LLMRequest
-//   2. applies model-id rewrites (anthropic dot→dash, alias expansion)
-//   3. builds the OpenAI-shape request body (messages, tools, params)
-//   4. applies reasoning-model overrides + anthropic temperature clamp
-//   5. normalizes reasoning_effort spelling
-//   6. encodes inline credentials from litellm_params into the
-//      X-LangWatch-Inline-Credentials header that the GatewayClient
-//      consumes
-//   7. invokes the GatewayClient (in-process dispatcher in production
-//      since the library pivot)
-//   8. parses the response back into app.LLMResponse
+//  1. parses provider+model from the LLMRequest
+//  2. applies model-id rewrites (anthropic dot→dash, alias expansion)
+//  3. builds the OpenAI-shape request body (messages, tools, params)
+//  4. applies reasoning-model overrides + anthropic temperature clamp
+//  5. normalizes reasoning_effort spelling
+//  6. encodes inline credentials from litellm_params into the
+//     X-LangWatch-Inline-Credentials header that the GatewayClient
+//     consumes
+//  7. invokes the GatewayClient (in-process dispatcher in production
+//     since the library pivot)
+//  8. parses the response back into app.LLMResponse
 //
 // All providers route through chat/completions — Bifrost's per-provider
 // adapter handles native-format translation downstream. This matches the
@@ -335,7 +335,7 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	choice := raw.Choices[0]
 
 	out := &app.LLMResponse{
-		ToolCalls:  choice.Message.ToolCalls,
+		ToolCalls: choice.Message.ToolCalls,
 		Usage: app.Usage{
 			PromptTokens:     raw.Usage.PromptTokens,
 			CompletionTokens: raw.Usage.CompletionTokens,
@@ -414,9 +414,9 @@ func filterEmptyContentMessages(messages []app.ChatMessage) []app.ChatMessage {
 			if len(filtered) == 0 {
 				continue
 			}
-			copy := m
-			copy.Content = filtered
-			out = append(out, copy)
+			msgCopy := m
+			msgCopy.Content = filtered
+			out = append(out, msgCopy)
 		default:
 			// Other content shapes (e.g. typed message structs) flow
 			// through unchanged — only the explicit empty cases above
