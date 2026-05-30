@@ -93,3 +93,52 @@ on a `helm upgrade` or run the gateway out-of-band per
 docs/ai-gateway/self-hosting/helm.
 
 {{- end }}
+
+──────────────────────────────────────────────────────────────────────
+6. Required Secrets — check before upgrading
+──────────────────────────────────────────────────────────────────────
+Each chart bump may introduce new required keys on the umbrella
+Secrets. When upgrading, verify these are present in the Secrets the
+app + gateway pods mount, otherwise the pods crashloop at boot with
+a CreateContainerConfigError that hides the missing key behind a
+generic message.
+
+  {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }} keys (always required):
+    - credentialsEncryptionKey
+    - cronApiKey
+    - nextAuthSecret
+    - virtualKeyPepper          (introduced in 3.3.0)
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+
+  {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} keys (gateway.chartManaged=true):
+    - {{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}     (introduced in 3.3.0)
+    - {{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}          (introduced in 3.3.0)
+
+  Materialise via the chart (autogen.enabled=true, dev) OR populate
+  out-of-band before upgrade (production):
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
+      --from-literal={{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}="$(openssl rand -hex 32)" \
+      --from-literal={{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}="$(openssl rand -hex 32)"
+
+  Migrating an existing out-of-band Secret to chart-managed (autogen on)
+  requires a one-time ownership handoff so Helm does not refuse the
+  upgrade with "exists and cannot be imported":
+
+    kubectl -n {{ .Release.Namespace }} annotate secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
+      meta.helm.sh/release-name={{ .Release.Name }} \
+      meta.helm.sh/release-namespace={{ .Release.Namespace }} --overwrite
+    kubectl -n {{ .Release.Namespace }} label secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
+      app.kubernetes.io/managed-by=Helm --overwrite
+{{- end }}
+{{- if and .Values.gateway .Values.gateway.chartManaged (contains "/api/otel" (((.Values.gateway).otel).endpoint | default "")) }}
+
+  Gateway OTEL export to langwatch-app /api/otel requires an auth
+  token. Without it the ingest returns 401 on every export — older
+  builds of the gateway had a startupErrorHandler loop that crashed
+  the pod on repeated 401s (fixed since pkg/otelsetup PR #4112).
+  Configure one of:
+
+    gateway.otel.authExistingSecretName: <secret-name>   # production
+    gateway.otel.authToken: <inline>                     # dev only
+{{- end }}

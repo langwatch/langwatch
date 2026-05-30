@@ -281,6 +281,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{/* Prometheus is optional — no error when chartManaged=false and no external config */}}
 {{- end }}
 
+{{/* Validate AI Gateway secret + telemetry wiring (postmortem 2026-05-21 root causes #1 + #6) */}}
+{{- $gw := .Values.gateway | default dict }}
+{{- if $gw.chartManaged }}
+  {{- $gwSecrets := $gw.secrets | default dict }}
+  {{- $existingName := $gwSecrets.existingSecretName }}
+  {{- if and (not .Values.autogen.enabled) (empty $existingName) }}
+    {{- $errors = append $errors "gateway.chartManaged is true but neither autogen.enabled nor gateway.secrets.existingSecretName is configured. Either enable autogen (dev), point gateway.secrets.existingSecretName at an out-of-band Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET (production), or set gateway.chartManaged: false." }}
+  {{- end }}
+
+  {{/* Trigger of the postmortem's Bifrost OTEL recursion outage: gateway
+       export points at /api/otel but no auth token is configured. Ingest
+       returns 401 on every export, the (since-patched) startupErrorHandler
+       recursed until the goroutine stack hit 1 GiB. Fail-fast here makes
+       the misconfiguration visible at helm render instead of during pod
+       crashloop. */}}
+  {{- $gwOtel := $gw.otel | default dict }}
+  {{- if $gwOtel.endpoint }}
+    {{- if contains "/api/otel" $gwOtel.endpoint }}
+      {{- if and (empty $gwOtel.authExistingSecretName) (empty $gwOtel.authToken) }}
+        {{- $errors = append $errors (printf "gateway.otel.endpoint=%s requires an auth token: set gateway.otel.authExistingSecretName (production) or gateway.otel.authToken (dev). Without it the langwatch-app /api/otel ingest will 401 every export — historically a pod-crashloop trigger." $gwOtel.endpoint) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{/* Output errors and warnings */}}
 {{- if $errors }}
 {{- fail (printf "Secret validation failed:\n%s" (join "\n" $errors)) }}
