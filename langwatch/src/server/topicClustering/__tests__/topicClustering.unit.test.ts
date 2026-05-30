@@ -63,7 +63,10 @@ import { prisma } from "~/server/db";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { scheduleTopicClusteringNextPage } from "~/server/background/queues/topicClusteringQueue";
 import { fetch as mockFetchH2 } from "fetch-h2";
-import { clusterTopicsForProject } from "../topicClustering";
+import {
+  clusterTopicsForProject,
+  fetchTracesFromClickHouse,
+} from "../topicClustering";
 
 function makeProject(overrides: Record<string, unknown> = {}) {
   return {
@@ -292,5 +295,31 @@ describe("clusterTopicsForProject", () => {
       expect(body?.traces).toHaveLength(10);
       expect(body?.traces[0]?.input).toBe("User message 0");
     });
+  });
+});
+
+describe("fetchTracesFromClickHouse de-duplication", () => {
+  it("collapses duplicate TraceId rows so returnedCount and the cursor stay correct", async () => {
+    // Two physical rows for t-0 (e.g. two versions sharing max(UpdatedAt))
+    // must not double-count. Rows arrive ordered OccurredAt DESC, TraceId ASC.
+    const now = Date.now();
+    const mockCh = {
+      query: vi.fn().mockResolvedValue({
+        json: () =>
+          Promise.resolve([
+            { TraceId: "t-0", ComputedInput: JSON.stringify("a"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now) },
+            { TraceId: "t-0", ComputedInput: JSON.stringify("a"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now - 1) },
+            { TraceId: "t-1", ComputedInput: JSON.stringify("b"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now - 2) },
+          ]),
+      }),
+    } as any;
+
+    const res = await fetchTracesFromClickHouse(mockCh, "proj-1", false, [], []);
+
+    expect(res.returnedCount).toBe(2); // t-0 counted once + t-1
+    expect(res.traces).toHaveLength(2);
+    expect(res.traces.map((t) => t.trace_id)).toEqual(["t-0", "t-1"]);
+    // Cursor lands on the last distinct trace, not the dropped duplicate.
+    expect(res.lastSort).toEqual([now - 2, "t-1"]);
   });
 });

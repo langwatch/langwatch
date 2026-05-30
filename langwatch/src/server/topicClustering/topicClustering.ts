@@ -323,11 +323,6 @@ export async function fetchTracesFromClickHouse(
           GROUP BY TenantId, TraceId
         )
       ORDER BY t.OccurredAt DESC, t.TraceId ASC
-      -- Collapse the rare case where two versions share an identical
-      -- max(UpdatedAt): otherwise the IN-tuple would emit both, inflating
-      -- returnedCount and nudging the boundary cursor. The query is
-      -- single-tenant (WHERE TenantId = ...), so TraceId is a sufficient key.
-      LIMIT 1 BY TraceId
       LIMIT 2000
     `,
     query_params: {
@@ -342,13 +337,28 @@ export async function fetchTracesFromClickHouse(
     format: "JSONEachRow",
   });
 
-  const rows = (await result.json()) as Array<{
+  const rawRows = (await result.json()) as Array<{
     TraceId: string;
     ComputedInput: string;
     TopicId: string | null;
     SubTopicId: string | null;
     OccurredAtMs: string;
   }>;
+
+  // Defensive de-duplication by TraceId. The monotonic `UpdatedAt` invariant
+  // should make `(TenantId, TraceId, max(UpdatedAt))` match exactly one row per
+  // trace, but `returnedCount` / `lastSort` now drive pagination, so collapse
+  // any same-version duplicate here in JS rather than at the SQL layer — the
+  // per-key SQL dedup operator is banned in this path for OOM safety (it reads
+  // heavy columns for the whole granule; see trace-dedup-oom-safety.unit.test).
+  // Rows arrive ordered by `OccurredAt DESC, TraceId ASC`, so the first row per
+  // TraceId is the one the boundary cursor should land on.
+  const seenTraceIds = new Set<string>();
+  const rows = rawRows.filter((row) => {
+    if (seenTraceIds.has(row.TraceId)) return false;
+    seenTraceIds.add(row.TraceId);
+    return true;
+  });
 
   const traces: TopicClusteringTrace[] = rows
     .map((row) => {
