@@ -254,6 +254,18 @@ secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
       callbackUrl,
     });
 
+    const emailDomain = userInfo.email?.split("@")[1]?.toLowerCase();
+    if (!emailDomain || emailDomain !== domain.toLowerCase()) {
+      logger.warn(
+        { domain, emailDomain },
+        "IdP returned email outside the SSO connection domain",
+      );
+      return c.redirect(
+        `/auth/signin?error=${encodeURIComponent("Your email domain does not match this SSO connection.")}`,
+        302,
+      );
+    }
+
     const result = await getApp().ssoAuth.handleSsoCallback({
       userInfo,
       provider,

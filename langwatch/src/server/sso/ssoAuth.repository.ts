@@ -1,4 +1,7 @@
 import type { PrismaClient, User, Account, OrganizationUser, OrganizationUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 export class SsoAuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -115,9 +118,23 @@ export class SsoAuthRepository {
     organizationId: string;
     role: OrganizationUserRole;
   }): Promise<void> {
-    await this.prisma.organizationUser.create({
-      data: { userId, organizationId, role },
-    });
+    const teamRole = role === "ADMIN" ? TeamUserRole.ADMIN : TeamUserRole.MEMBER;
+
+    await this.prisma.$transaction([
+      this.prisma.organizationUser.create({
+        data: { userId, organizationId, role },
+      }),
+      this.prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          userId,
+          role: teamRole,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
+        },
+      }),
+    ]);
   }
 
   async isSoleAdmin({

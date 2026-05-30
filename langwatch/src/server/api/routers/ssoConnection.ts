@@ -82,7 +82,7 @@ export const ssoConnectionRouter = createTRPCRouter({
   create: ssoConnectionProcedure
     .input(
       z.object({
-        domain: z.string().min(1).max(253),
+        domain: z.string().min(1).max(253).transform((d) => d.trim().toLowerCase()),
         provider: z.string().min(1),
         clientId: z.string().min(1).nullish(),
         clientSecret: z.string().min(1).nullish(),
