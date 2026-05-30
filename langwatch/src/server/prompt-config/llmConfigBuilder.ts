@@ -15,6 +15,8 @@
 
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { mapReasoningToProvider } from "./reasoningBoundary";
+import type { SupportedParameter } from "../modelProviders/customModel.schema";
+import { filterUnsupportedSamplingParams } from "../modelProviders/resolveSupportedParameters";
 
 /**
  * Input type for building LLM config - accepts camelCase fields
@@ -56,10 +58,22 @@ export interface LLMConfigInput {
  * });
  * // Returns: { model: "openai/gpt-5", temperature: 0.7, max_tokens: 4096, reasoning_effort: "high" }
  */
-export function buildLLMConfig(input: LLMConfigInput): LLMConfig {
+export function buildLLMConfig(
+  input: LLMConfigInput,
+  /**
+   * Resolved model `supportedParameters` (see resolveSupportedParameters).
+   * - omitted / `null` → no filtering, every set field is forwarded
+   *   (legacy behavior, used when the caller can't or doesn't want to
+   *   resolve the registry).
+   * - `string[]` → only listed params survive into the returned LLMConfig.
+   *   Stale fields from older saved blobs get dropped here so they never
+   *   reach the gateway.
+   */
+  supportedParameters?: SupportedParameter[] | null,
+): LLMConfig {
   const reasoningMapped = mapReasoningToProvider(input.model, input.reasoning);
 
-  return {
+  const full: LLMConfig = {
     model: input.model,
     temperature: input.temperature,
     max_tokens: input.maxTokens,
@@ -75,4 +89,9 @@ export function buildLLMConfig(input: LLMConfigInput): LLMConfig {
     verbosity: input.verbosity,
     litellm_params: input.litellmParams,
   };
+
+  if (supportedParameters === undefined || supportedParameters === null) {
+    return full;
+  }
+  return filterUnsupportedSamplingParams(full, supportedParameters);
 }

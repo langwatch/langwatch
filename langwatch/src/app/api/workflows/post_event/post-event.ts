@@ -7,6 +7,8 @@ import type {
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
 import { createLogger } from "../../../../utils/logger/server";
+import { prisma } from "../../../../server/db";
+import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workflows/stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:post_event");
 
@@ -44,6 +46,37 @@ export const studioBackendPostEvent = async ({
 }) => {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
+    // Dispatch chokepoint: strip every sampling param a node's model
+    // does not list as supported (per project customModels + built-in
+    // registry). Catches stale `top_p` etc on saved prompt-config
+    // blobs that older edits left behind — Bedrock + others reject
+    // mixed sampling knobs, so the previously-bug was a "stale field
+    // sneaks into the dispatch" rather than a configuration error.
+    // Runs for every event type that carries a workflow payload;
+    // best-effort so a registry-lookup miss never blocks the run.
+    if (
+      "payload" in message &&
+      message.payload &&
+      typeof message.payload === "object" &&
+      "workflow" in message.payload &&
+      message.payload.workflow
+    ) {
+      try {
+        await stripUnsupportedLLMParamsFromWorkflow({
+          prisma,
+          projectId,
+          workflow: message.payload.workflow as Parameters<
+            typeof stripUnsupportedLLMParamsFromWorkflow
+          >[0]["workflow"],
+        });
+      } catch (filterError) {
+        logger.warn(
+          { err: filterError, projectId, eventType: message.type },
+          "stripUnsupportedLLMParamsFromWorkflow failed; forwarding original payload",
+        );
+      }
+    }
+
     const s3CacheKey = getS3CacheKey(projectId);
 
     const goEnabled =
