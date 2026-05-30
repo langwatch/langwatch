@@ -114,31 +114,44 @@ generic message.
     - {{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}     (introduced in 3.3.0)
     - {{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}          (introduced in 3.3.0)
 
-  Materialise via the chart (autogen.enabled=true, dev) OR populate
-  out-of-band before upgrade (production):
+  The chart materialises this Secret automatically on first install
+  (lookup-or-rand, matching clickhouse / redis / pg). Subsequent
+  `helm upgrade` runs reuse the existing values via lookup so the
+  app + gateway pods do not roll. No operator-side Secret prep is
+  required for a stock `helm install`.
+
+  ArgoCD: the repo-server has no cluster access, so lookup returns
+  nil on every sync and the chart would re-generate the Secret each
+  time. Pin the data in the Application manifest to prevent rotation:
+
+    spec:
+      ignoreDifferences:
+        - group: ""
+          kind: Secret
+          name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
+          jsonPointers: ["/data"]
+
+  Operators preferring out-of-band materialisation (PreSync hook,
+  external-secrets, SealedSecrets, vault-agent, manual kubectl):
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
       --from-literal={{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}="$(openssl rand -hex 32)" \
       --from-literal={{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}="$(openssl rand -hex 32)"
 
-  Migrating an existing out-of-band Secret to chart-managed (autogen on)
-  requires a one-time ownership handoff so Helm does not refuse the
-  upgrade with "exists and cannot be imported":
+  When the Secret pre-exists and was not created by Helm, a one-time
+  ownership handoff lets Helm adopt it instead of failing the install
+  with "exists and cannot be imported":
 
     kubectl -n {{ .Release.Namespace }} annotate secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
       meta.helm.sh/release-name={{ .Release.Name }} \
       meta.helm.sh/release-namespace={{ .Release.Namespace }} --overwrite
     kubectl -n {{ .Release.Namespace }} label secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
       app.kubernetes.io/managed-by=Helm --overwrite
-{{- end }}
-{{- if and .Values.gateway .Values.gateway.chartManaged (contains "/api/otel" (((.Values.gateway).otel).endpoint | default "")) }}
 
-  Gateway OTEL export to langwatch-app /api/otel requires an auth
-  token. Without it the ingest returns 401 on every export — older
-  builds of the gateway had a startupErrorHandler loop that crashed
-  the pod on repeated 401s (fixed since pkg/otelsetup PR #4112).
-  Configure one of:
-
-    gateway.otel.authExistingSecretName: <secret-name>   # production
-    gateway.otel.authToken: <inline>                     # dev only
+  The Secret carries helm.sh/resource-policy=keep so it survives
+  `helm uninstall` (the app + gateway both depend on it; losing it
+  forces a full rotation). A reinstall in the same namespace will
+  therefore hit the same "exists and cannot be imported" error and
+  needs the same handoff. To opt out of the keep policy, override
+  the annotation in your values.
 {{- end }}
