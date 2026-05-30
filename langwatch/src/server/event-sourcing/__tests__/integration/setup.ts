@@ -66,30 +66,62 @@ export async function setup(): Promise<void> {
 }
 
 /**
- * The app-singleton ioredis client in src/server/redis.ts auto-reconnects
- * forever (BullMQ requires `maxRetriesPerRequest: null` for blocking-fetch
- * semantics, which also disables the reconnect cap). At shard end, the
- * latest reconnected socket is the only thing keeping the vitest worker's
- * event loop alive, and ioredis re-establishes it every time we close it,
- * so quit() / disconnect() can't drain the connection. The cure that works
- * is to unref the underlying socket as soon as it's connected: ioredis
- * still functions for tests that send commands, but the OS-level socket
- * no longer pins the loop, so the worker exits the moment vitest stops
- * issuing work.
+ * The dump on 91df42da1 narrowed the leaking handle at the last file of
+ * integration shard 4 down to a single Socket to ::1:6379, the app-layer
+ * ioredis singleton. ioredis auto-reconnects each time we close it
+ * (BullMQ requires maxRetriesPerRequest:null, which also keeps reconnect
+ * attempts uncapped), so quit() / disconnect() can't actually keep the
+ * socket down. The cure that works is to unref the underlying socket so
+ * it stops pinning the event loop. ioredis still works for any test that
+ * sends commands, but a hung loop at shard end no longer has a reason to
+ * stay up.
+ *
+ * Walk process._getActiveHandles() rather than poking at ioredis
+ * internals: the dump already proved we can find the socket that way,
+ * and it's resilient across ioredis versions. Re-running on every
+ * connect / ready event of the redis module catches reconnects.
  */
 async function unrefAppRedisSingleton(): Promise<void> {
+  unrefRedisSockets();
   try {
     const redisMod = await import("../../../redis");
     const conn = redisMod.connection as
-      | { stream?: { unref?: () => void }; on?: Function }
+      | {
+          on?: (event: string, cb: () => void) => void;
+        }
       | undefined;
     if (!conn) return;
-    conn.stream?.unref?.();
-    conn.on?.("connect", () => conn.stream?.unref?.());
-    conn.on?.("ready", () => conn.stream?.unref?.());
+    conn.on?.("connect", unrefRedisSockets);
+    conn.on?.("ready", unrefRedisSockets);
+    conn.on?.("reconnecting", unrefRedisSockets);
   } catch {
-    // The redis module is gated by env at module load; if anything goes
-    // wrong here, the existing teardown still attempts a graceful close.
+    // No redis module loaded; nothing to attach.
+  }
+}
+
+function unrefRedisSockets(): void {
+  try {
+    const proc = process as unknown as {
+      _getActiveHandles?: () => Array<{
+        remoteAddress?: string;
+        remotePort?: number;
+        unref?: () => void;
+        constructor?: { name?: string };
+      }>;
+    };
+    const handles = proc._getActiveHandles?.() ?? [];
+    for (const h of handles) {
+      const name = h?.constructor?.name;
+      if (name !== "Socket" && name !== "TLSSocket") continue;
+      if (h.remotePort !== 6379) continue;
+      try {
+        h.unref?.();
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // _getActiveHandles is an internal API; tolerate runtime variation
   }
 }
 
