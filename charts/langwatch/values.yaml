@@ -42,6 +42,29 @@ global:
 # This section enables automatic secret generation for development environments.
 # In production, you should manually create and manage secrets.
 ## @section Auto-generation
+# =============================================================================
+# Pre-Upgrade Preflight
+# =============================================================================
+# Helm pre-upgrade hook Job that verifies every required Secret key exists
+# in the live namespace BEFORE pods roll. Catches the postmortem trap
+# where a chart bump added a required key (virtualKeyPepper / LW_GATEWAY_*)
+# and pods crashlooped at boot with an opaque CreateContainerConfigError.
+# Skipped entirely on fresh installs (only the upgrade path runs the hook).
+## @section Preflight
+preflight:
+  ## @param preflight.enabled [default: true] Run the pre-upgrade Secret-keys check.
+  enabled: true
+  # Alpine + kubectl + the standard shell utilities the preflight script
+  # relies on (sh, printf). registry.k8s.io/kubectl is distroless and
+  # has no /bin/sh, which the script needs. Override for air-gapped
+  # clusters with an internal mirror.
+  ## @param preflight.image [string, default: alpine/k8s:1.30.0] Container image for the preflight Job (needs sh + kubectl).
+  image: alpine/k8s:1.30.0
+  ## @param preflight.imagePullPolicy [string, default: IfNotPresent] Pull policy for the preflight image.
+  imagePullPolicy: IfNotPresent
+  ## @param preflight.activeDeadlineSeconds [default: 60] Hard limit on hook runtime — beats helm hook timeout for clearer logs.
+  activeDeadlineSeconds: 60
+
 autogen:
   # Enable automatic secret generation (set to false in production)
   ## @param autogen.enabled [default: false] Enable automatic secret generation (development only).
