@@ -1000,6 +1000,7 @@ func TestPattern005_HTTPThenSignatureWithLiquidUse(t *testing.T) {
 	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"narration","type":"str"}]}}
 	      ],
 	      "edges":[
+	        {"id":"e0","source":"entry","sourceHandle":"outputs.city","target":"fetch","targetHandle":"inputs.city","type":"default"},
 	        {"id":"e1","source":"fetch","sourceHandle":"outputs.forecast","target":"narrate","targetHandle":"inputs.forecast","type":"default"},
 	        {"id":"e2","source":"narrate","sourceHandle":"outputs.narration","target":"end","targetHandle":"inputs.narration","type":"default"}
 	      ],

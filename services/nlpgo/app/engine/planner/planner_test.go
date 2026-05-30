@@ -284,6 +284,7 @@ func disconnectedWorkflow() *dsl.Workflow {
 	}
 }
 
+// @scenario "a Signature node disconnected from Entry is not planned"
 func TestPlan_ExcludesOrphanNodeOnFullRun(t *testing.T) {
 	p, err := planner.New(disconnectedWorkflow())
 	require.NoError(t, err)
@@ -294,6 +295,7 @@ func TestPlan_ExcludesOrphanNodeOnFullRun(t *testing.T) {
 	assert.False(t, ids["orphan"], "orphan signature with no incoming edges must not be planned (Python find_reachable_nodes parity)")
 }
 
+// @scenario "a disconnected sub-chain whose root is not reachable from Entry is skipped"
 func TestPlan_ExcludesDisconnectedSubChain(t *testing.T) {
 	// Two parallel chains, only one of which roots at Entry. The whole
 	// floating chain (floatA -> floatB) must be skipped — neither node
@@ -320,6 +322,7 @@ func TestPlan_ExcludesDisconnectedSubChain(t *testing.T) {
 	assert.False(t, ids["floatB"], "floatB (child of disconnected root) must be skipped")
 }
 
+// @scenario "\"Run until here\" trims downstream nodes and disconnected siblings"
 func TestPlan_WithUntilNode_TrimsDownstreamAndOrphans(t *testing.T) {
 	// Entry -> A -> B -> C -> End, plus an orphan Signature. "Run until
 	// B" must plan {entry, A, B} only: C and End are downstream of the
@@ -350,6 +353,7 @@ func TestPlan_WithUntilNode_TrimsDownstreamAndOrphans(t *testing.T) {
 	assert.False(t, ids["orphan"], "orphan stays excluded under until-here")
 }
 
+// @scenario "\"Run until here\" with an unknown target returns an UnknownNodeError"
 func TestPlan_WithUntilNode_UnknownTargetErrors(t *testing.T) {
 	_, err := planner.New(disconnectedWorkflow(), planner.WithUntilNode("does-not-exist"))
 	require.Error(t, err)
@@ -358,6 +362,7 @@ func TestPlan_WithUntilNode_UnknownTargetErrors(t *testing.T) {
 	assert.Equal(t, "does-not-exist", une.NodeID)
 }
 
+// @scenario "\"Run until here\" pointed at Entry plans just Entry"
 func TestPlan_WithUntilNode_EntryItself(t *testing.T) {
 	// Until = Entry should plan just Entry: nothing else is upstream.
 	p, err := planner.New(linearWorkflow(), planner.WithUntilNode("A"))
