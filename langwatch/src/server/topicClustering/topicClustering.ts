@@ -323,6 +323,11 @@ export async function fetchTracesFromClickHouse(
           GROUP BY TenantId, TraceId
         )
       ORDER BY t.OccurredAt DESC, t.TraceId ASC
+      -- Collapse the rare case where two versions share an identical
+      -- max(UpdatedAt): otherwise the IN-tuple would emit both, inflating
+      -- returnedCount and nudging the boundary cursor. The query is
+      -- single-tenant (WHERE TenantId = ...), so TraceId is a sufficient key.
+      LIMIT 1 BY TraceId
       LIMIT 2000
     `,
     query_params: {
