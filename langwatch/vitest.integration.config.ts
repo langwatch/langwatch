@@ -32,8 +32,15 @@ export default defineConfig({
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
     // Run test files sequentially to avoid BullMQ/Redis resource contention
-    // when multiple pipelines are created and destroyed in parallel
-    fileParallelism: false,
+    // when multiple pipelines are created and destroyed in parallel. Use
+    // maxWorkers/minWorkers (NOT `fileParallelism: false`) because the
+    // coverage module reads `!fileParallelism` as "treat this run as
+    // singleFork" -- it then groups every file into one long-lived fork,
+    // which is what caused the integration shard to wedge post-test once
+    // v8 coverage data accumulated past the heap (see #4417). maxWorkers:1
+    // gives the same sequential guarantee with a fresh fork per file.
+    maxWorkers: 1,
+    minWorkers: 1,
     // Run integration files in forked child processes (vs the unit pool's
     // `vmThreads`) so each worker is force-killed on file exit. With vmThreads
     // a single un-`unref`'d timer or unclosed client in any file makes the
