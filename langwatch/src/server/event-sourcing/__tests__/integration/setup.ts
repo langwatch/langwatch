@@ -62,6 +62,35 @@ export async function setup(): Promise<void> {
   }
   // Don't clean up all data here - each test uses unique tenant IDs
   // and cleans up its own data in afterEach
+  await unrefAppRedisSingleton();
+}
+
+/**
+ * The app-singleton ioredis client in src/server/redis.ts auto-reconnects
+ * forever (BullMQ requires `maxRetriesPerRequest: null` for blocking-fetch
+ * semantics, which also disables the reconnect cap). At shard end, the
+ * latest reconnected socket is the only thing keeping the vitest worker's
+ * event loop alive, and ioredis re-establishes it every time we close it,
+ * so quit() / disconnect() can't drain the connection. The cure that works
+ * is to unref the underlying socket as soon as it's connected: ioredis
+ * still functions for tests that send commands, but the OS-level socket
+ * no longer pins the loop, so the worker exits the moment vitest stops
+ * issuing work.
+ */
+async function unrefAppRedisSingleton(): Promise<void> {
+  try {
+    const redisMod = await import("../../../redis");
+    const conn = redisMod.connection as
+      | { stream?: { unref?: () => void }; on?: Function }
+      | undefined;
+    if (!conn) return;
+    conn.stream?.unref?.();
+    conn.on?.("connect", () => conn.stream?.unref?.());
+    conn.on?.("ready", () => conn.stream?.unref?.());
+  } catch {
+    // The redis module is gated by env at module load; if anything goes
+    // wrong here, the existing teardown still attempts a graceful close.
+  }
 }
 
 /**
@@ -77,33 +106,6 @@ export async function setup(): Promise<void> {
 export async function teardown(): Promise<void> {
   await stopTestContainers();
   await closeAppRuntimeSingletons();
-  armForceExitFallback();
-}
-
-/**
- * After every file's teardown, schedule a hard process.exit(0) ten seconds
- * out and replace any prior schedule. While files are still running, the
- * next file's teardown clears this one and arms a new one, so the timer
- * never fires mid-shard. On the LAST file of the shard there is no next
- * teardown to clear it; ten seconds after the last file completes its
- * teardown the timer fires and the worker exits, which lets vitest's
- * reporter print the summary line.
- *
- * The timer is left ref'd on purpose: when nothing else is keeping the
- * loop alive the runtime will still wait the full ten seconds, but that
- * is a small tax in exchange for never wedging the shard at the timeout
- * cap. The cost only applies to the last file of each shard.
- */
-let forceExitTimer: ReturnType<typeof setTimeout> | undefined;
-function armForceExitFallback(): void {
-  if (forceExitTimer) clearTimeout(forceExitTimer);
-  forceExitTimer = setTimeout(() => {
-    // eslint-disable-next-line no-console
-    console.log(
-      "[teardown] force-exit fallback firing — last-file teardown reached its idle window",
-    );
-    process.exit(0);
-  }, 10_000);
 }
 
 /**
