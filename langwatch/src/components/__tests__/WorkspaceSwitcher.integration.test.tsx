@@ -193,6 +193,33 @@ describe("WorkspaceSwitcher", () => {
         screen.queryByRole("button", { name: /create project in/i }),
       ).not.toBeInTheDocument();
     });
+
+    /** @scenario The "Create project" tooltip never auto-opens on switcher mount */
+    it("does not show a visible 'Create project' tooltip when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The IconButton itself must still be reachable (aria-label only).
+      expect(
+        await screen.findByRole("button", {
+          name: /create project in acme engineering/i,
+        }),
+      ).toBeInTheDocument();
+      // But no visible "Create project" tooltip text may be rendered. A
+      // Tooltip wrapper around the + button auto-opened on switcher mount
+      // because Ark Menu roves focus into the dropdown and Zag's tooltip
+      // has no openOnFocus={false} escape hatch — see WorkspaceSwitcher.tsx.
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+    });
   });
 
   describe("personal entry governance gate", () => {

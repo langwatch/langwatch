@@ -13,7 +13,6 @@ import { useRouter } from "~/utils/compat/next-router";
 
 import { Menu } from "./ui/menu";
 import { Link } from "./ui/link";
-import { Tooltip } from "./ui/tooltip";
 import { ProjectAvatar } from "./ProjectAvatar";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
@@ -303,28 +302,34 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                             }}
                           />
                           {team.canCreateProject && onCreateProjectForTeam && (
-                            <Tooltip content="Create project">
-                              <IconButton
-                                aria-label={`Create project in ${team.label}`}
-                                size="xs"
-                                variant="ghost"
-                                position="absolute"
-                                right={2}
-                                top="50%"
-                                transform="translateY(-50%)"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  setOpen(false);
-                                  onCreateProjectForTeam({
-                                    teamId: team.teamId,
-                                    orgId: team.orgId,
-                                  });
-                                }}
-                              >
-                                <Plus size={14} />
-                              </IconButton>
-                            </Tooltip>
+                            // No Tooltip wrapper here: Ark Menu auto-moves
+                            // focus into the dropdown when it opens, and a
+                            // Tooltip around a focusable child opens itself
+                            // on focus (Zag tooltip has no openOnFocus={false}
+                            // escape hatch). That made the "Create project"
+                            // tooltip visible-by-default on switcher mount.
+                            // The icon's meaning is clear from the team-row
+                            // context and aria-label covers screen readers.
+                            <IconButton
+                              aria-label={`Create project in ${team.label}`}
+                              size="xs"
+                              variant="ghost"
+                              position="absolute"
+                              right={2}
+                              top="50%"
+                              transform="translateY(-50%)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setOpen(false);
+                                onCreateProjectForTeam({
+                                  teamId: team.teamId,
+                                  orgId: team.orgId,
+                                });
+                              }}
+                            >
+                              <Plus size={14} />
+                            </IconButton>
                           )}
                         </Box>
                         {teamProjects.length > 0 && (
