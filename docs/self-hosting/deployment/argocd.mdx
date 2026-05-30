@@ -42,6 +42,9 @@ spec:
         # ... your other overrides
   syncPolicy:
     automated:
+      # selfHeal must be set with the ignoreDifferences block below or the
+      # auto-sync reconciler will mark the Application OutOfSync on every
+      # refresh and rotate the gateway-auth Secret on every cycle.
       prune: true
       selfHeal: true
     syncOptions:
@@ -58,7 +61,7 @@ spec:
 If your `gateway.secrets.existingSecretName` is customised, mirror the name into `ignoreDifferences`. Both must match the actual rendered `metadata.name`. The chart fails fast when `autogen.secretNames.gatewayAuth` and `gateway.secrets.existingSecretName` disagree, so you can rely on a single source of truth here.
 
 <Warning>
-  `ignoreDifferences` is asymmetric: it stops Argo from overwriting the live `.data`, but it does not stop you from accidentally clobbering it via `kubectl apply` outside of Argo, or from a different `Application` syncing the same chart with `replace: true`. If you rotate the credentials intentionally, delete the Secret first so the next sync regenerates from a clean slate.
+  `ignoreDifferences` only affects ArgoCD's auto-sync drift detection. The application stays `Synced` after subsequent renders even though the rendered Secret differs from the live one, so auto-sync with `selfHeal: true` does not fire and the live data is preserved. **A manual `argocd app sync` still applies the freshly-rendered random pair and rotates the live Secret** because the sync operation always pushes the rendered manifest. If you need to push a non-Secret change to the Application with `argocd app sync`, add `--strategy=apply` and exclude the Secret, or temporarily delete the Secret to force a clean regeneration. The same applies to `kubectl apply` outside of Argo and to a different `Application` syncing the same chart with `replace: true`.
 </Warning>
 
 ## What does NOT work (and why)
@@ -127,7 +130,7 @@ After that the next Argo sync (or `helm upgrade`) succeeds. `NOTES.txt` section 
 
 ## Smoke test
 
-After the first sync completes, verify both pods are running on the credentials you expect and that subsequent syncs do not roll them:
+After the first sync completes, verify both pods are running on the credentials you expect and that subsequent reconciles do not roll them:
 
 ```bash
 kubectl -n langwatch get pods -l 'app.kubernetes.io/component in (app, gateway)' -o wide
@@ -135,7 +138,19 @@ kubectl -n langwatch get secret langwatch-gateway-auth \
   -o jsonpath='{.metadata.annotations}'
 ```
 
-The Secret should carry `meta.helm.sh/release-name: <your-release>` and `app.kubernetes.io/managed-by: Helm`. Capture the gateway and app pod restart counts, run an Argo sync with no Application changes, and confirm both deployments stay at the same `RESTARTS` count and the same pod UIDs. If either rolled, the `ignoreDifferences` block is missing or the wrong Secret name is pinned.
+The Secret should carry `meta.helm.sh/release-name: <your-release>` and `app.kubernetes.io/managed-by: Helm`. To confirm the `ignoreDifferences` block is wired correctly, capture the Secret's `resourceVersion`, force a hard refresh on the Application, wait a reconcile cycle, then re-read:
+
+```bash
+kubectl -n langwatch get secret langwatch-gateway-auth \
+  -o jsonpath='{.metadata.resourceVersion}'
+kubectl -n argocd annotate application langwatch \
+  argocd.argoproj.io/refresh=hard --overwrite
+sleep 30
+kubectl -n langwatch get secret langwatch-gateway-auth \
+  -o jsonpath='{.metadata.resourceVersion}'
+```
+
+The two `resourceVersion` values should be identical. If the second is higher, `selfHeal` re-applied the rendered Secret and the `ignoreDifferences` block did not match the rendered name. Verified on ArgoCD `stable` against this chart: with the block in place the resourceVersion stays constant across a hard refresh; without it the resourceVersion advances every reconcile.
 
 You can also confirm Argo treats the Secret's `/data` as managed-but-ignored by reading the live Application status:
 
