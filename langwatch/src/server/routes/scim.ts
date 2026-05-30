@@ -11,7 +11,6 @@
  * - GET              /api/scim/v2/ServiceProviderConfig
  */
 import type { Context } from "hono";
-import type { Next } from "hono";
 import {
   createServiceApp,
   internalSecret,
@@ -25,9 +24,7 @@ import {
   scimPatchRequestSchema,
   scimReplaceGroupRequestSchema,
 } from "~/server/scim/scim.types";
-import { createLogger } from "~/utils/logger/server";
 
-const scimLogger = createLogger("langwatch:scim:request-log");
 
 const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
 
@@ -87,44 +84,6 @@ async function requireEnterprise(
     return scimError(c, 403, "SCIM provisioning requires an Enterprise plan");
   }
   return null;
-}
-
-function detectIdentityProvider(userAgent: string | undefined): string | null {
-  if (!userAgent) return null;
-  const ua = userAgent.toLowerCase();
-  if (ua.includes("okta")) return "okta";
-  if (ua.includes("azure") || ua.includes("microsoft")) return "azure-ad";
-  if (ua.includes("onelogin")) return "onelogin";
-  if (ua.includes("jumpcloud")) return "jumpcloud";
-  if (ua.includes("ping")) return "ping";
-  return null;
-}
-
-async function logScimRequest(
-  c: Context,
-  next: Next,
-): Promise<Response | void> {
-  const startMs = Date.now();
-  await next();
-
-  const organizationId = c.get("scimOrganizationId") as string | undefined;
-  if (!organizationId) return;
-
-  const durationMs = Date.now() - startMs;
-  const requestPath = new URL(c.req.url).pathname;
-
-  try {
-    await getApp().ssoConnection.logScimRequest({
-      organizationId,
-      requestMethod: c.req.method,
-      requestPath,
-      responseStatus: c.res.status,
-      durationMs,
-      identityProvider: detectIdentityProvider(c.req.header("user-agent")),
-    });
-  } catch (err) {
-    scimLogger.error({ err }, "Failed to write SCIM request log");
-  }
 }
 
 async function parseJsonBody(c: Context): Promise<unknown | null> {

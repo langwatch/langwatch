@@ -407,29 +407,7 @@ describe("<SsoConnectionModal/>", () => {
           screen.getByPlaceholderText(/IdP Group Name/i),
         ).toBeTruthy();
       });
-      // There should be a remove button (Trash icon)
-      const removeButtons = screen
-        .getAllByRole("button")
-        .filter((b) => b.getAttribute("data-testid") === "remove-group" ||
-          // Trash2 icon buttons don't have accessible names by default,
-          // so we look for a ghost/red button that appeared after adding
-          b.className?.includes?.("red") ||
-          // The remove button is a ghost red button with Trash2 icon inside
-          Array.from(b.children).some(
-            (child) =>
-              child.tagName === "svg" ||
-              (child as HTMLElement).querySelector?.("svg"),
-          )
-        )
-        // Filter to only the ones likely to be the remove/trash button
-        .filter((b) => {
-          const html = b.innerHTML;
-          return html.includes("svg") || html.includes("path");
-        });
-      // Verify at least one remove button exists after adding a row
-      // (button is a ghost variant with Trash2 icon)
       const allButtons = screen.getAllByRole("button");
-      // The newly added row should have added at least 1 more button
       expect(allButtons.length).toBeGreaterThan(4);
     });
   });
