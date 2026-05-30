@@ -941,14 +941,20 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const predicates = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
-    const query_params: Record<string, string> = { tenantId: projectId };
+    const query_params: Record<string, string | string[]> = {
+      tenantId: projectId,
+    };
     if (batchRunId) {
       predicates.push("BatchRunId = {batchRunId:String}");
       query_params.batchRunId = batchRunId;
     }
     if (scenarioSetId) {
-      predicates.push("ScenarioSetId = {scenarioSetId:String}");
-      query_params.scenarioSetId = scenarioSetId;
+      // The default set is stored as '' but addressed as 'default' (and
+      // vice-versa). Expand to both storage forms so archiving the default
+      // set matches its rows — the same normalization every other
+      // set-scoped query uses via expandSetIdFilter.
+      predicates.push("ScenarioSetId IN ({scenarioSetIds:Array(String)})");
+      query_params.scenarioSetIds = expandSetIdFilter(scenarioSetId);
     }
 
     const client = await this.getClient(projectId);
