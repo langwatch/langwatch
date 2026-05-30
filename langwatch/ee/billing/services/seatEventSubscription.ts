@@ -149,14 +149,12 @@ export const createSeatEventSubscriptionFns = ({
     const billingCycleAnchor = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
     );
-    const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
-      {
+    const subscriptionData = {
         metadata: selectedOptionsMetadata,
         billing_cycle_anchor: Math.floor(
           billingCycleAnchor.getTime() / 1000,
         ),
-        proration_behavior:
-          "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
+        proration_behavior: "create_prorations" as const,
       };
 
     const session = await stripe.checkout.sessions.create({
@@ -283,17 +281,19 @@ export const createSeatEventSubscriptionFns = ({
     }
 
     // Fetch upcoming invoice WITH the proposed seat change
-    const upcomingWithChange = await stripe.invoices.retrieveUpcoming({
+    const upcomingWithChange = await stripe.invoices.createPreview({
       subscription: lastSubscription.stripeSubscriptionId,
-      subscription_items: [
-        { id: seatItem.id, quantity: newTotalSeats },
-      ],
-      subscription_proration_behavior: "create_prorations",
+      subscription_details: {
+        items: [
+          { id: seatItem.id, quantity: newTotalSeats },
+        ],
+        proration_behavior: "create_prorations",
+      },
     });
 
     // Fetch current upcoming invoice WITHOUT changes to isolate pre-existing
     // prorations (e.g. from mid-month signup with billing_cycle_anchor)
-    const upcomingCurrent = await stripe.invoices.retrieveUpcoming({
+    const upcomingCurrent = await stripe.invoices.createPreview({
       subscription: lastSubscription.stripeSubscriptionId,
     });
 
@@ -302,10 +302,18 @@ export const createSeatEventSubscriptionFns = ({
 
     // Subtract existing prorations from changed prorations to get ONLY
     // the incremental cost of adding/removing seats.
-    const sumProrations = (lines: { proration: boolean; amount: number }[]) => {
+    const isProration = (line: Stripe.InvoiceLineItem): boolean => {
+      const parent = line.parent;
+      if (!parent) return false;
+      return (
+        parent.invoice_item_details?.proration === true ||
+        parent.subscription_item_details?.proration === true
+      );
+    };
+    const sumProrations = (lines: Stripe.InvoiceLineItem[]) => {
       let total = 0;
       for (const line of lines) {
-        if (line.proration) total += line.amount;
+        if (isProration(line)) total += line.amount;
       }
       return total;
     };

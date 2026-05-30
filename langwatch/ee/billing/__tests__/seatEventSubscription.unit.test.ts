@@ -37,7 +37,7 @@ const createMockStripe = () => ({
     },
   },
   invoices: {
-    retrieveUpcoming: vi.fn(),
+    createPreview: vi.fn(),
   },
   billingPortal: {
     sessions: {
@@ -119,20 +119,20 @@ describe("seatEventSubscription", () => {
 
       it("returns formatted proration amount and recurring total for USD", async () => {
         // "with change" invoice has $15 proration, "current" has $5 existing proration
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
               data: [
-                { proration: true, amount: 1500 },
-                { proration: false, amount: 5000 },
+                { parent: { subscription_item_details: { proration: true } }, amount: 1500 },
+                { parent: { subscription_item_details: { proration: false } }, amount: 5000 },
               ],
             },
           })
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
-              data: [{ proration: true, amount: 500 }],
+              data: [{ parent: { subscription_item_details: { proration: true } }, amount: 500 }],
             },
           });
 
@@ -165,10 +165,10 @@ describe("seatEventSubscription", () => {
           },
         });
 
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "eur",
-            lines: { data: [{ proration: true, amount: 2000 }] },
+            lines: { data: [{ parent: { subscription_item_details: { proration: true } }, amount: 2000 }] },
           })
           .mockResolvedValueOnce({
             currency: "eur",
@@ -186,10 +186,10 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats whole-dollar amounts without decimals", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
-            lines: { data: [{ proration: true, amount: 5000 }] },
+            lines: { data: [{ parent: { subscription_item_details: { proration: true } }, amount: 5000 }] },
           })
           .mockResolvedValueOnce({
             currency: "usd",
@@ -208,14 +208,14 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats fractional amounts with two decimal places", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
-            lines: { data: [{ proration: true, amount: 1550 }] },
+            lines: { data: [{ parent: { subscription_item_details: { proration: true } }, amount: 1550 }] },
           })
           .mockResolvedValueOnce({
             currency: "usd",
-            lines: { data: [{ proration: true, amount: 100 }] },
+            lines: { data: [{ parent: { subscription_item_details: { proration: true } }, amount: 100 }] },
           });
 
         const result = await service.previewProration({
@@ -228,20 +228,20 @@ describe("seatEventSubscription", () => {
       });
 
       it("subtracts existing prorations to isolate incremental cost", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
               data: [
-                { proration: true, amount: 3000 },
-                { proration: true, amount: 1000 },
+                { parent: { subscription_item_details: { proration: true } }, amount: 3000 },
+                { parent: { subscription_item_details: { proration: true } }, amount: 1000 },
               ],
             },
           })
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
-              data: [{ proration: true, amount: 2000 }],
+              data: [{ parent: { subscription_item_details: { proration: true } }, amount: 2000 }],
             },
           });
 
@@ -255,7 +255,7 @@ describe("seatEventSubscription", () => {
       });
 
       it("passes correct subscription_items to Stripe upstream invoice", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: { data: [] },
@@ -270,10 +270,12 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 7,
         });
 
-        expect(stripe.invoices.retrieveUpcoming).toHaveBeenCalledWith({
+        expect(stripe.invoices.createPreview).toHaveBeenCalledWith({
           subscription: "sub_stripe_1",
-          subscription_items: [{ id: "si_seat", quantity: 7 }],
-          subscription_proration_behavior: "create_prorations",
+          subscription_details: {
+            items: [{ id: "si_seat", quantity: 7 }],
+            proration_behavior: "create_prorations",
+          },
         });
       });
     });
