@@ -23,9 +23,11 @@ export function buildMetadataKeysFacetQuery(
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
     : "";
 
-  // Same I/O optimisation as `span-attribute-keys.ts`: read the keys
-  // subcolumn directly so the values side of the Map never gets loaded,
-  // and short-circuit empty maps before the arrayJoin fans out rows.
+  // Same I/O optimisation as `span-attribute-keys.ts`: stay entirely on the
+  // keys subcolumn so the values side of the Map never gets loaded. The
+  // empty-map short-circuit probes `Attributes.keys`, not `Attributes` —
+  // `length(Attributes)` would materialise the whole Map (keys and values)
+  // just to count entries, pulling the heavy values column into memory.
   return {
     sql: `
       SELECT
@@ -36,7 +38,7 @@ export function buildMetadataKeysFacetQuery(
         SELECT arrayJoin(Attributes.keys) AS key
         FROM trace_summaries
         WHERE ${where}
-          AND length(Attributes) > 0
+          AND length(Attributes.keys) > 0
       )
       WHERE key != ''
         ${prefixFilter}
