@@ -34,9 +34,10 @@ afterAll(async () => {
 
   // Diagnostic: dump active event-loop handles AFTER the normal afterAll chain
   // has run. Anything still here is what's keeping the fork from exiting and
-  // ultimately wedging the shard. The CI artifact stays small (one line per
-  // file × ~2 categories) but immediately surfaces which test file leaves
-  // sockets/timers/streams behind. Opt-out via DEBUG_OPEN_HANDLES=0 if needed.
+  // ultimately wedging the shard. The CI artifact stays small but surfaces
+  // the actual remote endpoint for each socket so the leaking connection can
+  // be identified by name (clickhouse host, redis host, postgres host, ...).
+  // Opt-out via DEBUG_OPEN_HANDLES=0 if needed.
   if (process.env.DEBUG_OPEN_HANDLES !== "0") {
     try {
       // @ts-expect-error -- internal API, intentional
@@ -44,10 +45,38 @@ afterAll(async () => {
       // @ts-expect-error -- internal API, intentional
       const requests = process._getActiveRequests?.() ?? [];
       if (handles.length > 0 || requests.length > 0) {
-        const handleCounts: Record<string, number> = {};
+        const describeSocket = (s: any): string => {
+          try {
+            const remote =
+              s.remoteAddress && s.remotePort
+                ? `${s.remoteAddress}:${s.remotePort}`
+                : undefined;
+            const local =
+              s.localAddress && s.localPort
+                ? `${s.localAddress}:${s.localPort}`
+                : undefined;
+            const fd = typeof s.fd === "number" ? s.fd : undefined;
+            const meta = [
+              remote ? `r=${remote}` : null,
+              local ? `l=${local}` : null,
+              fd != null ? `fd=${fd}` : null,
+            ]
+              .filter(Boolean)
+              .join(",");
+            return meta || "?";
+          } catch {
+            return "?";
+          }
+        };
+        const socketDetails: string[] = [];
+        const otherCounts: Record<string, number> = {};
         for (const h of handles) {
           const k = h?.constructor?.name ?? typeof h;
-          handleCounts[k] = (handleCounts[k] ?? 0) + 1;
+          if (k === "Socket" || k === "TLSSocket") {
+            socketDetails.push(`${k}(${describeSocket(h)})`);
+          } else {
+            otherCounts[k] = (otherCounts[k] ?? 0) + 1;
+          }
         }
         const requestCounts: Record<string, number> = {};
         for (const r of requests) {
@@ -56,7 +85,7 @@ afterAll(async () => {
         }
         // eslint-disable-next-line no-console
         console.log(
-          `[open-handles] handles=${handles.length} requests=${requests.length} | handles=${JSON.stringify(handleCounts)} requests=${JSON.stringify(requestCounts)}`,
+          `[open-handles] handles=${handles.length} requests=${requests.length} | sockets=${JSON.stringify(socketDetails)} other=${JSON.stringify(otherCounts)} requests=${JSON.stringify(requestCounts)}`,
         );
       }
     } catch {

@@ -75,60 +75,8 @@ export async function setup(): Promise<void> {
  *    BullMQ workers that may still be completing (causes "Missing key for job" errors)
  */
 export async function teardown(): Promise<void> {
-  // Tagged so the CI log shows where in the shard-end pipeline a wedge,
-  // if any, actually stalls. Remove once the integration shard hang
-  // diagnostic is no longer needed.
-  // eslint-disable-next-line no-console
-  console.log("[teardown] stopTestContainers begin");
   await stopTestContainers();
-  // eslint-disable-next-line no-console
-  console.log("[teardown] closeAppRuntimeSingletons begin");
   await closeAppRuntimeSingletons();
-  // eslint-disable-next-line no-console
-  console.log("[teardown] unrefRemainingHandles begin");
-  unrefRemainingHandles();
-  // eslint-disable-next-line no-console
-  console.log("[teardown] done");
-}
-
-/**
- * Belt-and-suspenders: unref any sockets/timers that are still keeping the
- * event loop alive after the named teardowns above. Anything not enumerable
- * via a typed close path (HTTP keep-alive pools, BullMQ worker internals,
- * third-party background pollers) gets released here so vitest's reporter
- * can finish and the worker exits without waiting for the shard timeout.
- *
- * This is safe at this point: all tests have completed, the explicit
- * teardowns have already run, and any remaining handles are bookkeeping
- * the runtime no longer needs.
- */
-function unrefRemainingHandles(): void {
-  try {
-    const proc = process as unknown as {
-      _getActiveHandles?: () => Array<{
-        unref?: () => void;
-        constructor?: { name?: string };
-      }>;
-    };
-    const handles = proc._getActiveHandles?.() ?? [];
-    for (const h of handles) {
-      // Pipe is the IPC channel that the vitest worker uses to send its
-      // "I'm done" message back to the main process. Unref'ing it makes
-      // the loop exit without the message being delivered, so vitest then
-      // waits for a result that never arrives, which is the exact shape
-      // of the shard hang we are trying to fix. WriteStream covers
-      // process.stdout / process.stderr for the same reason.
-      const name = h?.constructor?.name;
-      if (name === "Pipe" || name === "WriteStream") continue;
-      try {
-        h.unref?.();
-      } catch {
-        // some handles are read-only; ignore
-      }
-    }
-  } catch {
-    // _getActiveHandles is an internal API; tolerate runtime variation
-  }
 }
 
 /**
