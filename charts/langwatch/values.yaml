@@ -65,6 +65,21 @@ preflight:
   ## @param preflight.activeDeadlineSeconds [default: 60] Hard limit on hook runtime — beats helm hook timeout for clearer logs.
   activeDeadlineSeconds: 60
 
+  # Per-hook overrides for pod security and scheduling. Empty defaults
+  # fall through to `global.podSecurityContext` / `global.scheduling.*`
+  # via the coalesce chain in the template, matching the convention the
+  # langwatch_nlp / app / workers Deployments use.
+  ## @param preflight.podSecurityContext [object] Pod security context override for the preflight hook.
+  podSecurityContext: {}
+  ## @param preflight.containerSecurityContext [object] Container security context override for the preflight container.
+  containerSecurityContext: {}
+  ## @param preflight.nodeSelector [object] Node selector override for the preflight hook.
+  nodeSelector: {}
+  ## @param preflight.tolerations [array] Tolerations override for the preflight hook.
+  tolerations: []
+  ## @param preflight.affinity [object] Affinity override for the preflight hook.
+  affinity: {}
+
 autogen:
   # Enable automatic secret generation (set to false in production)
   ## @param autogen.enabled [default: false] Enable automatic secret generation (development only).
