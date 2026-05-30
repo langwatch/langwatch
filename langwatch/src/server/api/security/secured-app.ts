@@ -199,9 +199,9 @@ const projectStrategy: AuthStrategy = {
     switch (policy.kind) {
       case "permission":
         return [authMiddleware, requirePermission(policy.permission)];
-      case "patPermission":
-        // PAT ceiling: legacy project keys keep full access, personal access
-        // tokens must hold the permission. `requireApiKeyPermission` reads the
+      case "apiKeyPermission":
+        // API-key ceiling: legacy project keys keep full access, scoped API
+        // keys must hold the permission. `requireApiKeyPermission` reads the
         // resolved token `authMiddleware` set, so it runs after it.
         return [
           authMiddleware,

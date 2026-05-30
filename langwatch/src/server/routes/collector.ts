@@ -92,9 +92,9 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
       return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
     }
 
-    // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+    // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
     // access — ADMIN and MEMBER have it; VIEWER does not, preventing
-    // read-only PATs from ingesting traces.
+    // read-only API keys from ingesting traces.
     try {
       await enforceApiKeyCeiling({
         prisma,
@@ -258,8 +258,8 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
       return c.json({ error: validationError.message }, 400);
     }
 
-    // Body successfully validated — mark PAT as used if this request was
-    // authenticated via PAT
+    // Body successfully validated — mark the API key as used if this request was
+    // authenticated via API key
     if (resolved.type === "apiKey") {
       tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }

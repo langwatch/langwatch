@@ -18,7 +18,7 @@ import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { createProjectApp, patPermission } from "~/server/api/security";
+import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
@@ -185,7 +185,7 @@ const secured = createProjectApp({ basePath: "/api/gateway/v1" });
 
 // ── Virtual keys ────────────────────────────────────────────────────────
 
-secured.access(patPermission("virtualKeys:view")).get(
+secured.access(apiKeyPermission("virtualKeys:view")).get(
   "/virtual-keys",
   describeRoute({
     summary: "List virtual keys",
@@ -212,7 +212,7 @@ secured.access(patPermission("virtualKeys:view")).get(
   },
 );
 
-secured.access(patPermission("virtualKeys:create")).post(
+secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
     summary: "Create virtual key",
@@ -281,7 +281,7 @@ secured.access(patPermission("virtualKeys:create")).post(
   },
 );
 
-secured.access(patPermission("virtualKeys:view")).get(
+secured.access(apiKeyPermission("virtualKeys:view")).get(
   "/virtual-keys/:id",
   describeRoute({
     summary: "Get virtual key",
@@ -326,7 +326,7 @@ secured.access(patPermission("virtualKeys:view")).get(
   },
 );
 
-secured.access(patPermission("virtualKeys:update")).patch(
+secured.access(apiKeyPermission("virtualKeys:update")).patch(
   "/virtual-keys/:id",
   describeRoute({
     summary: "Update virtual key",
@@ -381,7 +381,7 @@ secured.access(patPermission("virtualKeys:update")).patch(
   },
 );
 
-secured.access(patPermission("virtualKeys:rotate")).post(
+secured.access(apiKeyPermission("virtualKeys:rotate")).post(
   "/virtual-keys/:id/rotate",
   describeRoute({
     summary: "Rotate virtual key secret",
@@ -419,7 +419,7 @@ secured.access(patPermission("virtualKeys:rotate")).post(
   },
 );
 
-secured.access(patPermission("virtualKeys:delete")).post(
+secured.access(apiKeyPermission("virtualKeys:delete")).post(
   "/virtual-keys/:id/revoke",
   describeRoute({
     summary: "Revoke virtual key",
@@ -454,7 +454,7 @@ secured.access(patPermission("virtualKeys:delete")).post(
 
 // ── Gateway provider bindings ───────────────────────────────────────────
 
-secured.access(patPermission("gatewayProviders:view")).get(
+secured.access(apiKeyPermission("gatewayProviders:view")).get(
   "/providers",
   describeRoute({
     summary: "List provider bindings",
@@ -504,7 +504,7 @@ secured.access(patPermission("gatewayProviders:view")).get(
   },
 );
 
-secured.access(patPermission("gatewayProviders:manage")).post(
+secured.access(apiKeyPermission("gatewayProviders:manage")).post(
   "/providers",
   describeRoute({
     summary: "Bind a model provider to the gateway",
@@ -541,7 +541,7 @@ secured.access(patPermission("gatewayProviders:manage")).post(
 
 // ── Budgets ─────────────────────────────────────────────────────────────
 
-secured.access(patPermission("gatewayBudgets:view")).get(
+secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   "/budgets",
   describeRoute({
     summary: "List budgets applicable to the project",
@@ -583,7 +583,7 @@ secured.access(patPermission("gatewayBudgets:view")).get(
   },
 );
 
-secured.access(patPermission("gatewayBudgets:create")).post(
+secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   "/budgets",
   describeRoute({
     summary: "Create budget",
@@ -640,7 +640,7 @@ secured.access(patPermission("gatewayBudgets:create")).post(
   },
 );
 
-secured.access(patPermission("gatewayBudgets:update")).patch(
+secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
   "/budgets/:id",
   describeRoute({
     summary: "Update budget",
@@ -691,7 +691,7 @@ secured.access(patPermission("gatewayBudgets:update")).patch(
   },
 );
 
-secured.access(patPermission("gatewayBudgets:delete")).delete(
+secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
   "/budgets/:id",
   describeRoute({
     summary: "Archive budget",
@@ -726,7 +726,7 @@ secured.access(patPermission("gatewayBudgets:delete")).delete(
 
 // ── Provider credentials — update + disable ────────────────────────────
 
-secured.access(patPermission("gatewayProviders:update")).patch(
+secured.access(apiKeyPermission("gatewayProviders:update")).patch(
   "/providers/:id",
   describeRoute({
     summary: "Update provider binding",
@@ -761,7 +761,7 @@ secured.access(patPermission("gatewayProviders:update")).patch(
   },
 );
 
-secured.access(patPermission("gatewayProviders:manage")).delete(
+secured.access(apiKeyPermission("gatewayProviders:manage")).delete(
   "/providers/:id",
   describeRoute({
     summary: "Disable provider binding",
@@ -801,7 +801,7 @@ secured.access(patPermission("gatewayProviders:manage")).delete(
 
 // ── Cache-control rules ────────────────────────────────────────────────
 
-secured.access(patPermission("gatewayCacheRules:view")).get(
+secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
   "/cache-rules",
   describeRoute({
     summary: "List cache-control rules",
@@ -829,7 +829,7 @@ secured.access(patPermission("gatewayCacheRules:view")).get(
   },
 );
 
-secured.access(patPermission("gatewayCacheRules:view")).get(
+secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
   "/cache-rules/:id",
   describeRoute({
     summary: "Get a cache rule",
@@ -870,7 +870,7 @@ secured.access(patPermission("gatewayCacheRules:view")).get(
   },
 );
 
-secured.access(patPermission("gatewayCacheRules:create")).post(
+secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   "/cache-rules",
   describeRoute({
     summary: "Create a cache rule",
@@ -926,7 +926,7 @@ secured.access(patPermission("gatewayCacheRules:create")).post(
   },
 );
 
-secured.access(patPermission("gatewayCacheRules:update")).patch(
+secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
   "/cache-rules/:id",
   describeRoute({
     summary: "Update a cache rule",
@@ -978,7 +978,7 @@ secured.access(patPermission("gatewayCacheRules:update")).patch(
   },
 );
 
-secured.access(patPermission("gatewayCacheRules:delete")).delete(
+secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
   "/cache-rules/:id",
   describeRoute({
     summary: "Archive a cache rule",

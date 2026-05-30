@@ -8,9 +8,9 @@ import type { Permission } from "~/server/api/rbac";
  *
  *   - permission       — the caller's credential must hold this RBAC permission
  *                        at the app's scope (project or organization).
- *   - patPermission    — like `permission`, but enforced through the API-key
+ *   - apiKeyPermission — like `permission`, but enforced through the API-key
  *                        ceiling: legacy project API keys retain full access
- *                        while personal access tokens must hold the permission.
+ *                        while scoped API keys must hold the permission.
  *                        Use for the public REST surface (gateway-platform,
  *                        governance) so the registry records the real
  *                        permission instead of a blanket "any authenticated".
@@ -26,7 +26,7 @@ import type { Permission } from "~/server/api/rbac";
  */
 export type AccessPolicy =
   | { readonly kind: "permission"; readonly permission: Permission }
-  | { readonly kind: "patPermission"; readonly permission: Permission }
+  | { readonly kind: "apiKeyPermission"; readonly permission: Permission }
   | { readonly kind: "anyAuthenticated" }
   | { readonly kind: "public"; readonly reason: string }
   | { readonly kind: "internal"; readonly reason: string }
@@ -44,13 +44,13 @@ export function requires(permission: Permission): AccessPolicy {
 /**
  * Require an RBAC permission through the API-key ceiling. Legacy project API
  * keys bypass the ceiling (full access — the historical behaviour of project
- * keys); personal access tokens must satisfy `effective = ApiKey ∩ user` for
+ * keys); scoped API keys must satisfy `effective = ApiKey ∩ user` for
  * the permission at the project scope. This is the public REST surface's
  * equivalent of `requires(...)`, kept distinct so the registry records that
- * the gate is the PAT ceiling rather than a strict role check.
+ * the gate is the API-key ceiling rather than a strict role check.
  */
-export function patPermission(permission: Permission): AccessPolicy {
-  return { kind: "patPermission", permission };
+export function apiKeyPermission(permission: Permission): AccessPolicy {
+  return { kind: "apiKeyPermission", permission };
 }
 
 /**
@@ -108,8 +108,8 @@ export function describeAccessPolicy(policy: AccessPolicy): string {
   switch (policy.kind) {
     case "permission":
       return `requires ${policy.permission}`;
-    case "patPermission":
-      return `requires ${policy.permission} (PAT ceiling; legacy project keys bypass)`;
+    case "apiKeyPermission":
+      return `requires ${policy.permission} (API-key ceiling; legacy project keys bypass)`;
     case "anyAuthenticated":
       return "any authenticated credential";
     case "public":

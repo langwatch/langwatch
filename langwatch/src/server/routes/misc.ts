@@ -86,7 +86,7 @@ import {
 } from "~/server/api/security";
 
 const logger = createLogger("langwatch:misc");
-// Shared auth middlewares for every PAT-aware handler in this file.
+// Shared auth middlewares for every API-key-aware handler in this file.
 // `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
 // → setContext → late markUsed pipeline once; `requireApiKeyPermission`
 // enforces the per-route ceiling and returns 403 on denial.
@@ -191,10 +191,10 @@ const HOTEL_SYSTEM_PROMPT =
 const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
-// NOTE(pat): /demo/hotel_bot is intentionally NOT migrated to the unified
+// NOTE: /demo/hotel_bot is intentionally NOT migrated to the unified
 // extractCredentials + TokenResolver + enforceApiKeyCeiling pipeline. It is a
 // demo fixture that only forwards the caller's token onward to /api/collector,
-// which performs full PAT/legacy auth + ceiling enforcement itself. Adding a
+// which performs full API-key/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
 secured.access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler")).post("/demo/hotel_bot", async (c) => {

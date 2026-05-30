@@ -7,9 +7,9 @@ import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
 import {
+  apiKeyPermission,
   describeAccessPolicy,
   internalSecret,
-  patPermission,
   publicEndpoint,
 } from "../access-policy";
 import { getRoutePolicy } from "../route-registry";
@@ -82,18 +82,18 @@ describe("SecuredApp", () => {
     });
   });
 
-  describe("when a project route declares a patPermission policy", () => {
-    /** @scenario "A PAT-ceiling route records its real required permission" */
+  describe("when a project route declares an apiKeyPermission policy", () => {
+    /** @scenario "An API-key-ceiling route records its real required permission" */
     it("records the real permission in the registry (not 'any authenticated')", () => {
-      const app = createProjectApp({ basePath: "/api/__test_pat" });
+      const app = createProjectApp({ basePath: "/api/__test_apikey" });
 
       app
-        .access(patPermission("virtualKeys:view"))
+        .access(apiKeyPermission("virtualKeys:view"))
         .get("/keys", (c) => c.text("ok"));
 
-      const recorded = getRoutePolicy("GET", "/api/__test_pat/keys");
+      const recorded = getRoutePolicy("GET", "/api/__test_apikey/keys");
       expect(recorded?.policy).toEqual({
-        kind: "patPermission",
+        kind: "apiKeyPermission",
         permission: "virtualKeys:view",
       });
       expect(describeAccessPolicy(recorded!.policy)).toContain(

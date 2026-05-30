@@ -26,7 +26,7 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     A route is registered through the secured app builder, whose verb methods are
     only reachable via `.access(policy)`. The policy is one of:
-      requires(permission) | patPermission(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason) | handlerManagedAuth(reason)
+      requires(permission) | apiKeyPermission(permission) | anyAuthenticated() | publicEndpoint(reason) | internalSecret(reason) | handlerManagedAuth(reason)
     Omitting it is a TypeScript error. Bypassing the builder is caught by a CI test
     that introspects the fully composed router against the route registry. Every
     family is migrated, so there is no allowlist: every concrete endpoint must
@@ -52,9 +52,9 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then it carries a non-empty human-readable reason
 
     @unit
-    Scenario: A PAT-ceiling route records its real required permission
+    Scenario: An API-key-ceiling route records its real required permission
       Given a public REST route guarded by the API-key ceiling
-      When it is registered with patPermission instead of anyAuthenticated
+      When it is registered with apiKeyPermission instead of anyAuthenticated
       Then the route registry records the real permission, not "any authenticated"
 
     @unit

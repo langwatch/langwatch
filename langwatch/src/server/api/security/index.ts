@@ -1,10 +1,10 @@
 export {
   type AccessPolicy,
   anyAuthenticated,
+  apiKeyPermission,
   describeAccessPolicy,
   handlerManagedAuth,
   internalSecret,
-  patPermission,
   publicEndpoint,
   requires,
 } from "./access-policy";

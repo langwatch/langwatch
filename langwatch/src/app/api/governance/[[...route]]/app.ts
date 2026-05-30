@@ -24,7 +24,7 @@ import type { Prisma } from "@prisma/client";
  *
  * Auth: project API key (`Authorization: Bearer <projectApiKey>` or
  * `X-Auth-Token`). The org for the call is derived from the project's
- * team. PATs additionally must satisfy the per-route ceiling permission
+ * team. Scoped API keys additionally must satisfy the per-route ceiling permission
  * (`aiTools:view` / `aiTools:manage`); legacy project tokens bypass the
  * ceiling — same model as `gateway-platform`.
  *
@@ -38,7 +38,7 @@ import type { MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { createProjectApp, patPermission } from "~/server/api/security";
+import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
@@ -54,7 +54,7 @@ const logger = createLogger("langwatch:api:governance");
 // project key: legacy project tokens bypass the aiTools:manage ceiling
 // (same model as gateway-platform), so without this a project-key holder
 // could read every org template's OTTL rules and mutate org config. The
-// per-route ceiling permission is declared via patPermission(...) on each
+// per-route ceiling permission is declared via apiKeyPermission(...) on each
 // route; this extra guard enforces the user-bound requirement on top.
 const requireUserBoundCaller: MiddlewareHandler<{
   Variables: Variables;
@@ -66,7 +66,7 @@ const requireUserBoundCaller: MiddlewareHandler<{
           type: "forbidden",
           code: "user_token_required",
           message:
-            "This endpoint requires a personal access token bound to a user; legacy project API keys cannot administer organization governance templates.",
+            "This endpoint requires a user-bound API key; legacy project API keys cannot administer organization governance templates.",
         },
       },
       403,
@@ -228,15 +228,15 @@ function mapBindingError(error: unknown): {
 }
 
 function callerUserIdRequired(
-  patUserId: string | undefined,
+  apiKeyUserId: string | undefined,
 ): { ok: true; userId: string } | { ok: false } {
   // UserIngestionBinding routes require a real human caller — the
   // service-layer cross-bind invariant enforces
   // `Project.ownerUserId === callerUserId`. A synthetic `svc_<projectId>`
   // wouldn't own a personal project, so legacy project tokens that don't
   // resolve to a User MUST be rejected here.
-  if (!patUserId) return { ok: false };
-  return { ok: true, userId: patUserId };
+  if (!apiKeyUserId) return { ok: false };
+  return { ok: true, userId: apiKeyUserId };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -322,10 +322,10 @@ function mapTemplateError(error: unknown): {
 }
 
 function callerUserIdFromContext(
-  patUserId: string | undefined,
+  apiKeyUserId: string | undefined,
   projectId: string,
 ): string {
-  return patUserId ?? `svc_${projectId}`;
+  return apiKeyUserId ?? `svc_${projectId}`;
 }
 
 /**
@@ -350,7 +350,7 @@ const secured = createProjectApp({ basePath: "/api/governance" });
 
 // ── Ingestion Templates ───────────────────────────────────────────────
 
-secured.access(patPermission("aiTools:view")).get(
+secured.access(apiKeyPermission("aiTools:view")).get(
   "/ingestion-templates",
   describeRoute({
     summary: "List ingestion templates",
@@ -380,7 +380,7 @@ secured.access(patPermission("aiTools:view")).get(
   },
 );
 
-secured.access(patPermission("aiTools:manage")).get(
+secured.access(apiKeyPermission("aiTools:manage")).get(
   "/ingestion-templates/admin",
   describeRoute({
     summary: "List ingestion templates (admin shape, includes OTTL)",
@@ -411,7 +411,7 @@ secured.access(patPermission("aiTools:manage")).get(
   },
 );
 
-secured.access(patPermission("aiTools:view")).get(
+secured.access(apiKeyPermission("aiTools:view")).get(
   "/ingestion-templates/:id",
   describeRoute({
     summary: "Get ingestion template",
@@ -460,7 +460,7 @@ secured.access(patPermission("aiTools:view")).get(
   },
 );
 
-secured.access(patPermission("aiTools:manage")).post(
+secured.access(apiKeyPermission("aiTools:manage")).post(
   "/ingestion-templates",
   describeRoute({
     summary: "Create org-authored ingestion template",
@@ -535,7 +535,7 @@ secured.access(patPermission("aiTools:manage")).post(
   },
 );
 
-secured.access(patPermission("aiTools:manage")).patch(
+secured.access(apiKeyPermission("aiTools:manage")).patch(
   "/ingestion-templates/:id/ottl-rules",
   describeRoute({
     summary: "Replace ottl_rules on an org-authored template",
@@ -604,7 +604,7 @@ secured.access(patPermission("aiTools:manage")).patch(
   },
 );
 
-secured.access(patPermission("aiTools:manage")).delete(
+secured.access(apiKeyPermission("aiTools:manage")).delete(
   "/ingestion-templates/:id",
   describeRoute({
     summary: "Soft-archive an org-authored template",
@@ -657,7 +657,7 @@ secured.access(patPermission("aiTools:manage")).delete(
   },
 );
 
-secured.access(patPermission("aiTools:manage")).post(
+secured.access(apiKeyPermission("aiTools:manage")).post(
   "/ingestion-templates/clone",
   describeRoute({
     summary: "Clone a platform-published template into the caller's org",
@@ -722,7 +722,7 @@ secured.access(patPermission("aiTools:manage")).post(
 
 // ── User Ingestion Bindings ───────────────────────────────────────────
 
-secured.access(patPermission("organization:view")).get(
+secured.access(apiKeyPermission("organization:view")).get(
   "/user-ingestion-bindings",
   describeRoute({
     summary: "List the caller's bindings",
@@ -755,7 +755,7 @@ secured.access(patPermission("organization:view")).get(
             type: "forbidden",
             code: "human_caller_required",
             message:
-              "UserIngestionBinding routes require a PAT bound to a User; legacy project API keys cannot list user-scoped bindings.",
+              "UserIngestionBinding routes require a user-bound API key; legacy project API keys cannot list user-scoped bindings.",
           },
         },
         403,
@@ -771,7 +771,7 @@ secured.access(patPermission("organization:view")).get(
   },
 );
 
-secured.access(patPermission("organization:view")).post(
+secured.access(apiKeyPermission("organization:view")).post(
   "/user-ingestion-bindings",
   describeRoute({
     summary: "Install a binding for the caller",
@@ -817,7 +817,7 @@ secured.access(patPermission("organization:view")).post(
             type: "forbidden",
             code: "human_caller_required",
             message:
-              "UserIngestionBinding install requires a PAT bound to a User; legacy project API keys cannot bind a personal project.",
+              "UserIngestionBinding install requires a user-bound API key; legacy project API keys cannot bind a personal project.",
           },
         },
         403,
@@ -869,7 +869,7 @@ secured.access(patPermission("organization:view")).post(
   },
 );
 
-secured.access(patPermission("organization:view")).delete(
+secured.access(apiKeyPermission("organization:view")).delete(
   "/user-ingestion-bindings/:id",
   describeRoute({
     summary: "Uninstall (soft-archive) a binding",
@@ -902,7 +902,7 @@ secured.access(patPermission("organization:view")).delete(
             type: "forbidden",
             code: "human_caller_required",
             message:
-              "UserIngestionBinding routes require a PAT bound to a User.",
+              "UserIngestionBinding routes require a user-bound API key.",
           },
         },
         403,
@@ -927,7 +927,7 @@ secured.access(patPermission("organization:view")).delete(
   },
 );
 
-secured.access(patPermission("organization:view")).post(
+secured.access(apiKeyPermission("organization:view")).post(
   "/user-ingestion-bindings/:id/rotate",
   describeRoute({
     summary: "Rotate the binding access token (hard-cut v1)",
@@ -965,7 +965,7 @@ secured.access(patPermission("organization:view")).post(
             type: "forbidden",
             code: "human_caller_required",
             message:
-              "UserIngestionBinding routes require a PAT bound to a User.",
+              "UserIngestionBinding routes require a user-bound API key.",
           },
         },
         403,

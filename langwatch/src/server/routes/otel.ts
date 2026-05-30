@@ -120,7 +120,7 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+  // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.
   try {
     await enforceApiKeyCeiling({
@@ -342,7 +342,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
       }
       const traceRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
@@ -438,7 +438,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       }
       const logRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
@@ -517,7 +517,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
