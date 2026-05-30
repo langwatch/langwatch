@@ -333,8 +333,14 @@ func buildStructuredOutputTool(rf *app.ResponseFormat) (app.Tool, map[string]any
 	if rf == nil || rf.Type != "json_schema" || rf.JSONSchema == nil {
 		return app.Tool{}, nil, false
 	}
-	schema, ok := rf.JSONSchema["schema"]
-	if !ok || schema == nil {
+	// Schema must be an object. Strings, numbers, arrays, etc. would
+	// produce a tool with an invalid `parameters` field that bedrock
+	// rejects with a 400. Fall back to passing response_format through
+	// unchanged so the malformed payload at least reaches the upstream
+	// validator with a recognizable shape instead of being silently
+	// reshaped on the way out.
+	schema, ok := rf.JSONSchema["schema"].(map[string]any)
+	if !ok {
 		return app.Tool{}, nil, false
 	}
 	name, _ := rf.JSONSchema["name"].(string)

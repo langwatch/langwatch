@@ -763,6 +763,46 @@ func TestExecute_StructuredOutput_BedrockNonAnthropicLeavesResponseFormatIntact(
 	}
 }
 
+// TestExecute_StructuredOutput_BedrockAnthropicMalformedSchemaFallsBackToResponseFormat
+// pins the documented fallback: when response_format is structurally
+// valid (type=json_schema, json_schema!=nil) but the `schema` payload
+// itself is not an object (e.g. a stringly-typed schema from a buggy
+// upstream), the rewrite must NOT silently emit an invalid tool. Pass
+// response_format through unchanged so the malformed payload reaches
+// the upstream validator with a recognizable shape.
+func TestExecute_StructuredOutput_BedrockAnthropicMalformedSchemaFallsBackToResponseFormat(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse(`ok`)}
+	exec := New(gw)
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+		ResponseFormat: &app.ResponseFormat{
+			Type: "json_schema",
+			JSONSchema: map[string]any{
+				"name":   "Verifier",
+				"schema": "oops, not an object",
+			},
+		},
+		LiteLLMParams: map[string]any{
+			"aws_access_key_id":     "AKIA...",
+			"aws_secret_access_key": "secret",
+			"aws_region_name":       "us-east-1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasField(t, gw.lastReq.Body, "response_format") {
+		t.Fatal("malformed schema must fall back to response_format pass-through, not get silently rewritten into an invalid tool")
+	}
+	if hasField(t, gw.lastReq.Body, "tools") {
+		t.Fatal("malformed schema must NOT synthesize a tools array; fallback path keeps body unchanged")
+	}
+	if hasField(t, gw.lastReq.Body, "tool_choice") {
+		t.Fatal("malformed schema must NOT synthesize tool_choice; fallback path keeps body unchanged")
+	}
+}
+
 // TestShouldUseToolUseForStructuredOutput pins the provider/model gate.
 // Misclassifying here would either break the customer (anthropic missed)
 // or regress other providers (openai/gemini hijacked).
