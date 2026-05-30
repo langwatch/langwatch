@@ -34,6 +34,14 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel
     fileParallelism: false,
+    // Run integration files in forked child processes (vs the unit pool's
+    // `vmThreads`) so each worker is force-killed on file exit. With vmThreads
+    // a single un-`unref`'d timer or unclosed client in any file makes the
+    // whole shard wait forever under --coverage (which awaits a graceful
+    // worker exit instead of force-killing the pool); forks side-step that
+    // class of hang entirely. The startup cost is a few hundred ms per file,
+    // which is dwarfed by integration tests' actual work.
+    pool: "forks",
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },
