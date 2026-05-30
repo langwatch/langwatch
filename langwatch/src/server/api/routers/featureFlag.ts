@@ -80,4 +80,46 @@ export const featureFlagRouter = createTRPCRouter({
 
       return { enabled };
     }),
+
+  /**
+   * Check if a feature flag is enabled for ANY of the given organizations.
+   *
+   * Org-targeted flags can only be evaluated one organization at a time, but
+   * some UI (the workspace switcher's personal entry) gates on whether the
+   * user has the flag in any organization they belong to. Returns true as
+   * soon as one organization has it enabled.
+   *
+   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
+   * @param organizationIds - Organizations to evaluate the flag against
+   * @returns { enabled: boolean }
+   */
+  isEnabledForAnyOrganization: protectedProcedure
+    .input(
+      z.object({
+        flag: frontendFeatureFlagSchema,
+        organizationIds: z.array(z.string()),
+      }),
+    )
+    // organizationIds is a plural targeting param, not one of the sensitive
+    // singular keys (organizationId/teamId/projectId), so no allow-list needed.
+    .use(skipPermissionCheck())
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      if (input.organizationIds.length === 0) {
+        return { enabled: false };
+      }
+
+      const results = await Promise.all(
+        input.organizationIds.map((organizationId) =>
+          featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
+            distinctId: userId,
+            defaultValue: false,
+            organizationId,
+          }),
+        ),
+      );
+
+      return { enabled: results.some(Boolean) };
+    }),
 });

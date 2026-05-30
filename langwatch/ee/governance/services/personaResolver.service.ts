@@ -62,6 +62,16 @@ export interface PersonaResolverInput {
   isEnterprise: boolean;
 
   /**
+   * True when `release_ui_ai_governance_enabled` is on for this org. The
+   * `/me` and `/governance` surfaces are gated behind this flag and 404
+   * when it is off, so the resolver must never auto-route there for an org
+   * without it — it falls back to the project home (the pre-governance
+   * LLMOps experience). A user-pinned `lastHomePath` still wins, since a
+   * pin can only have been set while the surface was reachable.
+   */
+  hasGovernanceUi: boolean;
+
+  /**
    * The user's first project slug, or null if the user has no project
    * memberships. Drives the project_only destination + the personal_only
    * vs mixed fork.
@@ -74,6 +84,12 @@ export interface PersonaResolution {
   destination: string;
   /** True when User.lastHomePath was set and used. */
   isOverride: boolean;
+  /**
+   * Mirrors the input `hasGovernanceUi`. Lets the `/` redirect client gate
+   * its own `lastVisitedHomeKind === "personal"` fallback so it never
+   * overrides to `/me` when that surface is flag-gated off for the org.
+   */
+  governanceUiEnabled: boolean;
 }
 
 export function resolvePersonaHome(
@@ -86,6 +102,7 @@ export function resolvePersonaHome(
       persona,
       destination: input.userLastHomePath,
       isOverride: true,
+      governanceUiEnabled: input.hasGovernanceUi,
     };
   }
 
@@ -93,6 +110,7 @@ export function resolvePersonaHome(
     persona,
     destination: mapPersonaToDestination(persona, input),
     isOverride: false,
+    governanceUiEnabled: input.hasGovernanceUi,
   };
 }
 
@@ -116,6 +134,7 @@ export function resolvePersonaHomeSafe(
       hasOrganizationManagePermission:
         input.hasOrganizationManagePermission ?? false,
       isEnterprise: input.isEnterprise ?? false,
+      hasGovernanceUi: input.hasGovernanceUi ?? false,
       firstProjectSlug: input.firstProjectSlug,
     };
     return resolvePersonaHome(full);
@@ -126,6 +145,7 @@ export function resolvePersonaHomeSafe(
         ? `/${input.firstProjectSlug}/messages`
         : "/me",
       isOverride: false,
+      governanceUiEnabled: input.hasGovernanceUi ?? false,
     };
   }
 }
@@ -155,6 +175,19 @@ function mapPersonaToDestination(
   persona: Persona,
   input: PersonaResolverInput,
 ): string {
+  const projectHome = input.firstProjectSlug
+    ? `/${input.firstProjectSlug}/messages`
+    : noProjectFallback(input.hasGovernanceUi);
+
+  // `/me` and `/governance` are gated behind release_ui_ai_governance_enabled
+  // and 404 when it is off. An org without the governance UI gets the
+  // pre-governance project home, no matter the detected persona — this is
+  // what keeps an impersonated (or freshly signed-in) non-governance
+  // customer off the dead-end /me page.
+  if (!input.hasGovernanceUi) {
+    return projectHome;
+  }
+
   switch (persona) {
     case "governance_admin":
       return "/governance";
@@ -162,8 +195,17 @@ function mapPersonaToDestination(
     case "mixed":
       return "/me";
     case "project_only":
-      return input.firstProjectSlug
-        ? `/${input.firstProjectSlug}/messages`
-        : "/me";
+      return projectHome;
   }
+}
+
+/**
+ * Where to send a user with no project membership. `/me` is the natural
+ * personal home, but it is flag-gated and 404s without the governance UI, so
+ * a non-governance org with no project falls back to the recoverable
+ * onboarding bootstrap instead (mirrors the org-less branch in
+ * pages/index.tsx) rather than the dead-end /me.
+ */
+function noProjectFallback(hasGovernanceUi: boolean): string {
+  return hasGovernanceUi ? "/me" : "/onboarding/welcome";
 }

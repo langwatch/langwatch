@@ -21,7 +21,10 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
-import { useCostCenterColumn } from "../../components/settings/useCostCenterColumn";
+import {
+  useCostCenterColumn,
+  type CostCenterOption,
+} from "../../components/settings/useCostCenterColumn";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -395,11 +398,13 @@ function ProjectSection({
   access,
   organizationId,
   canManage,
+  costCenter,
 }: {
   project: { id: string; name: string };
   access: ProjectAccessEntry[];
   organizationId: string;
   canManage: boolean;
+  costCenter: ReturnType<typeof useCostCenterColumn>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
@@ -448,6 +453,16 @@ function ProjectSection({
           <Text fontSize="xs" color="gray.500">
             {access.length} with access
           </Text>
+          {costCenter.show && canManage && (
+            <InlineCostCenter
+              organizationId={organizationId}
+              kind="project"
+              entityId={project.id}
+              value={costCenter.byProject.get(project.id) ?? null}
+              costCenters={costCenter.costCenters}
+              onAssigned={costCenter.refetch}
+            />
+          )}
         </HStack>
 
         {expanded && (
@@ -607,6 +622,47 @@ function ProjectSection({
 
 // ── Team card ─────────────────────────────────────────────────────────────────
 
+// Inline cost-center picker for team and project rows. Reads as one more meta
+// item next to "N projects · M members": a leading dot, a normal-case "Cost
+// center" caption, then a compact select.
+function InlineCostCenter({
+  organizationId,
+  kind,
+  entityId,
+  value,
+  costCenters,
+  onAssigned,
+}: {
+  organizationId: string;
+  kind: "team" | "project";
+  entityId: string;
+  value: string | null;
+  costCenters: CostCenterOption[];
+  onAssigned: () => Promise<unknown> | void;
+}) {
+  return (
+    <HStack
+      gap={2}
+      pl={2}
+      color="gray.500"
+      fontSize="sm"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Text>·</Text>
+      <Text>Cost center</Text>
+      <CostCenterPicker
+        organizationId={organizationId}
+        kind={kind}
+        entityId={entityId}
+        value={value}
+        costCenters={costCenters}
+        onAssigned={onAssigned}
+        width="130px"
+      />
+    </HStack>
+  );
+}
+
 function TeamCard({
   team,
   organizationId,
@@ -667,16 +723,14 @@ function TeamCard({
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
           {costCenter.show && canManage && (
-            <Box onClick={(e) => e.stopPropagation()}>
-              <CostCenterPicker
-                organizationId={organizationId}
-                kind="team"
-                entityId={team.id}
-                value={costCenter.byTeam.get(team.id) ?? null}
-                costCenters={costCenter.costCenters}
-                onAssigned={costCenter.refetch}
-              />
-            </Box>
+            <InlineCostCenter
+              organizationId={organizationId}
+              kind="team"
+              entityId={team.id}
+              value={costCenter.byTeam.get(team.id) ?? null}
+              costCenters={costCenter.costCenters}
+              onAssigned={costCenter.refetch}
+            />
           )}
           {canManage && (
             <Link
@@ -885,6 +939,7 @@ function TeamCard({
                     access={team.projectAccess[proj.id] ?? []}
                     organizationId={organizationId}
                     canManage={canManage}
+                    costCenter={costCenter}
                   />
                 ))
               )}

@@ -19,6 +19,7 @@ export function CostCenterPicker({
   value,
   costCenters,
   onAssigned,
+  width,
 }: {
   organizationId: string;
   kind: "user" | "team" | "project";
@@ -26,6 +27,12 @@ export function CostCenterPicker({
   value: string | null;
   costCenters: CostCenterOption[];
   onAssigned: () => Promise<unknown> | void;
+  /**
+   * Fixed width override. Members-table usage leaves this unset and relies on
+   * the min/max range; the compact labeled variant on the teams page passes a
+   * smaller fixed width.
+   */
+  width?: string;
 }) {
   const assignUser = api.costCenters.assignUser.useMutation();
   const assignTeam = api.costCenters.assignTeam.useMutation();
@@ -67,7 +74,11 @@ export function CostCenterPicker({
   };
 
   return (
-    <NativeSelect.Root size="sm" maxW="200px" disabled={isPending}>
+    <NativeSelect.Root
+      size="sm"
+      {...(width ? { width } : { minW: "160px", maxW: "220px" })}
+      disabled={isPending}
+    >
       <NativeSelect.Field
         value={value ?? ""}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>

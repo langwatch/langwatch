@@ -140,8 +140,13 @@ describe("cost-center assignment UI", () => {
       expect(
         screen.getByRole("link", { name: /People/i }).getAttribute("href"),
       ).toBe("/settings/members");
+      // Anchored to the link title: the Projects link now also mentions the
+      // "teams page" in its description and points to /settings/teams too.
       expect(
-        screen.getByRole("link", { name: /Teams/i }).getAttribute("href"),
+        screen.getByRole("link", { name: /^Teams/i }).getAttribute("href"),
+      ).toBe("/settings/teams");
+      expect(
+        screen.getByRole("link", { name: /^Projects/i }).getAttribute("href"),
       ).toBe("/settings/teams");
       // The per-person assignment list is gone: no <select> on the page.
       expect(document.querySelector("select")).toBeNull();

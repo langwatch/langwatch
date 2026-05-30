@@ -15,6 +15,12 @@ Feature: Backoffice User Impersonation Reason
     And the reason field accepts a single line of text
 
   @integration
+  Scenario: Impersonation dialog focuses the reason field on open
+    When the ops admin chooses to impersonate "Yoel Ernst"
+    Then the reason field is focused immediately
+    And the ops admin can type the reason without clicking into the field first
+
+  @integration
   Scenario: Enter submits a completed impersonation reason
     Given the ops admin has opened the impersonation dialog for "Yoel Ernst"
     And the reason field contains "support"

@@ -92,6 +92,12 @@ export function trackServerEvent({
 export async function shutdownPostHog(): Promise<void> {
   if (_posthogInstance) {
     logger.info("Shutting down PostHog client");
-    await _posthogInstance.shutdown();
+    const instance = _posthogInstance;
+    // Reset before awaiting so the next getPostHogInstance() rebuilds a fresh
+    // client rather than handing back the shut-down one. Harmless in prod
+    // (called once at exit) and load-bearing in tests, where one worker runs
+    // many files and a later file may evaluate a flag after this teardown.
+    _posthogInstance = undefined;
+    await instance.shutdown();
   }
 }

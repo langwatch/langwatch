@@ -41,7 +41,12 @@ export default function Index() {
     if (resolved.data?.destination) {
       // Explicit picker pin always wins. Only override the auto-detected
       // destination when the user has no pin AND their last visit was /me.
+      // Gate on governanceUiEnabled: /me is flag-gated and 404s for orgs
+      // without it, so never fall back there for a non-governance org (this
+      // is the admin's own localStorage leaking into an impersonated
+      // session — the impersonated customer must not be sent to /me).
       const detectedFallback =
+        resolved.data.governanceUiEnabled &&
         !resolved.data.isOverride &&
         lastVisitedHomeKind === "personal" &&
         resolved.data.destination !== "/me";

@@ -1,6 +1,11 @@
-import { useMemo } from "react";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { useCallback, useMemo } from "react";
 
+import { useDrawer } from "~/hooks/useDrawer";
+import { CLIENT_FLAG_STALE_TIME_MS } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { api } from "~/utils/api";
 
 import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
 
@@ -20,25 +25,63 @@ import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
  * entry above (rchaves caught this in dogfood). Same filter cascades to
  * projects since they iterate via the filtered team list.
  *
+ * The personal "My Workspace" entry is gated on the AI governance flag: it
+ * only renders when at least one of the user's organizations has
+ * `release_ui_ai_governance_enabled`, since /me 404s otherwise. Org-less
+ * users (no organizations at all) still see it — it is their only context.
+ *
+ * Each team carries `canCreateProject` (org or team admin) which drives the
+ * per-team "+ New project" affordance, wired here to the create-project
+ * drawer.
+ *
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
 export function useWorkspaceData(): Pick<
   WorkspaceSwitcherProps,
-  "personal" | "teams" | "projects"
+  "personal" | "teams" | "projects" | "onCreateProjectForTeam"
 > {
   const { organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  const { data: session } = useRequiredSession();
+  const userId = session?.user?.id;
+  const { openDrawer } = useDrawer();
 
-  return useMemo(() => {
-    const personal = {
-      kind: "personal" as const,
-      href: "/me",
-      label: "My Workspace",
-      subtitle: "Personal usage, personal budget",
-    };
+  const organizationIds = useMemo(
+    () => (organizations ?? []).map((org) => org.id),
+    [organizations],
+  );
 
+  const governanceQuery =
+    api.featureFlag.isEnabledForAnyOrganization.useQuery(
+      {
+        flag: "release_ui_ai_governance_enabled",
+        organizationIds,
+      },
+      {
+        enabled: organizationIds.length > 0,
+        staleTime: CLIENT_FLAG_STALE_TIME_MS,
+      },
+    );
+
+  // Hide the personal entry only when the user has organizations and none of
+  // them enable governance. Org-less users keep it — it is their only context.
+  const showPersonal =
+    organizationIds.length === 0 || (governanceQuery.data?.enabled ?? false);
+
+  const onCreateProjectForTeam = useCallback(
+    ({ teamId, orgId }: { teamId: string; orgId: string }) => {
+      openDrawer("createProject", {
+        navigateOnCreate: true,
+        defaultTeamId: teamId,
+        organizationId: orgId,
+      });
+    },
+    [openDrawer],
+  );
+
+  const { teams, projects } = useMemo(() => {
     // Personal teams never render in the team list — the top-level
     // "My Workspace" entry already covers the caller's own one, and
     // every other user's belongs only to them. Cascades to projects
@@ -46,18 +89,27 @@ export function useWorkspaceData(): Pick<
     const isVisibleTeam = (team: { isPersonal?: boolean }) => !team.isPersonal;
 
     const teams = (organizations ?? [])
-      .flatMap((org) =>
-        (org.teams ?? []).filter(isVisibleTeam).map((team) => ({
-          kind: "team" as const,
-          teamId: team.id,
-          teamSlug: team.slug,
-          orgId: org.id,
-          orgName: org.name,
-          orgSlug: org.slug,
-          href: `/settings/teams/${team.slug}`,
-          label: team.name,
-        })),
-      )
+      .flatMap((org) => {
+        const isOrgAdmin =
+          org.members?.find((m) => m.userId === userId)?.role ===
+          OrganizationUserRole.ADMIN;
+        return (org.teams ?? []).filter(isVisibleTeam).map((team) => {
+          const isTeamAdmin =
+            team.members?.find((m) => m.userId === userId)?.role ===
+            TeamUserRole.ADMIN;
+          return {
+            kind: "team" as const,
+            teamId: team.id,
+            teamSlug: team.slug,
+            orgId: org.id,
+            orgName: org.name,
+            orgSlug: org.slug,
+            href: `/settings/teams/${team.slug}`,
+            label: team.name,
+            canCreateProject: isOrgAdmin || isTeamAdmin,
+          };
+        });
+      })
       .sort((a, b) => a.label.localeCompare(b.label));
 
     const projects = (organizations ?? [])
@@ -78,6 +130,17 @@ export function useWorkspaceData(): Pick<
       )
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    return { personal, teams, projects };
-  }, [organizations]);
+    return { teams, projects };
+  }, [organizations, userId]);
+
+  const personal = showPersonal
+    ? {
+        kind: "personal" as const,
+        href: "/me",
+        label: "My Workspace",
+        subtitle: "Personal usage, personal budget",
+      }
+    : undefined;
+
+  return { personal, teams, projects, onCreateProjectForTeam };
 }

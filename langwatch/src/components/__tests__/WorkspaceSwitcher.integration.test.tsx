@@ -147,6 +147,92 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
+  describe("given a team the user can create projects in", () => {
+    /** @scenario The dropdown shows a per-team "Create project" button (admin-only) */
+    it("renders a + button that opens the create-project drawer scoped to that team", async () => {
+      const user = userEvent.setup();
+      const onCreateProjectForTeam = vi.fn();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      await user.click(addButton);
+
+      expect(onCreateProjectForTeam).toHaveBeenCalledWith({
+        teamId: "team_a",
+        orgId: "org_acme",
+      });
+    });
+
+    /** @scenario The "Create project" button is suppressed for non-admin members */
+    it("hides the + button when the user cannot create projects in the team", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: false }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /create project in/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("personal entry governance gate", () => {
+    /** @scenario The personal entry is hidden when no organization enables governance */
+    it("does not render the My Workspace entry when personal is omitted", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "team", teamId: "team_a" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // "Foo Project" is unique to the open dropdown (the trigger shows the
+      // current team), so finding it confirms the menu opened.
+      expect(await screen.findByText("Foo Project")).toBeInTheDocument();
+      expect(screen.queryByText("My Workspace")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The personal entry shows when any organization enables governance */
+    it("renders the My Workspace entry when personal is provided", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "team", teamId: "team_a" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      expect(
+        (await screen.findAllByText("My Workspace")).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
   describe("given an unknown current context", () => {
     it("falls back to a 'choose workspace' label", () => {
       renderSwitcher({
