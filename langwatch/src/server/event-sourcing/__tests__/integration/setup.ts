@@ -75,9 +75,20 @@ export async function setup(): Promise<void> {
  *    BullMQ workers that may still be completing (causes "Missing key for job" errors)
  */
 export async function teardown(): Promise<void> {
+  // Tagged so the CI log shows where in the shard-end pipeline a wedge,
+  // if any, actually stalls. Remove once the integration shard hang
+  // diagnostic is no longer needed.
+  // eslint-disable-next-line no-console
+  console.log("[teardown] stopTestContainers begin");
   await stopTestContainers();
+  // eslint-disable-next-line no-console
+  console.log("[teardown] closeAppRuntimeSingletons begin");
   await closeAppRuntimeSingletons();
+  // eslint-disable-next-line no-console
+  console.log("[teardown] unrefRemainingHandles begin");
   unrefRemainingHandles();
+  // eslint-disable-next-line no-console
+  console.log("[teardown] done");
 }
 
 /**
