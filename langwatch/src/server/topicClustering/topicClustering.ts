@@ -133,11 +133,34 @@ export const clusterTopicsForProject = async (
     "Final trace count for clustering",
   );
 
+  // Keep paging while the page was full, even if this batch had too few
+  // usable traces to cluster. Progress is driven by the page boundary
+  // (returnedCount / lastSort from the page CTE), not the post-filter usable
+  // count — older eligible traces can sit beyond a full page of empty-input
+  // (or already-clustered) traces, and stopping here would strand them.
+  const maybeScheduleNextPage = async () => {
+    if (!(returnedCount > 10 && lastSort)) return;
+    if (!scheduleNextPage) {
+      logger.info(
+        { projectId, lastTraceSort: lastSort },
+        "skipping scheduling next page for project",
+      );
+      return;
+    }
+    logger.info(
+      { projectId, lastTraceSort: lastSort },
+      "scheduling the next page for clustering",
+    );
+    await scheduleTopicClusteringNextPage(projectId, lastSort);
+  };
+
   if (traces.length < minimumTraces) {
     logger.info(
       { projectId },
-      `less than ${minimumTraces} traces found for project, skipping topic clustering`,
+      `less than ${minimumTraces} usable traces on this page, skipping clustering but still paging`,
     );
+    await maybeScheduleNextPage();
+    logger.info({ projectId }, "done! project");
     return;
   }
 
@@ -147,21 +170,7 @@ export const clusterTopicsForProject = async (
     await batchClusterTraces(project, traces);
   }
 
-  // If results are not close to empty, schedule the seek for next page
-  if (returnedCount > 10 && lastSort) {
-    logger.info(
-      { projectId, lastTraceSort: lastSort },
-      "scheduling the next page for clustering",
-    );
-    if (scheduleNextPage) {
-      await scheduleTopicClusteringNextPage(projectId, lastSort);
-    } else {
-      logger.info(
-        { projectId, lastTraceSort: lastSort },
-        "skipping scheduling next page for project",
-      );
-    }
-  }
+  await maybeScheduleNextPage();
 
   logger.info({ projectId }, "done! project");
 };
