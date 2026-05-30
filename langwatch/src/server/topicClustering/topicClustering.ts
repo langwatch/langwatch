@@ -133,11 +133,34 @@ export const clusterTopicsForProject = async (
     "Final trace count for clustering",
   );
 
+  // Keep paging while the page was full, even if this batch had too few
+  // usable traces to cluster. Progress is driven by the page boundary
+  // (returnedCount / lastSort from the page CTE), not the post-filter usable
+  // count — older eligible traces can sit beyond a full page of empty-input
+  // (or already-clustered) traces, and stopping here would strand them.
+  const maybeScheduleNextPage = async () => {
+    if (!(returnedCount > 10 && lastSort)) return;
+    if (!scheduleNextPage) {
+      logger.info(
+        { projectId, lastTraceSort: lastSort },
+        "skipping scheduling next page for project",
+      );
+      return;
+    }
+    logger.info(
+      { projectId, lastTraceSort: lastSort },
+      "scheduling the next page for clustering",
+    );
+    await scheduleTopicClusteringNextPage(projectId, lastSort);
+  };
+
   if (traces.length < minimumTraces) {
     logger.info(
       { projectId },
-      `less than ${minimumTraces} traces found for project, skipping topic clustering`,
+      `less than ${minimumTraces} usable traces on this page, skipping clustering but still paging`,
     );
+    await maybeScheduleNextPage();
+    logger.info({ projectId }, "done! project");
     return;
   }
 
@@ -147,21 +170,7 @@ export const clusterTopicsForProject = async (
     await batchClusterTraces(project, traces);
   }
 
-  // If results are not close to empty, schedule the seek for next page
-  if (returnedCount > 10 && lastSort) {
-    logger.info(
-      { projectId, lastTraceSort: lastSort },
-      "scheduling the next page for clustering",
-    );
-    if (scheduleNextPage) {
-      await scheduleTopicClusteringNextPage(projectId, lastSort);
-    } else {
-      logger.info(
-        { projectId, lastTraceSort: lastSort },
-        "skipping scheduling next page for project",
-      );
-    }
-  }
+  await maybeScheduleNextPage();
 
   logger.info({ projectId }, "done! project");
 };
@@ -226,7 +235,7 @@ async function fetchCountsFromClickHouse(
   };
 }
 
-async function fetchTracesFromClickHouse(
+export async function fetchTracesFromClickHouse(
   clickhouse: ClickHouseClient,
   projectId: string,
   isIncrementalProcessing: boolean,
@@ -236,45 +245,64 @@ async function fetchTracesFromClickHouse(
 ): Promise<TraceSearchResult> {
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
-  const baseConditions = [
-    "TenantId = {tenantId:String}",
-    "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
-    "OccurredAt < now64(3)",
-    "ComputedInput IS NOT NULL",
-    "ComputedInput != ''",
-  ];
-
-  const conditions = [...baseConditions];
+  // Page selection runs on the lightweight key columns only: it picks the
+  // 2000 most-recent matching traces without ever reading ComputedInput.
+  // ComputedInput (a potentially large payload) is read in the outer query
+  // for those <=2000 traces alone — never across the whole 12-month window,
+  // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
+  // and cursor predicates run against the latest version of each trace
+  // (argMax over UpdatedAt), so they live in the CTE's HAVING.
+  //
+  // The outer query deliberately does NOT filter on ComputedInput: empty /
+  // null inputs are dropped downstream by `extractInputFromComputed`, while
+  // the raw rows still carry the full page so `lastSort` (the pagination
+  // cursor) tracks the page boundary. Filtering here would advance the cursor
+  // by the surviving subset and could strand older eligible traces behind a
+  // run of empty-input traces.
+  const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
     // Must either not have any of the known topics, or not have any of the known subtopics
     const topicCondition =
       topicIds.length > 0
-        ? `(TopicId IS NULL OR TopicId NOT IN ({topicIds:Array(String)}))`
+        ? `(argMax(TopicId, UpdatedAt) IS NULL OR argMax(TopicId, UpdatedAt) NOT IN ({topicIds:Array(String)}))`
         : "1=1";
     const subtopicCondition =
       subtopicIds.length > 0
-        ? `(SubTopicId IS NULL OR SubTopicId NOT IN ({subtopicIds:Array(String)}))`
+        ? `(argMax(SubTopicId, UpdatedAt) IS NULL OR argMax(SubTopicId, UpdatedAt) NOT IN ({subtopicIds:Array(String)}))`
         : "1=1";
-    conditions.push(`(${topicCondition} OR ${subtopicCondition})`);
+    pageHaving.push(`(${topicCondition} OR ${subtopicCondition})`);
   }
 
   if (searchAfter) {
-    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here
-    conditions.push(`(
-      toUnixTimestamp64Milli(OccurredAt) < {lastTs:UInt64}
+    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here.
+    // Compare against the latest version's OccurredAt (argMax over UpdatedAt).
+    pageHaving.push(`(
+      toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) < {lastTs:UInt64}
       OR (
-        toUnixTimestamp64Milli(OccurredAt) = {lastTs:UInt64}
+        toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) = {lastTs:UInt64}
         AND TraceId > {lastTraceId:String}
       )
     )`);
   }
 
-  const baseWhereClause = baseConditions.join(" AND ");
-  const whereClause = conditions.join(" AND ");
+  const pageHavingClause = pageHaving.length
+    ? `HAVING ${pageHaving.join(" AND ")}`
+    : "";
 
   const result = await clickhouse.query({
     query: `
+      WITH page AS (
+        SELECT TraceId
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          AND OccurredAt < now64(3)
+        GROUP BY TenantId, TraceId
+        ${pageHavingClause}
+        ORDER BY argMax(OccurredAt, UpdatedAt) DESC, TraceId ASC
+        LIMIT 2000
+      )
       SELECT
         t.TraceId AS TraceId,
         t.ComputedInput AS ComputedInput,
@@ -282,11 +310,16 @@ async function fetchTracesFromClickHouse(
         t.SubTopicId AS SubTopicId,
         toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
       FROM trace_summaries t
-      WHERE ${whereClause}
+      WHERE TenantId = {tenantId:String}
+        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND OccurredAt < now64(3)
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
-          WHERE ${baseWhereClause}
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+            AND OccurredAt < now64(3)
+            AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
         )
       ORDER BY t.OccurredAt DESC, t.TraceId ASC
@@ -304,13 +337,28 @@ async function fetchTracesFromClickHouse(
     format: "JSONEachRow",
   });
 
-  const rows = (await result.json()) as Array<{
+  const rawRows = (await result.json()) as Array<{
     TraceId: string;
     ComputedInput: string;
     TopicId: string | null;
     SubTopicId: string | null;
     OccurredAtMs: string;
   }>;
+
+  // Defensive de-duplication by TraceId. The monotonic `UpdatedAt` invariant
+  // should make `(TenantId, TraceId, max(UpdatedAt))` match exactly one row per
+  // trace, but `returnedCount` / `lastSort` now drive pagination, so collapse
+  // any same-version duplicate here in JS rather than at the SQL layer — the
+  // per-key SQL dedup operator is banned in this path for OOM safety (it reads
+  // heavy columns for the whole granule; see trace-dedup-oom-safety.unit.test).
+  // Rows arrive ordered by `OccurredAt DESC, TraceId ASC`, so the first row per
+  // TraceId is the one the boundary cursor should land on.
+  const seenTraceIds = new Set<string>();
+  const rows = rawRows.filter((row) => {
+    if (seenTraceIds.has(row.TraceId)) return false;
+    seenTraceIds.add(row.TraceId);
+    return true;
+  });
 
   const traces: TopicClusteringTrace[] = rows
     .map((row) => {
