@@ -220,7 +220,7 @@ describe("WorkspaceSwitcher", () => {
       expect(screen.queryByText("Create project")).not.toBeInTheDocument();
     });
 
-    /** @scenario The "+" button is not in the menu's auto-focus reach on dropdown open */
+    /** @scenario The "+" button is not auto-focused on dropdown open */
     it("does not auto-focus the + button when the dropdown opens", async () => {
       const user = userEvent.setup();
       renderSwitcher({
