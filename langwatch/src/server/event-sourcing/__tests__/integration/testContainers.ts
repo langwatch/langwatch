@@ -135,24 +135,42 @@ export async function startTestContainers(): Promise<{
 export async function stopTestContainers(): Promise<void> {
   const errors: Error[] = [];
 
-  // Close ClickHouse client
+  // Close ClickHouse client. Bounded by a small timeout so a wedged
+  // HTTP keep-alive pool can't hold the shard's afterAll forever.
   if (clickHouseClient) {
+    const client = clickHouseClient;
+    clickHouseClient = null;
     try {
-      await clickHouseClient.close();
+      await Promise.race([
+        client.close(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
     } catch (e) {
       errors.push(e instanceof Error ? e : new Error(String(e)));
     }
-    clickHouseClient = null;
   }
 
-  // Close Redis connection
+  // Close Redis connection. quit() waits for pending replies, so a test
+  // that left a BRPOP/SUBSCRIBE on the shared test connection (BullMQ
+  // workers, groupQueue dispatchers) wedges the entire shard's teardown
+  // and stalls vitest's reporter. Race a quick quit() against a short
+  // timeout, then forcibly disconnect so the worker can exit either way.
   if (redisConnection) {
+    const conn = redisConnection;
+    redisConnection = null;
     try {
-      await redisConnection.quit();
+      await Promise.race([
+        conn.quit().catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
     } catch (e) {
       errors.push(e instanceof Error ? e : new Error(String(e)));
     }
-    redisConnection = null;
+    try {
+      conn.disconnect();
+    } catch {
+      // already disconnected
+    }
   }
 
   if (errors.length > 0) {
