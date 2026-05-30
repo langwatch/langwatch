@@ -67,6 +67,10 @@ vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
   }),
 }));
 
+vi.mock("../../../hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("../../../utils/api", () => ({
   api: {
     modelProvider: {

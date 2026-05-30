@@ -21,7 +21,6 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
-  authorizeInResolver,
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
@@ -139,6 +138,14 @@ export const modelProviderRouter = createTRPCRouter({
           .optional(),
         scopeType: z.enum(SCOPE_TIERS).optional(),
         scopeId: z.string().optional(),
+        // Advanced (Gateway) fields live on the same ModelProvider row.
+        // Accepted on the unified write path so the drawer ships one Save
+        // button across basic + advanced settings.
+        rateLimitRpm: z.number().int().min(0).nullable().optional(),
+        rateLimitTpm: z.number().int().min(0).nullable().optional(),
+        rateLimitRpd: z.number().int().min(0).nullable().optional(),
+        fallbackPriorityGlobal: z.number().int().nullable().optional(),
+        providerConfig: z.object({}).passthrough().nullable().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
@@ -162,6 +169,14 @@ export const modelProviderRouter = createTRPCRouter({
           scopes: input.scopes,
           scopeType: input.scopeType,
           scopeId: input.scopeId,
+          rateLimitRpm: input.rateLimitRpm,
+          rateLimitTpm: input.rateLimitTpm,
+          rateLimitRpd: input.rateLimitRpd,
+          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+          providerConfig: input.providerConfig as
+            | Record<string, unknown>
+            | null
+            | undefined,
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
@@ -214,42 +229,6 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
       return { managed: isManagedProvider(input.organizationId, input.provider) };
-    }),
-
-  /**
-   * Advanced gateway settings (rate limits, fallback priority, rotation
-   * policy, provider config) for a single ModelProvider. Split from the
-   * main `update` so the Advanced tab can ship its own payload without
-   * round-tripping the full provider (avoids reseeding credentials /
-   * scopes on every rate-limit tweak).
-   *
-   * Iter 110: fields landed on ModelProvider via S0 schema after
-   * GatewayProviderCredential was folded in. v1 ships MANUAL rotation
-   * only; AUTO + secret-store integration are v1.1 scope. Spec:
-   * specs/ai-gateway/gateway-provider-settings.feature.
-   */
-  updateAdvanced: protectedProcedure
-    .input(
-      z.object({
-        id: z.string().min(1),
-        rateLimitRpm: z.number().int().min(0).nullable().optional(),
-        rateLimitTpm: z.number().int().min(0).nullable().optional(),
-        rateLimitRpd: z.number().int().min(0).nullable().optional(),
-        fallbackPriorityGlobal: z.number().int().nullable().optional(),
-        rotationPolicy: z.enum(["MANUAL"]).optional(),
-        providerConfig: z.object({}).passthrough().nullable().optional(),
-      }),
-    )
-    // Scope authz is data-dependent (the provider's own scope set), so it
-    // runs inside updateAdvancedSettings; this satisfies the builder's
-    // fail-closed permission gate while keeping audit + domain-error.
-    .use(authorizeInResolver)
-    .mutation(async ({ input, ctx }) => {
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateAdvancedSettings(
-        { prisma: ctx.prisma, session: ctx.session },
-        input,
-      );
     }),
 
   /**

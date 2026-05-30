@@ -1,4 +1,5 @@
-import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@prisma/client";
+import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
@@ -177,6 +178,11 @@ export class ModelProviderRepository {
        * at `projectId`, matching the legacy iter-107 behavior.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
@@ -211,6 +217,28 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
+        ...(data.rateLimitRpm !== undefined && {
+          rateLimitRpm: data.rateLimitRpm,
+        }),
+        ...(data.rateLimitTpm !== undefined && {
+          rateLimitTpm: data.rateLimitTpm,
+        }),
+        ...(data.rateLimitRpd !== undefined && {
+          rateLimitRpd: data.rateLimitRpd,
+        }),
+        ...(data.fallbackPriorityGlobal !== undefined && {
+          fallbackPriorityGlobal: data.fallbackPriorityGlobal,
+        }),
+        ...(data.providerConfig !== undefined && {
+          // Explicit null on the input clears the column (Prisma.JsonNull
+          // writes DB null to a Json? field). Bare `null` is rejected by
+          // InputJsonValue, and `?? undefined` would silently turn a
+          // "clear me" into a no-op.
+          providerConfig:
+            data.providerConfig === null
+              ? Prisma.JsonNull
+              : (data.providerConfig as Prisma.InputJsonValue),
+        }),
         scopes: {
           create: scopes.map((scope) => ({
             id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
@@ -239,11 +267,16 @@ export class ModelProviderRepository {
        * inserted; when omitted the scope set is untouched.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
     const encryptedKeys = this.encryptCustomKeys(data.customKeys);
-    const { scopes, ...rest } = data;
+    const { scopes, providerConfig, ...rest } = data;
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
@@ -288,6 +321,12 @@ export class ModelProviderRepository {
           customEmbeddingsModels: data.customEmbeddingsModels as
             | Prisma.InputJsonValue
             | undefined,
+          ...(providerConfig !== undefined && {
+            providerConfig:
+              providerConfig === null
+                ? Prisma.JsonNull
+                : (providerConfig as Prisma.InputJsonValue),
+          }),
         },
         include: { scopes: true },
       });
