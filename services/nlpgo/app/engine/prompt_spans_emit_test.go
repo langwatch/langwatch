@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	testPromptConfigID    = "prompt_4RXLJtB9Cj-OA1BaLpxWc"
-	testPromptHandle      = "pizza-prompt"
-	testPromptVersionID   = "prompt_version_I21kDsHKtr5wQm9k1Dap2"
-	testPromptVersionNum  = 6
-	testPromptCreatedAt   = "2026-05-01T12:00:00Z"
+	testPromptConfigID   = "prompt_4RXLJtB9Cj-OA1BaLpxWc"
+	testPromptHandle     = "pizza-prompt"
+	testPromptVersionID  = "prompt_version_I21kDsHKtr5wQm9k1Dap2"
+	testPromptVersionNum = 6
+	testPromptCreatedAt  = "2026-05-01T12:00:00Z"
 )
 
 func signatureNodeWithPromptConfig(setup func(*dsl.Component)) *dsl.Node {
@@ -67,9 +67,9 @@ func TestEmitPromptSpans_SavedVersionEmitsBothSpansWithFullIdentity(t *testing.T
 	// PromptApiService.get: combined id + variables envelope.
 	getAttrs := attrMap(got.Attributes())
 	assert.Equal(t, "pizza-prompt:6", getAttrs["langwatch.prompt.id"])
-	assert.Equal(t,
+	assert.JSONEq(t,
 		`{"type":"json","value":{"prompt_id":"prompt_4RXLJtB9Cj-OA1BaLpxWc"}}`,
-		getAttrs["langwatch.prompt.variables"],
+		getAttrs["langwatch.prompt.variables"].(string),
 	)
 
 	// Prompt.compile: full 4-attr identity + variables + NO draft (saved).
@@ -78,9 +78,9 @@ func TestEmitPromptSpans_SavedVersionEmitsBothSpansWithFullIdentity(t *testing.T
 	assert.Equal(t, testPromptHandle, compileAttrs["langwatch.prompt.handle"])
 	assert.Equal(t, testPromptVersionID, compileAttrs["langwatch.prompt.version.id"])
 	assert.Equal(t, int64(6), compileAttrs["langwatch.prompt.version.number"])
-	assert.Equal(t,
+	assert.JSONEq(t,
 		`{"type":"json","value":{"input":"I want a refund"}}`,
-		compileAttrs["langwatch.prompt.variables"],
+		compileAttrs["langwatch.prompt.variables"].(string),
 	)
 	assert.NotContains(t, compileAttrs, "langwatch.prompt.draft",
 		"saved-version execution must OMIT langwatch.prompt.draft (not set to false) per python-sdk's _set_attribute_if_not_none convention")
@@ -134,9 +134,9 @@ func TestEmitPromptSpans_PartialIdentityOmitsCombinedId(t *testing.T) {
 	assert.NotContains(t, getAttrs, "langwatch.prompt.id",
 		"combined id must be omitted when version is unresolved")
 	// Variables envelope still emits with prompt_id input.
-	assert.Equal(t,
+	assert.JSONEq(t,
 		`{"type":"json","value":{"prompt_id":"prompt_4RXLJtB9Cj-OA1BaLpxWc"}}`,
-		getAttrs["langwatch.prompt.variables"],
+		getAttrs["langwatch.prompt.variables"].(string),
 	)
 
 	// Compile span: id + handle present, version.* absent.
@@ -160,7 +160,7 @@ func TestEmitPromptSpans_EmptyInputsRecordsEmptyVariablesMap(t *testing.T) {
 	require.Len(t, ended, 2)
 
 	compileAttrs := attrMap(ended[1].Attributes())
-	assert.Equal(t, `{"type":"json","value":{}}`, compileAttrs["langwatch.prompt.variables"])
+	assert.JSONEq(t, `{"type":"json","value":{}}`, compileAttrs["langwatch.prompt.variables"].(string))
 }
 
 // Regression for the 2026-05-17 prod report (#4094 post-merge dogfood):
@@ -190,9 +190,9 @@ func TestEmitPromptSpans_FiltersDispatchEnvelopeKeysFromCompileVariables(t *test
 	require.Len(t, ended, 2)
 
 	compileAttrs := attrMap(ended[1].Attributes())
-	assert.Equal(t,
+	assert.JSONEq(t,
 		`{"type":"json","value":{"example":"foobar","input":"how big is mars?"}}`,
-		compileAttrs["langwatch.prompt.variables"],
+		compileAttrs["langwatch.prompt.variables"].(string),
 		"messages + chat_messages are dispatch envelope and must be stripped from langwatch.prompt.variables; user vars (input, example) must survive",
 	)
 }

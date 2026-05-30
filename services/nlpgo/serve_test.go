@@ -84,7 +84,7 @@ func TestBuildServices_UvicornChildWorkerDoesNotBlockStart(t *testing.T) {
 		t.Fatalf("uvicorn-child worker not registered; got names %v", names(services))
 	}
 
-	// Run Start with a context that will never be cancelled until we
+	// Run Start with a context that will never be canceled until we
 	// say so. If startFn synchronously blocks (the regression we want
 	// to catch), Start won't return and the deadline below fires.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,4 +216,3 @@ func names(services []lifecycle.Service) []string {
 	}
 	return out
 }
-

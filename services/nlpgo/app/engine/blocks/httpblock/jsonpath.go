@@ -14,12 +14,13 @@ import (
 //
 // Supported syntax (a subset of JSONPath, sized for the workflows we
 // observe in the Python tests):
-//   $                     — root
-//   $.foo                 — child key
-//   $.foo.bar.baz         — nested keys
-//   $.items[0]            — numeric index
-//   $.items[*]            — every element
-//   $.items[*].id         — every element's "id" key
+//
+//	$                     — root
+//	$.foo                 — child key
+//	$.foo.bar.baz         — nested keys
+//	$.items[0]            — numeric index
+//	$.items[*]            — every element
+//	$.items[*].id         — every element's "id" key
 //
 // Anything outside this subset returns an error.
 func ExtractJSONPath(data any, path string) (any, error) {

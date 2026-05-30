@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -506,7 +507,7 @@ func TestExecute_GatewayNon2xxReturnsTypedError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *GatewayHTTPError, got %T", err)
 	}
-	if herr.StatusCode != 401 {
+	if herr.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", herr.StatusCode)
 	}
 	if !strings.Contains(string(herr.Body), "auth_failed") {

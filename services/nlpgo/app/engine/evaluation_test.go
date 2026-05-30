@@ -183,8 +183,8 @@ func TestSelectEvaluationEntries_TestSizeRespected(t *testing.T) {
 	wf := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
-				TrainSize: ptrFloat(0.5),  // 5 rows
-				TestSize:  ptrFloat(0.2),  // 2 rows (not 5)
+				TrainSize: ptrFloat(0.5), // 5 rows
+				TestSize:  ptrFloat(0.2), // 2 rows (not 5)
 				Dataset: &dsl.NodeDataset{Inline: &dsl.DatasetInline{
 					Records: map[string][]any{"q": {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
 				}},

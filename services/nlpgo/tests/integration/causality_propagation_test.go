@@ -117,11 +117,11 @@ func installProductionTracerStack(t *testing.T) *tracetest.SpanRecorder {
 // We snapshot exactly what we'll assert against — header values and the
 // body — so the test stays decoupled from the http.Request lifecycle.
 type capturedRequest struct {
-	path                string
-	traceparent         string
-	baggage             string
-	depthHeader         string
-	xLangwatchTraceID   string
+	path              string
+	traceparent       string
+	baggage           string
+	depthHeader       string
+	xLangwatchTraceID string
 }
 
 func setupCausalityStack(t *testing.T) (url string, captured *[]capturedRequest) {

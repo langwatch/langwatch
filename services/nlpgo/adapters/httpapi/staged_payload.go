@@ -95,11 +95,11 @@ func fetchStagedPayload(ctx context.Context, client *http.Client, raw string, ma
 	if client == nil {
 		client = http.DefaultClient
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil) //nolint:gosec // url is validated by validateStagedPayloadURL above (https + AWS S3 host only)
 	if err != nil {
 		return nil, fmt.Errorf("build staged payload request: %w", err)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // url is validated by validateStagedPayloadURL above (https + AWS S3 host only)
 	if err != nil {
 		return nil, fmt.Errorf("fetch staged payload: %w", err)
 	}

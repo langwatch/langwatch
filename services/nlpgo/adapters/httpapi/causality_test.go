@@ -27,7 +27,7 @@ func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	r := httptest.NewRequest("POST", "/", nil)
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	r.Header.Set(CausalityDepthHeader, "3")
 
 	ctx := applyInboundCausality(context.Background(), r)
@@ -47,7 +47,7 @@ func TestApplyInboundCausality_MissingHeader_NoStamp(t *testing.T) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	r := httptest.NewRequest("POST", "/", nil)
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	ctx := applyInboundCausality(context.Background(), r)
 
@@ -62,7 +62,7 @@ func TestApplyInboundCausality_NegativeHeader_TreatedAsZero(t *testing.T) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	r := httptest.NewRequest("POST", "/", nil)
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	r.Header.Set(CausalityDepthHeader, "-5")
 
 	ctx := applyInboundCausality(context.Background(), r)
@@ -81,7 +81,7 @@ func TestApplyInboundCausality_HeaderZero_StampsOne(t *testing.T) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	r := httptest.NewRequest("POST", "/", nil)
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	r.Header.Set(CausalityDepthHeader, "0")
 
 	ctx := applyInboundCausality(context.Background(), r)
@@ -97,7 +97,7 @@ func TestApplyInboundCausality_ExtractsTraceparent(t *testing.T) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	r := httptest.NewRequest("POST", "/", nil)
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	traceID := "0af7651916cd43dd8448eb211c80319c"
 	spanID := "b7ad6b7169203331"
 	r.Header.Set("traceparent", "00-"+traceID+"-"+spanID+"-01")

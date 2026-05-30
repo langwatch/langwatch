@@ -16,12 +16,12 @@ import (
 // captureCall is a one-shot httptest fixture that records the inbound
 // request and replies with whatever the test wants.
 type captureCall struct {
-	method        string
-	path          string
-	authToken     string
-	traceID       string
-	origin        string
-	requestBody   map[string]any
+	method      string
+	path        string
+	authToken   string
+	traceID     string
+	origin      string
+	requestBody map[string]any
 }
 
 func newServer(t *testing.T, status int, response any, capture *captureCall) *httptest.Server {
@@ -184,7 +184,7 @@ func TestExecute_ErrorResultStatusErrorAndDetails(t *testing.T) {
 
 func TestExecute_NonJSONErrorBodyPropagatesAsHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("internal server error"))
 	}))
 	defer srv.Close()
@@ -203,7 +203,7 @@ func TestExecute_NonJSONErrorBodyPropagatesAsHTTPError(t *testing.T) {
 	if !errors.As(err, &httpErr) {
 		t.Fatalf("Execute: error = %v, want *HTTPError", err)
 	}
-	if httpErr.StatusCode != 500 {
+	if httpErr.StatusCode != http.StatusInternalServerError {
 		t.Errorf("StatusCode = %d, want 500", httpErr.StatusCode)
 	}
 	if !strings.Contains(httpErr.Body, "internal server error") {
