@@ -136,8 +136,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
-    description: "Reveals the AI Gateway menu in the project sidebar.",
+    defaultValue: true,
+    description:
+      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
   {
     key: "release_ui_ai_governance_enabled",
