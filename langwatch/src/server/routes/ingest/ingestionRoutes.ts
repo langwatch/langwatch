@@ -31,7 +31,7 @@
  *      OCSF read projection (SIEM export) on top of the unified store.
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 import type {
   IExportLogsServiceRequest,
@@ -261,7 +261,8 @@ async function extractCostEventsForSource(input: {
   }
 }
 
-export const app = new Hono().basePath("/api/ingest");
+const secured = createServiceApp({ basePath: "/api/ingest" });
+const ingestAuth = handlerManagedAuth("ingestion source bearer secret resolved in-handler via authIngestionSource");
 
 /**
  * Resolve `Authorization: Bearer <secret>` against IngestionSource.
@@ -326,7 +327,7 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
 //   - receiver-shapes.feature (Lane-S)
 //   - architecture-invariants.feature (Lane-B)
 // ---------------------------------------------------------------------------
-app.post("/otel/:sourceId", async (c: Context) => {
+secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -445,7 +446,7 @@ app.post("/otel/:sourceId", async (c: Context) => {
 //   - receiver-shapes.feature flat-event scenarios
 //   - architecture-invariants.feature unified-substrate scenarios
 // ---------------------------------------------------------------------------
-app.post("/webhook/:sourceId", async (c: Context) => {
+secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -539,7 +540,7 @@ app.post("/webhook/:sourceId", async (c: Context) => {
 //
 // Spec: docs/ai-governance/ingestion-sources/claude-code-otlp.feature
 // ---------------------------------------------------------------------------
-app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
+secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: Context) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -788,7 +789,7 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
   return c.json(responseBody, 202);
 });
 
-app.post("/otel/:sourceId/v1/metrics", async (c: Context) => {
+secured.access(ingestAuth).post("/otel/:sourceId/v1/metrics", async (c: Context) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -849,3 +850,5 @@ app.post("/otel/:sourceId/v1/metrics", async (c: Context) => {
   if (parseHint) responseBody.hint = parseHint;
   return c.json(responseBody, 202);
 });
+
+export const app = secured.hono;

@@ -10,9 +10,6 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
@@ -35,6 +32,7 @@ import {
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -43,9 +41,9 @@ const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
 const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
-export const app = new Hono().basePath("/api/otel/v1");
-app.use(tracerMiddleware({ name: "otel-v1" }));
-app.use(loggerMiddleware());
+const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
+
+const secured = createServiceApp({ basePath: "/api/otel/v1" });
 
 // ── shared auth + limit check ────────────────────────────────────────
 
@@ -122,7 +120,7 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+  // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.
   try {
     await enforceApiKeyCeiling({
@@ -262,7 +260,7 @@ export function peekCustomerTraceIds(
 
 // ── POST /traces ─────────────────────────────────────────────────────
 
-app.post("/traces", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.traces");
 
   return tracer.withActiveSpan(
@@ -344,7 +342,7 @@ app.post("/traces", async (c) => {
       }
       const traceRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
@@ -388,7 +386,7 @@ app.post("/traces", async (c) => {
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
-app.post("/logs", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.logs");
 
   return tracer.withActiveSpan(
@@ -440,7 +438,7 @@ app.post("/logs", async (c) => {
       }
       const logRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
@@ -467,7 +465,7 @@ app.post("/logs", async (c) => {
 
 // ── POST /metrics ────────────────────────────────────────────────────
 
-app.post("/metrics", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
   return tracer.withActiveSpan(
@@ -519,7 +517,7 @@ app.post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
-      // Body successfully parsed — mark PAT as used
+      // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
@@ -534,3 +532,5 @@ app.post("/metrics", async (c) => {
     },
   );
 });
+
+export const app = secured.hono;

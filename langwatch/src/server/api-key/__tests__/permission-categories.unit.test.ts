@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { Resources } from "../../api/rbac";
+import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
 import {
-  PERMISSION_CATEGORIES,
   categoryPermissions,
   computePermissionsFromSelections,
+  PERMISSION_CATEGORIES,
   selectionsFromPermissions,
 } from "../permission-categories";
-import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
-import { Resources } from "../../api/rbac";
 
 const RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES = new Set<string>([
   Resources.ORGANIZATION,
@@ -35,9 +35,14 @@ describe("PERMISSION_CATEGORIES", () => {
     const categoryResources = new Set(PERMISSION_CATEGORIES.map((c) => c.key));
     const allResources = Object.values(Resources);
     const uncovered = allResources.filter(
-      (r) => !categoryResources.has(r) && !RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES.has(r),
+      (r) =>
+        !categoryResources.has(r) &&
+        !RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES.has(r),
     );
-    expect(uncovered, "Resources missing from PERMISSION_CATEGORIES — add a category or mark as excluded").toEqual([]);
+    expect(
+      uncovered,
+      "Resources missing from PERMISSION_CATEGORIES — add a category or mark as excluded",
+    ).toEqual([]);
   });
 
   /** @scenario Permission categories include all platform resources */
@@ -57,6 +62,7 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Datasets", accessLevels: "read, write" },
       { category: "Triggers", accessLevels: "read, write" },
       { category: "Workflows", accessLevels: "read, write" },
+      { category: "Experiments", accessLevels: "read, write" },
       { category: "Prompts", accessLevels: "read, write" },
       { category: "Secrets", accessLevels: "read, write" },
       { category: "Audit Log", accessLevels: "read" },
@@ -122,6 +128,10 @@ describe("categoryPermissions()", () => {
           category: "Workflows",
           permissions: "workflows:view, workflows:manage",
         },
+        {
+          category: "Experiments",
+          permissions: "experiments:view, experiments:manage",
+        },
         { category: "Prompts", permissions: "prompts:view, prompts:manage" },
         { category: "Secrets", permissions: "secrets:view, secrets:manage" },
         { category: "Team", permissions: "team:view, team:manage" },
@@ -136,7 +146,9 @@ describe("categoryPermissions()", () => {
 
   describe("when key is unknown", () => {
     it("returns empty array", () => {
-      expect(categoryPermissions({ key: "nonexistent", level: "read" })).toEqual([]);
+      expect(
+        categoryPermissions({ key: "nonexistent", level: "read" }),
+      ).toEqual([]);
     });
   });
 });
@@ -145,7 +157,9 @@ describe("computePermissionsFromSelections()", () => {
   describe("when all categories are none", () => {
     /** @scenario Selecting no categories produces an empty permission set */
     it("returns an empty array", () => {
-      expect(computePermissionsFromSelections({ traces: "none", cost: "none" })).toEqual([]);
+      expect(
+        computePermissionsFromSelections({ traces: "none", cost: "none" }),
+      ).toEqual([]);
     });
   });
 
@@ -223,9 +237,7 @@ describe("contract: computePermissionsFromSelections → CustomRolePermissionsSc
     it("produces permissions that pass the CustomRolePermissionsSchema", () => {
       const allMax: Record<string, "read" | "write"> = {};
       for (const cat of PERMISSION_CATEGORIES) {
-        allMax[cat.key] = cat.accessLevels.includes("write")
-          ? "write"
-          : "read";
+        allMax[cat.key] = cat.accessLevels.includes("write") ? "write" : "read";
       }
 
       const permissions = computePermissionsFromSelections(allMax);
@@ -243,7 +255,10 @@ describe("contract: computePermissionsFromSelections → CustomRolePermissionsSc
         });
         const result = CustomRolePermissionsSchema.safeParse(permissions);
 
-        expect(result.success, `${cat.key} read permissions failed schema: ${JSON.stringify(permissions)}`).toBe(true);
+        expect(
+          result.success,
+          `${cat.key} read permissions failed schema: ${JSON.stringify(permissions)}`,
+        ).toBe(true);
       }
     });
   });
@@ -258,7 +273,10 @@ describe("contract: computePermissionsFromSelections → CustomRolePermissionsSc
         });
         const result = CustomRolePermissionsSchema.safeParse(permissions);
 
-        expect(result.success, `${cat.key} write permissions failed schema: ${JSON.stringify(permissions)}`).toBe(true);
+        expect(
+          result.success,
+          `${cat.key} write permissions failed schema: ${JSON.stringify(permissions)}`,
+        ).toBe(true);
       }
     });
   });

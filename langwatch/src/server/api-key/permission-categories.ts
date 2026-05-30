@@ -80,6 +80,13 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: ["workflows:view", "workflows:manage"],
   },
   {
+    key: "experiments",
+    label: "Experiments",
+    accessLevels: ["read", "write"],
+    readPermissions: ["experiments:view"],
+    writePermissions: ["experiments:view", "experiments:manage"],
+  },
+  {
     key: "prompts",
     label: "Prompts",
     accessLevels: ["read", "write"],
@@ -131,7 +138,9 @@ export function categoryPermissions({
 }): Permission[] {
   const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
   if (!category) return [];
-  return level === "write" ? category.writePermissions : category.readPermissions;
+  return level === "write"
+    ? category.writePermissions
+    : category.readPermissions;
 }
 
 export function computePermissionsFromSelections(

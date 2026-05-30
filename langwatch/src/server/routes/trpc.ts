@@ -10,8 +10,8 @@
  */
 
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
-import { Hono } from "hono";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { getServerAuthSession } from "~/server/auth";
 
@@ -27,7 +27,7 @@ async function getAppRouter() {
   return _appRouter;
 }
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
  * Build a minimal NextApiRequest-shaped shim from a web Request.
@@ -93,5 +93,11 @@ const handler = async (c: { req: { raw: Request } }) => {
   });
 };
 
-app.get("/trpc/*", handler);
-app.post("/trpc/*", handler);
+secured.access(
+  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
+).get("/trpc/*", handler);
+secured.access(
+  handlerManagedAuth("tRPC enforces per-procedure RBAC internally"),
+).post("/trpc/*", handler);
+
+export const app = secured.hono;

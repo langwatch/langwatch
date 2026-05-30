@@ -14,9 +14,7 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -27,11 +25,11 @@ import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:dataset:generate");
 
-export const app = new Hono().basePath("/api/dataset");
-app.use(tracerMiddleware({ name: "dataset-generate" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/dataset" });
 
-app.post("/generate", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/generate", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -110,3 +108,5 @@ ${dataset}`,
     headers: response.headers,
   });
 });
+
+export const app = secured.hono;

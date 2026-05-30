@@ -14,8 +14,8 @@
  * 7. Handles cleanup on client disconnect
  */
 
-import { Hono } from "hono";
 import superjson from "superjson";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
 let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
 async function getAppRouter() {
@@ -31,7 +31,7 @@ import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:sse");
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
  * Build a minimal NextApiRequest-shaped shim from a web Request.
@@ -65,7 +65,9 @@ function buildReqShim(req: Request): any {
   } as any;
 }
 
-app.get("/sse/*", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).get("/sse/*", async (c) => {
   const raw = c.req.raw;
   const url = new URL(raw.url);
 
@@ -236,3 +238,5 @@ app.get("/sse/*", async (c) => {
     headers: c.res.headers,
   });
 });
+
+export const app = secured.hono;

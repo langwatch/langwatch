@@ -1,15 +1,13 @@
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  type OrganizationMiddlewareVariables,
-  organizationMiddleware,
-} from "../../middleware";
+import type { AuthMiddlewareVariables } from "../../middleware/auth";
+import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
+import { organizationMiddleware } from "../../middleware";
 import {
   type ModelProviderServiceMiddlewareVariables,
   modelProviderServiceMiddleware,
@@ -24,22 +22,24 @@ const logger = createLogger("langwatch:api:model-providers");
 
 patchZodOpenapi();
 
-type Variables = ModelProviderServiceMiddlewareVariables &
-  AuthMiddlewareVariables &
+export type ModelProviderAppVariables = AuthMiddlewareVariables &
+  ModelProviderServiceMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
+export function registerModelProviderRoutes(
+  secured: SecuredApp<{ Variables: ModelProviderAppVariables }>,
+): void {
+  // organizationMiddleware + modelProviderServiceMiddleware run AFTER the
+  // access chain (which authenticates and sets `project`), so they are
+  // applied per-route rather than app-wide.
 
-// Middleware
-app.use("/*", organizationMiddleware);
-app.use("/*", modelProviderServiceMiddleware);
-
-// List all model providers
-app.get(
-  "/",
-  describeRoute({
+  // List all model providers — read scope, mirrors the tRPC modelProviders
+  // getAll (project:view).
+  secured.access(requires("project:view")).get(
+    "/",
+    organizationMiddleware,
+    modelProviderServiceMiddleware,
+    describeRoute({
     description: "List all model providers for a project with masked API keys",
     responses: {
       ...baseResponses,
@@ -70,11 +70,14 @@ app.get(
   },
 );
 
-// Upsert a model provider
-app.put(
-  "/:provider",
-  describeRoute({
-    description: "Create or update a model provider",
+  // Upsert a model provider — write scope, mirrors the tRPC modelProviders
+  // update (project:update).
+  secured.access(requires("project:update")).put(
+    "/:provider",
+    organizationMiddleware,
+    modelProviderServiceMiddleware,
+    describeRoute({
+      description: "Create or update a model provider",
     responses: {
       ...baseResponses,
       200: {
@@ -148,4 +151,5 @@ app.put(
 
     return c.json(apiResponseModelProvidersSchema.parse(providers));
   },
-);
+  );
+}

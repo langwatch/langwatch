@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -7,18 +6,12 @@ import { z } from "zod";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
+import { type createProjectApp, requires } from "~/server/api/security";
 import { createLogger } from "~/utils/logger/server";
-import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:analytics");
-
-type Variables = AuthMiddlewareVariables;
-
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
 
 // Body schema: combine shared filters + timeseries series input, but
 // omit projectId (comes from auth) and allow ISO string dates alongside epoch numbers.
@@ -30,10 +23,14 @@ const analyticsBodySchema = sharedFiltersInputSchema
     endDate: flexibleDateSchema,
   });
 
-// POST /timeseries - Query analytics timeseries
-app.post(
-  "/timeseries",
-  describeRoute({
+export function registerAnalyticsRoutes(
+  secured: ReturnType<typeof createProjectApp>,
+): void {
+  // POST /timeseries - Query analytics timeseries. Read scope: analytics:view
+  // (mirrors the tRPC analytics router + the dashboards/graphs sibling apps).
+  secured.access(requires("analytics:view")).post(
+    "/timeseries",
+    describeRoute({
     description:
       "Query analytics timeseries data with metrics, aggregations, and filters",
     responses: {
@@ -79,4 +76,5 @@ app.post(
       throw e;
     }
   },
-);
+  );
+}

@@ -27,7 +27,7 @@ import {
   PLATFORM_OPTIONS,
 } from "~/features/onboarding/regions/observability/ui-options";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { PatIntegrationInfoCard } from "./PatIntegrationInfoCard";
+import { ApiKeyIntegrationInfoCard } from "./ApiKeyIntegrationInfoCard";
 
 type Segment = "skill" | "mcp" | "prompt" | "manually";
 
@@ -147,12 +147,12 @@ export function IntegrateDrawer({
         <Drawer.Body>
           <ActiveProjectProvider value={activeProjectContext}>
             <VStack align="stretch" gap={6}>
-              {/* PAT generator at the top of the drawer — minting a
+              {/* API key generator at the top of the drawer — minting a
                   token is the first step of integration. The lifted
                   onboarding screens below read the token via
                   ActiveProjectProvider, so they automatically pick up
                   the freshly-scoped credential. */}
-              <PatIntegrationInfoCard
+              <ApiKeyIntegrationInfoCard
                 organizationId={organization.id}
                 projectId={project.id}
                 token={token}

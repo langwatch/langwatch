@@ -1,5 +1,5 @@
 /**
- * TokenCreatedDialog — shown immediately after a PAT is minted.
+ * TokenCreatedDialog — shown immediately after an API key is minted.
  *
  * Renders four sections:
  *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox

@@ -100,6 +100,21 @@ Feature: Multi-scope model cost overrides
     When the caller sets a project-level custom cost for "web-app"
     Then the write succeeds
 
+  @integration
+  Scenario: createOrUpdate rejects re-anchoring a cost row the caller does not own
+    Given an existing project-level cost row owned by organization "acme"
+    And a caller who manages a project in a different organization
+    When the caller calls createOrUpdate with that row's id but their own scope
+    Then the write is forbidden
+    And the row keeps its original organization, scope, and model
+
+  @integration
+  Scenario: createOrUpdate updates a cost row when the caller manages its current scope
+    Given an existing project-level cost row in the caller's organization
+    And a caller who manages that project
+    When the caller calls createOrUpdate with the row's id and scope
+    Then the write succeeds
+
   # ────────────────────────────────────────────────────────────────────────────
   # Migration
   # ────────────────────────────────────────────────────────────────────────────

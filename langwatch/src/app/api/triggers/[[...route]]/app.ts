@@ -1,30 +1,21 @@
 import type { Prisma, Trigger } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { createProjectApp, requires } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { handleError } from "../../middleware";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:triggers");
-
-type Variables = AuthMiddlewareVariables;
 
 const triggerActionEnum = z.enum([
   "SEND_EMAIL",
@@ -96,256 +87,255 @@ function toTriggerResponse(trigger: Trigger) {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/triggers")
-  .use(tracerMiddleware({ name: "triggers" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/triggers" });
 
-  // ── List Triggers ──────────────────────────────────────────
-  .get(
-    "/",
-    requirePermission("triggers:view"),
-    describeRoute({
-      description: "List all active triggers (automations) for the project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(triggerResponseWithPlatformUrlSchema)),
-            },
+// ── List Triggers ──────────────────────────────────────────
+secured.access(requires("triggers:view")).get(
+  "/",
+  describeRoute({
+    description: "List all active triggers (automations) for the project",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(z.array(triggerResponseWithPlatformUrlSchema)),
           },
         },
       },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      logger.info({ projectId: project.id }, "Listing triggers");
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    logger.info({ projectId: project.id }, "Listing triggers");
 
-      const triggers = await prisma.trigger.findMany({
-        where: { projectId: project.id, deleted: false },
-        orderBy: { createdAt: "desc" },
-      });
+    const triggers = await prisma.trigger.findMany({
+      where: { projectId: project.id, deleted: false },
+      orderBy: { createdAt: "desc" },
+    });
 
-      return c.json(triggers.map((t) => ({
+    return c.json(
+      triggers.map((t) => ({
         ...toTriggerResponse(t),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${t.id}`,
         }),
-      })));
-    },
-  )
+      })),
+    );
+  },
+);
 
-  // ── Get Trigger ────────────────────────────────────────────
-  .get(
-    "/:id",
-    requirePermission("triggers:view"),
-    describeRoute({
-      description: "Get a trigger by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
+// ── Get Trigger ────────────────────────────────────────────
+secured.access(requires("triggers:view")).get(
+  "/:id",
+  describeRoute({
+    description: "Get a trigger by its ID",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(triggerResponseWithPlatformUrlSchema),
           },
         },
       },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, triggerId: id }, "Getting trigger");
+      404: {
+        description: "Trigger not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { id } = c.req.param();
+    logger.info({ projectId: project.id, triggerId: id }, "Getting trigger");
 
-      const trigger = await prisma.trigger.findFirst({
-        where: { id, projectId: project.id, deleted: false },
-      });
+    const trigger = await prisma.trigger.findFirst({
+      where: { id, projectId: project.id, deleted: false },
+    });
 
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
+    if (!trigger) {
+      return c.json({ error: "Trigger not found" }, 404);
+    }
 
-      return c.json({
+    return c.json({
+      ...toTriggerResponse(trigger),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+      }),
+    });
+  },
+);
+
+// ── Create Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).post(
+  "/",
+  resourceLimitMiddleware("automations"),
+  describeRoute({
+    description: "Create a new trigger (automation)",
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Trigger created",
+        content: {
+          "application/json": {
+            schema: resolver(triggerResponseWithPlatformUrlSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", createTriggerSchema),
+  async (c) => {
+    const project = c.get("project");
+    const body = c.req.valid("json");
+    logger.info({ projectId: project.id }, "Creating trigger");
+
+    const trigger = await prisma.trigger.create({
+      data: {
+        id: nanoid(),
+        name: body.name,
+        action: body.action,
+        actionParams: body.actionParams as Prisma.InputJsonValue,
+        filters: JSON.stringify(body.filters),
+        projectId: project.id,
+        lastRunAt: new Date().getTime(),
+        message: body.message ?? null,
+        alertType: body.alertType ?? null,
+      },
+    });
+
+    await getApp().triggers.invalidate(project.id);
+
+    return c.json(
+      {
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
         }),
-      });
-    },
-  )
+      },
+      201,
+    );
+  },
+);
 
-  // ── Create Trigger ─────────────────────────────────────────
-  .post(
-    "/",
-    requirePermission("triggers:manage"),
-    resourceLimitMiddleware("automations"),
-    describeRoute({
-      description: "Create a new trigger (automation)",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Trigger created",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
+// ── Update Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).patch(
+  "/:id",
+  describeRoute({
+    description: "Update a trigger (name, active state, message, filters)",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Trigger updated",
+        content: {
+          "application/json": {
+            schema: resolver(triggerResponseWithPlatformUrlSchema),
           },
         },
       },
-    }),
-    zValidator("json", createTriggerSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id }, "Creating trigger");
-
-      const trigger = await prisma.trigger.create({
-        data: {
-          id: nanoid(),
-          name: body.name,
-          action: body.action,
-          actionParams: body.actionParams as Prisma.InputJsonValue,
-          filters: JSON.stringify(body.filters),
-          projectId: project.id,
-          lastRunAt: new Date().getTime(),
-          message: body.message ?? null,
-          alertType: body.alertType ?? null,
+      404: {
+        description: "Trigger not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
         },
-      });
-
-      await getApp().triggers.invalidate(project.id);
-
-      return c.json({
-        ...toTriggerResponse(trigger),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
-        }),
-      }, 201);
+      },
     },
-  )
+  }),
+  zValidator("json", updateTriggerSchema),
+  async (c) => {
+    const project = c.get("project");
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+    logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
 
-  // ── Update Trigger ─────────────────────────────────────────
-  .patch(
-    "/:id",
-    requirePermission("triggers:manage"),
-    describeRoute({
-      description: "Update a trigger (name, active state, message, filters)",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Trigger updated",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
+    const trigger = await prisma.trigger.findFirst({
+      where: { id, projectId: project.id, deleted: false },
+    });
+
+    if (!trigger) {
+      return c.json({ error: "Trigger not found" }, 404);
+    }
+
+    const data: Record<string, unknown> = {};
+    if (body.name !== undefined) data.name = body.name;
+    if (body.active !== undefined) data.active = body.active;
+    if (body.message !== undefined) data.message = body.message;
+    if (body.alertType !== undefined) data.alertType = body.alertType;
+    if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
+    if (body.actionParams !== undefined) data.actionParams = body.actionParams;
+
+    const updated = await prisma.trigger.update({
+      where: { id, projectId: project.id },
+      data,
+    });
+
+    await getApp().triggers.invalidate(project.id);
+
+    return c.json({
+      ...toTriggerResponse(updated),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
+      }),
+    });
+  },
+);
+
+// ── Delete Trigger ─────────────────────────────────────────
+secured.access(requires("triggers:manage")).delete(
+  "/:id",
+  describeRoute({
+    description: "Delete (soft-delete) a trigger",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Trigger deleted",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({ id: z.string(), deleted: z.boolean() }),
+            ),
           },
         },
       },
-    }),
-    zValidator("json", updateTriggerSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
-
-      const trigger = await prisma.trigger.findFirst({
-        where: { id, projectId: project.id, deleted: false },
-      });
-
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
-
-      const data: Record<string, unknown> = {};
-      if (body.name !== undefined) data.name = body.name;
-      if (body.active !== undefined) data.active = body.active;
-      if (body.message !== undefined) data.message = body.message;
-      if (body.alertType !== undefined) data.alertType = body.alertType;
-      if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
-      if (body.actionParams !== undefined) data.actionParams = body.actionParams;
-
-      const updated = await prisma.trigger.update({
-        where: { id, projectId: project.id },
-        data,
-      });
-
-      await getApp().triggers.invalidate(project.id);
-
-      return c.json({
-        ...toTriggerResponse(updated),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
-        }),
-      });
-    },
-  )
-
-  // ── Delete Trigger ─────────────────────────────────────────
-  .delete(
-    "/:id",
-    requirePermission("triggers:manage"),
-    describeRoute({
-      description: "Delete (soft-delete) a trigger",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Trigger deleted",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
+      404: {
+        description: "Trigger not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
         },
       },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, triggerId: id }, "Deleting trigger");
-
-      const trigger = await prisma.trigger.findFirst({
-        where: { id, projectId: project.id, deleted: false },
-      });
-
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
-
-      await prisma.trigger.update({
-        where: { id, projectId: project.id },
-        data: { deleted: true, active: false },
-      });
-
-      await getApp().triggers.invalidate(project.id);
-
-      return c.json({ id, deleted: true });
     },
-  );
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { id } = c.req.param();
+    logger.info({ projectId: project.id, triggerId: id }, "Deleting trigger");
+
+    const trigger = await prisma.trigger.findFirst({
+      where: { id, projectId: project.id, deleted: false },
+    });
+
+    if (!trigger) {
+      return c.json({ error: "Trigger not found" }, 404);
+    }
+
+    await prisma.trigger.update({
+      where: { id, projectId: project.id },
+      data: { deleted: true, active: false },
+    });
+
+    await getApp().triggers.invalidate(project.id);
+
+    return c.json({ id, deleted: true });
+  },
+);
+
+export const app = secured.hono;

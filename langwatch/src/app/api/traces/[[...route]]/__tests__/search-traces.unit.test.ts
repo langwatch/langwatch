@@ -52,7 +52,26 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
   };
 });
 
-const { app: v1App } = await import("../app.v1");
+// The routes are registered through the SecuredApp builder, whose project
+// strategy runs the real authMiddleware. Mock it to a passthrough so these
+// unit tests exercise the handler logic with an injected project, not real auth.
+vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  return {
+    ...actual,
+    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+      c.set("project", { id: "project-123", apiKey: "key-123" });
+      await next();
+    },
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
+
+const { registerTracesRoutes } = await import("../app.v1");
+const { createProjectApp } = await import("~/server/api/security");
+const securedTest = createProjectApp({ basePath: "/" });
+registerTracesRoutes(securedTest);
+const v1App = securedTest.hono;
 
 const testApp = new Hono();
 testApp.use("*", async (c, next) => {

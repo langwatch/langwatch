@@ -1,13 +1,13 @@
 import {
   OrganizationUserRole,
-  RoleBindingScopeType,
   type PrismaClient,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
 // ============================================================================
@@ -56,6 +56,10 @@ export const Resources = {
   DATASETS: "datasets",
   TRIGGERS: "triggers",
   WORKFLOWS: "workflows",
+  // Experiments are their own capability: a user can run experiments on
+  // prompts or agents without touching the workflow studio. Historically they
+  // inherited `workflows:view`; this dedicated permission decouples them.
+  EXPERIMENTS: "experiments",
   PROMPTS: "prompts",
   SECRETS: "secrets",
   PLAYGROUND: "playground",
@@ -188,6 +192,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Workflows
     "workflows:view",
     "workflows:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -265,6 +272,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Workflows
     "workflows:view",
     "workflows:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -311,6 +321,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "datasets:view",
     // Workflows
     "workflows:view",
+    // Experiments
+    "experiments:view",
     // Prompts
     "prompts:view",
     // Scenarios
@@ -346,6 +358,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "datasets:view",
     // Workflows
     "workflows:view",
+    // Experiments
+    "experiments:view",
     // Prompts
     "prompts:view",
     // Scenarios
@@ -441,6 +455,7 @@ export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "evaluations:view",
   "datasets:view",
   "workflows:view",
+  "experiments:view",
   "prompts:view",
   "scenarios:view",
   "secrets:view",
@@ -618,7 +633,9 @@ export const checkProjectPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+          cause: new LiteMemberRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
         });
       }
       throw new TRPCError({
@@ -653,7 +670,9 @@ export const checkTeamPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+          cause: new LiteMemberRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
         });
       }
       throw new TRPCError({
@@ -787,7 +806,10 @@ async function checkPermissionFromBindings({
       // OrganizationUser role is authoritative for EXTERNAL restrictions.
       if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      if (
+        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
+      )
+        return true;
       continue;
     }
 
@@ -948,7 +970,10 @@ export async function resolveTeamPermission(
     organizationId: team.organizationId,
     scopes: [
       { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: team.organizationId },
+      {
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: team.organizationId,
+      },
     ],
     organizationRole,
     permission,
@@ -1024,7 +1049,9 @@ export async function hasOrganizationPermission(
     prisma: ctx.prisma,
     userId,
     organizationId,
-    scopes: [{ scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId }],
+    scopes: [
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
+    ],
     organizationRole: orgMember.role,
     permission,
   });
@@ -1111,8 +1138,7 @@ export async function batchScopePermissions(
     where: { userId, organizationId: args.organizationId },
     select: { role: true },
   });
-  const organizationRole: OrganizationUserRole | null =
-    orgMember?.role ?? null;
+  const organizationRole: OrganizationUserRole | null = orgMember?.role ?? null;
   if (!orgMember) {
     args.teamIds.forEach((id) => teamsMap.set(id, false));
     args.projectIds.forEach((id) => projectsMap.set(id, false));
@@ -1125,11 +1151,7 @@ export async function batchScopePermissions(
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  const scopeIds = [
-    args.organizationId,
-    ...args.teamIds,
-    ...args.projectIds,
-  ];
+  const scopeIds = [args.organizationId, ...args.teamIds, ...args.projectIds];
   const bindings =
     scopeIds.length > 0
       ? await ctx.prisma.roleBinding.findMany({
@@ -1152,9 +1174,7 @@ export async function batchScopePermissions(
 
   const customRoleIds = Array.from(
     new Set(
-      bindings
-        .map((b) => b.customRoleId)
-        .filter((id): id is string => !!id),
+      bindings.map((b) => b.customRoleId).filter((id): id is string => !!id),
     ),
   );
   const customRoles =
@@ -1310,6 +1330,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "datasets:view",
   "evaluations:view",
   "workflows:view",
+  "experiments:view",
   "prompts:view",
   "scenarios:view",
   "playground:view",
@@ -1361,7 +1382,9 @@ function isMiddlewareParams(
  */
 export function skipPermissionCheck(
   options?: SkipPermissionCheckOptions,
-): (params: PermissionMiddlewareParams<object>) => ReturnType<typeof params.next>;
+): (
+  params: PermissionMiddlewareParams<object>,
+) => ReturnType<typeof params.next>;
 export function skipPermissionCheck(
   params: PermissionMiddlewareParams<object>,
 ): ReturnType<typeof params.next>;
@@ -1532,10 +1555,7 @@ export const checkOpsPermission =
     permission: Permission;
     throwOnDeny?: boolean;
   }) =>
-  async ({
-    ctx,
-    next,
-  }: PermissionMiddlewareParams<unknown>) => {
+  async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });

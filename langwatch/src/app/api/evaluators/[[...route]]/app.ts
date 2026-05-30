@@ -1,20 +1,16 @@
-import { Hono } from "hono";
+import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { authMiddleware, requirePermission, handleError } from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
-import { app as appV1 } from "./app.v1";
+import {
+  type EvaluatorAppVariables,
+  registerEvaluatorRoutes,
+} from "./app.v1";
 
 patchZodOpenapi();
 
-// Define the Hono app
-export const app = new Hono().basePath("/api/evaluators");
+const secured = createProjectApp<EvaluatorAppVariables>({
+  basePath: "/api/evaluators",
+});
 
-// Middleware
-app.use(tracerMiddleware({ name: "evaluators" }));
-app.use(loggerMiddleware());
-app.use(authMiddleware);
-// https://hono.dev/docs/api/hono#error-handling
-app.onError(handleError);
+registerEvaluatorRoutes(secured);
 
-app.route("/", appV1);
+export const app = secured.hono;

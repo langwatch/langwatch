@@ -17,7 +17,7 @@ import {
   type GetOneRequest,
 } from "ra-data-simple-prisma";
 import { PlanTypes, Prisma, SubscriptionStatus } from "@prisma/client";
-import { Hono } from "hono";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auth as betterAuth } from "~/server/better-auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -36,7 +36,8 @@ import {
 } from "../backoffice/userVisibility";
 import { ImpersonationService } from "../impersonation.service";
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
+const adminAuth = handlerManagedAuth("super-admin session validated in-handler via isAdmin");
 
 const ALLOWED_RESOURCES = new Set([
   "user",
@@ -57,8 +58,8 @@ const ALLOWED_RESOURCES = new Set([
 // the helper below maps those to HTTP status codes, keeping the route
 // thin and leaving the rules in one testable place.
 
-app.post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
-app.delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
+secured.access(adminAuth).post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
+secured.access(adminAuth).delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
 async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -125,7 +126,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 }
 
 // ---------- POST /api/admin/:resource ----------
-app.post("/admin/:resource", async (c) => {
+secured.access(adminAuth).post("/admin/:resource", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   const user = session?.user.impersonator ?? session?.user;
   if (!session || !user || !isAdmin(user)) {
@@ -481,3 +482,5 @@ app.post("/admin/:resource", async (c) => {
 
   return c.json(result);
 });
+
+export const app = secured.hono;

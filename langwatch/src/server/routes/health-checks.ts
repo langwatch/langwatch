@@ -16,20 +16,19 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import crypto from "crypto";
 import { nanoid } from "nanoid";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import {
+  createServiceApp,
+  publicEndpoint,
+} from "~/server/api/security";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:health-checks");
 
-export const app = new Hono().basePath("/api/health");
-app.use(tracerMiddleware({ name: "health-checks" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/health" });
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,7 +66,7 @@ async function authenticateProject(c: {
 
 // ── GET /collector ───────────────────────────────────────────────────
 
-app.get("/collector", async (c) => {
+secured.access(publicEndpoint("subsystem health probe")).get("/collector", async (c) => {
   const auth = await authenticateProject(c);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
@@ -181,7 +180,7 @@ app.get("/collector", async (c) => {
 
 // ── GET /evaluations ─────────────────────────────────────────────────
 
-app.get("/evaluations", async (c) => {
+secured.access(publicEndpoint("subsystem health probe")).get("/evaluations", async (c) => {
   const auth = await authenticateProject(c);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
@@ -237,7 +236,7 @@ app.get("/evaluations", async (c) => {
 
 // ── GET /processor ───────────────────────────────────────────────────
 
-app.get("/processor", async (c) => {
+secured.access(publicEndpoint("subsystem health probe")).get("/processor", async (c) => {
   const auth = await authenticateProject(c);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
@@ -463,7 +462,7 @@ app.get("/processor", async (c) => {
 
 // ── GET /triggers ────────────────────────────────────────────────────
 
-app.get("/triggers", async (c) => {
+secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async (c) => {
   const auth = await authenticateProject(c);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
@@ -507,7 +506,7 @@ app.get("/triggers", async (c) => {
 
 // ── GET /workflows ───────────────────────────────────────────────────
 
-app.get("/workflows", async (c) => {
+secured.access(publicEndpoint("subsystem health probe")).get("/workflows", async (c) => {
   const auth = await authenticateProject(c);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
@@ -554,3 +553,5 @@ app.get("/workflows", async (c) => {
     body: await response?.json(),
   });
 });
+
+export const app = secured.hono;

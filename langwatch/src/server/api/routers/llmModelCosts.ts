@@ -120,6 +120,22 @@ export const llmModelCostsRouter = createTRPCRouter({
         });
       }
 
+      // Updating an existing row: the caller must also hold manage on the row's
+      // CURRENT scope, not just the destination scope above. Without this a
+      // caller who manages only scope X could pass another tenant's row id and
+      // re-anchor it into X. Mirrors the delete handler's row-derived check.
+      const existing = await ctx.prisma.customLLMModelCost.findUnique({
+        where: { id },
+        select: { scopeType: true, scopeId: true },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await assertCanManageScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        { scopeType: existing.scopeType, scopeId: existing.scopeId },
+      );
+
       return prisma.customLLMModelCost.update({
         where: { id },
         data: {

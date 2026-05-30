@@ -11,21 +11,19 @@
  * Iteration 1: route skeleton + auth middleware + contract-shaped stubs.
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
-import { Hono } from "hono";
-import type { Context, Next } from "hono";
+
 import { createHash, createHmac, timingSafeEqual } from "crypto";
+import type { Context, Next } from "hono";
 import { z } from "zod";
 
 import { env } from "~/env.mjs";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
-import { createLogger } from "~/utils/logger/server";
-
-import { prisma } from "~/server/db";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+
+import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
@@ -33,15 +31,25 @@ import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser"
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
-  VirtualKeyCryptoError,
   hashVirtualKeySecret,
   parseVirtualKey,
+  VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { createLogger } from "~/utils/logger/server";
 
-export const app = new Hono().basePath("/api/internal/gateway");
-app.use(tracerMiddleware({ name: "gateway-internal" }));
-app.use(loggerMiddleware());
+// `verifySecret` applies the HMAC verifier as the builder chain for every
+// route (uniform with `files/.../app.ts`), rather than an app-wide
+// `secured.use(...)`. `verifyGatewaySignature` is hoisted (function decl).
+const secured = createServiceApp({
+  basePath: "/api/internal/gateway",
+  verifySecret: verifyGatewaySignature,
+});
+
+const gatewayPolicy = () =>
+  internalSecret(
+    "gateway HMAC signature verified by the verifySecret chain (verifyGatewaySignature)",
+  );
 
 const logger = createLogger("langwatch:gateway-internal");
 
@@ -128,7 +136,8 @@ function logAuthDecision(
 }
 
 async function verifyGatewaySignature(c: Context, next: Next) {
-  const secret = process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
+  const secret =
+    process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
     logAuthDecision(c, "gateway_internal_secret_missing", 500);
     return c.json(
@@ -223,8 +232,6 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   await next();
 }
 
-app.use("/*", verifyGatewaySignature);
-
 // ── helpers ─────────────────────────────────────────────────────────────
 
 function notImplemented(c: Context) {
@@ -249,7 +256,7 @@ function notImplemented(c: Context) {
  * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
  * Response: { jwt, revision, key_id, display_prefix }
  */
-app.post("/resolve-key", async (c) => {
+secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     key_presented?: string;
     gateway_node_id?: string;
@@ -347,7 +354,7 @@ app.post("/resolve-key", async (c) => {
  * §4.2 — full warm-cache config by vk_id with `If-None-Match: <revision>`.
  * Returns 304 Not Modified when client has current revision.
  */
-app.get("/config/:vk_id", async (c) => {
+secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   const vkId = c.req.param("vk_id");
   const vk = await prisma.virtualKey.findUnique({
     where: { id: vkId },
@@ -392,9 +399,10 @@ app.get("/config/:vk_id", async (c) => {
         return client;
       })
     : null;
-  const payload = await new GatewayConfigMaterialiser(prisma, chRepo).materialise(
-    vk,
-  );
+  const payload = await new GatewayConfigMaterialiser(
+    prisma,
+    chRepo,
+  ).materialise(vk);
   return c.json(payload, 200, {
     ETag: currentRevision,
     "Cache-Control": "no-store",
@@ -411,7 +419,7 @@ app.get("/config/:vk_id", async (c) => {
  * Response: { current_revision, changes: [{kind, vk_id, revision}, ...] }
  * Returns 204 No Content when no diff within timeout.
  */
-app.get("/changes", async (c) => {
+secured.access(gatewayPolicy()).get("/changes", async (c) => {
   const sinceParam = c.req.query("since") ?? "0";
   const orgId = c.req.query("organization_id");
   if (!orgId) {
@@ -483,7 +491,7 @@ app.get("/changes", async (c) => {
  * Request:  { vk_id, gateway_request_id, projected_cost_usd, model }
  * Response: { decision: allow|soft_warn|hard_block, warnings[], block_reason }
  */
-app.post("/budget/check", async (c) => {
+secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     vk_id?: string;
     gateway_request_id?: string;
@@ -532,10 +540,7 @@ app.post("/budget/check", async (c) => {
   // Throttle to 60s to avoid hot-row contention at high RPS — admin
   // dashboards refresh on minute-scale anyway. Fire-and-forget so a
   // DB blip doesn't deny the request.
-  if (
-    !vk.lastUsedAt ||
-    Date.now() - vk.lastUsedAt.getTime() > 60 * 1000
-  ) {
+  if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
     const vkService = VirtualKeyService.create(prisma);
     void vkService.touchUsage(vk.id).catch(() => {});
   }
@@ -617,7 +622,7 @@ app.post("/budget/check", async (c) => {
  * (contract §4.6, and @sergey's iter 3 gateway-side fan-out mirrors this
  * contract).
  */
-app.post("/guardrail/check", async (c) => {
+secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -670,4 +675,6 @@ app.post("/guardrail/check", async (c) => {
  * Query: ?cursor=<opaque>&limit=1000
  * Response: { jwts: [...], next_cursor: null | string, current_revision }
  */
-app.get("/bootstrap", (c) => notImplemented(c));
+secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
+
+export const app = secured.hono;

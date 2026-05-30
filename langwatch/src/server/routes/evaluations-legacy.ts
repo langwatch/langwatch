@@ -17,7 +17,6 @@ import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -76,16 +75,19 @@ import {
   apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const tokenResolver = TokenResolver.create(prisma);
 
+const AUTH_REASON = "project API key resolved in-handler";
+
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
  * success or `{ error, status }` for the caller to short-circuit with
  * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
- * lastUsedAt bump for PATs — callers invoke it after building a success
+ * lastUsedAt bump for API keys — callers invoke it after building a success
  * response.
  */
 async function authenticateRequest(
@@ -131,10 +133,10 @@ async function authenticateRequest(
   return { project: resolved.project, markUsed };
 }
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
-app.get("/evaluations/list", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/evaluations/list", async (c) => {
   const evaluators = Object.fromEntries(
     Object.entries(AVAILABLE_EVALUATORS)
       .filter(
@@ -160,7 +162,7 @@ app.get("/evaluations/list", async (c) => {
 });
 
 // ---------- POST /api/evaluations/batch/log_results ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/batch/log_results",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   async (c) => {
@@ -275,7 +277,7 @@ app.post(
 );
 
 // ---------- POST /api/evaluations/:evaluator/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/:evaluator/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -285,7 +287,7 @@ app.post(
 );
 
 // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/:evaluator/:subpath/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -295,7 +297,7 @@ app.post(
 );
 
 // ---------- POST /api/guardrails/:evaluator/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/guardrails/:evaluator/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -305,7 +307,7 @@ app.post(
 );
 
 // ---------- POST /api/dataset/evaluate ----------
-app.post("/dataset/evaluate", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async (c) => {
   const auth = await authenticateRequest(c, "evaluations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -473,6 +475,8 @@ app.post("/dataset/evaluate", async (c) => {
   markUsed();
   return c.json(result);
 });
+
+export const app = secured.hono;
 
 // ============ Shared helpers ============
 
