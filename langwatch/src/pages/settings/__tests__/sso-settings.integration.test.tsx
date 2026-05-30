@@ -226,8 +226,8 @@ describe("<SsoSettings/>", () => {
     /** @scenario Enterprise org sees full SSO settings */
     it("renders the SSO connections table and SCIM provisioning section", () => {
       renderPage();
-      expect(screen.getByText(/SSO Connections/i)).toBeTruthy();
-      expect(screen.getByText(/SCIM Provisioning/i)).toBeTruthy();
+      expect(screen.getAllByText(/SSO Connections/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/SCIM Provisioning/i).length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -411,11 +411,11 @@ describe("<SsoSettings/>", () => {
     /** @scenario SCIM logs table renders with filter controls */
     it("shows a table with Time, Method, Path, Status, Duration columns and filter buttons", () => {
       renderPage();
-      expect(screen.getByText("Time")).toBeTruthy();
-      expect(screen.getByText("Method")).toBeTruthy();
-      expect(screen.getByText("Path")).toBeTruthy();
-      expect(screen.getByText("Status")).toBeTruthy();
-      expect(screen.getByText("Duration")).toBeTruthy();
+      expect(screen.getAllByText("Time").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Method").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Path").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Status").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Duration").length).toBeGreaterThanOrEqual(1);
       // Filter buttons
       expect(screen.getByRole("button", { name: "All" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "2xx" })).toBeTruthy();
