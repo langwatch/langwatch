@@ -243,6 +243,13 @@ export async function fetchTracesFromClickHouse(
   // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
   // and cursor predicates run against the latest version of each trace
   // (argMax over UpdatedAt), so they live in the CTE's HAVING.
+  //
+  // The outer query deliberately does NOT filter on ComputedInput: empty /
+  // null inputs are dropped downstream by `extractInputFromComputed`, while
+  // the raw rows still carry the full page so `lastSort` (the pagination
+  // cursor) tracks the page boundary. Filtering here would advance the cursor
+  // by the surviving subset and could strand older eligible traces behind a
+  // run of empty-input traces.
   const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
@@ -297,12 +304,12 @@ export async function fetchTracesFromClickHouse(
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
         AND OccurredAt < now64(3)
-        AND ComputedInput IS NOT NULL
-        AND ComputedInput != ''
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+            AND OccurredAt < now64(3)
             AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
         )

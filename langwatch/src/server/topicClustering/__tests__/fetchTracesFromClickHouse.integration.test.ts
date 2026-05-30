@@ -124,10 +124,10 @@ const PAGED_SQL = `
   SELECT t.TraceId, t.ComputedInput, t.TopicId, t.SubTopicId, toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
   FROM trace_summaries t
   WHERE TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64}) AND OccurredAt < now64(3)
-    AND ComputedInput IS NOT NULL AND ComputedInput != ''
     AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
       SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries
-      WHERE TenantId = {tenantId:String} AND TraceId IN (SELECT TraceId FROM page)
+      WHERE TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64}) AND OccurredAt < now64(3)
+        AND TraceId IN (SELECT TraceId FROM page)
       GROUP BY TenantId, TraceId)
   ORDER BY t.OccurredAt DESC, t.TraceId ASC LIMIT 2000`;
 
@@ -184,6 +184,73 @@ describe("fetchTracesFromClickHouse integration", () => {
       expect(second.traces.length).toBeGreaterThan(0);
       const firstIds = new Set(first.traces.map((t) => t.trace_id));
       expect(second.traces.some((t) => firstIds.has(t.trace_id))).toBe(false);
+    });
+  });
+
+  describe("when the newest traces have empty input", () => {
+    // The page is selected by recency alone, so empty-input traces still
+    // occupy page slots. The cursor must track the page boundary (including
+    // those rows) so pagination doesn't stall before older eligible traces —
+    // the regression CodeRabbit flagged when the empty filter lived in SQL.
+    const EMPTY_TENANT = "topic-fetch-empty-test";
+
+    beforeAll(async () => {
+      const now = Date.now();
+      const bigInput = JSON.stringify("x".repeat(64));
+      const rows = Array.from({ length: 40 }, (_, i) => ({
+        ProjectionId: `proj-${nanoid()}`,
+        TenantId: EMPTY_TENANT,
+        TraceId: `${EMPTY_TENANT}-trace-${String(i).padStart(4, "0")}`,
+        Version: "v1",
+        Attributes: {},
+        OccurredAt: new Date(now - i * 60_000),
+        CreatedAt: new Date(now),
+        UpdatedAt: new Date(now - i),
+        ComputedIOSchemaVersion: "",
+        // The 20 newest traces have empty input; the older 20 carry input.
+        ComputedInput: i < 20 ? "" : bigInput,
+        ComputedOutput: "out",
+        TimeToFirstTokenMs: 1,
+        TimeToLastTokenMs: 1,
+        TotalDurationMs: 1,
+        TokensPerSecond: 1,
+        SpanCount: 1,
+        ContainsErrorStatus: 0,
+        ContainsOKStatus: 1,
+        ErrorMessage: null,
+        Models: ["gpt-5-mini"],
+        TotalCost: 0.01,
+        TokensEstimated: false,
+        TotalPromptTokenCount: 1,
+        TotalCompletionTokenCount: 1,
+        OutputFromRootSpan: 0,
+        OutputSpanEndTimeMs: 0,
+        BlockedByGuardrail: 0,
+        TopicId: null,
+        SubTopicId: null,
+        HasAnnotation: null,
+      }));
+      await ch.insert({
+        table: "trace_summaries",
+        values: rows,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+    }, 60_000);
+
+    afterAll(async () => {
+      await cleanupTestData(EMPTY_TENANT);
+    });
+
+    it("advances the cursor past empty-input traces to reach older ones", async () => {
+      const res = await fetchTracesFromClickHouse(ch, EMPTY_TENANT, false, [], []);
+
+      // Only the 20 input-bearing traces are clustered...
+      expect(res.traces).toHaveLength(20);
+      // ...but pagination accounts for the whole page (incl. the 20 empties),
+      // so the cursor reaches the oldest trace and clustering won't stall.
+      expect(res.returnedCount).toBe(40);
+      expect(res.lastSort?.[1]).toBe(`${EMPTY_TENANT}-trace-0039`);
     });
   });
 
