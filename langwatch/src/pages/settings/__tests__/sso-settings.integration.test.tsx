@@ -70,7 +70,7 @@ const {
   hasAnyPermissionRef: { current: true as boolean },
   mockWithPermissionGuard: vi.fn(
     (_permission: string, _opts?: unknown) =>
-      (Component: React.ComponentType<unknown>) =>
+      <P extends object>(Component: { new(props: P): unknown } | ((props: P) => unknown)) =>
         Component,
   ),
 }));
@@ -79,7 +79,11 @@ vi.mock("~/utils/api", () => ({
   api: {
     ssoConnection: {
       list: {
-        useQuery: () => ({ data: connectionsRef.current, isLoading: false }),
+        useQuery: () => ({
+          data: connectionsRef.current,
+          isLoading: false,
+          refetch: vi.fn().mockResolvedValue(undefined),
+        }),
       },
       create: {
         useMutation: ({ onSuccess, onError }: { onSuccess?: () => void; onError?: (e: Error) => void } = {}) => ({
@@ -165,7 +169,6 @@ vi.mock("~/components/subscription/ContactSalesBlock", () => ({
   ContactSalesBlock: () => <div data-testid="contact-sales-block">Contact Sales</div>,
 }));
 
-import React from "react";
 import SsoSettingsPage from "../sso";
 
 function renderPage() {
@@ -198,18 +201,10 @@ describe("<SsoSettings/>", () => {
 
   describe("when the user does not have organization:manage permission", () => {
     /** @scenario Non-admin is blocked by permission guard */
-    it("renders a permission denied message via the permission guard wrapper", () => {
-      // The HOC is mocked as an identity — the real guard renders PermissionAlert.
-      // We verify the page is exported wrapped with withPermissionGuard by checking
-      // that the default export's displayName contains the guard pattern, or simply
-      // that withPermissionGuard was called with the right permission.
-      // Since we mock as identity HOC the page renders normally, so we test the
-      // integration by verifying the mock was invoked with the correct permission.
-      const { withPermissionGuard } = vi.mocked(
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require("~/components/WithPermissionGuard"),
-      ) as { withPermissionGuard: ReturnType<typeof vi.fn> };
-      expect(withPermissionGuard).toHaveBeenCalledWith(
+    it("wraps the page with withPermissionGuard requiring organization:manage", () => {
+      // withPermissionGuard is called at module-evaluation time (static HOC).
+      // We verify it was invoked with the correct permission and layout options.
+      expect(mockWithPermissionGuard).toHaveBeenCalledWith(
         "organization:manage",
         expect.objectContaining({ layoutComponent: expect.anything() }),
       );

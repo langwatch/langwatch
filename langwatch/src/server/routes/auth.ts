@@ -27,6 +27,7 @@ import {
 } from "~/server/sso/ssoOAuth";
 import { getApp } from "~/server/app-layer/app";
 
+const logger = createLogger("auth-routes");
 const secured = createServiceApp({ basePath: "/api" });
 
 const authPolicy = () =>

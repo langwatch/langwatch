@@ -5,18 +5,10 @@ import { APIError } from "better-auth/api";
  * fully unit-testable without a real database or BetterAuth instance.
  */
 export interface SsoEnforcementDeps {
-  /** Find an org whose ssoDomain (legacy field) matches the given domain */
   findOrgByDomain(domain: string): Promise<{ id: string; ssoProvider: string | null } | null>;
-  /** Find an SsoConnection that has ssoEnforced=true and is verified for this domain */
   findEnforcedSsoConnection(domain: string): Promise<{ organizationId: string } | null>;
-  /** Check active plan type; returns null if plan check fails (silently degrades enforcement) */
   getActivePlanType(organizationId: string): Promise<string | null>;
-  /** Find a user by email (for sole-admin escape-hatch check) */
-  findUserByEmail(email: string): Promise<{ id: string } | null>;
-  /** Count active admins in the org */
-  countActiveAdmins(organizationId: string): Promise<number>;
-  /** Check if the user is an admin of the org */
-  findUserAdmin(params: { userId: string; organizationId: string }): Promise<{ userId: string } | null>;
+  isSoleAdmin(params: { email: string; organizationId: string }): Promise<boolean>;
 }
 
 /**
@@ -74,19 +66,11 @@ export async function checkSsoEnforcement({
   }
 
   if (enforcedOrgId && isSignIn) {
-    // Sole-owner escape hatch: allow password login if the user is the
-    // only active ADMIN so they can recover during IdP outages.
-    const user = await deps.findUserByEmail(email);
-    if (user) {
-      const activeAdminCount = await deps.countActiveAdmins(enforcedOrgId);
-      const userIsAdmin = await deps.findUserAdmin({
-        userId: user.id,
-        organizationId: enforcedOrgId,
-      });
-      if (userIsAdmin && activeAdminCount === 1) {
-        return;
-      }
-    }
+    const soleAdmin = await deps.isSoleAdmin({
+      email,
+      organizationId: enforcedOrgId,
+    });
+    if (soleAdmin) return;
   }
 
   if (enforcedOrgId) {

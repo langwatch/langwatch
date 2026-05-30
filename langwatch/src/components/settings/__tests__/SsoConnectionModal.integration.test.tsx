@@ -14,6 +14,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockToasterCreate, mockOnSave, mockOnClose, mockOnVerify } =
@@ -37,7 +38,7 @@ Object.defineProperty(navigator, "clipboard", {
 import { SsoConnectionModal } from "../SsoConnectionModal";
 
 function renderModal(
-  props: Partial<React.ComponentProps<typeof SsoConnectionModal>> = {},
+  props: Partial<ComponentProps<typeof SsoConnectionModal>> = {},
 ) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -90,7 +91,7 @@ describe("<SsoConnectionModal/>", () => {
         provider: "okta",
         ssoEnforced: false,
         jitProvisioning: false,
-        defaultOrgRole: "MEMBER",
+        defaultOrgRole: "MEMBER" as const,
         verifiedAt: null,
         verificationToken: "abc123token",
         clientId: "cid",
@@ -100,6 +101,8 @@ describe("<SsoConnectionModal/>", () => {
         samlSsoUrl: null,
         attributeMapping: null,
         roleMapping: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
       renderModal({ editingConnection: existingConn, onVerify: mockOnVerify });
       expect(screen.getByText("Domain Verification")).toBeTruthy();
@@ -118,7 +121,7 @@ describe("<SsoConnectionModal/>", () => {
         provider: "okta",
         ssoEnforced: false,
         jitProvisioning: false,
-        defaultOrgRole: "MEMBER",
+        defaultOrgRole: "MEMBER" as const,
         verifiedAt: null,
         verificationToken: "tok",
         clientId: "cid",
@@ -128,6 +131,8 @@ describe("<SsoConnectionModal/>", () => {
         samlSsoUrl: null,
         attributeMapping: null,
         roleMapping: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
       const { rerender } = renderModal({
         editingConnection: pendingConn,
@@ -281,10 +286,8 @@ describe("<SsoConnectionModal/>", () => {
       });
       expect(screen.getByText(/SSO URL \*/i)).toBeTruthy();
       expect(screen.getByText(/X\.509 Certificate \*/i)).toBeTruthy();
-      // Certificate field is a textarea
-      const textarea = screen.getByRole("textbox", {
-        name: /X\.509 Certificate/i,
-      });
+      // Certificate field is a textarea — find it by placeholder text
+      const textarea = screen.getByPlaceholderText(/BEGIN CERTIFICATE/i);
       expect(textarea.tagName.toLowerCase()).toBe("textarea");
     });
   });
