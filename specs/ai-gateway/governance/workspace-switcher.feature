@@ -284,3 +284,26 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     When the user picks "<project-new>"
     Then localStorage.selectedProjectSlug is set to "<project-new>"
     And subsequent visits to ambiguous routes can default to that project
+
+  @bdd @ui @workspace-switcher @add-project @focus @integration
+  Scenario: The "Create project" tooltip never auto-opens on switcher mount
+    Given the user opens the switcher
+    Then the per-team "Create project" tooltip is not visible by default
+    And no tooltip text appears for any team's "+" button until the
+        pointer actually hovers it (pointer-only, not focus-driven)
+
+  @bdd @ui @workspace-switcher @add-project @focus @integration
+  Scenario: The "Create project" tooltip still appears on actual pointer hover
+    Given the user opens the switcher
+    When the user hovers the per-team "+" button with the pointer
+    Then the "Create project" tooltip becomes visible
+    And it disappears again when the pointer leaves
+
+  @bdd @ui @workspace-switcher @add-project @focus @integration
+  Scenario: The "+" button is not in the menu's auto-focus reach on dropdown open
+    Given the user opens the switcher
+    Then the per-team "+" button is removed from the menu's natural
+        focus order (tabindex=-1)
+    And no "+" button receives focus when the dropdown opens
+    And the dropdown's initial focus lands on the first team entry instead
+    But the "+" button remains clickable with the pointer
