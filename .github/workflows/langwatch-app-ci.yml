@@ -87,6 +87,10 @@ jobs:
       BUILD_TIME: "true"
 
     runs-on: ubuntu-latest
+    # Same fail-fast cap as test-integration: a worker that wedges post-test
+    # (open handle, coverage finalize, etc.) should fail in ~25 min instead of
+    # burning the 6h default.
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
