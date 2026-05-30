@@ -73,3 +73,15 @@ Feature: Governance preview hides behind a single feature flag
       | how to gate a page (useFeatureFlag hook + redirect/empty state) |
       | how to gate a nav entry (conditional render + a11y considerations) |
       | how to test gating in BDD + integration tests                   |
+
+  Scenario: The cross-org flag check rejects arbitrary organization ids
+    Given a user logged into LangWatch who is a member of org A only
+    When the workspace switcher asks whether `release_ui_ai_governance_enabled`
+      is enabled for any of [org A, org B] (org B is foreign)
+    Then the procedure intersects the input with the user's actual
+      OrganizationUser memberships before evaluating the flag
+    And the flag is evaluated only against org A
+    And org B is silently dropped, never passed to the flag service
+    And a user with zero matching memberships gets exactly the same
+      `{ enabled: false }` response shape as a member whose flag is off,
+      so the response cannot be used as a membership oracle

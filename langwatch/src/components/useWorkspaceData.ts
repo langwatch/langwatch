@@ -53,6 +53,11 @@ export function useWorkspaceData(): Pick<
     [organizations],
   );
 
+  // The workspace switcher mounts on every page that renders a chrome
+  // header, so this query would fire on each navigation + every window
+  // refocus without caching. Mirror useFeatureFlag's policy: long
+  // staleTime + no refetch on focus / reconnect — a full reload picks
+  // up new flag state, which is what governance preview rollouts need.
   const governanceQuery =
     api.featureFlag.isEnabledForAnyOrganization.useQuery(
       {
@@ -62,6 +67,8 @@ export function useWorkspaceData(): Pick<
       {
         enabled: organizationIds.length > 0,
         staleTime: CLIENT_FLAG_STALE_TIME_MS,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
       },
     );
 
