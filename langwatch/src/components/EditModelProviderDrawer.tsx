@@ -41,7 +41,7 @@ export const EditModelProviderDrawer = (
     <Drawer.Root
       open={true}
       placement="end"
-      size="md"
+      size="xl"
       onOpenChange={({ open }) => {
         if (!open) {
           closeDrawer();
