@@ -105,10 +105,21 @@ export async function teardown(): Promise<void> {
 function unrefRemainingHandles(): void {
   try {
     const proc = process as unknown as {
-      _getActiveHandles?: () => Array<{ unref?: () => void }>;
+      _getActiveHandles?: () => Array<{
+        unref?: () => void;
+        constructor?: { name?: string };
+      }>;
     };
     const handles = proc._getActiveHandles?.() ?? [];
     for (const h of handles) {
+      // Pipe is the IPC channel that the vitest worker uses to send its
+      // "I'm done" message back to the main process. Unref'ing it makes
+      // the loop exit without the message being delivered, so vitest then
+      // waits for a result that never arrives, which is the exact shape
+      // of the shard hang we are trying to fix. WriteStream covers
+      // process.stdout / process.stderr for the same reason.
+      const name = h?.constructor?.name;
+      if (name === "Pipe" || name === "WriteStream") continue;
       try {
         h.unref?.();
       } catch {
