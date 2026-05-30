@@ -77,6 +77,36 @@ export async function setup(): Promise<void> {
 export async function teardown(): Promise<void> {
   await stopTestContainers();
   await closeAppRuntimeSingletons();
+  unrefRemainingHandles();
+}
+
+/**
+ * Belt-and-suspenders: unref any sockets/timers that are still keeping the
+ * event loop alive after the named teardowns above. Anything not enumerable
+ * via a typed close path (HTTP keep-alive pools, BullMQ worker internals,
+ * third-party background pollers) gets released here so vitest's reporter
+ * can finish and the worker exits without waiting for the shard timeout.
+ *
+ * This is safe at this point: all tests have completed, the explicit
+ * teardowns have already run, and any remaining handles are bookkeeping
+ * the runtime no longer needs.
+ */
+function unrefRemainingHandles(): void {
+  try {
+    const proc = process as unknown as {
+      _getActiveHandles?: () => Array<{ unref?: () => void }>;
+    };
+    const handles = proc._getActiveHandles?.() ?? [];
+    for (const h of handles) {
+      try {
+        h.unref?.();
+      } catch {
+        // some handles are read-only; ignore
+      }
+    }
+  } catch {
+    // _getActiveHandles is an internal API; tolerate runtime variation
+  }
 }
 
 /**
