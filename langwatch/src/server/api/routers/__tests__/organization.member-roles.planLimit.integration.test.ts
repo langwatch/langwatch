@@ -155,7 +155,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       await resetApp();
     });
 

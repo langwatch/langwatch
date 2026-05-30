@@ -87,7 +87,7 @@ describe("Limits Router Integration", () => {
     caller = appRouter.createCaller(ctx);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     await resetApp();
   });
 
@@ -105,7 +105,7 @@ describe("Limits Router Integration", () => {
   });
 
   describe("getUsage", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       mockGetCurrentMonthCount.mockReset();
       mockGetActivePlan.mockResolvedValue({
         ...FREE_PLAN,
