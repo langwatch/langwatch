@@ -31,6 +31,40 @@ afterAll(async () => {
     // Teardown-phase flush can throw once test env globals (URL/fetch) are
     // gone; the poller is already cleared by then, so swallow it.
   }
+
+  // Diagnostic: dump active event-loop handles AFTER the normal afterAll chain
+  // has run. Anything still here is what's keeping the fork from exiting and
+  // ultimately wedging the shard. The CI artifact stays small (one line per
+  // file × ~2 categories) but immediately surfaces which test file leaves
+  // sockets/timers/streams behind. Opt-out via DEBUG_OPEN_HANDLES=0 if needed.
+  if (process.env.DEBUG_OPEN_HANDLES !== "0") {
+    try {
+      // @ts-expect-error -- internal API, intentional
+      const handles = process._getActiveHandles?.() ?? [];
+      // @ts-expect-error -- internal API, intentional
+      const requests = process._getActiveRequests?.() ?? [];
+      if (handles.length > 0 || requests.length > 0) {
+        const handleCounts: Record<string, number> = {};
+        for (const h of handles) {
+          const k =
+            h?.constructor?.name ?? typeof h ?? "unknown";
+          handleCounts[k] = (handleCounts[k] ?? 0) + 1;
+        }
+        const requestCounts: Record<string, number> = {};
+        for (const r of requests) {
+          const k =
+            r?.constructor?.name ?? typeof r ?? "unknown";
+          requestCounts[k] = (requestCounts[k] ?? 0) + 1;
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+          `[open-handles] handles=${handles.length} requests=${requests.length} | handles=${JSON.stringify(handleCounts)} requests=${JSON.stringify(requestCounts)}`,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
 });
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
