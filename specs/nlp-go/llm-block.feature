@@ -217,6 +217,30 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     Then the assistant message content parses as JSON
     And the JSON validates against the declared json_schema
 
+  # Customer dogfood 2026-05-30: a Studio Prompt with Structured Outputs
+  # ON (output:bool + reason:str) bound to a Bedrock Anthropic Haiku 4.5
+  # inference profile returned raw prose (`TRUE\n\nReason: ...`) instead
+  # of parsed JSON. Bifrost v1.4.22 routes response_format on anthropic-
+  # family Bedrock models through Anthropic's native output_config.format
+  # extension which has rolling per-region / per-model-version support;
+  # when the combination doesn't line up the field is silently ignored
+  # and the model returns prose. Python langwatch_nlp doesn't hit this
+  # because LiteLLM translates response_format → forced tool_use, which
+  # is the oldest + most universally supported Anthropic structured-
+  # output path. nlpgo must do the same translation in its executor so
+  # the Go path has python parity + the same robustness profile.
+  @integration @v1
+  Scenario: bedrock + anthropic response_format rewrites to forced tool_use
+    Given a workflow whose signature node targets a bedrock anthropic-family model
+    And the signature node sets response_format = json_schema with {output:bool, reason:str}
+    When nlpgo builds the gateway request body
+    Then the body has no response_format field
+    And the body has a tools array with one synthesized tool whose function name starts with "lw_so_"
+    And the body has tool_choice forcing that tool
+    When the model returns its JSON payload as the tool_call arguments
+    Then the response Content carries that JSON string lifted from the tool_call
+    And the engine extracts each declared output field from the JSON
+
   # ============================================================================
   # Multi-turn chat history preserved across signature nodes
   # ============================================================================
