@@ -46,14 +46,12 @@ afterAll(async () => {
       if (handles.length > 0 || requests.length > 0) {
         const handleCounts: Record<string, number> = {};
         for (const h of handles) {
-          const k =
-            h?.constructor?.name ?? typeof h ?? "unknown";
+          const k = h?.constructor?.name ?? typeof h;
           handleCounts[k] = (handleCounts[k] ?? 0) + 1;
         }
         const requestCounts: Record<string, number> = {};
         for (const r of requests) {
-          const k =
-            r?.constructor?.name ?? typeof r ?? "unknown";
+          const k = r?.constructor?.name ?? typeof r;
           requestCounts[k] = (requestCounts[k] ?? 0) + 1;
         }
         // eslint-disable-next-line no-console
