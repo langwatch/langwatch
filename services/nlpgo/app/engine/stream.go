@@ -48,7 +48,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		// to LangWatch endpoints. Mirrors the Execute() path.
 		req.TraceID = traceID
 	}
-	plan, err := planner.New(req.Workflow)
+	plan, err := planner.New(req.Workflow, planOptionsFor(req)...)
 	if err != nil {
 		return nil, err
 	}

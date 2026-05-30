@@ -250,3 +250,117 @@ func TestPlan_StableLayerOrdering(t *testing.T) {
 	require.Len(t, p.Layers, 1)
 	assert.Equal(t, []string{"alpha", "beta", "gamma"}, p.Layers[0])
 }
+
+// flattenLayers collapses Plan.Layers into a single set so tests can
+// assert "which nodes ran" without caring about layer ordering.
+func flattenLayers(layers [][]string) map[string]bool {
+	out := map[string]bool{}
+	for _, layer := range layers {
+		for _, id := range layer {
+			out[id] = true
+		}
+	}
+	return out
+}
+
+// disconnectedWorkflow models the rchaves dogfood shape:
+// Entry -> Code -> End on the main chain, plus an Orphan LLM node that
+// sits on the canvas with NO incoming edges. Python skips Orphan via
+// find_reachable_nodes; pre-fix the Go engine ran it because Kahn's
+// algorithm treats Orphan's zero indegree as "ready" regardless of
+// reachability.
+func disconnectedWorkflow() *dsl.Workflow {
+	return &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "code", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+			{ID: "orphan", Type: dsl.ComponentSignature},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "code"},
+			{ID: "e2", Source: "code", Target: "end"},
+		},
+	}
+}
+
+func TestPlan_ExcludesOrphanNodeOnFullRun(t *testing.T) {
+	p, err := planner.New(disconnectedWorkflow())
+	require.NoError(t, err)
+	ids := flattenLayers(p.Layers)
+	assert.True(t, ids["entry"], "entry must be planned")
+	assert.True(t, ids["code"], "code must be planned")
+	assert.True(t, ids["end"], "end must be planned")
+	assert.False(t, ids["orphan"], "orphan signature with no incoming edges must not be planned (Python find_reachable_nodes parity)")
+}
+
+func TestPlan_ExcludesDisconnectedSubChain(t *testing.T) {
+	// Two parallel chains, only one of which roots at Entry. The whole
+	// floating chain (floatA -> floatB) must be skipped — neither node
+	// is reachable forward from Entry.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "code", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+			{ID: "floatA", Type: dsl.ComponentSignature},
+			{ID: "floatB", Type: dsl.ComponentCode},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "code"},
+			{ID: "e2", Source: "code", Target: "end"},
+			{ID: "fe1", Source: "floatA", Target: "floatB"},
+		},
+	}
+	p, err := planner.New(w)
+	require.NoError(t, err)
+	ids := flattenLayers(p.Layers)
+	assert.True(t, ids["entry"] && ids["code"] && ids["end"], "main chain must be planned")
+	assert.False(t, ids["floatA"], "floatA (disconnected root) must be skipped")
+	assert.False(t, ids["floatB"], "floatB (child of disconnected root) must be skipped")
+}
+
+func TestPlan_WithUntilNode_TrimsDownstreamAndOrphans(t *testing.T) {
+	// Entry -> A -> B -> C -> End, plus an orphan Signature. "Run until
+	// B" must plan {entry, A, B} only: C and End are downstream of the
+	// target, orphan is unreachable from Entry. Mirrors Python's
+	// find_path_until_node behavior.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "A", Type: dsl.ComponentCode},
+			{ID: "B", Type: dsl.ComponentSignature},
+			{ID: "C", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
+			{ID: "orphan", Type: dsl.ComponentSignature},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "A"},
+			{ID: "e2", Source: "A", Target: "B"},
+			{ID: "e3", Source: "B", Target: "C"},
+			{ID: "e4", Source: "C", Target: "end"},
+		},
+	}
+	p, err := planner.New(w, planner.WithUntilNode("B"))
+	require.NoError(t, err)
+	ids := flattenLayers(p.Layers)
+	assert.True(t, ids["entry"] && ids["A"] && ids["B"], "entry, A, B must be planned (the path to B)")
+	assert.False(t, ids["C"], "C is downstream of until=B and must be skipped")
+	assert.False(t, ids["end"], "End is downstream of until=B and must be skipped")
+	assert.False(t, ids["orphan"], "orphan stays excluded under until-here")
+}
+
+func TestPlan_WithUntilNode_UnknownTargetErrors(t *testing.T) {
+	_, err := planner.New(disconnectedWorkflow(), planner.WithUntilNode("does-not-exist"))
+	require.Error(t, err)
+	var une *planner.UnknownNodeError
+	require.True(t, errors.As(err, &une), "expected UnknownNodeError, got %T", err)
+	assert.Equal(t, "does-not-exist", une.NodeID)
+}
+
+func TestPlan_WithUntilNode_EntryItself(t *testing.T) {
+	// Until = Entry should plan just Entry: nothing else is upstream.
+	p, err := planner.New(linearWorkflow(), planner.WithUntilNode("A"))
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"A"}}, p.Layers)
+}
