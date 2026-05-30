@@ -226,7 +226,7 @@ async function fetchCountsFromClickHouse(
   };
 }
 
-async function fetchTracesFromClickHouse(
+export async function fetchTracesFromClickHouse(
   clickhouse: ClickHouseClient,
   projectId: string,
   isIncrementalProcessing: boolean,
@@ -236,45 +236,57 @@ async function fetchTracesFromClickHouse(
 ): Promise<TraceSearchResult> {
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
-  const baseConditions = [
-    "TenantId = {tenantId:String}",
-    "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
-    "OccurredAt < now64(3)",
-    "ComputedInput IS NOT NULL",
-    "ComputedInput != ''",
-  ];
-
-  const conditions = [...baseConditions];
+  // Page selection runs on the lightweight key columns only: it picks the
+  // 2000 most-recent matching traces without ever reading ComputedInput.
+  // ComputedInput (a potentially large payload) is read in the outer query
+  // for those <=2000 traces alone — never across the whole 12-month window,
+  // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
+  // and cursor predicates run against the latest version of each trace
+  // (argMax over UpdatedAt), so they live in the CTE's HAVING.
+  const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
     // Must either not have any of the known topics, or not have any of the known subtopics
     const topicCondition =
       topicIds.length > 0
-        ? `(TopicId IS NULL OR TopicId NOT IN ({topicIds:Array(String)}))`
+        ? `(argMax(TopicId, UpdatedAt) IS NULL OR argMax(TopicId, UpdatedAt) NOT IN ({topicIds:Array(String)}))`
         : "1=1";
     const subtopicCondition =
       subtopicIds.length > 0
-        ? `(SubTopicId IS NULL OR SubTopicId NOT IN ({subtopicIds:Array(String)}))`
+        ? `(argMax(SubTopicId, UpdatedAt) IS NULL OR argMax(SubTopicId, UpdatedAt) NOT IN ({subtopicIds:Array(String)}))`
         : "1=1";
-    conditions.push(`(${topicCondition} OR ${subtopicCondition})`);
+    pageHaving.push(`(${topicCondition} OR ${subtopicCondition})`);
   }
 
   if (searchAfter) {
-    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here
-    conditions.push(`(
-      toUnixTimestamp64Milli(OccurredAt) < {lastTs:UInt64}
+    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here.
+    // Compare against the latest version's OccurredAt (argMax over UpdatedAt).
+    pageHaving.push(`(
+      toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) < {lastTs:UInt64}
       OR (
-        toUnixTimestamp64Milli(OccurredAt) = {lastTs:UInt64}
+        toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) = {lastTs:UInt64}
         AND TraceId > {lastTraceId:String}
       )
     )`);
   }
 
-  const baseWhereClause = baseConditions.join(" AND ");
-  const whereClause = conditions.join(" AND ");
+  const pageHavingClause = pageHaving.length
+    ? `HAVING ${pageHaving.join(" AND ")}`
+    : "";
 
   const result = await clickhouse.query({
     query: `
+      WITH page AS (
+        SELECT TraceId
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          AND OccurredAt < now64(3)
+        GROUP BY TenantId, TraceId
+        ${pageHavingClause}
+        ORDER BY argMax(OccurredAt, UpdatedAt) DESC, TraceId ASC
+        LIMIT 2000
+      )
       SELECT
         t.TraceId AS TraceId,
         t.ComputedInput AS ComputedInput,
@@ -282,11 +294,16 @@ async function fetchTracesFromClickHouse(
         t.SubTopicId AS SubTopicId,
         toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
       FROM trace_summaries t
-      WHERE ${whereClause}
+      WHERE TenantId = {tenantId:String}
+        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND OccurredAt < now64(3)
+        AND ComputedInput IS NOT NULL
+        AND ComputedInput != ''
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
-          WHERE ${baseWhereClause}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
         )
       ORDER BY t.OccurredAt DESC, t.TraceId ASC
