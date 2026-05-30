@@ -584,6 +584,220 @@ func TestExecute_ToolCallsForwardedAndResponseToolCallsParsed(t *testing.T) {
 	}
 }
 
+// TestExecute_StructuredOutput_BedrockAnthropicRewritesToToolUse pins the
+// customer-dogfood fix (2026-05-30): when a signature node sets
+// response_format on bedrock + an anthropic-family model, the executor
+// must rewrite to a forced tool_use call instead of passing
+// response_format through to bifrost. bifrost v1.4.22 routes
+// response_format on anthropic-family bedrock models through
+// output_config.format which has rolling per-region / per-model-version
+// support — when the combination doesn't line up the field is silently
+// ignored and the model returns prose, dumping the whole blob into the
+// first declared output field via the engine's prose-fallback.
+func TestExecute_StructuredOutput_BedrockAnthropicRewritesToToolUse(t *testing.T) {
+	// Response side: bifrost returns the model's structured output as a
+	// tool_call whose name carries our synthetic prefix. The executor
+	// must lift its `arguments` back into Content so the engine sees
+	// the JSON object it would have received from a provider that
+	// honored response_format natively.
+	respBody := []byte(`{
+		"choices":[{
+			"index":0,
+			"message":{
+				"role":"assistant",
+				"content":null,
+				"tool_calls":[
+					{"id":"call_1","type":"function","function":{"name":"lw_so_Verifier","arguments":"{\"output\":true,\"reason\":\"yes\"}"}}
+				]
+			},
+			"finish_reason":"tool_calls"
+		}],
+		"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}
+	}`)
+	gw := &fakeGateway{respStatus: 200, respBody: respBody}
+	exec := New(gw)
+
+	resp, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+		ResponseFormat: &app.ResponseFormat{
+			Type: "json_schema",
+			JSONSchema: map[string]any{
+				"name":   "Verifier",
+				"strict": true,
+				"schema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"output": map[string]any{"type": "boolean"},
+						"reason": map[string]any{"type": "string"},
+					},
+					"required":             []string{"output", "reason"},
+					"additionalProperties": false,
+				},
+			},
+		},
+		LiteLLMParams: map[string]any{
+			"aws_access_key_id":     "AKIA...",
+			"aws_secret_access_key": "secret",
+			"aws_region_name":       "us-east-1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Request shape: response_format dropped, tools populated with the
+	// synthetic lw_so_<name> tool, tool_choice pinned to it.
+	body := gw.lastReq.Body
+	if hasField(t, body, "response_format") {
+		t.Fatal("response_format must NOT be in body for bedrock+anthropic; expected tool_use rewrite")
+	}
+	var bodyMap map[string]any
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	tools, ok := bodyMap["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected exactly 1 tool synthesized from response_format, got %v", bodyMap["tools"])
+	}
+	tool := tools[0].(map[string]any)
+	if tool["type"] != "function" {
+		t.Errorf("expected synthesized tool.type=function, got %v", tool["type"])
+	}
+	fn := tool["function"].(map[string]any)
+	if fn["name"] != "lw_so_Verifier" {
+		t.Errorf("expected tool.function.name=lw_so_Verifier, got %v", fn["name"])
+	}
+	if fn["parameters"] == nil {
+		t.Error("expected tool.function.parameters = response_format.json_schema.schema, got nil")
+	}
+	if fn["strict"] != true {
+		t.Errorf("expected strict=true preserved from response_format.json_schema.strict, got %v", fn["strict"])
+	}
+	choice, ok := bodyMap["tool_choice"].(map[string]any)
+	if !ok {
+		t.Fatal("expected tool_choice forcing the synthesized tool, got nil")
+	}
+	if choice["type"] != "function" {
+		t.Errorf("expected tool_choice.type=function, got %v", choice["type"])
+	}
+	choiceFn := choice["function"].(map[string]any)
+	if choiceFn["name"] != "lw_so_Verifier" {
+		t.Errorf("expected tool_choice.function.name=lw_so_Verifier, got %v", choiceFn["name"])
+	}
+
+	// Response side: Content must contain the lifted tool-call arguments
+	// so engine.extractSignatureOutputs parses it as JSON and splits
+	// across declared fields.
+	if resp.Content != `{"output":true,"reason":"yes"}` {
+		t.Errorf("expected Content lifted from tool-call arguments, got %q", resp.Content)
+	}
+	// Original tool_calls remain on the response for completeness / trace
+	// inspection — only Content is mutated.
+	if len(resp.ToolCalls) != 1 {
+		t.Errorf("expected tool_calls preserved on response, got %d", len(resp.ToolCalls))
+	}
+}
+
+// TestExecute_StructuredOutput_OpenAILeavesResponseFormatIntact pins
+// that the rewrite only fires for bedrock + anthropic-family. Direct
+// OpenAI must continue to pass response_format through unchanged
+// (it natively supports the OpenAI shape).
+func TestExecute_StructuredOutput_OpenAILeavesResponseFormatIntact(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse(`ok`)}
+	exec := New(gw)
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "openai/gpt-5-mini",
+		ResponseFormat: &app.ResponseFormat{
+			Type: "json_schema",
+			JSONSchema: map[string]any{
+				"name":   "Verifier",
+				"schema": map[string]any{"type": "object"},
+			},
+		},
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasField(t, gw.lastReq.Body, "response_format") {
+		t.Fatal("response_format must pass through to openai; rewrite should only fire for bedrock+anthropic")
+	}
+	if hasField(t, gw.lastReq.Body, "tools") {
+		t.Fatal("openai path must not synthesize tools from response_format")
+	}
+}
+
+// TestExecute_StructuredOutput_BedrockNonAnthropicLeavesResponseFormatIntact
+// pins that other bedrock model families (Nova, Llama, Mistral) keep
+// the response_format pass-through — bifrost's bedrock provider routes
+// those through its generic response_format → bf_so_<name> tool path
+// which is well-supported.
+func TestExecute_StructuredOutput_BedrockNonAnthropicLeavesResponseFormatIntact(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse(`ok`)}
+	exec := New(gw)
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "bedrock/amazon.nova-pro-v1:0",
+		ResponseFormat: &app.ResponseFormat{
+			Type: "json_schema",
+			JSONSchema: map[string]any{
+				"name":   "Verifier",
+				"schema": map[string]any{"type": "object"},
+			},
+		},
+		LiteLLMParams: map[string]any{
+			"aws_access_key_id":     "AKIA...",
+			"aws_secret_access_key": "secret",
+			"aws_region_name":       "us-east-1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasField(t, gw.lastReq.Body, "response_format") {
+		t.Fatal("non-anthropic bedrock must pass response_format through")
+	}
+	if hasField(t, gw.lastReq.Body, "tools") {
+		t.Fatal("non-anthropic bedrock path must not synthesize tools")
+	}
+}
+
+// TestShouldUseToolUseForStructuredOutput pins the provider/model gate.
+// Misclassifying here would either break the customer (anthropic missed)
+// or regress other providers (openai/gemini hijacked).
+func TestShouldUseToolUseForStructuredOutput(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider string
+		model    string
+		want     bool
+	}{
+		// Hit: bedrock + anthropic-family (the customer case).
+		{"bedrock us. inference profile", "bedrock", "us.anthropic.claude-haiku-4-5-20251001-v1:0", true},
+		{"bedrock eu. inference profile", "bedrock", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", true},
+		{"bedrock anthropic.claude-sonnet", "bedrock", "anthropic.claude-3-5-sonnet-20240620-v1:0", true},
+		{"bedrock claude alias", "bedrock", "claude-opus-4-5-v1:0", true},
+		// Miss: direct anthropic (own response_format works natively).
+		{"direct anthropic", "anthropic", "claude-3-5-sonnet-20240620", false},
+		// Miss: bedrock non-anthropic (bifrost's bf_so_* tool path works).
+		{"bedrock nova", "bedrock", "amazon.nova-pro-v1:0", false},
+		{"bedrock llama", "bedrock", "meta.llama3-1-70b-instruct-v1:0", false},
+		// Miss: openai/gemini/etc.
+		{"openai", "openai", "gpt-5-mini", false},
+		{"gemini", "gemini", "gemini-2.5-pro", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := shouldUseToolUseForStructuredOutput(tc.provider, tc.model)
+			if got != tc.want {
+				t.Errorf("shouldUseToolUseForStructuredOutput(%q, %q) = %v, want %v",
+					tc.provider, tc.model, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExecute_RejectsModelWithoutProvider(t *testing.T) {
 	gw := &fakeGateway{}
 	exec := New(gw)
