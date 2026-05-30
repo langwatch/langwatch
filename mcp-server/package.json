@@ -75,10 +75,5 @@
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
-  },
-  "pnpm": {
-    "overrides": {
-      "liquidjs": ">=10.26.0"
-    }
   }
 }
