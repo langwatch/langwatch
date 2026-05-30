@@ -41,7 +41,7 @@ const AUTH_REASON = "project API key / public share resolved in-handler";
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either `{ project, markUsed }` or
  * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
  * keys — callers invoke it after a successful response.

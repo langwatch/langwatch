@@ -18,12 +18,12 @@ import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
-interface PatIntegrationInfoCardProps {
+interface ApiKeyIntegrationInfoCardProps {
   organizationId: string;
   projectId: string;
   /**
    * The token, when one has been minted. Lifting this to the parent lets
-   * the empty-state shell drive every setup tab off the same PAT instead
+   * the empty-state shell drive every setup tab off the same API key instead
    * of forcing each path to mint its own.
    */
   token: string | null;
@@ -31,11 +31,11 @@ interface PatIntegrationInfoCardProps {
 }
 
 /**
- * Hardcoded scope for the empty-state PAT: project-level MEMBER role —
+ * Hardcoded scope for the empty-state API key: project-level MEMBER role —
  * read+write within the active project, nothing else. We don't expose a
  * scope picker here because the goal is one-click provisioning for "send
  * me my first traces"; users who need narrower or broader scopes can mint
- * a custom PAT from Settings → API Keys.
+ * a custom API key from Settings → API Keys.
  *
  * TODO(traces-v2): When LangWatch ships a tracing-only custom role we
  * should switch this to `customRoleId = TRACING_RW` for least-privilege.
@@ -52,11 +52,11 @@ function buildEmptyStateBindings(projectId: string) {
   ];
 }
 
-// TODO(traces-v2): Rename this card's generated PAT to something more
+// TODO(traces-v2): Rename this card's generated key to something more
 // descriptive ("LangWatch Tracing — <projectName>") and let the user supply
 // their own name. "Initial API key" is a placeholder so the empty-state
 // flow has zero text inputs.
-const PAT_NAME = "Initial API key";
+const API_KEY_NAME = "Initial API key";
 
 interface EnvLine {
   key: string;
@@ -96,8 +96,8 @@ function renderEnv(lines: EnvLine[]): string {
 }
 
 /**
- * Generate-token card for the traces-v2 empty state. Mints a Personal
- * Access Token scoped to the caller's role bindings, then renders the
+ * Generate-token card for the traces-v2 empty state. Mints an API key
+ * scoped to the caller's role bindings, then renders the
  * `LANGWATCH_API_KEY` / `X-Project-Id` / `LANGWATCH_ENDPOINT`
  * env block exactly once. The parent owns the token so other setup
  * paths (Coding Agent, MCP) can render with the same credential.
@@ -109,12 +109,12 @@ function renderEnv(lines: EnvLine[]): string {
  * the cloud default — it's a no-op on cloud and adding clutter would
  * obscure the lines that matter.
  */
-export function PatIntegrationInfoCard({
+export function ApiKeyIntegrationInfoCard({
   organizationId,
   projectId,
   token,
   onTokenGenerated,
-}: PatIntegrationInfoCardProps) {
+}: ApiKeyIntegrationInfoCardProps) {
   const publicEnv = usePublicEnv();
   // Mirror the onboarding ApiIntegrationInfoCard / codegen logic: only
   // surface LANGWATCH_ENDPOINT when BASE_HOST is set AND differs from the
@@ -132,7 +132,7 @@ export function PatIntegrationInfoCard({
     createMutation.mutate(
       {
         organizationId,
-        name: PAT_NAME,
+        name: API_KEY_NAME,
         bindings: buildEmptyStateBindings(projectId),
       },
       {

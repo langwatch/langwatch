@@ -235,7 +235,7 @@ const orgStrategy: AuthStrategy = {
 
 /**
  * A project-scoped secured app. Authenticates via project API key / legacy
- * project key / PAT (the unified auth middleware) and authorizes `requires(...)`
+ * project key / API key (the unified auth middleware) and authorizes `requires(...)`
  * against the caller's project-scoped role bindings — the Hono equivalent of
  * tRPC's `checkProjectPermission`.
  *

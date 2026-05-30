@@ -75,12 +75,12 @@ legacyAliasApp.all("/*", (c) => {
 const tokenResolver = TokenResolver.create(prisma);
 
 /**
- * Authenticates a request via the unified PAT + legacy-key path and enforces
+ * Authenticates a request via the unified API-key + legacy-key path and enforces
  * the given permission ceiling. Accepts any Hono-like context shape so this
  * helper remains testable.
  *
  * Returns `markUsed` in the success case — a no-op for legacy keys, a
- * fire-and-forget lastUsedAt bump for PATs. Callers invoke it only after the
+ * fire-and-forget lastUsedAt bump for API keys. Callers invoke it only after the
  * response has been built so `lastUsedAt` tracks fully-successful outcomes
  * (matches the route-owned pattern in `collector.ts`).
  */

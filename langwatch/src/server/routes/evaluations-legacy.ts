@@ -83,11 +83,11 @@ const tokenResolver = TokenResolver.create(prisma);
 const AUTH_REASON = "project API key resolved in-handler";
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
  * success or `{ error, status }` for the caller to short-circuit with
  * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
- * lastUsedAt bump for PATs — callers invoke it after building a success
+ * lastUsedAt bump for API keys — callers invoke it after building a success
  * response.
  */
 async function authenticateRequest(

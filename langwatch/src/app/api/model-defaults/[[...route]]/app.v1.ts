@@ -35,7 +35,7 @@ const logger = createLogger("langwatch:api:model-defaults");
 patchZodOpenapi();
 
 // Build a Session-shaped object for the service's RBAC walk. Hono
-// auth gives us apiKeyUserId; user-bound PATs always carry one.
+// auth gives us apiKeyUserId; user-bound API keys always carry one.
 // Legacy project tokens don't — assertCanWriteScope rejects those,
 // which is the documented API contract for default-model writes.
 function sessionFor(userId: string | undefined): Session | null {

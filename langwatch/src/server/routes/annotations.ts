@@ -28,7 +28,7 @@ const AUTH_REASON =
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context or an
  * error descriptor the caller surfaces via c.json(...). `markUsed` is
  * fire-and-forget and a no-op for legacy keys.

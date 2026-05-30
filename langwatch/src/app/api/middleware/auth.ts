@@ -9,7 +9,7 @@ import type { Permission } from "~/server/api/rbac";
 
 /**
  * Variables set by the auth middleware.
- * Extended to include optional PAT fields from the unified middleware.
+ * Extended to include optional API-key fields from the unified middleware.
  */
 export type AuthMiddlewareVariables = {
   project: Project;

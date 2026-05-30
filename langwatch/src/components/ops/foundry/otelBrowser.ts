@@ -17,7 +17,7 @@ export function createFoundryProvider({
   endpoint: string;
   /**
    * Required when `apiKey` is a legacy API key (`pat-lw-*`). The
-   * unified auth middleware needs the project id alongside the PAT to
+   * unified auth middleware needs the project id alongside the API key to
    * resolve the role binding. Optional for legacy `sk-lw-*` keys, which
    * encode project identity themselves.
    */
