@@ -129,47 +129,46 @@ export const EditModelProviderForm = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
-  // Stable seed for the advanced draft. Memoizing on the underlying
-  // values means the reset effect below only re-fires when one of the
-  // five gateway fields actually changes — even if `provider` itself
-  // re-references for unrelated reasons.
-  const advancedSeed = useMemo(
-    () => ({
-      rateLimitRpm:
-        (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-      rateLimitTpm:
-        (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-      rateLimitRpd:
-        (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
-      fallbackPriorityGlobal:
-        (provider as { fallbackPriorityGlobal?: number | null })
-          .fallbackPriorityGlobal ?? null,
-      providerConfig: (provider as { providerConfig?: unknown })
-        .providerConfig,
-    }),
-    [
-      (provider as { rateLimitRpm?: number | null }).rateLimitRpm,
-      (provider as { rateLimitTpm?: number | null }).rateLimitTpm,
-      (provider as { rateLimitRpd?: number | null }).rateLimitRpd,
-      (provider as { fallbackPriorityGlobal?: number | null })
-        .fallbackPriorityGlobal,
-      (provider as { providerConfig?: unknown }).providerConfig,
-    ],
-  );
-
-  // Reset advanced draft when the loaded provider row changes (drawer
-  // opened, multi-instance switch, etc.). Skipped when the gateway flag
-  // is off so we never spread defaults into the payload from a hidden
-  // section.
+  // Reset advanced draft when the *drawer subject* changes — i.e. the
+  // user opened the drawer on a different provider row. We intentionally
+  // do NOT re-seed on every underlying-value change: a background
+  // refetch (window focus, invalidation, concurrent edit in another
+  // tab) re-runs this effect and would overwrite the user's in-progress
+  // draft + clear their JSON error with no warning. Keying on the row
+  // id + the flag preserves typed values across silent refetches.
+  const providerId = (provider as { id?: string }).id;
   useEffect(() => {
     if (!gatewayMenuEnabled) {
       setAdvancedDraft(EMPTY_ADVANCED_DRAFT);
       setAdvancedJsonError(null);
       return;
     }
-    setAdvancedDraft(draftFromProvider(advancedSeed));
+    setAdvancedDraft(
+      draftFromProvider({
+        rateLimitRpm:
+          (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+        rateLimitTpm:
+          (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+        rateLimitRpd:
+          (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+        fallbackPriorityGlobal:
+          (provider as { fallbackPriorityGlobal?: number | null })
+            .fallbackPriorityGlobal ?? null,
+        providerConfig: (provider as { providerConfig?: unknown })
+          .providerConfig,
+      }),
+    );
     setAdvancedJsonError(null);
-  }, [gatewayMenuEnabled, advancedSeed]);
+    setAdvancedAccordionValue([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatewayMenuEnabled, providerId]);
+
+  // Controlled accordion state: collapsed by default, but expands
+  // automatically when the user clicks Save with malformed JSON so the
+  // inline error is actually visible.
+  const [advancedAccordionValue, setAdvancedAccordionValue] = useState<
+    string[]
+  >([]);
 
   const getAdvancedPayload = useCallback(() => {
     if (!gatewayMenuEnabled) return null;
@@ -178,9 +177,12 @@ export const EditModelProviderForm = ({
       setAdvancedJsonError(null);
       return parsed;
     } catch (e) {
-      setAdvancedJsonError(
-        e instanceof Error ? e.message : "Invalid JSON",
-      );
+      const message = e instanceof Error ? e.message : "Invalid JSON";
+      setAdvancedJsonError(message);
+      // Auto-expand the accordion so the inline error is visible. Save
+      // would otherwise stop spinning + the drawer stay open with no
+      // visible feedback if the user collapsed the section before save.
+      setAdvancedAccordionValue(["advanced-gateway"]);
       throw e;
     }
   }, [gatewayMenuEnabled, advancedDraft]);
@@ -388,6 +390,8 @@ export const EditModelProviderForm = ({
               setAdvancedJsonError(null);
             }}
             jsonError={advancedJsonError}
+            accordionValue={advancedAccordionValue}
+            onAccordionValueChange={setAdvancedAccordionValue}
             initial={{
               healthStatus: (provider as { healthStatus?: string | null })
                 .healthStatus,

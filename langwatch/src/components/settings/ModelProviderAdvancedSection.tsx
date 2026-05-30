@@ -90,10 +90,18 @@ export function parseAdvancedDraft(
 ): ParsedAdvancedPayload {
   let providerConfig: Record<string, unknown> | null = null;
   if (draft.providerConfigJson.trim()) {
-    providerConfig = JSON.parse(draft.providerConfigJson) as Record<
-      string,
-      unknown
-    >;
+    const parsed: unknown = JSON.parse(draft.providerConfigJson);
+    // Reject valid-but-non-object JSON ([1,2], 42, "x", null) up front
+    // so the user gets a clean inline error instead of the gateway zod
+    // rejecting it with a cryptic "Expected object, received array".
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error("Provider config must be a JSON object");
+    }
+    providerConfig = parsed as Record<string, unknown>;
   }
   return {
     rateLimitRpm: inputToInt(draft.rateLimitRpm),
@@ -121,6 +129,8 @@ export function ModelProviderAdvancedSection({
   onDraftChange,
   jsonError,
   initial,
+  accordionValue,
+  onAccordionValueChange,
 }: {
   modelProviderId: string | undefined;
   draft: ModelProviderAdvancedDraft;
@@ -132,6 +142,14 @@ export function ModelProviderAdvancedSection({
     lastHealthCheckAt?: Date | string | null;
     disabledAt?: Date | string | null;
   };
+  /**
+   * Controlled accordion expansion. Lifted so the parent form can
+   * auto-expand on malformed JSON at Save time — otherwise the inline
+   * `jsonError` renders inside collapsed content and the user gets no
+   * feedback. `[]` = collapsed, `["advanced-gateway"]` = expanded.
+   */
+  accordionValue: string[];
+  onAccordionValueChange: (value: string[]) => void;
 }) {
   const setField =
     <K extends keyof ModelProviderAdvancedDraft>(key: K) =>
@@ -147,7 +165,12 @@ export function ModelProviderAdvancedSection({
   };
 
   return (
-    <Accordion.Root collapsible width="full">
+    <Accordion.Root
+      collapsible
+      width="full"
+      value={accordionValue}
+      onValueChange={(details) => onAccordionValueChange(details.value)}
+    >
       <Accordion.Item value="advanced-gateway" width="full">
         <Accordion.ItemTrigger paddingY={2}>
           <HStack width="full" justify="space-between">

@@ -485,6 +485,95 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     // =========================================================================
+    // Advanced (Gateway) writes: rate limits / fallback priority /
+    // providerConfig are folded into the unified `update` mutation. The
+    // service must still demand manage on every existing-row scope when
+    // the caller writes any advanced field — even when no `scopes`
+    // array is supplied — so a team admin can't nudge an org-shared
+    // credential's rate limit without org-manage perm.
+    // =========================================================================
+
+    describe("given an ORG-scoped MP exists", () => {
+      describe("when a team admin (not org admin) writes an advanced field via id-only", () => {
+        /** @scenario Advanced gateway writes require manage on every existing-row scope */
+        it("rejects with FORBIDDEN and does not mutate the rate limit", async () => {
+          const mp = await service().updateModelProvider(
+            {
+              projectId: projectAId,
+              provider: "cerebras",
+              enabled: true,
+              customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
+              scopes: [
+                { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ],
+            },
+            ctxFor(orgAdminUserId),
+          );
+          // Sanity: no rate limit set yet.
+          const before = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(before?.rateLimitRpm).toBeNull();
+
+          await expect(
+            service().updateModelProvider(
+              {
+                id: mp.id,
+                projectId: projectAId,
+                provider: "cerebras",
+                enabled: true,
+                rateLimitRpm: 600,
+              },
+              ctxFor(teamAAdminUserId),
+            ),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: expect.stringContaining("organization:manage"),
+          });
+
+          const after = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(after?.rateLimitRpm).toBeNull();
+        });
+      });
+
+      describe("when the org admin writes an advanced field via id-only", () => {
+        it("persists the rate limit", async () => {
+          const mp = await service().updateModelProvider(
+            {
+              projectId: projectAId,
+              provider: "xai",
+              enabled: true,
+              customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
+              scopes: [
+                { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ],
+            },
+            ctxFor(orgAdminUserId),
+          );
+          await service().updateModelProvider(
+            {
+              id: mp.id,
+              projectId: projectAId,
+              provider: "xai",
+              enabled: true,
+              rateLimitRpm: 900,
+            },
+            ctxFor(orgAdminUserId),
+          );
+          const stored = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(stored?.rateLimitRpm).toBe(900);
+        });
+      });
+    });
+
+    // =========================================================================
     // Read gate: NOT_FOUND (not FORBIDDEN) for unreadable scopes
     // =========================================================================
 

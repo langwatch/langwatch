@@ -96,6 +96,21 @@ Feature: AI Gateway — Provider settings cohesion
     And no separate "Save Advanced" button is rendered
 
   # ============================================================================
+  # Advanced (Gateway) writes inherit the row's scope-manage requirement
+  # ============================================================================
+
+  @integration
+  Scenario: Advanced gateway writes require manage on every existing-row scope
+    Given a ModelProvider "cerebras" exists scoped to ORGANIZATION "acme"
+    And I am a team admin in "acme" without organization:manage
+    When I send `updateModelProvider({ id, rateLimitRpm: 600 })` with no
+      `scopes` array
+    Then the service rejects with FORBIDDEN and does not mutate
+      `rateLimitRpm`
+    And the same check holds for `rateLimitTpm`, `rateLimitRpd`,
+      `fallbackPriorityGlobal`, and `providerConfig`
+
+  # ============================================================================
   # Dispatch-side stripping of unsupported sampling params
   # ============================================================================
 
