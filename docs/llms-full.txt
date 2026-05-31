@@ -25565,7 +25565,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.3.0  # use the latest published chart version, see https://github.com/langwatch/langwatch/releases
+    targetRevision: 3.3.0
     helm:
       releaseName: langwatch
       values: |
@@ -25601,7 +25601,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 # Open http://localhost:5560
 ```
 
-The pre-upgrade preflight Job validates that every required key is present on both Secrets before pods roll, so a missing or misspelled key fails the sync with a clear list of what is missing rather than crashlooping pods opaquely.
+The preflight Job (mapped from Helm's `pre-install` + `pre-upgrade` hooks to ArgoCD's `PreSync` phase) validates that every required key is present on both Secrets before pods roll, so a missing or misspelled key fails the sync with a clear list of what is missing rather than crashlooping pods opaquely.
 
 ## Production overrides
 
@@ -25612,7 +25612,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.3.0  # use the latest published chart version, see https://github.com/langwatch/langwatch/releases
+      targetRevision: 3.3.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -25634,9 +25634,13 @@ Topic-specific configuration pages:
 
 ## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
 
-Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the names you point it at (`secrets.existingSecret` for the app, `gateway.secrets.existingSecretName` for the gateway pair). The preflight Job runs as an ArgoCD `PreSync` hook (mapped automatically from Helm's `pre-upgrade` hook, see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)) so a Secret that has not landed in time fails the sync with a clear missing-keys error.
+Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the names you point it at (`secrets.existingSecret` for the app, `gateway.secrets.existingSecretName` for the gateway pair). The preflight Job runs as an ArgoCD `PreSync` hook (mapped automatically from Helm's `pre-install` + `pre-upgrade` hooks, see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)) so a Secret that has not landed in time fails the sync with a clear missing-keys error.
 
-If your secrets operator has its own ArgoCD sync wave, set the operator-rendered Secret to a lower wave (e.g. `argocd.argoproj.io/sync-wave: "-20"`) so it lands before the langwatch PreSync preflight runs.
+The preflight Job runs during ArgoCD's `PreSync` phase, which Argo completes in full before any `Sync` phase manifest is applied. A regular `ExternalSecret` / `SealedSecret` / `vaultauth` resource is a `Sync`-phase manifest by default, so a `sync-wave` annotation on it cannot pull it ahead of the preflight, even at wave `-1000`. Pick one of:
+
+- Materialise the Secret from a **separate ArgoCD Application** that you sync first (app-of-apps or explicit ordering between Applications). This is the cleanest path for `ExternalSecret`-based stacks.
+- Annotate the operator-rendered Secret as a `PreSync` hook on this Application (`argocd.argoproj.io/hook: PreSync` plus a `sync-wave` lower than `-5`, since the preflight's Helm `pre-upgrade` hook lands at wave `-5`). Works if the operator supports being a hook resource.
+- Pre-create the Secret with `kubectl` before the first sync (or before the operator's first reconcile). This is the one-shot path the quick-start uses.
 
 ## Reinstall and ownership
 
