@@ -191,19 +191,17 @@ export class TraceAttributeAccumulationService {
     const spanAttrs = this.extractAttributes(span);
     const merged = { ...spanAttrs, ...state.attributes };
 
-    // Labels: union across spans, unless the user explicitly set them via API
-    if (!state.labelsUserOverridden) {
-      const existingLabels = state.attributes["langwatch.labels"];
-      const newLabels = spanAttrs["langwatch.labels"];
-      if (existingLabels || newLabels) {
-        const union = [
-          ...new Set([
-            ...parseJsonStringArray(existingLabels),
-            ...parseJsonStringArray(newLabels),
-          ]),
-        ];
-        if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
-      }
+    // Labels: union across spans
+    const existingLabels = state.attributes["langwatch.labels"];
+    const newLabels = spanAttrs["langwatch.labels"];
+    if (existingLabels || newLabels) {
+      const union = [
+        ...new Set([
+          ...parseJsonStringArray(existingLabels),
+          ...parseJsonStringArray(newLabels),
+        ]),
+      ];
+      if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
     }
 
     // Prompt IDs: union across spans
