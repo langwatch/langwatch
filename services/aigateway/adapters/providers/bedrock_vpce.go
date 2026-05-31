@@ -459,7 +459,7 @@ func mapBedrockToolChoice(tc *bfschemas.ChatToolChoice) brtypes.ToolChoice {
 		case "auto":
 			return &brtypes.ToolChoiceMemberAuto{}
 		default:
-			// "none" or anything unrecognised: don't pin. Bedrock's
+			// "none" or anything unrecognized: don't pin. Bedrock's
 			// "none" semantics aren't a first-class Converse value; the
 			// caller can omit tools entirely to achieve the same.
 			return nil
