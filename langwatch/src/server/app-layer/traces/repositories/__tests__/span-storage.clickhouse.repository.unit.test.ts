@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  SpanStorageClickHouseRepository,
   deserializeAttributes,
   serializeAttributes,
 } from "../span-storage.clickhouse.repository";
@@ -221,6 +222,44 @@ describe("given a requested span-read limit", () => {
     it("defaults to the ceiling instead of propagating NaN/Infinity", () => {
       expect(clampSpanReadLimit(NaN)).toBe(MAX_DERIVATION_SPANS);
       expect(clampSpanReadLimit(Infinity)).toBe(MAX_DERIVATION_SPANS);
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository single-trace reads", () => {
+  function repoWithSpyClient() {
+    const query = vi.fn().mockResolvedValue({ json: async () => [] });
+    const repo = new SpanStorageClickHouseRepository(
+      (async () => ({ query })) as unknown as ConstructorParameters<
+        typeof SpanStorageClickHouseRepository
+      >[0],
+    );
+    return { repo, query };
+  }
+
+  describe("when reading a trace's full-attribute spans", () => {
+    it("caps query memory so one heavy trace cannot pressure the whole server", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.getSpansByTraceId({ tenantId: "p-1", traceId: "t-1" });
+
+      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
+    });
+
+    it("caps query memory on the normalized-spans read", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.getNormalizedSpansByTraceId({ tenantId: "p-1", traceId: "t-1" });
+
+      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
+    });
+
+    it("caps query memory on the single-span read", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.getSpanByIds({ tenantId: "p-1", traceId: "t-1", spanId: "s-1" });
+
+      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
     });
   });
 });
