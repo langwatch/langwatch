@@ -226,12 +226,19 @@ export function getOpsClickHouseClient(): ClickHouseClient | null {
   const url = process.env.CLICKHOUSE_OPS_URL;
   if (!url || url.trim() === "") return null;
   const parsed = parseOpsConnection(url);
+  // No client-side `clickhouse_settings` here: the langwatch_ops user runs
+  // under the `readonly_safe` profile (readonly=1) which forbids modifying
+  // any session setting client-side, so the previous default of
+  // date_time_input_format=best_effort made every request fail with
+  // "Cannot modify ... in readonly mode". EXPLAIN never parses input
+  // values anyway, so dropping the setting is also functionally correct.
+  // The execution/result/memory caps that USED to live here are enforced
+  // server-side by the profile.
   opsClickHouseClient = createClient({
     url: parsed?.url ?? url,
     username: parsed?.username || undefined,
     password: parsed?.password || undefined,
     database: parsed?.database,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
     max_open_connections: 5,
     keep_alive: { enabled: true, idle_socket_ttl: 1500 },
   });
