@@ -30,6 +30,12 @@ describe("buildExplainQuery", () => {
     }
   });
 
+  it("expands INDEXES to `EXPLAIN PLAN indexes = 1, actions = 1` (CH parser quirk)", () => {
+    const r = buildExplainQuery(TENANT_OK, "INDEXES");
+    expect(r.ok).toBe(true);
+    expect(r.wrapped).toBe(`EXPLAIN PLAN indexes = 1, actions = 1 ${TENANT_OK}`);
+  });
+
   it("rejects an empty / whitespace-only query", () => {
     expect(buildExplainQuery("").ok).toBe(false);
     expect(buildExplainQuery("   ").ok).toBe(false);
