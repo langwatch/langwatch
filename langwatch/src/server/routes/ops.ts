@@ -140,10 +140,15 @@ secured
     );
 
     try {
+      // Only send guardrails when we fell back to the default-user client.
+      // The langwatch_ops user runs under the `readonly_safe` profile
+      // (readonly=1), which forbids client-side setting modifications —
+      // sending guardrails here would 400 every request. The profile
+      // already enforces the same caps server-side.
       const result = await client.query({
         query: built.wrapped!,
         format: "JSONEachRow",
-        clickhouse_settings: CLICKHOUSE_GUARDRAILS,
+        ...(usingFallback ? { clickhouse_settings: CLICKHOUSE_GUARDRAILS } : {}),
       });
       const rows = await result.json();
       return c.json({ type: built.type, rows });
