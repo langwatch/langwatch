@@ -34,6 +34,7 @@ function createPinnedTracePrisma() {
 describe("PinnedTraceService", () => {
   describe("given an unpinned trace", () => {
     describe("when pin() is called", () => {
+      /** @scenario Pinning a trace does not change retention */
       it("creates a PinnedTrace row and issues no ClickHouse commands", async () => {
         const repository = new PinnedTraceRepository(
           createPinnedTracePrisma() as any,

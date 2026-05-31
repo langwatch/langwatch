@@ -5,6 +5,7 @@ import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
     describe("given the traces category is updated", () => {
+      /** @scenario Retroactive retention update applies uniformly across all retention-managed tables */
       it("issues the same WHERE clause shape for every retention-managed traces table including event_log", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
