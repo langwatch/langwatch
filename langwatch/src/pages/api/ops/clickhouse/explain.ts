@@ -14,14 +14,19 @@ const logger = createLogger("langwatch:ops:clickhouse:explain");
 /// ClickHouse access. Defenses, outermost to innermost:
 ///
 ///  1. API key auth (LANGWATCH_OPS_API_KEY), constant-time compared.
-///  2. Query normalization — strip `/* ... */`, `-- ...\n`, and quoted
-///     string literals BEFORE the regex pass, so bypasses like
-///     `url/**/('http://x')` or `WHERE 1=1 /* TenantId = */` cannot
-///     evade the checks below.
+///  2. Query normalization — a single lexer strips `/* ... */` (nested),
+///     `-- ...\n`, `#`-comments, and quoted string literals in lockstep
+///     with the actual ClickHouse parser. Bypasses like
+///     `url/**/('http://x')` or `'/*' = 'x' OR ... url(...)` cannot evade
+///     the regex pass below; an opener inside a string stays inside the
+///     string, and vice versa.
 ///  3. Input regex filter on the normalized text — table-function
 ///     deny-list (url/s3/remote/file/postgresql/mysql/...), SYSTEM_SCHEMA
-///     guard, multi-statement guard, forbidden-keyword guard, mandatory
-///     `TenantId =` predicate (multitenancy invariant).
+///     guard, multi-statement guard, forbidden-keyword guard. Tenant
+///     scoping is NOT enforced here on purpose: the operator agent
+///     legitimately runs cross-tenant EXPLAINs for fleet-wide queries,
+///     and the boundary is at the user level (defense 6), not the SQL
+///     text.
 ///  4. Server-side EXPLAIN wrapping — the caller's SQL never reaches the
 ///     DB unwrapped, so they cannot smuggle an INSERT/DROP/etc through.
 ///  5. EXPLAIN type allowlist — ANALYZE is blocked because it actually
@@ -68,13 +73,13 @@ const TABLE_FUNCTION_RE =
 /// of other tenants, etc.). Reject any reference to it.
 const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 
-/// Every ClickHouse query in this codebase MUST be scoped by TenantId
-/// (multitenancy invariant). EXPLAIN is no different — an unscoped
-/// EXPLAIN reveals partition stats across tenants. Soft check: the
-/// query body must mention `TenantId =` somewhere. The caller is
-/// trusted to pass the correct value; this just ensures the query is
-/// of the right shape and not a "SELECT count() FROM stored_spans".
-const TENANT_PREDICATE_RE = /\bTenantId\s*=/;
+/// Tenant scoping is intentionally NOT enforced by this endpoint. The
+/// clickhouse-optimizer agent is an operator and legitimately runs
+/// cross-tenant EXPLAINs (e.g. to find a query shape that's slow across
+/// the whole fleet, not just one project). The security boundary is the
+/// langwatch_ops user with no SOURCES grant, not the SQL text; layering
+/// a `TenantId =` regex on top would only false-reject the cross-tenant
+/// cases that are part of the job.
 
 /// Per-query ClickHouse-side guardrails. readonly=1 prevents writes even
 /// if the wrapping or pre-check is bypassed. max_execution_time caps a
@@ -108,69 +113,123 @@ export interface ParseResult {
   reason?: string;
 }
 
-/// Strip block comments with a small state machine that tracks nesting —
-/// ClickHouse treats `/* outer /* inner */ */` as ONE comment, but a
-/// non-greedy regex would stop at the first `*/` and resurrect the
-/// fake-predicate-bearing tail (`TenantId = '...' */`) as live SQL text.
-/// Replaces each top-level comment with a single space so adjacency
-/// tricks like `INS/**/ERT` collapse to `INS ERT` (no keyword reborn).
-/// If a comment is unbalanced (depth never returns to 0), we consume to
-/// EOF — same behaviour ClickHouse exhibits, the query would fail to
-/// parse there too, so the regex pass treating the rest as gone is fine.
-function stripBlockComments(s: string): string {
+/// Normalize the query for the regex safety pass with a single lexer that
+/// tracks string, line-comment, and (nested) block-comment state in
+/// ClickHouse order. The previous implementation ran block-comment
+/// stripping BEFORE string-literal stripping, which let a `/*` inside a
+/// legitimate SQL string open a phantom comment that swallowed real SQL
+/// after it (the reviewer repro: `'/*' = 'x' OR ... url('http://...')`
+/// would normalize to nothing past the first quoted `/*`, hiding the
+/// live table-function call from the deny-list).
+///
+/// A character is either inside a string, inside a comment, or in normal
+/// SQL — never two at once — so we walk char-by-char with one state
+/// variable. Replacements preserve word boundaries:
+///   - strings collapse to `''` / `""` so `WHERE x = '...'` keeps shape
+///   - comments collapse to a single space so `INS/**/ERT` becomes
+///     `INS ERT` (no resurrected keyword)
+/// Unbalanced openers (string or block comment) consume to EOF, which is
+/// what the CH parser does anyway — that query would fail to execute.
+///
+/// We use this only for the regex safety pass; the EXECUTED query is
+/// always the caller's original text. The EXPLAIN wrapping plus the
+/// langwatch_ops user (no SOURCES, scoped SELECT) are what actually
+/// decide what runs.
+export function stripCommentsAndStrings(query: string): string {
   let out = "";
-  let depth = 0;
-  for (let i = 0; i < s.length; i++) {
-    if (depth === 0) {
-      if (s[i] === "/" && s[i + 1] === "*") {
-        depth = 1;
-        i++; // consume the `*`
-        continue;
+  let i = 0;
+  const n = query.length;
+  while (i < n) {
+    const c = query[i];
+    const next = query[i + 1];
+
+    // Block comment opener — takes precedence over `/` as a normal char.
+    if (c === "/" && next === "*") {
+      let depth = 1;
+      i += 2;
+      while (i < n && depth > 0) {
+        if (query[i] === "/" && query[i + 1] === "*") {
+          depth++;
+          i += 2;
+        } else if (query[i] === "*" && query[i + 1] === "/") {
+          depth--;
+          i += 2;
+        } else {
+          i++;
+        }
       }
-      out += s[i];
-    } else {
-      if (s[i] === "/" && s[i + 1] === "*") {
-        depth++;
-        i++;
-      } else if (s[i] === "*" && s[i + 1] === "/") {
-        depth--;
-        i++;
-        if (depth === 0) out += " "; // separator so `a/**/b` -> `a b`
-      }
-      // else: swallow the char, we're inside a comment
+      out += " "; // word boundary
+      continue;
     }
+
+    // `--` line comment.
+    if (c === "-" && next === "-") {
+      i += 2;
+      while (i < n && query[i] !== "\n") i++;
+      out += " ";
+      continue;
+    }
+
+    // `#` line comment — only at the start of a token (preceded by start
+    // or whitespace), to avoid clobbering identifiers like `tag#1`.
+    if (c === "#" && (i === 0 || /\s/.test(query[i - 1] ?? ""))) {
+      i++;
+      while (i < n && query[i] !== "\n") i++;
+      out += " ";
+      continue;
+    }
+
+    // Single-quoted string. ClickHouse supports `''` (doubled) AND `\'`
+    // (escaped) as a literal quote inside the string. We handle both.
+    if (c === "'") {
+      i++;
+      while (i < n) {
+        if (query[i] === "\\" && i + 1 < n) {
+          i += 2;
+          continue;
+        }
+        if (query[i] === "'" && query[i + 1] === "'") {
+          i += 2; // escaped via doubling
+          continue;
+        }
+        if (query[i] === "'") {
+          i++; // closing quote
+          break;
+        }
+        i++;
+      }
+      out += "''";
+      continue;
+    }
+
+    // Double-quoted identifier / string (CH treats `"name"` as an
+    // identifier but the principle is the same — keep the regex pass
+    // from peeking inside).
+    if (c === '"') {
+      i++;
+      while (i < n) {
+        if (query[i] === "\\" && i + 1 < n) {
+          i += 2;
+          continue;
+        }
+        if (query[i] === '"' && query[i + 1] === '"') {
+          i += 2;
+          continue;
+        }
+        if (query[i] === '"') {
+          i++;
+          break;
+        }
+        i++;
+      }
+      out += '""';
+      continue;
+    }
+
+    out += c;
+    i++;
   }
   return out;
-}
-
-/// Strip SQL comments and quoted string literals from the query so the
-/// regex pass below cannot be tricked by tokens that the ClickHouse parser
-/// will treat as no-ops. Without this, `url/**/('http://x')` evades the
-/// table-function check (`\burl\s*\(` doesn't see the `/* */` between
-/// `url` and `(`), and `WHERE 1=1 /* TenantId = */` satisfies the tenant
-/// predicate without filtering anything. Nested block comments are
-/// handled by stripBlockComments above.
-///
-/// Returns the normalized text — same length as the input is NOT
-/// guaranteed. We use this only for the safety regex pass; the EXECUTED
-/// query is always the caller's original text, because the EXPLAIN
-/// wrapping + ClickHouse parser handle the real SQL.
-export function stripCommentsAndStrings(query: string): string {
-  // The order matters. Block comments may legally contain `'` or `"`
-  // (and line-comment markers) that would otherwise open a phantom
-  // string. So strip comments first, then strings.
-  let s = stripBlockComments(query);
-  // Line comments -- ... and # ... to end of line (CH supports both `--`
-  // and `#`; the # form must be at start-of-token to count, but we play
-  // safe and strip from `#` to newline whenever found).
-  s = s.replace(/--[^\n]*/g, " ");
-  s = s.replace(/(^|\s)#[^\n]*/g, "$1 ");
-  // Quoted string literals — both single- and double-quoted, with `\'`
-  // and `\"` escape handling. The replacement leaves an empty pair so
-  // the resulting string still parses if anything cares (regex doesn't).
-  s = s.replace(/'(?:\\.|[^'\\])*'/g, "''");
-  s = s.replace(/"(?:\\.|[^"\\])*"/g, '""');
-  return s;
 }
 
 /// Pure function for the SQL-wrapping logic so it stays unit-testable.
@@ -207,12 +266,6 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   }
   if (SYSTEM_SCHEMA_RE.test(normalized)) {
     return { ok: false, reason: "references to the system.* schema are not allowed" };
-  }
-  if (!TENANT_PREDICATE_RE.test(normalized)) {
-    return {
-      ok: false,
-      reason: "query must include a `TenantId = ...` predicate (multitenancy invariant)",
-    };
   }
   return { ok: true, wrapped: `EXPLAIN ${type} ${trimmed}`, type };
 }

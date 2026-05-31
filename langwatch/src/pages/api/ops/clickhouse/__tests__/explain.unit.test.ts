@@ -8,9 +8,9 @@ import explainHandler, {
 } from "../explain";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
-// A minimal SELECT that satisfies the tenant-predicate invariant. Used as
-// the "valid baseline" everywhere we need an otherwise-acceptable shape so
-// the test is exercising the OTHER rejection paths in isolation.
+// A minimal SELECT used as the "valid baseline" everywhere we need an
+// otherwise-acceptable shape so the test is exercising the OTHER
+// rejection paths in isolation.
 const TENANT_OK = "SELECT count() FROM stored_spans WHERE TenantId = 'p_x'";
 
 describe("buildExplainQuery", () => {
@@ -131,10 +131,13 @@ describe("buildExplainQuery", () => {
     expect(r.reason).toMatch(/system/i);
   });
 
-  it("rejects an unscoped query — multitenancy invariant", () => {
+  it("accepts an unscoped (cross-tenant) query — operator endpoint by design", () => {
+    // The agent legitimately runs cross-tenant EXPLAINs to find slow query
+    // shapes across the whole fleet. The boundary is the langwatch_ops
+    // user (no SOURCES, scoped SELECT), not the input text. Enforcing a
+    // TenantId predicate here would block half the agent's job.
     const r = buildExplainQuery("SELECT count() FROM stored_spans");
-    expect(r.ok).toBe(false);
-    expect(r.reason).toMatch(/TenantId/);
+    expect(r.ok).toBe(true);
   });
 
   // The reviewer's bypass repros — these checks are why we normalize before
@@ -158,42 +161,44 @@ describe("buildExplainQuery", () => {
       expect(r.reason).toMatch(/table function/i);
     });
 
-    it("rejects a tenant predicate that only appears inside a block comment", () => {
-      // `/* TenantId = */` would satisfy the bare regex; after normalization
-      // the comment is gone and there's no real predicate.
-      const q = `SELECT * FROM stored_spans WHERE 1 = 1 /* TenantId = */`;
-      const r = buildExplainQuery(q);
-      expect(r.ok).toBe(false);
-      expect(r.reason).toMatch(/TenantId/);
-    });
-
-    it("rejects the nested-block-comment tenant bypass (reviewer regression)", () => {
-      // ClickHouse treats `/* outer /* inner */ */` as ONE nested comment
-      // and the executed query is tenant-unscoped. A non-greedy regex
-      // stripper would stop at the first `*/`, leaving `TenantId = '' */`
-      // in the normalized text and tricking the tenant-predicate check.
-      // The nesting-aware state machine in stripBlockComments swallows
-      // the whole nest.
-      const q = `SELECT * FROM stored_spans WHERE 1 = 1 /* outer /* inner */ TenantId = 'p_fake' */`;
-      const r = buildExplainQuery(q);
-      expect(r.ok).toBe(false);
-      expect(r.reason).toMatch(/TenantId/);
-    });
-
     it("rejects deeper nested block comments hiding a forbidden keyword", () => {
-      // Three levels of nesting. The state machine must track depth.
+      // Three levels of nesting. The lexer must track depth.
       const q = `SELECT 1 FROM stored_spans /* a /* b /* DROP TABLE foo */ */ */ WHERE TenantId = 'p_x'`;
       const r = buildExplainQuery(q);
-      // Comment is entirely stripped, DROP never reaches the keyword
-      // check. Query is otherwise valid -> ok.
       expect(r.ok).toBe(true);
     });
 
-    it("rejects a tenant predicate that only appears inside a string literal", () => {
-      const q = `SELECT * FROM stored_spans WHERE name = 'TenantId = something'`;
+    it("rejects a string-opener-inside-string bypass (P2a, reviewer regression)", () => {
+      // Reviewer repro: a quoted `/*` followed by a live `url(...)` call.
+      // The OLD normalizer stripped block comments BEFORE strings, so it
+      // saw `/*` inside the first string as a phantom comment opener and
+      // swallowed everything after — including the table function. The
+      // integrated lexer tracks string state first, so the `/*` inside
+      // the quotes stays inside the quotes and the table-function check
+      // sees the live `url(...)`.
+      const q = `SELECT * FROM stored_spans WHERE '/*' = 'literal' OR SpanId IN (SELECT SpanId FROM url('http://127.0.0.1:9/', CSV)) /* trailing */`;
       const r = buildExplainQuery(q);
       expect(r.ok).toBe(false);
-      expect(r.reason).toMatch(/TenantId/);
+      expect(r.reason).toMatch(/table function/i);
+    });
+
+    it("treats a quoted block-comment marker as data, not a comment", () => {
+      // Sanity: a query that legitimately compares against a string
+      // containing `/*` runs fine.
+      const q = `SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(true);
+    });
+
+    it("handles escaped quotes via backslash and doubling", () => {
+      // ClickHouse accepts both `\'` and `''` inside a single-quoted
+      // string. The lexer must close on the OUTER quote, not the
+      // escaped one — otherwise a later `'` would prematurely re-open
+      // string state and let regex see the wrong thing.
+      const q1 = `SELECT name FROM stored_spans WHERE name = 'it\\'s fine'`;
+      const q2 = `SELECT name FROM stored_spans WHERE name = 'it''s fine'`;
+      expect(buildExplainQuery(q1).ok).toBe(true);
+      expect(buildExplainQuery(q2).ok).toBe(true);
     });
 
     it("rejects an obviously-DROP query even when split by a comment", () => {
@@ -270,6 +275,32 @@ describe("stripCommentsAndStrings", () => {
     const out = stripCommentsAndStrings("SELECT 1 /* unterminated TenantId = 'p_x'");
     expect(out).toMatch(/SELECT 1/);
     expect(out).not.toMatch(/TenantId/i);
+  });
+
+  it("does NOT open a block comment for /* inside a string literal (P2a)", () => {
+    // The OLD two-pass stripper ran block comments first, so `'/*'`
+    // opened a phantom comment that swallowed live SQL after it.
+    // The integrated lexer enters string state on the first `'`, so the
+    // `/*` inside the string is data and the live `url(...)` survives
+    // for the table-function check.
+    const out = stripCommentsAndStrings(
+      `SELECT * FROM stored_spans WHERE '/*' = 'x' OR id IN (SELECT id FROM url('http://h/', CSV))`,
+    );
+    expect(out).toMatch(/url\s*\(/i);
+  });
+
+  it("does NOT open a string for ' inside a block comment", () => {
+    // Inverse of the bypass above. A bare `'` inside a block comment is
+    // not a string opener; the lexer must stay in comment state.
+    const out = stripCommentsAndStrings("SELECT 1 /* don't open here */ FROM x");
+    expect(out).toMatch(/SELECT 1\s+\s+FROM x/);
+  });
+
+  it("handles `''` (doubled-quote) escapes", () => {
+    // ClickHouse accepts `''` inside a single-quoted string as an
+    // escaped quote.
+    const out = stripCommentsAndStrings("SELECT 'it''s fine' FROM x");
+    expect(out).toMatch(/SELECT '' FROM x/);
   });
 });
 
