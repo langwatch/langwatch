@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.10.0...mcp-server@v0.10.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **mcp-server:** resolve critical/high dependency vulnerabilities (protobufjs, langsmith) ([#4428](https://github.com/langwatch/langwatch/issues/4428)) ([25c0307](https://github.com/langwatch/langwatch/commit/25c0307747e01e3ed81c122ce13d0d57423cbab0))
+* **mcp-server:** resolve critical/high deps vulns (protobufjs, langsmith) ([25c0307](https://github.com/langwatch/langwatch/commit/25c0307747e01e3ed81c122ce13d0d57423cbab0))
+
 ## [0.10.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.9.0...mcp-server@v0.10.0) (2026-05-29)
 
 
