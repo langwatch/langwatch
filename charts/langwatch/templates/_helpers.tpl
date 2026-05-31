@@ -296,15 +296,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Validate AI Gateway secret wiring.
 
-     gateway-auth-secret.yaml always materialises the LW_GATEWAY_*
-     Secret when gateway.chartManaged is true, matching the
-     clickhouse / redis / postgresql subchart pattern (lookup-or-rand,
-     no autogen.enabled gate). So there is no "missing secret" case
-     to validate here. What we DO still validate is the autogen
-     name-mismatch trap: if an operator overrode autogen.secretNames.gatewayAuth
-     but left gateway.secrets.existingSecretName at the default, the
-     chart would materialise the Secret under one name and the app +
-     gateway pods would mount the other.
+     The gateway-auth Secret holds LW_GATEWAY_INTERNAL_SECRET +
+     LW_GATEWAY_JWT_SECRET, both mounted by langwatch-app and the
+     gateway pod. It follows the same gating shape as app-secrets:
+     when autogen.enabled is true the chart materialises it via
+     lookup-or-rand; when autogen.enabled is false the operator
+     pre-creates the Secret out-of-band and the preflight Job
+     validates the required keys are present before pods roll.
+
+     Hard-fail at render time when gateway.chartManaged is true and
+     the operator has unset BOTH the autogen opt-in AND the existing
+     Secret name pointer, because in that state the gateway pod has
+     no path to find a usable Secret. We do not use lookup here:
+     under ArgoCD's repo-server lookup returns nil and the operator
+     may legitimately have pre-created the Secret out of band, so
+     keep the chart-time check name-only and let the in-cluster
+     preflight Job validate the live keys (it runs as pre-upgrade
+     under the same hook the chart already ships).
 
      We do NOT validate gateway.otel.* auth here. The gateway subchart
      deployment template (charts/gateway/templates/deployment.yaml)
@@ -319,9 +327,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $gw := .Values.gateway | default dict }}
 {{- if $gw.chartManaged }}
   {{- $gwSecrets := $gw.secrets | default dict }}
-  {{- $existingName := $gwSecrets.existingSecretName }}
+  {{- $existingName := $gwSecrets.existingSecretName | default "" }}
   {{- $autogenNames := .Values.autogen.secretNames | default dict }}
   {{- $autogenGatewayAuth := $autogenNames.gatewayAuth | default "" }}
+  {{- if and (not .Values.autogen.enabled) (empty $existingName) }}
+    {{- $errors = append $errors "gateway.chartManaged=true but no gateway-auth Secret is available: either set autogen.enabled=true (chart materialises the Secret on first install via lookup-or-rand) OR pre-create the Secret out-of-band and set gateway.secrets.existingSecretName to its name. See NOTES.txt section 6 for the kubectl create commands." }}
+  {{- end }}
+  {{/* The app deployment + gateway subchart mount
+       gateway.secrets.existingSecretName (default langwatch-gateway-auth).
+       autogen.secretNames.gatewayAuth picks the rendered name. If the
+       operator overrides one without the other (or sets them to
+       different values), the chart renders one Secret name while the
+       pods mount another, and both deployments crashloop with
+       CreateContainerConfigError. Reject the misaligned cases here. */}}
+  {{- if and $autogenGatewayAuth (empty $existingName) }}
+    {{- $errors = append $errors (printf "autogen.secretNames.gatewayAuth is set to %q but gateway.secrets.existingSecretName is empty; the chart would render the Secret under the autogen name while langwatch-app and the gateway pod mount the default langwatch-gateway-auth. Set gateway.secrets.existingSecretName to the same value as autogen.secretNames.gatewayAuth." $autogenGatewayAuth) }}
+  {{- end }}
   {{- if and $autogenGatewayAuth $existingName (ne $autogenGatewayAuth $existingName) }}
     {{- $errors = append $errors (printf "autogen.secretNames.gatewayAuth (%s) must match gateway.secrets.existingSecretName (%s); the chart materialises the former while both langwatch-app and the gateway pod mount the latter." $autogenGatewayAuth $existingName) }}
   {{- end }}

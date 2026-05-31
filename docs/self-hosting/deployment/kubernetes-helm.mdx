@@ -73,17 +73,23 @@ For production, you should:
 
 ### 1. Create Secrets
 
-Create a Kubernetes Secret with your application secrets:
+Create the app Secret and the gateway-auth Secret:
 
 ```bash
 kubectl create namespace langwatch
 
-kubectl create secret generic langwatch-secrets \
-  --namespace langwatch \
-  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
-  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32)
+kubectl -n langwatch create secret generic langwatch-app-secrets \
+  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)"
+
+kubectl -n langwatch create secret generic langwatch-gateway-auth \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 ```
+
+The gateway-auth Secret is mounted by both `langwatch-app` and the AI gateway pod, so the two values must stay byte-for-byte identical. Pre-creating it once and pointing the chart at it (next step) keeps both deployments stable across upgrades and avoids re-rolling pods on `helm upgrade`.
 
 For external databases, create additional secrets:
 
@@ -110,7 +116,11 @@ autogen:
   enabled: false
 
 secrets:
-  existingSecret: langwatch-secrets
+  existingSecret: langwatch-app-secrets
+
+gateway:
+  secrets:
+    existingSecretName: langwatch-gateway-auth
 
 app:
   replicaCount: 2
@@ -384,7 +394,7 @@ That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-en
 
 Three things to know before flipping it on:
 
-1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`), same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
+1. **Shared secrets must exist before install** (or use `autogen.enabled=true` and let the chart materialise them). The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from `gateway.secrets.existingSecretName` (default `langwatch-gateway-auth`), same byte-for-byte values. The app additionally reads `virtualKeyPepper` from its own `secrets.existingSecret` Secret (default `langwatch-app-secrets`). The [Production Deployment](#production-deployment) section above shows the two `kubectl create secret generic` commands. With `autogen.enabled=false` and one of those Secrets missing, the preflight Job aborts the install with a clear list of missing keys; under `autogen.enabled=true` the chart materialises both Secrets on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 

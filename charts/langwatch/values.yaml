@@ -1581,7 +1581,7 @@ gateway:
   controlPlane:
     baseUrl: http://langwatch-app:5560
 
-  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Shared between langwatch-app and the gateway pod. The umbrella chart materialises this Secret whenever gateway.chartManaged is true (independent of autogen.enabled): first install generates the values, subsequent renders reuse them via lookup, so no out-of-band creation is needed for a stock install. Under ArgoCD the repo-server lookup returns nil, so pin the data with ignoreDifferences on /data plus RespectIgnoreDifferences=true (see docs/self-hosting/deployment/argocd.mdx).
+  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Shared between langwatch-app and the gateway pod. Gated the same way as app-secrets: when autogen.enabled=true the chart materialises this Secret on first install via lookup-or-rand and subsequent renders reuse the existing values; when autogen.enabled=false the operator pre-creates the Secret out-of-band (see NOTES.txt section 6) and the preflight Job validates the required keys before pods roll. The operator-provided path is the only one that works cleanly under GitOps controllers whose render step has no cluster access (ArgoCD's repo-server), because the chart never renders this Secret for the controller to reconcile against.
   secrets:
     existingSecretName: langwatch-gateway-auth
 
