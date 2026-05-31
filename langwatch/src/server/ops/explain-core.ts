@@ -172,7 +172,14 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   if (SYSTEM_SCHEMA_RE.test(normalized)) {
     return { ok: false, reason: "references to the system.* schema are not allowed" };
   }
-  return { ok: true, wrapped: `EXPLAIN ${type} ${trimmed}`, type };
+  // `INDEXES` is not a top-level EXPLAIN type in ClickHouse — it's a
+  // modifier on `EXPLAIN PLAN` (`EXPLAIN PLAN indexes = 1 ...`). Sending
+  // `EXPLAIN INDEXES <query>` raises a parser error and the endpoint
+  // 502s. Expand it to the canonical form so callers can pass `INDEXES`
+  // as a logical type without needing to know that wrinkle.
+  const prefix =
+    type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
+  return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 
 export function redactQueryForAudit(query: string): { shape: string; sha256: string } {
