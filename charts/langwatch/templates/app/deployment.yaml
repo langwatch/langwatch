@@ -133,7 +133,7 @@ spec:
             - name: CRON_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: cronApiKey
             {{- end }}
 
@@ -168,7 +168,7 @@ spec:
             - name: LW_VIRTUAL_KEY_PEPPER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: virtualKeyPepper
             {{- end }}
 
@@ -211,7 +211,7 @@ spec:
             - name: NEXTAUTH_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: nextAuthSecret
             {{- end }}
 
