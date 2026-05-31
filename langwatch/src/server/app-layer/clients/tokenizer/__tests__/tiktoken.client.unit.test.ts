@@ -231,8 +231,11 @@ describe("TiktokenClient", () => {
       // Best-effort tokenization: the bounded fetch times out, loadEncoder's
       // catch turns the throw into `undefined`, and token counting is skipped.
       expect(result).toBe(undefined);
-      // Proves we hit the timeout path, not an instant unrelated failure, and
-      // that we did not hang (generous upper bound for slow CI runners).
+      // Prove the timeout branch was actually exercised: the fetch was invoked
+      // (so we reached remoteFetch, not an instant unrelated failure) and
+      // elapsed cleared the 50ms timeout floor — yet stayed well under a hang.
+      expect(globalThis.fetch).toHaveBeenCalled();
+      expect(elapsed).toBeGreaterThanOrEqual(40);
       expect(elapsed).toBeLessThan(5000);
     });
   });
