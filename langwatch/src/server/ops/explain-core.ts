@@ -189,18 +189,48 @@ export function redactQueryForAudit(query: string): { shape: string; sha256: str
 let opsClickHouseClient: ClickHouseClient | null = null;
 let warnedAboutMissingOpsUrl = false;
 
+/**
+ * Parse CLICKHOUSE_OPS_URL into the pieces @clickhouse/client wants as
+ * separate config fields. We do the userinfo split + percent-decoding
+ * ourselves because the lib forwards `URL.username` / `URL.password`
+ * to the wire as-is — both getters return the URL-encoded form. With a
+ * Terraform-generated password that may contain '@' or '%' (which TF
+ * wraps via `urlencode()` to keep the URL parseable), passing the URL
+ * verbatim ends up authenticating with the encoded form (e.g. "p%40ss")
+ * and ClickHouse rejects with "Authentication failed". Decoding here
+ * means the wire password matches what users.xml hashes.
+ */
+export function parseOpsConnection(raw: string): {
+  url: string;
+  username: string;
+  password: string;
+  database?: string;
+} | null {
+  try {
+    const u = new URL(raw);
+    const username = u.username ? decodeURIComponent(u.username) : "";
+    const password = u.password ? decodeURIComponent(u.password) : "";
+    const database =
+      u.pathname && u.pathname !== "/"
+        ? decodeURIComponent(u.pathname.replace(/^\//, ""))
+        : undefined;
+    const cleanUrl = `${u.protocol}//${u.host}`;
+    return { url: cleanUrl, username, password, database };
+  } catch {
+    return null;
+  }
+}
+
 export function getOpsClickHouseClient(): ClickHouseClient | null {
   if (opsClickHouseClient) return opsClickHouseClient;
   const url = process.env.CLICKHOUSE_OPS_URL;
   if (!url || url.trim() === "") return null;
-  let parsed: URL | string = url;
-  try {
-    parsed = new URL(url);
-  } catch {
-    /* pass raw if not a valid URL */
-  }
+  const parsed = parseOpsConnection(url);
   opsClickHouseClient = createClient({
-    url: parsed,
+    url: parsed?.url ?? url,
+    username: parsed?.username || undefined,
+    password: parsed?.password || undefined,
+    database: parsed?.database,
     clickhouse_settings: { date_time_input_format: "best_effort" },
     max_open_connections: 5,
     keep_alive: { enabled: true, idle_socket_ttl: 1500 },
