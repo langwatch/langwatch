@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.5.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.4.0...langwatch@v3.5.0) (2026-05-31)
+
+
+### Features
+
+* **clickhouse:** warn on cold-scan queries with no time filter ([#4449](https://github.com/langwatch/langwatch/issues/4449)) ([af267e6](https://github.com/langwatch/langwatch/commit/af267e63b674595696bf5fb0bf2e4a8181b02e9f))
+* **ops:** /ops/clickhouse/explain endpoint for the optimizer agent ([#4434](https://github.com/langwatch/langwatch/issues/4434)) ([ab0b6a6](https://github.com/langwatch/langwatch/commit/ab0b6a6e56c82cf9ea9611940ac2d0d550b8f626))
+
+
+### Bug Fixes
+
+* **chart:** gate clickhouse Secrets on autogen.enabled (Argo drift, subchart + parent) ([#4447](https://github.com/langwatch/langwatch/issues/4447)) ([e364851](https://github.com/langwatch/langwatch/commit/e3648513eac161870c652968edec8d7aae21ef20))
+* **chart:** gate gateway-auth Secret on autogen.enabled + docs rewrite ([#4440](https://github.com/langwatch/langwatch/issues/4440)) ([f76fa02](https://github.com/langwatch/langwatch/commit/f76fa0226eef881747ea2f04d47ea0917985210d))
+* **ops:** expand EXPLAIN INDEXES to the PLAN modifier form ClickHouse accepts ([#4448](https://github.com/langwatch/langwatch/issues/4448)) ([ec62c1f](https://github.com/langwatch/langwatch/commit/ec62c1f2d8c45f97c634dbe9929ea1213aa7bede))
+* **ops:** percent-decode CLICKHOUSE_OPS_URL userinfo for /ops/clickhouse/explain ([#4445](https://github.com/langwatch/langwatch/issues/4445)) ([09c5a51](https://github.com/langwatch/langwatch/commit/09c5a51f452cf2c6f0707039da641fbf27d9432f))
+* **ops:** stop sending client settings when using langwatch_ops (readonly profile) ([#4446](https://github.com/langwatch/langwatch/issues/4446)) ([8fdd270](https://github.com/langwatch/langwatch/commit/8fdd270de1b42532853820bf386abcbd470d1ed9))
+* **ops:** stop sending client settings when using the langwatch_ops user ([8fdd270](https://github.com/langwatch/langwatch/commit/8fdd270de1b42532853820bf386abcbd470d1ed9))
+* **ops:** wire /api/ops/clickhouse/explain into the Hono router ([#4443](https://github.com/langwatch/langwatch/issues/4443)) ([aed7700](https://github.com/langwatch/langwatch/commit/aed7700f0c8c0ae034bfd26e8fc82fd1cb07b36b))
+* **workflows:** strip unsupported LLM params on the server-driven dispatch path ([#4442](https://github.com/langwatch/langwatch/issues/4442)) ([bce3f1d](https://github.com/langwatch/langwatch/commit/bce3f1d84d94727780a5dd84484449d15e94165c))
+
 ## [3.4.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.3.0...langwatch@v3.4.0) (2026-05-31)
 
 
