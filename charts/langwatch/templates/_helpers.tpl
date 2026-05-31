@@ -38,7 +38,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   Canonical name of the umbrella's app Secret. Resolves to:
     - secrets.existingSecret (operator-provided), else
     - autogen.secretNames.app (when explicitly set), else
-    - <release>-app-secrets (default for `helm install langwatch ...`).
+    - "langwatch-app-secrets" (fixed default, matches the gateway
+      subchart's static `secrets.existingSecretName` default so both
+      pods land on the same Secret with zero operator config).
   Used by app/secrets.yaml, app/deployment.yaml, the gateway subchart
   bridge, the preflight Job, and NOTES.txt so every site agrees on the
   one Secret that holds credentialsEncryptionKey + cronApiKey +
@@ -47,9 +49,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   langwatch-gateway-auth Secret) into this one because there was no
   operational reason to keep them apart and it doubled the
   pre-create-then-install ceremony for operator-managed deployments.
+
+  Why fixed (not release-prefixed): Helm subchart values are literal
+  YAML; the gateway subchart's secrets.existingSecretName has to be a
+  static string. Picking a fixed name on the parent side means a
+  default install works regardless of release name. Operators who
+  override secrets.existingSecret OR autogen.secretNames.app must
+  also set gateway.secrets.existingSecretName to match — the
+  validateSecrets mismatch check below catches that.
 */}}
 {{- define "langwatch.appSecretName" -}}
-{{- .Values.secrets.existingSecret | default (.Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name)) -}}
+{{- .Values.secrets.existingSecret | default (.Values.autogen.secretNames.app | default "langwatch-app-secrets") -}}
 {{- end -}}
 
 {{/* Secret validation function */}}
@@ -351,7 +361,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- $gwSecretName := $gwSecrets.existingSecretName | default "" }}
   {{- $appSecretName := include "langwatch.appSecretName" . }}
   {{- if ne $gwSecretName $appSecretName }}
-    {{- $errors = append $errors (printf "gateway.secrets.existingSecretName (%q) must equal the app Secret name (%q). this release collapsed gateway-auth into the app Secret — both langwatch-app and the gateway pod mount the same Secret. Set gateway.secrets.existingSecretName to match secrets.existingSecret / autogen.secretNames.app / the {Release.Name}-app-secrets default." $gwSecretName $appSecretName) }}
+    {{- $errors = append $errors (printf "gateway.secrets.existingSecretName (%q) must equal the app Secret name (%q). this release collapsed gateway-auth into the app Secret so both langwatch-app and the gateway pod mount the same Secret. Either drop the secrets.existingSecret / autogen.secretNames.app override to use the langwatch-app-secrets default, or set gateway.secrets.existingSecretName to %q so both pods agree." $gwSecretName $appSecretName $appSecretName) }}
   {{- end }}
 {{- end }}
 
@@ -514,7 +524,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CREDENTIALS_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+      name: {{ include "langwatch.appSecretName" . }}
       key: credentialsEncryptionKey
 {{- end }}
 

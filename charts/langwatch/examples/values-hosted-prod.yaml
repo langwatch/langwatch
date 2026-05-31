@@ -19,6 +19,14 @@ autogen: { enabled: false }
 secrets:
   existingSecret: "langwatch-secrets"
 
+# When secrets.existingSecret is overridden, the gateway subchart's
+# secret reference must point at the same name. Helm subchart values
+# are literal YAML so this has to be set explicitly when the operator
+# names the Secret something other than the langwatch-app-secrets default.
+gateway:
+  secrets:
+    existingSecretName: "langwatch-secrets"
+
 # --- overlays/size-prod.yaml ---
 app:
   replicaCount: 2
