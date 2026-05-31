@@ -58,7 +58,28 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
   };
 });
 
-const { app: v1App } = await import("../app.v1");
+vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  return {
+    ...actual,
+    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+      c.set("project", {
+        id: "project-123",
+        slug: "test-project",
+        piiRedactionLevel: "DISABLED",
+      });
+      c.set("apiKeyUserId", "user-456");
+      await next();
+    },
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
+
+const { registerTracesRoutes } = await import("../app.v1");
+const { createProjectApp } = await import("~/server/api/security");
+const securedTest = createProjectApp({ basePath: "/" });
+registerTracesRoutes(securedTest);
+const v1App = securedTest.hono;
 
 const testApp = new Hono();
 testApp.use("*", async (c, next) => {
@@ -71,6 +92,10 @@ testApp.use("*", async (c, next) => {
   await next();
 });
 testApp.route("/", v1App);
+testApp.onError((err, c) => {
+  const status = "status" in err ? (err.status as number) : 500;
+  return c.json({ message: err.message }, status as 400 | 500);
+});
 
 function patchMetadata(traceId: string, metadata: Record<string, unknown>) {
   return testApp.request(`/${traceId}/metadata`, {
