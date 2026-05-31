@@ -73,11 +73,11 @@ const TENANT_PREDICATE_RE = /\bTenantId\s*=/;
 /// if the wrapping or pre-check is bypassed. max_execution_time caps a
 /// runaway EXPLAIN PIPELINE on a huge table. max_result_bytes caps the
 /// response so an EXPLAIN INDEXES on a wide table can't OOM the box.
-/// The ClickHouse settings type expects string values, even for the
-/// numeric ones — the server parses them.
+/// ClickHouseSettings is picky: `readonly` and `max_result_bytes` are
+/// typed `UInt64 = string`, `max_execution_time` is `Seconds = number`.
 const CLICKHOUSE_GUARDRAILS = {
   readonly: "1",
-  max_execution_time: "5",
+  max_execution_time: 5,
   max_result_bytes: "10000000",
 } as const;
 
