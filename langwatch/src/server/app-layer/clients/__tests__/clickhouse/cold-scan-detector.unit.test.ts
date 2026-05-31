@@ -38,6 +38,11 @@ describe("detectColdScan", () => {
         "SELECT 1 FROM stored_spans WHERE StartTime BETWEEN a AND b",
       ),
     ).toBeNull();
+    expect(
+      detectColdScan(
+        "SELECT 1 FROM stored_spans WHERE StartTime IN (1, 2, 3)",
+      ),
+    ).toBeNull();
   });
 
   it("STILL flags when the time column is only in the projection / ORDER BY (the real prod case)", () => {

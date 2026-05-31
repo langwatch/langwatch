@@ -19,14 +19,14 @@
  * Keep in sync with the ClickHouse migrations (PARTITION BY clauses). A table
  * absent from this map is treated as not time-partitioned and never flagged.
  */
-export const TIME_PARTITIONED_TABLES: Record<string, readonly string[]> = {
+export const TIME_PARTITIONED_TABLES = {
   stored_spans: ["StartTime"],
   stored_log_records: ["TimeUnixMs"],
   stored_metric_records: ["TimeUnixMs"],
   event_log: ["EventOccurredAt"],
   billable_events: ["EventTimestamp"],
   governance_ocsf_events: ["EventTime"],
-};
+} as const satisfies Record<string, readonly string[]>;
 
 /** Strip line and block comments so they can't hide or fake a predicate. */
 function stripComments(sql: string): string {
