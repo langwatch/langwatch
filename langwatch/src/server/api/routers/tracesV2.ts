@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
+import { prisma } from "~/server/db";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -624,22 +627,60 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:update"))
-    .mutation(async ({ input, ctx }) => {
-      const app = getApp();
-      const summary = await app.traces.summary.getByTraceId(
-        input.projectId,
-        input.traceId,
-      );
-      if (!summary) {
-        throw new TraceNotFoundError(input.traceId);
+    .mutation(async ({ input }) => {
+      const RESERVED_METADATA_KEYS = new Set([
+        "user_id", "customer_id", "thread_id", "labels",
+      ]);
+
+      const reserved: ReservedTraceMetadata = {};
+      const custom: CustomMetadata = {};
+      for (const [key, value] of Object.entries(input.metadata)) {
+        if (RESERVED_METADATA_KEYS.has(key)) {
+          (reserved as Record<string, unknown>)[key] = value;
+        } else {
+          custom[key] = value as CustomMetadata[string];
+        }
       }
 
-      await app.traces.changeTraceMetadata({
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata: reserved,
+        customMetadata: custom,
+      });
+
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: input.projectId },
+        select: { piiRedactionLevel: true },
+      });
+
+      const now = Date.now();
+      const nowNano = String(now * 1_000_000);
+      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      await getApp().traces.recordSpan({
         tenantId: input.projectId,
-        traceId: input.traceId,
-        metadata: input.metadata,
-        changedByUserId: ctx.session.user.id,
-        occurredAt: Date.now(),
+        span: {
+          traceId: input.traceId,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.metadata_update",
+          kind: 1,
+          startTimeUnixNano: nowNano,
+          endTimeUnixNano: nowNano,
+          attributes: [
+            { key: "langwatch.span.type", value: { stringValue: "span" } },
+          ],
+          events: [],
+          links: [],
+          status: { code: 1 },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource,
+        instrumentationScope: { name: "langwatch.api.metadata_update" },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: now,
       });
 
       return { traceId: input.traceId };

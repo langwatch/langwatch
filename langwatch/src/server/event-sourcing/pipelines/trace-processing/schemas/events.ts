@@ -12,7 +12,6 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
-  TRACE_METADATA_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "./constants";
@@ -387,57 +386,6 @@ export function isTraceNameChangedEvent(
 }
 
 /**
- * Zod schema for TraceMetadataChangedEvent metadata.
- */
-export const traceMetadataChangedEventMetadataSchema = z
-  .object({
-    processingTraceparent: z.string().optional(),
-  })
-  .passthrough();
-
-const metadataValueSchema = z.union([
-  z.string().max(4096),
-  z.number(),
-  z.boolean(),
-  z.array(z.string()),
-  z.record(z.unknown()),
-]);
-
-export const traceMetadataChangedEventDataSchema = z.object({
-  traceId: z.string(),
-  metadata: z
-    .record(metadataValueSchema)
-    .refine((obj) => Object.keys(obj).length > 0, {
-      message: "metadata must contain at least one key",
-    })
-    .refine(
-      (obj) => JSON.stringify(obj).length <= 32768,
-      { message: "total metadata payload must not exceed 32KB" },
-    ),
-  changedByUserId: z.string().nullable(),
-});
-
-export const traceMetadataChangedEventSchema = EventSchema.extend({
-  type: z.literal(TRACE_METADATA_CHANGED_EVENT_TYPE),
-  data: traceMetadataChangedEventDataSchema,
-  metadata: traceMetadataChangedEventMetadataSchema,
-});
-
-export type TraceMetadataChangedEventData = z.infer<
-  typeof traceMetadataChangedEventDataSchema
->;
-export type TraceMetadataChangedEvent = z.infer<typeof traceMetadataChangedEventSchema>;
-
-/**
- * Type guard for TraceMetadataChangedEvent.
- */
-export function isTraceMetadataChangedEvent(
-  event: TraceProcessingEvent,
-): event is TraceMetadataChangedEvent {
-  return event.type === TRACE_METADATA_CHANGED_EVENT_TYPE;
-}
-
-/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -449,5 +397,4 @@ export type TraceProcessingEvent =
   | AnnotationAddedEvent
   | AnnotationRemovedEvent
   | AnnotationsBulkSyncedEvent
-  | TraceNameChangedEvent
-  | TraceMetadataChangedEvent;
+  | TraceNameChangedEvent;
