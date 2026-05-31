@@ -130,6 +130,29 @@ const FULL_SPAN_SELECT = `
 `;
 
 /**
+ * Per-query memory ceiling for the single-trace full-attribute reads below.
+ *
+ * The heavy column on these reads is the `SpanAttributes` Map: ClickHouse reads
+ * the whole values array to return any of it, so a trace with very large
+ * per-span attribute values (big prompts / responses / embeddings) can allocate
+ * gigabytes even at a low span count. Without a cap those allocations land
+ * against the server's *total* memory limit, where the OvercommitTracker
+ * resolves the pressure by killing whichever query is allocating — so one
+ * pathological trace can take down unrelated requests across the cluster.
+ *
+ * With an explicit `max_memory_usage` the offending read fails on its own
+ * (`MEMORY_LIMIT_EXCEEDED`) and surfaces as a drawer/query error, instead of
+ * degrading everyone. Set generously above any normal trace (p95 read is
+ * single-digit MB) and below the global per-query limit, so it only ever trips
+ * on the pathological tail. Tune here if legitimate large traces start failing.
+ */
+const SINGLE_TRACE_READ_MAX_MEMORY_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
+const SINGLE_TRACE_READ_SETTINGS = {
+  // ClickHouse settings are string-typed over the wire.
+  max_memory_usage: String(SINGLE_TRACE_READ_MAX_MEMORY_BYTES),
+} as const;
+
+/**
  * Light projection used by readers that only need the span tree shape
  * (waterfall/flame, span list). Avoids reading heavy `SpanAttributes`,
  * `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a
@@ -654,6 +677,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               limit: effectiveLimit,
               ...partition.params,
             },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -719,6 +743,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               limit: effectiveLimit,
               ...partition.params,
             },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -777,6 +802,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT 1
             `,
             query_params: { tenantId, traceId, spanId, ...partition.params },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
