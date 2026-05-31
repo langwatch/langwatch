@@ -122,14 +122,22 @@ generic message.
 
   ArgoCD: the repo-server has no cluster access, so lookup returns
   nil on every sync and the chart would re-generate the Secret each
-  time. Pin the data in the Application manifest to prevent rotation:
+  time. Pin the data in the Application manifest to prevent rotation.
+  BOTH settings are required: ignoreDifferences hides /data from the
+  diff, and RespectIgnoreDifferences=true makes the sync itself skip
+  /data (without it, any ordinary sync still re-applies a fresh pair):
 
     spec:
+      syncPolicy:
+        syncOptions:
+          - RespectIgnoreDifferences=true
       ignoreDifferences:
         - group: ""
           kind: Secret
           name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
           jsonPointers: ["/data"]
+
+  See docs/self-hosting/deployment/argocd.mdx for the full guide.
 
   Operators preferring out-of-band materialisation (PreSync hook,
   external-secrets, SealedSecrets, vault-agent, manual kubectl):

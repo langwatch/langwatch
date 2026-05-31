@@ -25531,9 +25531,14 @@ Under direct Helm (`helm upgrade --install` from CLI, helmfile, or the Terraform
 
 This is the single most important behaviour to know about before pointing Argo at the chart.
 
-## The fix: ignoreDifferences on `/data`
+## The fix: `ignoreDifferences` on `/data` plus `RespectIgnoreDifferences=true`
 
-Tell Argo to leave the live Secret's `.data` alone after first install. Argo creates the Secret on first sync from whatever random values the repo-server rendered. On subsequent syncs, Argo notices `.data` differs (live values vs. a freshly-rendered random pair) but does not reconcile.
+Tell Argo to leave the live Secret's `.data` alone after first install. This takes two settings together:
+
+1. `ignoreDifferences` on the Secret's `/data` so Argo excludes it from the diff (auto-sync with `selfHeal` will not fire on a `/data`-only drift).
+2. `RespectIgnoreDifferences=true` in `syncOptions` so the **sync operation itself** omits the ignored `/data` from the manifest it applies. Without this, `ignoreDifferences` only hides the field from the diff. Any sync that runs for an unrelated reason (a chart bump, a values change, a manual `argocd app sync`) still applies the full rendered manifest, and because the repo-server renders `lookup` as nil it ships a freshly generated pair, rotating the shared app/gateway credentials. `RespectIgnoreDifferences=true` is the option that actually stops that. See the [ArgoCD diffing docs](https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/#syncing-resources-with-respectignoredifferences-configs).
+
+First-sync caveat: on the very first sync the Secret does not exist yet, so there is nothing to ignore. Argo creates it from the rendered random pair (the intended initial generation). `RespectIgnoreDifferences` only protects the live `/data` on every sync **after** the resource exists.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -25566,6 +25571,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      # Required: makes the sync operation skip the ignored /data so an
+      # unrelated sync does not re-apply a freshly-rendered random pair.
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     - group: ""
       kind: Secret
@@ -25577,7 +25585,7 @@ spec:
 If your `gateway.secrets.existingSecretName` is customised, mirror the name into `ignoreDifferences`. Both must match the actual rendered `metadata.name`. The chart fails fast when `autogen.secretNames.gatewayAuth` and `gateway.secrets.existingSecretName` disagree, so you can rely on a single source of truth here.
 
 <Warning>
-  `ignoreDifferences` only affects ArgoCD's auto-sync drift detection. The application stays `Synced` after subsequent renders even though the rendered Secret differs from the live one, so auto-sync with `selfHeal: true` does not fire and the live data is preserved. **A manual `argocd app sync` still applies the freshly-rendered random pair and rotates the live Secret** because the sync operation always pushes the rendered manifest. If you need to push a non-Secret change to the Application with `argocd app sync`, add `--strategy=apply` and exclude the Secret, or temporarily delete the Secret to force a clean regeneration. The same applies to `kubectl apply` outside of Argo and to a different `Application` syncing the same chart with `replace: true`.
+  `ignoreDifferences` on its own only affects ArgoCD's diff/drift detection: it stops auto-sync (`selfHeal: true`) from firing on a `/data`-only drift, but **any sync that runs applies the full rendered manifest and rotates the live Secret** because the sync operation still pushes `/data`. `RespectIgnoreDifferences=true` (above) is what fixes this: with it set, both auto-sync and a manual `argocd app sync` omit the ignored `/data` and the live credentials are preserved. The remaining ways to still force a rotation are `argocd app sync --force` / `replace: true` (which bypass the ignore and overwrite the whole object) and deleting the Secret to trigger a clean regeneration. The same `--force`/`replace` caveat applies to `kubectl apply --server-side --force-conflicts` outside of Argo.
 </Warning>
 
 ## What does NOT work (and why)
@@ -25587,7 +25595,7 @@ Earlier drafts of the chart annotated the Secret with `argocd.argoproj.io/sync-o
 - **`IgnoreExtraneous`** only changes how Argo computes sync status. It does not stop reconciliation. Argo still applies the rendered Secret on every sync.
 - **`ServerSideApply`** only changes the apply mechanism. It still applies the rendered fields, including the freshly-randomised `.data`.
 
-Only `ignoreDifferences` at the `Application` spec level (or skipping the template entirely, see below) actually stops the rotation.
+Only `ignoreDifferences` on `/data` **together with** `RespectIgnoreDifferences=true` at the `Application` spec level (or skipping the template entirely, see below) actually stops the rotation. `ignoreDifferences` without the sync option leaves the incident path open on every ordinary sync.
 
 ## App-secret path: out-of-band is supported
 
@@ -25608,13 +25616,13 @@ The full list of required keys lives in `secrets.secretKeys` in `values.yaml`. T
 
 For the gateway-auth Secret, the chart's helper requires `autogen.secretNames.gatewayAuth` to match `gateway.secrets.existingSecretName` whenever both are set. The deployment templates mount one Secret by name; the materialisation template renders into the same name. You cannot point the gateway pod at one Secret and have the chart create a different one.
 
-That leaves one supported pattern: chart materialises, ArgoCD `ignoreDifferences` keeps it from rotating. If your platform requires the Secret to flow through External Secrets / Sealed Secrets / Vault end-to-end, the path forward is to skip the chart-rendered Secret with a sync-time exclude (more brittle: requires the operator-rendered Secret to land before Argo applies the chart-rendered one), or to vendor the chart and remove the `langwatch.validateSecrets` name-mismatch check. Both are out of scope for this guide.
+That leaves one supported pattern: chart materialises, ArgoCD `ignoreDifferences` on `/data` plus `RespectIgnoreDifferences=true` keeps it from rotating. If your platform requires the Secret to flow through External Secrets / Sealed Secrets / Vault end-to-end, the path forward is to skip the chart-rendered Secret with a sync-time exclude (more brittle: requires the operator-rendered Secret to land before Argo applies the chart-rendered one), or to vendor the chart and remove the `langwatch.validateSecrets` name-mismatch check. Both are out of scope for this guide.
 
 ## Preflight Job and sync waves
 
-The chart includes a `pre-upgrade` Helm hook (`preflight-secrets-job.yaml`) that verifies every operator-provided Secret has all required keys before pods roll. Helm's `pre-upgrade` hook is not a thing ArgoCD natively understands; ArgoCD reads it via the `argocd.argoproj.io/hook: PreSync` annotation if you want it to gate the sync.
+The chart includes a `pre-upgrade` Helm hook (`preflight-secrets-job.yaml`) that verifies every operator-provided Secret has all required keys before pods roll. ArgoCD maps Helm's `pre-install` and `pre-upgrade` hooks to its own `PreSync` phase automatically, so the rendered Job runs as a `PreSync` hook on every sync without any extra annotation. See the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks). The chart does not add explicit `argocd.argoproj.io/hook` annotations because the Helm-to-Argo mapping already covers it.
 
-The chart does not emit Argo hook annotations by default because the matching behaviour is operator-side and platform-specific. In practice:
+In practice:
 
 - When you set `secrets.existingSecret` (operator-provided app Secret), the preflight Job validates that Secret's keys on every `helm upgrade`. ArgoCD drives the upgrade, the Job still fires.
 - When the chart materialises both Secrets (default), the preflight Job is a no-op (nothing to validate ahead of time).
@@ -25654,19 +25662,23 @@ kubectl -n langwatch get secret langwatch-gateway-auth \
   -o jsonpath='{.metadata.annotations}'
 ```
 
-The Secret should carry `meta.helm.sh/release-name: <your-release>` and `app.kubernetes.io/managed-by: Helm`. To confirm the `ignoreDifferences` block is wired correctly, capture the Secret's `resourceVersion`, force a hard refresh on the Application, wait a reconcile cycle, then re-read:
+The Secret should carry `meta.helm.sh/release-name: <your-release>` and `app.kubernetes.io/managed-by: Helm`. To confirm the mitigation actually holds, capture the Secret's `resourceVersion`, then run a real **sync** (not only a hard refresh — a refresh re-renders but does not apply, so it cannot catch a missing `RespectIgnoreDifferences`). The sync below is deliberately an ordinary one, the same kind any unrelated change would trigger:
 
 ```bash
 kubectl -n langwatch get secret langwatch-gateway-auth \
   -o jsonpath='{.metadata.resourceVersion}'
+# Hard refresh re-renders the manifest (repo-server lookup -> nil -> new random pair)...
 kubectl -n argocd annotate application langwatch \
   argocd.argoproj.io/refresh=hard --overwrite
-sleep 30
+# ...then an ordinary sync applies it. With RespectIgnoreDifferences=true the
+# ignored /data is skipped and the Secret is left alone.
+argocd app sync langwatch
+sleep 10
 kubectl -n langwatch get secret langwatch-gateway-auth \
   -o jsonpath='{.metadata.resourceVersion}'
 ```
 
-The two `resourceVersion` values should be identical. If the second is higher, `selfHeal` re-applied the rendered Secret and the `ignoreDifferences` block did not match the rendered name. Verified on ArgoCD `stable` against this chart: with the block in place the resourceVersion stays constant across a hard refresh; without it the resourceVersion advances every reconcile.
+The two `resourceVersion` values should be identical. If the second is higher, the sync re-applied the rendered Secret: either the `ignoreDifferences` block did not match the rendered name, or `RespectIgnoreDifferences=true` is missing from `syncOptions` (the common cause — `ignoreDifferences` alone passes a hard-refresh check but still rotates on sync). Verified on ArgoCD `stable` against this chart: with both settings in place the resourceVersion stays constant across a sync; with only `ignoreDifferences` it advances on every sync.
 
 You can also confirm Argo treats the Secret's `/data` as managed-but-ignored by reading the live Application status:
 
