@@ -123,9 +123,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_nlp_go_engine_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service instead of the legacy Python langwatch_nlp pipeline.",
+      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service. Default flipped to on: the legacy Python langwatch_nlp pipeline is now the opt-out path (set a PostHog rule or operator-store row to disable per project).",
   },
   {
     key: "release_ui_sdk_radar_banner_card_enabled",
@@ -136,8 +136,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
-    description: "Reveals the AI Gateway menu in the project sidebar.",
+    defaultValue: true,
+    description:
+      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
   {
     key: "release_ui_ai_governance_enabled",

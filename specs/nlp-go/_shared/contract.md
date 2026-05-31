@@ -215,14 +215,15 @@ Workflows pass `chat_messages` between nodes. The engine MUST:
 ## 11. Feature flag
 
 - Key: `release_nlp_go_engine_enabled`.
+- **Registry default: `true`** — new projects route through nlpgo by default. The legacy Python pipeline is the opt-out path (PostHog rule, operator-store row, or `NLPGO_BYPASS=1` on the pod for a chart-wide kill switch).
 - Backend: `featureFlagService` (PostHog when configured, in-memory otherwise).
-- Distinct id: **projectId**. Per-project rollout.
-- Env override: `RELEASE_NLP_GO_ENGINE_ENABLED=1` (also honored via `FEATURE_FLAG_FORCE_ENABLE`).
-- Decision points (TS app): `runWorkflow.ts`, `playground.ts`, `topicClustering.ts`. **All three** flip together so a flagged project sees the new path everywhere.
-- When on:
+- Distinct id: **projectId**. Per-project rollout / opt-out.
+- Env override: `RELEASE_NLP_GO_ENGINE_ENABLED=0` to force-disable; `FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled` to pin it on regardless of backend state.
+- Decision points (TS app): `runWorkflow.ts`, `playground.ts`, `topicClustering.ts`. **All three** flip together so a project sees the same path everywhere.
+- When on (default):
   - **runWorkflow + playground:** TS app prepends `/go` and routes to nlpgo (single container with Go front-door + Python child).
   - **topic clustering:** TS app routes to **langevals** at `${LANGEVALS_BASE_URL}/topics/{batch,incremental}_clustering` (new langevals workspace member). The langwatch_nlp side is bypassed.
-- When off:
+- When off (per-project opt-out):
   - All three call sites stay on the legacy paths (langwatch_nlp), bit-identical to today's traffic.
 
 The library pivot for nlpgo→aigateway (see §8) removed the LW_NLPGO_INTERNAL_SECRET HMAC bridge — both /go/* and the langevals /topics/* hops follow today's no-auth posture (Lambda Function URL + URL secrecy + restrictive SG).

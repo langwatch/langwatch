@@ -762,7 +762,8 @@
               "self-hosting/deployment/docker-compose",
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
-              "self-hosting/deployment/kubernetes-local"
+              "self-hosting/deployment/kubernetes-local",
+              "self-hosting/deployment/argocd"
             ]
           },
           {

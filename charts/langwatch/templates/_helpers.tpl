@@ -21,6 +21,19 @@ app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+  Single primitive for chart-materialised Secret values. Every autogen
+  site renders through this helper so a future "all secrets must be
+  N-bit / FIPS / Vault-issued" change has one update site instead of
+  several. Output: base64-encoded sha256(64-char alphanum), suitable
+  for the .data block of a Secret manifest. Callers are responsible
+  for idempotency (lookup-then-default) so the value only rolls when
+  the existing Secret data is missing.
+*/}}
+{{- define "langwatch.autogenSecretValue" }}
+{{- randAlphaNum 64 | sha256sum | b64enc }}
+{{- end }}
+
 {{/* Secret validation function */}}
 {{- define "langwatch.validateSecrets" }}
 {{- $errors := list }}
@@ -279,6 +292,39 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     {{- end }}
   {{- end }}
   {{/* Prometheus is optional — no error when chartManaged=false and no external config */}}
+{{- end }}
+
+{{/* Validate AI Gateway secret wiring.
+
+     gateway-auth-secret.yaml always materialises the LW_GATEWAY_*
+     Secret when gateway.chartManaged is true, matching the
+     clickhouse / redis / postgresql subchart pattern (lookup-or-rand,
+     no autogen.enabled gate). So there is no "missing secret" case
+     to validate here. What we DO still validate is the autogen
+     name-mismatch trap: if an operator overrode autogen.secretNames.gatewayAuth
+     but left gateway.secrets.existingSecretName at the default, the
+     chart would materialise the Secret under one name and the app +
+     gateway pods would mount the other.
+
+     We do NOT validate gateway.otel.* auth here. The gateway subchart
+     deployment template (charts/gateway/templates/deployment.yaml)
+     intentionally does NOT inject GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
+     (forward-compat-only knob), so failing on absent values would
+     tell operators to set knobs that do not actually authenticate
+     the OTLP export. The mitigation for the postmortem's Bifrost
+     recursion trigger is the chart default flipped to
+     gateway.otel.endpoint="". Operators who opt back in plumb the
+     header via gateway.extraEnvs (OTEL_OTLP_HEADERS) until the
+     subchart wires the knobs natively. */}}
+{{- $gw := .Values.gateway | default dict }}
+{{- if $gw.chartManaged }}
+  {{- $gwSecrets := $gw.secrets | default dict }}
+  {{- $existingName := $gwSecrets.existingSecretName }}
+  {{- $autogenNames := .Values.autogen.secretNames | default dict }}
+  {{- $autogenGatewayAuth := $autogenNames.gatewayAuth | default "" }}
+  {{- if and $autogenGatewayAuth $existingName (ne $autogenGatewayAuth $existingName) }}
+    {{- $errors = append $errors (printf "autogen.secretNames.gatewayAuth (%s) must match gateway.secrets.existingSecretName (%s); the chart materialises the former while both langwatch-app and the gateway pod mount the latter." $autogenGatewayAuth $existingName) }}
+  {{- end }}
 {{- end }}
 
 {{/* Output errors and warnings */}}
