@@ -399,6 +399,7 @@ export class EventSourcing {
     if (clickHouseEnabled) {
       this._eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(this._clickhouse!),
+        this._retentionPolicyResolver,
       );
       logger.debug("Using ClickHouse event store");
     } else if (!isProduction) {
