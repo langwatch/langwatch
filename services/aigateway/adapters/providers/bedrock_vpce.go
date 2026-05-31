@@ -402,6 +402,15 @@ func mapBedrockInferenceConfig(params *bfschemas.ChatParameters) *brtypes.Infere
 
 // mapBedrockToolConfig maps the neutral tool list to Bedrock's
 // ToolConfiguration. Returns nil when no tools are present.
+//
+// Forwards the caller's tool_choice directive to Bedrock when set. Without
+// this, customer 2026-05-31 dogfood: nlpgo translates response_format to
+// tools + tool_choice(forced) for structured outputs on bedrock+anthropic
+// (executor.go shouldUseToolUseForStructuredOutput); the public-bedrock
+// path through bifrost honors that, but the VPCE intercept here dropped
+// tool_choice silently. Model received the synthetic lw_so_* tool with no
+// pin → free to ignore it and reply with text → engine prose-fallback
+// dumped the entire reasoning into the first declared output field.
 func mapBedrockToolConfig(params *bfschemas.ChatParameters) *brtypes.ToolConfiguration {
 	if params == nil || len(params.Tools) == 0 {
 		return nil
@@ -426,7 +435,55 @@ func mapBedrockToolConfig(params *bfschemas.ChatParameters) *brtypes.ToolConfigu
 	if len(tools) == 0 {
 		return nil
 	}
-	return &brtypes.ToolConfiguration{Tools: tools}
+	return &brtypes.ToolConfiguration{
+		Tools:      tools,
+		ToolChoice: mapBedrockToolChoice(params.ToolChoice),
+	}
+}
+
+// mapBedrockToolChoice maps the OpenAI/bifrost-shape tool_choice union to
+// the Bedrock Converse ToolChoice union. Returns nil when no choice was
+// specified (bedrock defaults to auto). Specific-tool pins are required
+// for the structured-output rewrite path (forced lw_so_<schema> call);
+// only Anthropic Claude 3+ and Amazon Nova models honor specific-tool
+// per the bedrockruntime SDK docs, other model families silently fall
+// back to auto.
+func mapBedrockToolChoice(tc *bfschemas.ChatToolChoice) brtypes.ToolChoice {
+	if tc == nil {
+		return nil
+	}
+	if tc.ChatToolChoiceStr != nil {
+		switch strings.ToLower(*tc.ChatToolChoiceStr) {
+		case "any", "required":
+			return &brtypes.ToolChoiceMemberAny{}
+		case "auto":
+			return &brtypes.ToolChoiceMemberAuto{}
+		default:
+			// "none" or anything unrecognised: don't pin. Bedrock's
+			// "none" semantics aren't a first-class Converse value; the
+			// caller can omit tools entirely to achieve the same.
+			return nil
+		}
+	}
+	if tc.ChatToolChoiceStruct == nil {
+		return nil
+	}
+	s := tc.ChatToolChoiceStruct
+	switch s.Type {
+	case bfschemas.ChatToolChoiceTypeAny, bfschemas.ChatToolChoiceTypeRequired:
+		return &brtypes.ToolChoiceMemberAny{}
+	case bfschemas.ChatToolChoiceTypeAuto:
+		return &brtypes.ToolChoiceMemberAuto{}
+	case bfschemas.ChatToolChoiceTypeFunction:
+		if s.Function == nil || s.Function.Name == "" {
+			return nil
+		}
+		return &brtypes.ToolChoiceMemberTool{
+			Value: brtypes.SpecificToolChoice{Name: aws.String(s.Function.Name)},
+		}
+	default:
+		return nil
+	}
 }
 
 // converseOutputToBifrost maps a Bedrock Converse response back to the

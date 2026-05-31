@@ -176,3 +176,136 @@ func TestBedrockVPCELive_PingStream(t *testing.T) {
 		t.Fatalf("expected a terminal finish reason; got none over %d chunks", chunks)
 	}
 }
+
+// TestBedrockVPCELive_StructuredOutputToolChoice exercises the forced
+// tool_use path that nlpgo's executor.go uses to translate
+// response_format into structured outputs for bedrock+anthropic. Customer
+// dogfood 2026-05-31: nlpgo's translation sent tools + tool_choice but
+// the VPCE intercept's mapBedrockToolConfig dropped tool_choice, so the
+// model was free to ignore the synthetic lw_so_* tool and replied with
+// text. The engine's prose-fallback then dumped the entire reasoning
+// into the first declared output field. Same prompt shape as the
+// customer's failing classifier-relevance workflow (long system
+// instructions, structured-output schema with bool + str outputs).
+//
+// Run against any VPCE-compatible endpoint:
+//
+//	AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... \
+//	BVPCE_ENDPOINT=https://bedrock-runtime.us-east-1.amazonaws.com \
+//	BVPCE_REGION=us-east-1 \
+//	BVPCE_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0 \
+//	go test -tags live_bedrock_vpce ./services/aigateway/adapters/providers/ \
+//	  -run BedrockVPCELive_StructuredOutputToolChoice -count=1 -v
+func TestBedrockVPCELive_StructuredOutputToolChoice(t *testing.T) {
+	endpoint := os.Getenv("BVPCE_ENDPOINT")
+	if endpoint == "" {
+		t.Skip("BVPCE_ENDPOINT not set; skipping live Bedrock VPCE structured-output test")
+	}
+	ak := os.Getenv("AWS_ACCESS_KEY_ID")
+	sk := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	if ak == "" || sk == "" {
+		t.Skip("AWS creds not set; skipping live Bedrock VPCE structured-output test")
+	}
+	region := os.Getenv("BVPCE_REGION")
+	if region == "" {
+		region = "us-east-1"
+	}
+	model := os.Getenv("BVPCE_MODEL")
+	if model == "" {
+		t.Fatal("BVPCE_MODEL must be set (the inference-profile id to invoke)")
+	}
+
+	extra := map[string]string{
+		"bedrock_runtime_endpoint": endpoint,
+		"access_key":               ak,
+		"secret_key":               sk,
+		"region":                   region,
+	}
+	if st := os.Getenv("AWS_SESSION_TOKEN"); st != "" {
+		extra["session_token"] = st
+	}
+
+	cred := domain.Credential{
+		ID:         "live-bedrock-vpce-so",
+		ProviderID: domain.ProviderBedrock,
+		Extra:      extra,
+	}
+	// Mirrors what nlpgo executor.go emits for a signature node with
+	// {output:bool, reason:str} outputs after translating response_format
+	// to forced tool_use (shouldUseToolUseForStructuredOutput +
+	// buildStructuredOutputTool). The synthetic tool name uses the
+	// lw_so_<schema> prefix the engine uses.
+	body := []byte(`{
+		"messages":[
+			{"role":"system","content":"You are a strict boolean evaluator. Return TRUE only when the user input describes a feature-comparison question."},
+			{"role":"user","content":"What is the difference between budget navigator and pacing monitor?"}
+		],
+		"max_tokens":1024,
+		"tools":[{
+			"type":"function",
+			"function":{
+				"name":"lw_so_ClassifierRelevance",
+				"description":"Return the response as a JSON object matching the declared output schema.",
+				"parameters":{
+					"type":"object",
+					"properties":{
+						"output":{"type":"boolean"},
+						"reason":{"type":"string"}
+					},
+					"required":["output","reason"],
+					"additionalProperties":false
+				},
+				"strict":true
+			}
+		}],
+		"tool_choice":{"type":"function","function":{"name":"lw_so_ClassifierRelevance"}}
+	}`)
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: model,
+		Body:  body,
+	}
+
+	router := &BifrostRouter{}
+	resp, err := router.dispatchBedrockVPCE(context.Background(), req, mapProvider(cred.ProviderID), model, cred, endpoint)
+	if err != nil {
+		t.Fatalf("dispatchBedrockVPCE error: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d; body=%s", resp.StatusCode, string(resp.Body))
+	}
+
+	// Post-fix: the model MUST call the forced tool. The response shape
+	// carries the structured payload on tool_calls[0].function.arguments
+	// (JSON string), with empty text content. Pre-fix (tool_choice
+	// silently dropped by mapBedrockToolConfig): the model returned text
+	// content and no tool_calls — exact pre-fix manifestation that
+	// triggered the engine's prose-fallback into the first declared
+	// output field.
+	toolName := gjson.GetBytes(resp.Body, "choices.0.message.tool_calls.0.function.name").String()
+	args := gjson.GetBytes(resp.Body, "choices.0.message.tool_calls.0.function.arguments").String()
+	textContent := gjson.GetBytes(resp.Body, "choices.0.message.content").String()
+	t.Logf("LIVE 200 via %s | model=%s | tool_name=%q | args=%q | text=%q",
+		endpoint, model, toolName, args, textContent)
+
+	if toolName != "lw_so_ClassifierRelevance" {
+		t.Fatalf("expected forced tool call to lw_so_ClassifierRelevance, got %q (text content: %q) — tool_choice was likely dropped on the VPCE intercept path",
+			toolName, textContent)
+	}
+	if args == "" {
+		t.Fatalf("expected non-empty tool_call arguments JSON; body=%s", string(resp.Body))
+	}
+	if !gjson.Valid(args) {
+		t.Fatalf("tool_call arguments must be valid JSON, got %q", args)
+	}
+	output := gjson.Get(args, "output")
+	if !output.Exists() {
+		t.Fatalf("expected `output` field in tool_call arguments; got %s", args)
+	}
+	if output.Type != gjson.True && output.Type != gjson.False {
+		t.Fatalf("expected `output` to be a real bool, got type=%v value=%v", output.Type, output.Value())
+	}
+	if reason := gjson.Get(args, "reason").String(); reason == "" {
+		t.Fatalf("expected non-empty `reason` field in tool_call arguments; got %s", args)
+	}
+}
