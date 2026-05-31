@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
@@ -10,19 +11,27 @@ const logger = createLogger("langwatch:ops:clickhouse:explain");
 /// Operator-only endpoint for running EXPLAIN against the live ClickHouse
 /// instance the app is connected to. Lets the clickhouse-optimizer agent
 /// validate query plans for proposed optimisations without needing direct
-/// ClickHouse access. Defenses:
+/// ClickHouse access. Defenses, outermost to innermost:
 ///
 ///  1. API key auth (LANGWATCH_OPS_API_KEY), constant-time compared.
-///  2. Server-side EXPLAIN wrapping — the user's SQL never reaches the
+///  2. Input regex filter — table-function deny-list (url/s3/remote/file/
+///     postgresql/mysql/...) so a leaked key can't be turned into SSRF,
+///     plus SYSTEM_SCHEMA / multi-statement / forbidden-keyword guards.
+///  3. Server-side EXPLAIN wrapping — the caller's SQL never reaches the
 ///     DB unwrapped, so they cannot smuggle an INSERT/DROP/etc through.
-///  3. EXPLAIN type allowlist — ANALYZE is blocked because it actually
+///  4. EXPLAIN type allowlist — ANALYZE is blocked because it actually
 ///     executes the inner query (a load risk on prod).
-///  4. Forbidden-keyword pre-filter, defense in depth on top of the
-///     wrapper. Catches `INSERT`/`DROP`/`ALTER`/etc in the body.
-///  5. ClickHouse-side readonly=1 + a 5s execution cap + 10 MB result
-///     cap, the actual backstop if everything above is bypassed.
-///  6. Audit log — every accepted request logs caller-identified label,
-///     EXPLAIN type, and the first 200 chars of the query.
+///  5. Dedicated `langwatch_ops` ClickHouse user (via CLICKHOUSE_OPS_URL)
+///     with only `GRANT SELECT ON langwatch.*`. No SOURCES grant ->
+///     table functions rejected at the access-check layer regardless of
+///     what slips past the input filter. Falls back to the shared client
+///     (with a warning) when the env var is unset, so dev / pre-migration
+///     prod still works but defense (2) is the only line.
+///  6. Per-query CH settings: readonly=1 + 10s execution cap + 10 MB
+///     result cap + 1 GB memory cap, scoped to the EXPLAIN itself.
+///  7. Audit log — every accepted request logs the redacted shape and
+///     a sha256 prefix; raw literals are stripped so application logs
+///     don't become a PII sink.
 
 const ALLOWED_TYPES = ["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"] as const;
 type ExplainType = (typeof ALLOWED_TYPES)[number];
@@ -143,6 +152,39 @@ export function redactQueryForAudit(query: string): { shape: string; sha256: str
   return { shape: shape.slice(0, 300), sha256 };
 }
 
+/// Lazily-built dedicated client for the langwatch_ops user. Module-scoped
+/// cache so we reuse the connection pool across requests; reset only when
+/// the env var changes (which doesn't happen in a live pod). When
+/// CLICKHOUSE_OPS_URL is unset, returns null and the handler falls back to
+/// the shared default-user client.
+let opsClickHouseClient: ClickHouseClient | null = null;
+let warnedAboutMissingOpsUrl = false;
+
+export function getOpsClickHouseClient(): ClickHouseClient | null {
+  if (opsClickHouseClient) return opsClickHouseClient;
+  const url = process.env.CLICKHOUSE_OPS_URL;
+  if (!url || url.trim() === "") return null;
+  let parsed: URL | string = url;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // pass raw if not a valid URL — driver may still accept it
+  }
+  opsClickHouseClient = createClient({
+    url: parsed,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+    max_open_connections: 5,
+    keep_alive: { enabled: true, idle_socket_ttl: 1500 },
+  });
+  return opsClickHouseClient;
+}
+
+/// Exported for unit tests to reset the cached client between tests.
+export function _resetOpsClickHouseClientForTesting(): void {
+  opsClickHouseClient = null;
+  warnedAboutMissingOpsUrl = false;
+}
+
 function isAuthorized(req: NextApiRequest): boolean {
   const expected = process.env.LANGWATCH_OPS_API_KEY;
   if (!expected) return false; // fail closed when not configured
@@ -174,7 +216,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ message: built.reason });
   }
 
-  const client = getSharedClickHouseClient();
+  // Prefer the dedicated langwatch_ops user (no SOURCES grant, so url/s3/
+  // remote/file/postgresql table functions are refused at the access-check
+  // layer). Fall back to the shared client only when CLICKHOUSE_OPS_URL is
+  // not configured — log once so the gap is visible without spamming.
+  let client = getOpsClickHouseClient();
+  let usingFallback = false;
+  if (!client) {
+    if (!warnedAboutMissingOpsUrl) {
+      logger.warn(
+        "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +
+          "Provision the langwatch_ops user (see infrastructure/clickhouse-serverless/config/users.xml.template) " +
+          "and set CLICKHOUSE_OPS_URL to remove this fallback.",
+      );
+      warnedAboutMissingOpsUrl = true;
+    }
+    usingFallback = true;
+    client = getSharedClickHouseClient();
+  }
   if (!client) {
     return res.status(503).json({ message: "ClickHouse is not configured on this instance" });
   }
@@ -182,7 +241,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Audit log: shape + hash only. Literals (tenant ids, span attributes,
   // user-supplied values) are stripped so application logs don't become
   // a PII sink. The hash lets us correlate repeated identical queries.
-  logger.info({ type: built.type, ...redactQueryForAudit(parsed.data.query) }, "ops explain");
+  logger.info(
+    { type: built.type, usingFallback, ...redactQueryForAudit(parsed.data.query) },
+    "ops explain",
+  );
 
   try {
     const result = await client.query({

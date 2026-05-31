@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { buildExplainQuery, redactQueryForAudit } from "../explain";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  _resetOpsClickHouseClientForTesting,
+  buildExplainQuery,
+  getOpsClickHouseClient,
+  redactQueryForAudit,
+} from "../explain";
 
 // A minimal SELECT that satisfies the tenant-predicate invariant. Used as
 // the "valid baseline" everywhere we need an otherwise-acceptable shape so
@@ -151,5 +156,40 @@ describe("redactQueryForAudit", () => {
     const big = "SELECT " + "x, ".repeat(500) + " FROM y WHERE TenantId = 'p_x'";
     const { shape } = redactQueryForAudit(big);
     expect(shape.length).toBeLessThanOrEqual(300);
+  });
+});
+
+describe("getOpsClickHouseClient", () => {
+  const savedEnv = process.env.CLICKHOUSE_OPS_URL;
+
+  beforeEach(() => {
+    _resetOpsClickHouseClientForTesting();
+  });
+
+  afterEach(() => {
+    if (savedEnv === undefined) {
+      delete process.env.CLICKHOUSE_OPS_URL;
+    } else {
+      process.env.CLICKHOUSE_OPS_URL = savedEnv;
+    }
+    _resetOpsClickHouseClientForTesting();
+  });
+
+  it("returns null when CLICKHOUSE_OPS_URL is unset — handler falls back to shared client", () => {
+    delete process.env.CLICKHOUSE_OPS_URL;
+    expect(getOpsClickHouseClient()).toBeNull();
+  });
+
+  it("returns null when CLICKHOUSE_OPS_URL is whitespace-only", () => {
+    process.env.CLICKHOUSE_OPS_URL = "   ";
+    expect(getOpsClickHouseClient()).toBeNull();
+  });
+
+  it("builds and caches a client when CLICKHOUSE_OPS_URL is set", () => {
+    process.env.CLICKHOUSE_OPS_URL = "http://langwatch_ops:secret@ch.example:8123/langwatch";
+    const a = getOpsClickHouseClient();
+    const b = getOpsClickHouseClient();
+    expect(a).not.toBeNull();
+    expect(b).toBe(a);
   });
 });
