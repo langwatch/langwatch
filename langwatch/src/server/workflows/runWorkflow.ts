@@ -12,6 +12,10 @@ import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
+import { createLogger } from "../../utils/logger";
+import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
+
+const logger = createLogger("langwatch:workflows:runWorkflow");
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -232,6 +236,33 @@ export async function runWorkflow(
       origin,
     },
   };
+
+  // Strip every sampling parameter from each LLM block that the resolved
+  // model does not list as supported. The Studio path (POST
+  // /api/workflows/post_event) already does this; this is the parallel
+  // chokepoint for every server-driven dispatch (online evaluators,
+  // evaluator-as-evaluator chains, scheduled runs). Without it, a
+  // published workflow that carries a stale top_p from before the
+  // operator disabled it on their custom-model config still ships the
+  // field to the gateway, and Bedrock newer-Claude rejects the combo
+  // with `temperature and top_p cannot both be specified`. Customer
+  // dogfood 2026-05-31 surfaced exactly this path on
+  // us.anthropic.claude-haiku-4-5-* as an online evaluator. Best-effort
+  // so a registry-lookup miss never blocks the run.
+  try {
+    await stripUnsupportedLLMParamsFromWorkflow({
+      prisma,
+      projectId,
+      workflow: messageWithoutEnvs.payload.workflow as Parameters<
+        typeof stripUnsupportedLLMParamsFromWorkflow
+      >[0]["workflow"],
+    });
+  } catch (filterError) {
+    logger.warn(
+      { err: filterError, projectId, workflowId },
+      "stripUnsupportedLLMParamsFromWorkflow failed; forwarding original payload",
+    );
+  }
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
 
