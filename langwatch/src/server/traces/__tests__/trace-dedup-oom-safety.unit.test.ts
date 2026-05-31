@@ -158,15 +158,23 @@ describe("trace dedup OOM safety", () => {
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "getSpansByTraceId");
     const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
+    // getSpansByTraceId builds its SQL through this helper, which pages the
+    // SpanId set before reading heavy columns. The dedup lives in the helper.
+    const queryBuilder = extractFunctionBody(
+      spanStorageSource,
+      "fullSpansByTraceIdQuery",
+    );
 
     describe("when the stored_spans query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
         expect(body).not.toContain("LIMIT 1 BY");
+        expect(queryBuilder).not.toContain("LIMIT 1 BY");
         expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
       it("delegates dedup to the IN-tuple helper", () => {
-        expect(body).toContain("dedupInTuple");
+        expect(body).toContain("fullSpansByTraceIdQuery");
+        expect(queryBuilder).toContain("dedupInTuple");
       });
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
