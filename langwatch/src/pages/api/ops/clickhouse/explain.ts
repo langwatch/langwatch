@@ -108,29 +108,58 @@ export interface ParseResult {
   reason?: string;
 }
 
+/// Strip block comments with a small state machine that tracks nesting —
+/// ClickHouse treats `/* outer /* inner */ */` as ONE comment, but a
+/// non-greedy regex would stop at the first `*/` and resurrect the
+/// fake-predicate-bearing tail (`TenantId = '...' */`) as live SQL text.
+/// Replaces each top-level comment with a single space so adjacency
+/// tricks like `INS/**/ERT` collapse to `INS ERT` (no keyword reborn).
+/// If a comment is unbalanced (depth never returns to 0), we consume to
+/// EOF — same behaviour ClickHouse exhibits, the query would fail to
+/// parse there too, so the regex pass treating the rest as gone is fine.
+function stripBlockComments(s: string): string {
+  let out = "";
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (depth === 0) {
+      if (s[i] === "/" && s[i + 1] === "*") {
+        depth = 1;
+        i++; // consume the `*`
+        continue;
+      }
+      out += s[i];
+    } else {
+      if (s[i] === "/" && s[i + 1] === "*") {
+        depth++;
+        i++;
+      } else if (s[i] === "*" && s[i + 1] === "/") {
+        depth--;
+        i++;
+        if (depth === 0) out += " "; // separator so `a/**/b` -> `a b`
+      }
+      // else: swallow the char, we're inside a comment
+    }
+  }
+  return out;
+}
+
 /// Strip SQL comments and quoted string literals from the query so the
 /// regex pass below cannot be tricked by tokens that the ClickHouse parser
 /// will treat as no-ops. Without this, `url/**/('http://x')` evades the
 /// table-function check (`\burl\s*\(` doesn't see the `/* */` between
 /// `url` and `(`), and `WHERE 1=1 /* TenantId = */` satisfies the tenant
-/// predicate without filtering anything.
+/// predicate without filtering anything. Nested block comments are
+/// handled by stripBlockComments above.
 ///
 /// Returns the normalized text — same length as the input is NOT
-/// guaranteed (block comments become a single space, strings become `''`).
-/// We use this only for the safety regex pass; the EXECUTED query is
-/// always the caller's original text, because the EXPLAIN wrapping +
-/// ClickHouse parser handle the real SQL.
+/// guaranteed. We use this only for the safety regex pass; the EXECUTED
+/// query is always the caller's original text, because the EXPLAIN
+/// wrapping + ClickHouse parser handle the real SQL.
 export function stripCommentsAndStrings(query: string): string {
-  // The order matters. Block comments may legally contain `'` or `"` that
-  // would otherwise open a phantom string; line comments same. So strip
-  // comments first, then strings. ClickHouse also supports nested
-  // block comments — a deliberate trade-off: a deeply nested comment
-  // might leave a stray closing `*/` in the normalized text, which is
-  // fine for our purposes (the residue is just punctuation, no keyword
-  // gets resurrected).
-  let s = query;
-  // Block comments /* ... */ (non-greedy, multi-line).
-  s = s.replace(/\/\*[\s\S]*?\*\//g, " ");
+  // The order matters. Block comments may legally contain `'` or `"`
+  // (and line-comment markers) that would otherwise open a phantom
+  // string. So strip comments first, then strings.
+  let s = stripBlockComments(query);
   // Line comments -- ... and # ... to end of line (CH supports both `--`
   // and `#`; the # form must be at start-of-token to count, but we play
   // safe and strip from `#` to newline whenever found).

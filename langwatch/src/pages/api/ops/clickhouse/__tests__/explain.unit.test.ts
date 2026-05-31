@@ -167,6 +167,28 @@ describe("buildExplainQuery", () => {
       expect(r.reason).toMatch(/TenantId/);
     });
 
+    it("rejects the nested-block-comment tenant bypass (reviewer regression)", () => {
+      // ClickHouse treats `/* outer /* inner */ */` as ONE nested comment
+      // and the executed query is tenant-unscoped. A non-greedy regex
+      // stripper would stop at the first `*/`, leaving `TenantId = '' */`
+      // in the normalized text and tricking the tenant-predicate check.
+      // The nesting-aware state machine in stripBlockComments swallows
+      // the whole nest.
+      const q = `SELECT * FROM stored_spans WHERE 1 = 1 /* outer /* inner */ TenantId = 'p_fake' */`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/TenantId/);
+    });
+
+    it("rejects deeper nested block comments hiding a forbidden keyword", () => {
+      // Three levels of nesting. The state machine must track depth.
+      const q = `SELECT 1 FROM stored_spans /* a /* b /* DROP TABLE foo */ */ */ WHERE TenantId = 'p_x'`;
+      const r = buildExplainQuery(q);
+      // Comment is entirely stripped, DROP never reaches the keyword
+      // check. Query is otherwise valid -> ok.
+      expect(r.ok).toBe(true);
+    });
+
     it("rejects a tenant predicate that only appears inside a string literal", () => {
       const q = `SELECT * FROM stored_spans WHERE name = 'TenantId = something'`;
       const r = buildExplainQuery(q);
@@ -228,6 +250,26 @@ describe("stripCommentsAndStrings", () => {
   });
   it("removes /* TenantId = */ entirely so the predicate check is honest", () => {
     expect(stripCommentsAndStrings("WHERE 1=1 /* TenantId = */")).not.toMatch(/TenantId/i);
+  });
+
+  it("handles nested block comments by tracking depth (the reviewer repro)", () => {
+    // `/* outer /* inner */ TenantId = 'p_fake' */` is one ClickHouse
+    // comment; the whole thing should be stripped, no `TenantId` survives.
+    const out = stripCommentsAndStrings("WHERE 1=1 /* outer /* inner */ TenantId = 'p_fake' */");
+    expect(out).not.toMatch(/TenantId/i);
+    expect(out).not.toMatch(/p_fake/);
+  });
+
+  it("handles three-level nesting", () => {
+    const out = stripCommentsAndStrings("SELECT 1 /* a /* b /* DROP TABLE */ */ */ FROM x");
+    expect(out).not.toMatch(/DROP/i);
+    expect(out).toMatch(/SELECT 1\s+FROM x/);
+  });
+
+  it("consumes to EOF on an unbalanced opener (matches the CH parser)", () => {
+    const out = stripCommentsAndStrings("SELECT 1 /* unterminated TenantId = 'p_x'");
+    expect(out).toMatch(/SELECT 1/);
+    expect(out).not.toMatch(/TenantId/i);
   });
 });
 
