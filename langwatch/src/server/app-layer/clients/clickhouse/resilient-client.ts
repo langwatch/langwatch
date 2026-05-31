@@ -253,6 +253,12 @@ function extractQueryPreview(params: unknown): string | undefined {
   return p.query.length > 200 ? p.query.slice(0, 200) + "..." : p.query;
 }
 
+function extractRawQuery(params: unknown): string | undefined {
+  if (!params || typeof params !== "object") return undefined;
+  const p = params as Record<string, unknown>;
+  return typeof p.query === "string" ? p.query : undefined;
+}
+
 function logFailure({
   operation,
   error,
