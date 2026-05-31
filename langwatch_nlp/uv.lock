@@ -1803,7 +1803,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.107.0" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "pydantic", specifier = ">=2.4.0" },
-    { name = "tenacity", specifier = ">=8.4.0" },
+    { name = "tenacity", specifier = ">=9.1.4" },
     { name = "tqdm", specifier = ">=4.66.4" },
     { name = "transformers", specifier = ">=4.49.0" },
     { name = "zipp", specifier = ">=3.23.0" },
@@ -1814,7 +1814,7 @@ dev = [{ name = "ipykernel", specifier = ">=6.29.4" }]
 
 [[package]]
 name = "langwatch"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -1866,8 +1866,8 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
-    { name = "tenacity", specifier = ">=8.0.0" },
-    { name = "termcolor", specifier = ">=3.3.0" },
+    { name = "tenacity", specifier = ">=9.1.4" },
+    { name = "termcolor", specifier = ">=3.0.1" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
@@ -1898,7 +1898,7 @@ examples = [
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.62b1" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.0" },
@@ -1997,7 +1997,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.14.1,<2" },
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.58.0,<3" },
     { name = "structlog", specifier = ">=24.1.0" },
-    { name = "tenacity", specifier = ">=8.5.0,<9" },
+    { name = "tenacity", specifier = ">=9.1.4,<10" },
     { name = "uvicorn", specifier = ">=0.31.1" },
     { name = "watchdog", specifier = ">=5.0.3" },
     { name = "watchdog", marker = "extra == 'dev'", specifier = ">=5.0.3,<6" },
@@ -4189,11 +4189,11 @@ wheels = [
 
 [[package]]
 name = "tenacity"
-version = "8.5.0"
+version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309, upload-time = "2024-07-05T07:25:31.836Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165, upload-time = "2024-07-05T07:25:29.591Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
 ]
 
 [[package]]
