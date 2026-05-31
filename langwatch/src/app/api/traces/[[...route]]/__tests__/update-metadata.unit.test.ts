@@ -190,7 +190,7 @@ describe("PATCH /:traceId/metadata", () => {
   });
 
   describe("when called with custom metadata keys", () => {
-    /** @scenario PATCH endpoint maps custom keys to langwatch.metadata.* resource attributes */
+    /** @scenario "PATCH endpoint maps custom keys to langwatch.metadata.* resource attributes" */
     it("prefixes custom keys with langwatch.metadata.", async () => {
       const res = await patchMetadata("trace-abc", {
         environment: "staging",
