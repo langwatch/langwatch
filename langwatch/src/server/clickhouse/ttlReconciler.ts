@@ -337,14 +337,16 @@ export async function reconcileTTL(
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const needsRetention =
-        retentionTTLExpr &&
-        RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
-        !hasRetentionTTL(engineFull);
+      const isManaged = RETENTION_MANAGED_TABLES.includes(tableConfig.table);
+      // Whether the cold TTL alone is enough to skip this run — i.e. nothing
+      // has changed in the cold-TTL space. For managed tables we must still
+      // run when retention TTL is missing from the table (first-time apply).
+      const retentionMissing =
+        isManaged && retentionTTLExpr && !hasRetentionTTL(engineFull);
 
       if (
         !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
-        !needsRetention
+        !retentionMissing
       ) {
         skippedCount++;
         if (options.verbose) {
@@ -361,9 +363,13 @@ export async function reconcileTTL(
         days: desiredDays,
       });
 
+      // MODIFY TTL replaces the whole expression atomically, so for managed
+      // tables we ALWAYS re-emit retentionTTLExpr — even when it's already
+      // present — otherwise a hot-days bump silently drops the retention
+      // DELETE clause from the table.
       const ttlClauses = [
         coldTTLExpr,
-        needsRetention ? retentionTTLExpr : null,
+        isManaged && retentionTTLExpr ? retentionTTLExpr : null,
       ]
         .filter(Boolean)
         .join(",\n  ");
@@ -379,7 +385,7 @@ export async function reconcileTTL(
             table: tableConfig.table,
             from: currentDays,
             to: desiredDays,
-            retentionTTL: needsRetention,
+            retentionTTL: isManaged && !!retentionTTLExpr,
           },
           "Updating TTL",
         );
