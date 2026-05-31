@@ -42,13 +42,49 @@ backup:
 
 # Authentication
 auth:
-  password: ""         # Auto-generated when empty
-  clusterSecret: ""    # Inter-node cluster secret; auto-generated when empty
-  existingSecret: ""
+  password: ""         # Used as autogen seed when autogen.enabled=true and this is unset
+  clusterSecret: ""    # Used as autogen seed when autogen.enabled=true and this is unset
+  existingSecret: ""   # Operator-owned Secret name. Required when autogen.enabled=false.
   secretKeys:
     passwordKey: "password"
     clusterSecretKey: "clusterSecret"
 
+# Chart-managed Secret materialisation. Default false matches the prod-safe
+# behaviour of the parent langwatch chart's autogen.enabled.
+#
+# autogen.enabled=true: the chart renders the credentials Secret on first
+# install via the lookup-or-rand pattern (subsequent helm upgrades reuse the
+# existing keys verbatim, so ClickHouse pods don't roll). Convenient for
+# stock installs and dev quickstart.
+#
+# autogen.enabled=false: the chart does NOT render a Secret. The operator
+# pre-creates a Secret out-of-band and points auth.existingSecret at it.
+# This is the only mode that is drift-free under GitOps controllers whose
+# render step has no cluster access (ArgoCD's repo-server returns nil from
+# helm lookup every sync, so the autogen path would rotate credentials on
+# every reconcile). The preflight Job validates the configured keys exist
+# before pods roll.
+#
+# Either way, when both flags are unset the chart-time validator fails with
+# a clear message instructing the operator to pick one path.
+autogen:
+  enabled: false
+
+# Preflight Job that runs pre-install + pre-upgrade and verifies the
+# operator-owned Secret has every key the StatefulSet mounts. Only renders
+# when autogen.enabled=false and auth.existingSecret is set (when the chart
+# materialises the Secret there is nothing to validate ahead of time).
+#
+# Image needs sh + kubectl + jq. alpine/k8s ships all three. The script
+# does a single `kubectl get -o json` per Secret + `jq` lookups so dotted
+# operator-configured key names resolve correctly. registry.k8s.io/kubectl
+# is distroless and has no /bin/sh; bitnami/kubectl has /bin/sh but no jq.
+# A startup guard inside the Job fails fast if jq is missing from the image.
+preflight:
+  enabled: true
+  image: alpine/k8s:1.30.0
+  imagePullPolicy: IfNotPresent
+  activeDeadlineSeconds: 60
 
 # Advanced: override any computed value (applied last)
 env: {}

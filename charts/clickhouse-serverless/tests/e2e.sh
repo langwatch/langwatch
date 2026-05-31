@@ -122,8 +122,12 @@ test_existing_secret() {
   kc create secret generic ch-creds \
     --from-literal=password="externally-managed" 2>/dev/null || true
 
+  # Exercise the production-shape operator-owned path: autogen.enabled=false
+  # gates off the chart-managed Secret render entirely AND triggers the
+  # preflight Job that validates the operator's Secret has the required keys.
   helm_install \
     -f "$CHART_DIR/tests/values-single.yaml" \
+    --set autogen.enabled=false \
     --set auth.existingSecret=ch-creds \
     --set auth.secretKeys.passwordKey=password \
     --set auth.password=""
@@ -136,6 +140,14 @@ test_existing_secret() {
   else
     pass "No chart-managed secret created"
   fi
+
+  # Helm's hook contract guarantees the pre-install preflight Job ran (and
+  # succeeded) before this point — helm install blocks until the Job
+  # completes, and the chart's hook-delete-policy=hook-succeeded cleans up
+  # the Job + Role + RoleBinding + ServiceAccount immediately afterwards.
+  # A failed preflight would have aborted helm_install with a non-zero exit
+  # before this assertion ran. The negative case is exercised separately
+  # by test_existing_secret_missing_key.
 
   # Verify the external secret is actually mounted and contains the expected value
   local pod="${RELEASE}-clickhouse-0"
@@ -152,6 +164,71 @@ test_existing_secret() {
   assert_eq "Query with external password succeeds" "$query_result" "1"
 
   helm_uninstall
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: existing secret missing the required key (preflight blocks)
+# Verifies: preflight Job hard-fails helm install when the operator-owned
+# Secret is missing a key the StatefulSet would mount.
+# ─────────────────────────────────────────────────────────────────────────────
+test_existing_secret_missing_key() {
+  sep; info "Suite: existing secret missing required key (preflight blocks)"
+
+  kubectl --context "$KUBE_CTX" create namespace "$NAMESPACE" 2>/dev/null || true
+  kc delete secret ch-creds-broken 2>/dev/null || true
+  kc create secret generic ch-creds-broken \
+    --from-literal=wrongkey="not-the-password"
+
+  # helm install should FAIL: preflight detects the password key is missing.
+  # NOTE: the actionable error message lives in the preflight Job's pod logs,
+  # not in helm's stdout (helm just reports the hook exited non-zero). The
+  # chart's hook-delete-policy=before-hook-creation,hook-succeeded keeps the
+  # failed Job around so we can fetch its logs here.
+  if helm_install \
+    -f "$CHART_DIR/tests/values-single.yaml" \
+    --set autogen.enabled=false \
+    --set auth.existingSecret=ch-creds-broken \
+    --set auth.secretKeys.passwordKey=password \
+    --set auth.password="" 2>&1; then
+    fail "Expected helm install to fail when preflight detects missing key"
+  else
+    pass "Preflight blocked install on missing key"
+  fi
+
+  # Drain the preflight Job's pod logs (job/<name> selector covers all pods
+  # the Job ever spawned, regardless of which one currently exists). The
+  # --tail=-1 forces the full buffer rather than the kubectl default tail.
+  kc logs --tail=-1 "job/ch-clickhouse-preflight-secrets" > /tmp/ch-preflight-out 2>/dev/null || true
+
+  if grep -q "preflight: required Secret keys missing" /tmp/ch-preflight-out; then
+    pass "Preflight surfaced the missing-key error to the operator"
+  else
+    fail "Preflight error message not found in Job logs"
+  fi
+
+  # Clean up any partial release state so the next suite starts fresh.
+  helm_uninstall || true
+  kc delete secret ch-creds-broken 2>/dev/null || true
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: stock install without autogen or existingSecret fails at render
+# Verifies: chart-time validateAuth catches the "no Secret configured" footgun.
+# ─────────────────────────────────────────────────────────────────────────────
+test_no_auth_config_fails() {
+  sep; info "Suite: no auth configured → chart-time render fail"
+
+  if helm template ch "$CHART_DIR" 2>&1 | tee /tmp/ch-validate-out; then
+    fail "Expected helm template to fail when neither autogen nor existingSecret is set"
+  else
+    pass "Chart render hard-failed on missing auth config"
+  fi
+
+  if grep -q "no credentials Secret configured" /tmp/ch-validate-out; then
+    pass "validateAuth surfaced the actionable error"
+  else
+    fail "validateAuth error message not found in helm template output"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -290,6 +367,17 @@ build_and_load_image() {
   docker build -t "$IMAGE" "$DOCKER_DIR"
   info "Loading image into Kind cluster: $CLUSTER_NAME"
   kind load docker-image "$IMAGE" --name "$CLUSTER_NAME"
+
+  # Pre-pull the preflight Job's image into Kind so the (cold) pull does not
+  # eat the Job's activeDeadlineSeconds budget on first run. alpine/k8s is
+  # ~200MB; on a fresh Kind node the first pull regularly exceeds 60s on
+  # slower connections. On EKS / managed clusters the image is typically
+  # cached at the node group, so the chart default of 60s is fine in prod.
+  local preflight_image
+  preflight_image="${PREFLIGHT_IMAGE:-alpine/k8s:1.30.0}"
+  info "Pre-pulling preflight image: $preflight_image"
+  docker pull "$preflight_image" >/dev/null
+  kind load docker-image "$preflight_image" --name "$CLUSTER_NAME"
 }
 
 main() {
@@ -299,6 +387,8 @@ main() {
   test_single
   test_upgrade
   test_existing_secret
+  test_existing_secret_missing_key
+  test_no_auth_config_fails
   test_cold_storage
   test_backup
 
