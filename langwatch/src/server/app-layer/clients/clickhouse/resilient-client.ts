@@ -5,6 +5,7 @@ import {
   incrementClickHouseQueryCount,
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
+import { detectColdScan } from "./cold-scan-detector";
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
@@ -253,6 +254,12 @@ function extractQueryPreview(params: unknown): string | undefined {
   return p.query.length > 200 ? p.query.slice(0, 200) + "..." : p.query;
 }
 
+function extractRawQuery(params: unknown): string {
+  if (!params || typeof params !== "object") return "";
+  const p = params as Record<string, unknown>;
+  return typeof p.query === "string" ? p.query : "";
+}
+
 function logFailure({
   operation,
   error,
@@ -305,10 +312,20 @@ function logSuccess({
       && readBytes !== undefined
       && readBytes > expectations.maxReadBytes;
 
-    if (isSlow || isTooHeavy) {
+    // A SELECT against a time-partitioned table with no predicate on its time
+    // column cannot prune partitions, so it walks the whole history including
+    // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
+    // even when fast, because the cost is request count, not latency.
+    const coldScanTable = operation === "query"
+      ? detectColdScan(extractRawQuery(params))
+      : null;
+    const isColdScan = coldScanTable !== null;
+
+    if (isSlow || isTooHeavy || isColdScan) {
       const reasons: string[] = [];
       if (isSlow) reasons.push(`${roundedMs}ms > ${expectations.maxDurationMs}ms`);
       if (isTooHeavy) reasons.push(`${formatBytes(readBytes!)} > ${formatBytes(expectations.maxReadBytes!)} expected`);
+      if (isColdScan) reasons.push(`cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`);
 
       queryLogger.warn(
         {
@@ -322,8 +339,10 @@ function logSuccess({
           table: meta.table,
           paramKeys: meta.paramKeys,
           query: extractQueryPreview(params),
+          coldScan: isColdScan,
+          ...(coldScanTable ? { coldScanTable } : {}),
         },
-        `ClickHouse slow ${operation}: ${reasons.join(", ")}`
+        `ClickHouse ${isColdScan && !isSlow && !isTooHeavy ? "cold-scan" : "slow"} ${operation}: ${reasons.join(", ")}`
       );
     } else {
       queryLogger.debug(

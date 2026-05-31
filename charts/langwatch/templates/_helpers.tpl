@@ -279,7 +279,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if and (gt $replicas 1) (eq (mod $replicas 2) 0) }}
     {{- $errors = append $errors "clickhouse.replicas must be odd (1, 3, 5, 7) for Keeper quorum" }}
   {{- end }}
-  {{/* ClickHouse subchart auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
+  {{/* Gate the chart-managed ClickHouse Secret on autogen.enabled, same shape
+       as app-secrets / gateway-auth. When autogen=true the chart materialises
+       it via per-key lookup-or-rand. When autogen=false the operator owns
+       the Secret out-of-band and MUST set clickhouse.auth.existingSecret to a
+       name different from the default <release>-clickhouse — the deployment's
+       runtime CLICKHOUSE_URL composition only kicks in for the override path,
+       so the default-named case requires the chart-managed url-secret to
+       still render. */}}
+  {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
+  {{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+  {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
+    {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
+  {{- end }}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}

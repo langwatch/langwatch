@@ -13,6 +13,9 @@ auth:
   password: "e2etest"
   clusterSecret: "e2e-cluster-secret"
 
+autogen:
+  enabled: true
+
 keeper:
   resources:
     requests:

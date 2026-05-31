@@ -3,6 +3,7 @@ import {
   _resetOpsClickHouseClientForTesting,
   buildExplainQuery,
   getOpsClickHouseClient,
+  parseOpsConnection,
   redactQueryForAudit,
   stripCommentsAndStrings,
 } from "../explain-core";
@@ -27,6 +28,12 @@ describe("buildExplainQuery", () => {
       const r = buildExplainQuery(TENANT_OK, t);
       expect(r.ok, `type ${t} should be allowed`).toBe(true);
     }
+  });
+
+  it("expands INDEXES to `EXPLAIN PLAN indexes = 1, actions = 1` (CH parser quirk)", () => {
+    const r = buildExplainQuery(TENANT_OK, "INDEXES");
+    expect(r.ok).toBe(true);
+    expect(r.wrapped).toBe(`EXPLAIN PLAN indexes = 1, actions = 1 ${TENANT_OK}`);
   });
 
   it("rejects an empty / whitespace-only query", () => {
@@ -182,6 +189,47 @@ describe("redactQueryForAudit", () => {
     const b = redactQueryForAudit("SELECT 1 FROM x");
     expect(a.sha256).toBe(b.sha256);
     expect(a.sha256).toMatch(/^[0-9a-f]{16}$/);
+  });
+});
+
+describe("parseOpsConnection", () => {
+  it("splits scheme/host from userinfo/database", () => {
+    const r = parseOpsConnection("http://langwatch_ops:secret@ch.example:8123/langwatch");
+    expect(r).toEqual({
+      url: "http://ch.example:8123",
+      username: "langwatch_ops",
+      password: "secret",
+      database: "langwatch",
+    });
+  });
+
+  it("percent-decodes a password Terraform urlencode()'d (the prod failure mode)", () => {
+    // random_password override_special = "_%@" -> a real prod value would
+    // look like this once urlencode() wraps the '@' and '%' chars for the
+    // URL to parse at all. URL.password returns the encoded string, so the
+    // client used to authenticate with the literal "%40" instead of "@" —
+    // that's the "Authentication failed" we saw against prod CH.
+    const r = parseOpsConnection(
+      "http://langwatch_ops:_1a4ZZx_kpR%40%25efk_lL%40fm%25WSwa5C%40AN@ch.example:8123/langwatch",
+    );
+    expect(r?.username).toBe("langwatch_ops");
+    expect(r?.password).toBe("_1a4ZZx_kpR@%efk_lL@fm%WSwa5C@AN");
+  });
+
+  it("returns empty strings when userinfo is absent", () => {
+    const r = parseOpsConnection("http://ch.example:8123/langwatch");
+    expect(r?.username).toBe("");
+    expect(r?.password).toBe("");
+    expect(r?.database).toBe("langwatch");
+  });
+
+  it("returns undefined database when path is empty or '/'", () => {
+    expect(parseOpsConnection("http://u:p@ch:8123")?.database).toBeUndefined();
+    expect(parseOpsConnection("http://u:p@ch:8123/")?.database).toBeUndefined();
+  });
+
+  it("returns null on a non-URL string", () => {
+    expect(parseOpsConnection("not a url at all")).toBeNull();
   });
 });
 

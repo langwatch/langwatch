@@ -1453,6 +1453,18 @@ clickhouse:
       ## @param clickhouse.backup.incremental.schedule [string, default: "0 * * * *"] Cron schedule for incremental backups.
       schedule: "0 * * * *"
 
+  ## @extra clickhouse.preflight Subchart preflight Job override.
+  ## Disable the subchart's pre-install Secret-keys check under the umbrella:
+  ## the parent's url-secret.yaml materialises the Secret in the same release,
+  ## so the subchart preflight would run before the Secret exists and fail
+  ## with BackoffLimitExceeded. The parent chart's preflight-secrets-job.yaml
+  ## (which knows about the install ordering) is the right place to enforce
+  ## key presence for umbrella installs. Standalone subchart installs leave
+  ## preflight enabled by default.
+  preflight:
+    ## @param clickhouse.preflight.enabled [default: false] Disable subchart preflight under umbrella install.
+    enabled: false
+
   ## @extra clickhouse.auth Authentication configuration.
   ## The langwatch chart owns the ClickHouse password secret (templates/clickhouse/url-secret.yaml)
   ## and passes it to the subchart via auth.existingSecret. This ensures the full connection URL

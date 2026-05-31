@@ -172,7 +172,14 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   if (SYSTEM_SCHEMA_RE.test(normalized)) {
     return { ok: false, reason: "references to the system.* schema are not allowed" };
   }
-  return { ok: true, wrapped: `EXPLAIN ${type} ${trimmed}`, type };
+  // `INDEXES` is not a top-level EXPLAIN type in ClickHouse — it's a
+  // modifier on `EXPLAIN PLAN` (`EXPLAIN PLAN indexes = 1 ...`). Sending
+  // `EXPLAIN INDEXES <query>` raises a parser error and the endpoint
+  // 502s. Expand it to the canonical form so callers can pass `INDEXES`
+  // as a logical type without needing to know that wrinkle.
+  const prefix =
+    type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
+  return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 
 export function redactQueryForAudit(query: string): { shape: string; sha256: string } {
@@ -189,19 +196,56 @@ export function redactQueryForAudit(query: string): { shape: string; sha256: str
 let opsClickHouseClient: ClickHouseClient | null = null;
 let warnedAboutMissingOpsUrl = false;
 
+/**
+ * Parse CLICKHOUSE_OPS_URL into the pieces @clickhouse/client wants as
+ * separate config fields. We do the userinfo split + percent-decoding
+ * ourselves because the lib forwards `URL.username` / `URL.password`
+ * to the wire as-is — both getters return the URL-encoded form. With a
+ * Terraform-generated password that may contain '@' or '%' (which TF
+ * wraps via `urlencode()` to keep the URL parseable), passing the URL
+ * verbatim ends up authenticating with the encoded form (e.g. "p%40ss")
+ * and ClickHouse rejects with "Authentication failed". Decoding here
+ * means the wire password matches what users.xml hashes.
+ */
+export function parseOpsConnection(raw: string): {
+  url: string;
+  username: string;
+  password: string;
+  database?: string;
+} | null {
+  try {
+    const u = new URL(raw);
+    const username = u.username ? decodeURIComponent(u.username) : "";
+    const password = u.password ? decodeURIComponent(u.password) : "";
+    const database =
+      u.pathname && u.pathname !== "/"
+        ? decodeURIComponent(u.pathname.replace(/^\//, ""))
+        : undefined;
+    const cleanUrl = `${u.protocol}//${u.host}`;
+    return { url: cleanUrl, username, password, database };
+  } catch {
+    return null;
+  }
+}
+
 export function getOpsClickHouseClient(): ClickHouseClient | null {
   if (opsClickHouseClient) return opsClickHouseClient;
   const url = process.env.CLICKHOUSE_OPS_URL;
   if (!url || url.trim() === "") return null;
-  let parsed: URL | string = url;
-  try {
-    parsed = new URL(url);
-  } catch {
-    /* pass raw if not a valid URL */
-  }
+  const parsed = parseOpsConnection(url);
+  // No client-side `clickhouse_settings` here: the langwatch_ops user runs
+  // under the `readonly_safe` profile (readonly=1) which forbids modifying
+  // any session setting client-side, so the previous default of
+  // date_time_input_format=best_effort made every request fail with
+  // "Cannot modify ... in readonly mode". EXPLAIN never parses input
+  // values anyway, so dropping the setting is also functionally correct.
+  // The execution/result/memory caps that USED to live here are enforced
+  // server-side by the profile.
   opsClickHouseClient = createClient({
-    url: parsed,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
+    url: parsed?.url ?? url,
+    username: parsed?.username || undefined,
+    password: parsed?.password || undefined,
+    database: parsed?.database,
     max_open_connections: 5,
     keep_alive: { enabled: true, idle_socket_ttl: 1500 },
   });

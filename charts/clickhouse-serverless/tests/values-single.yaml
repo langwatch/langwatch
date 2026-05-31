@@ -11,3 +11,11 @@ storage:
 
 auth:
   password: "e2etest"
+
+# E2E exercises both the autogen and existing-secret paths. The
+# autogen-on default here covers test_single / test_upgrade /
+# test_cold_storage / test_backup; test_existing_secret overrides
+# auth.existingSecret on the CLI and the chart-time validator
+# accepts the existing-secret path.
+autogen:
+  enabled: true
