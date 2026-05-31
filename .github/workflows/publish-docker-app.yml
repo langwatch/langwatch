@@ -200,6 +200,12 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pin to cosign 2.x. cosign 3.x defaults to the new bundle format (OCI 1.1
+          # referrers), which Docker Hub does not reliably serve, so cosign verify
+          # reports "no signatures found" immediately after a successful cosign sign.
+          # The 2.x line writes the tag-based signature format Docker Hub supports.
+          cosign-release: v2.6.3
 
       - name: Install syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
