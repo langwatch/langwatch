@@ -14,22 +14,29 @@ const logger = createLogger("langwatch:ops:clickhouse:explain");
 /// ClickHouse access. Defenses, outermost to innermost:
 ///
 ///  1. API key auth (LANGWATCH_OPS_API_KEY), constant-time compared.
-///  2. Input regex filter — table-function deny-list (url/s3/remote/file/
-///     postgresql/mysql/...) so a leaked key can't be turned into SSRF,
-///     plus SYSTEM_SCHEMA / multi-statement / forbidden-keyword guards.
-///  3. Server-side EXPLAIN wrapping — the caller's SQL never reaches the
+///  2. Query normalization — strip `/* ... */`, `-- ...\n`, and quoted
+///     string literals BEFORE the regex pass, so bypasses like
+///     `url/**/('http://x')` or `WHERE 1=1 /* TenantId = */` cannot
+///     evade the checks below.
+///  3. Input regex filter on the normalized text — table-function
+///     deny-list (url/s3/remote/file/postgresql/mysql/...), SYSTEM_SCHEMA
+///     guard, multi-statement guard, forbidden-keyword guard, mandatory
+///     `TenantId =` predicate (multitenancy invariant).
+///  4. Server-side EXPLAIN wrapping — the caller's SQL never reaches the
 ///     DB unwrapped, so they cannot smuggle an INSERT/DROP/etc through.
-///  4. EXPLAIN type allowlist — ANALYZE is blocked because it actually
+///  5. EXPLAIN type allowlist — ANALYZE is blocked because it actually
 ///     executes the inner query (a load risk on prod).
-///  5. Dedicated `langwatch_ops` ClickHouse user (via CLICKHOUSE_OPS_URL)
+///  6. Dedicated `langwatch_ops` ClickHouse user (via CLICKHOUSE_OPS_URL)
 ///     with only `GRANT SELECT ON langwatch.*`. No SOURCES grant ->
 ///     table functions rejected at the access-check layer regardless of
-///     what slips past the input filter. Falls back to the shared client
-///     (with a warning) when the env var is unset, so dev / pre-migration
-///     prod still works but defense (2) is the only line.
-///  6. Per-query CH settings: readonly=1 + 10s execution cap + 10 MB
+///     anything that slips past the input filter. **In production we
+///     fail closed with 503 when this env var is unset** so the regex
+///     filter is never the only line of defense on a deployed pod;
+///     dev / NODE_ENV=test falls back to the shared client with a one-
+///     shot warning so local hacking still works.
+///  7. Per-query CH settings: readonly=1 + 10s execution cap + 10 MB
 ///     result cap + 1 GB memory cap, scoped to the EXPLAIN itself.
-///  7. Audit log — every accepted request logs the redacted shape and
+///  8. Audit log — every accepted request logs the redacted shape and
 ///     a sha256 prefix; raw literals are stripped so application logs
 ///     don't become a PII sink.
 
@@ -73,12 +80,18 @@ const TENANT_PREDICATE_RE = /\bTenantId\s*=/;
 /// if the wrapping or pre-check is bypassed. max_execution_time caps a
 /// runaway EXPLAIN PIPELINE on a huge table. max_result_bytes caps the
 /// response so an EXPLAIN INDEXES on a wide table can't OOM the box.
-/// ClickHouseSettings is picky: `readonly` and `max_result_bytes` are
-/// typed `UInt64 = string`, `max_execution_time` is `Seconds = number`.
+/// max_memory_usage backstops a query that the result-bytes cap doesn't
+/// reach (e.g. a heavy GROUP BY in EXPLAIN PIPELINE).
+/// Must stay aligned with the langwatch_ops profile in
+/// infrastructure/clickhouse-serverless/config/users.xml.template.
+/// ClickHouseSettings is picky: `readonly` / `max_result_bytes` /
+/// `max_memory_usage` are typed `UInt64 = string`, `max_execution_time`
+/// is `Seconds = number`.
 const CLICKHOUSE_GUARDRAILS = {
   readonly: "1",
-  max_execution_time: 5,
+  max_execution_time: 10,
   max_result_bytes: "10000000",
+  max_memory_usage: "1073741824",
 } as const;
 
 const bodySchema = z.object({
@@ -95,6 +108,42 @@ export interface ParseResult {
   reason?: string;
 }
 
+/// Strip SQL comments and quoted string literals from the query so the
+/// regex pass below cannot be tricked by tokens that the ClickHouse parser
+/// will treat as no-ops. Without this, `url/**/('http://x')` evades the
+/// table-function check (`\burl\s*\(` doesn't see the `/* */` between
+/// `url` and `(`), and `WHERE 1=1 /* TenantId = */` satisfies the tenant
+/// predicate without filtering anything.
+///
+/// Returns the normalized text — same length as the input is NOT
+/// guaranteed (block comments become a single space, strings become `''`).
+/// We use this only for the safety regex pass; the EXECUTED query is
+/// always the caller's original text, because the EXPLAIN wrapping +
+/// ClickHouse parser handle the real SQL.
+export function stripCommentsAndStrings(query: string): string {
+  // The order matters. Block comments may legally contain `'` or `"` that
+  // would otherwise open a phantom string; line comments same. So strip
+  // comments first, then strings. ClickHouse also supports nested
+  // block comments — a deliberate trade-off: a deeply nested comment
+  // might leave a stray closing `*/` in the normalized text, which is
+  // fine for our purposes (the residue is just punctuation, no keyword
+  // gets resurrected).
+  let s = query;
+  // Block comments /* ... */ (non-greedy, multi-line).
+  s = s.replace(/\/\*[\s\S]*?\*\//g, " ");
+  // Line comments -- ... and # ... to end of line (CH supports both `--`
+  // and `#`; the # form must be at start-of-token to count, but we play
+  // safe and strip from `#` to newline whenever found).
+  s = s.replace(/--[^\n]*/g, " ");
+  s = s.replace(/(^|\s)#[^\n]*/g, "$1 ");
+  // Quoted string literals — both single- and double-quoted, with `\'`
+  // and `\"` escape handling. The replacement leaves an empty pair so
+  // the resulting string still parses if anything cares (regex doesn't).
+  s = s.replace(/'(?:\\.|[^'\\])*'/g, "''");
+  s = s.replace(/"(?:\\.|[^"\\])*"/g, '""');
+  return s;
+}
+
 /// Pure function for the SQL-wrapping logic so it stays unit-testable.
 /// Returns `{ ok: true, wrapped }` when the query is acceptable, or
 /// `{ ok: false, reason }` with a one-line user-facing reason otherwise.
@@ -104,27 +153,33 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   if (/^\s*EXPLAIN\b/i.test(trimmed)) {
     return { ok: false, reason: "query already starts with EXPLAIN — pass the inner SELECT only and choose type via the `type` field" };
   }
-  if (trimmed.includes(";")) {
+  // Normalize once and run every regex against the result. The EXECUTED
+  // query stays the original (literals, comments and all) — the EXPLAIN
+  // wrapper plus the access-layer boundary on the dedicated user are
+  // what actually decide what runs.
+  const normalized = stripCommentsAndStrings(trimmed);
+  if (normalized.includes(";")) {
     // ClickHouse HTTP rejects multi-statement queries already, but reject
     // here so we don't even hand it to the driver. Catches trailing `;`
-    // copy-paste and any attempt at statement chaining.
+    // copy-paste and any attempt at statement chaining. Checking the
+    // normalized text means a `;` inside a string literal is fine.
     return { ok: false, reason: "query must be a single statement (no `;`)" };
   }
-  const forbidden = FORBIDDEN_KEYWORD_RE.exec(trimmed);
+  const forbidden = FORBIDDEN_KEYWORD_RE.exec(normalized);
   if (forbidden) {
     return { ok: false, reason: `forbidden keyword in query: ${(forbidden[1] ?? "").toUpperCase()}` };
   }
-  const tableFn = TABLE_FUNCTION_RE.exec(trimmed);
+  const tableFn = TABLE_FUNCTION_RE.exec(normalized);
   if (tableFn) {
     return {
       ok: false,
       reason: `table function not allowed (SSRF / external-read surface): ${(tableFn[1] ?? "").toLowerCase()}()`,
     };
   }
-  if (SYSTEM_SCHEMA_RE.test(trimmed)) {
+  if (SYSTEM_SCHEMA_RE.test(normalized)) {
     return { ok: false, reason: "references to the system.* schema are not allowed" };
   }
-  if (!TENANT_PREDICATE_RE.test(trimmed)) {
+  if (!TENANT_PREDICATE_RE.test(normalized)) {
     return {
       ok: false,
       reason: "query must include a `TenantId = ...` predicate (multitenancy invariant)",
@@ -218,11 +273,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Prefer the dedicated langwatch_ops user (no SOURCES grant, so url/s3/
   // remote/file/postgresql table functions are refused at the access-check
-  // layer). Fall back to the shared client only when CLICKHOUSE_OPS_URL is
-  // not configured — log once so the gap is visible without spamming.
+  // layer). In PRODUCTION, fail closed when CLICKHOUSE_OPS_URL is unset —
+  // a fallback to the default-user client would leave the regex filter as
+  // the only line of defense, and that filter is best-effort (a determined
+  // attacker can find SQL syntax the deny-list doesn't cover; see also the
+  // comment / string-literal bypasses fixed in stripCommentsAndStrings).
+  // In dev / test we still fall back with a warning so local hacking and
+  // pre-prod migrations work.
   let client = getOpsClickHouseClient();
   let usingFallback = false;
   if (!client) {
+    if (process.env.NODE_ENV === "production") {
+      logger.error(
+        "CLICKHOUSE_OPS_URL is not set in production — refusing to fall back to the default-user client. " +
+          "Provision the langwatch_ops user (see infrastructure/clickhouse-serverless/config/users.xml.template) " +
+          "and set CLICKHOUSE_OPS_URL.",
+      );
+      return res.status(503).json({
+        message:
+          "ClickHouse ops user is not configured on this instance (CLICKHOUSE_OPS_URL unset in production).",
+      });
+    }
     if (!warnedAboutMissingOpsUrl) {
       logger.warn(
         "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +

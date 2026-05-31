@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import explainHandler, {
   _resetOpsClickHouseClientForTesting,
   buildExplainQuery,
   getOpsClickHouseClient,
   redactQueryForAudit,
+  stripCommentsAndStrings,
 } from "../explain";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
 // A minimal SELECT that satisfies the tenant-predicate invariant. Used as
 // the "valid baseline" everywhere we need an otherwise-acceptable shape so
@@ -51,7 +53,6 @@ describe("buildExplainQuery", () => {
   it("rejects forbidden mutation keywords even when inside the body", () => {
     const cases = [
       "INSERT INTO foo VALUES (1)",
-      "SELECT * FROM foo WHERE bar = 'DELETE' AND TenantId = 'p_x'", // string-literal still rejected (acceptable false positive)
       "ALTER TABLE foo ADD COLUMN x Int",
       "SYSTEM RELOAD CONFIG",
       "OPTIMIZE TABLE foo FINAL",
@@ -62,6 +63,16 @@ describe("buildExplainQuery", () => {
       expect(r.ok, `should reject: ${q}`).toBe(false);
       expect(r.reason).toMatch(/forbidden keyword/i);
     }
+  });
+
+  it("does not reject a forbidden keyword that only appears inside a string literal", () => {
+    // The previous behaviour was a noted false-positive ("DELETE" inside
+    // a string literal triggered the forbidden-keyword regex). After the
+    // bypass-fix that normalizes the query before checking, strings are
+    // collapsed first, so this query is correctly accepted.
+    const q = "SELECT * FROM foo WHERE bar = 'DELETE' AND TenantId = 'p_x'";
+    const r = buildExplainQuery(q);
+    expect(r.ok).toBe(true);
   });
 
   it("word-boundary aware — does not false-reject identifiers that merely contain a keyword", () => {
@@ -124,6 +135,99 @@ describe("buildExplainQuery", () => {
     const r = buildExplainQuery("SELECT count() FROM stored_spans");
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/TenantId/);
+  });
+
+  // The reviewer's bypass repros — these checks are why we normalize before
+  // running the regex pass. Without stripCommentsAndStrings, all of these
+  // would slip through.
+  describe("comment / string-literal bypasses (reviewer regressions)", () => {
+    it("rejects table functions hidden behind a block comment", () => {
+      // `url/**/(` — `\burl\s*\(` doesn't see the `/* */` between `url`
+      // and `(`, so without normalization this slipped through to
+      // ClickHouse where it would have executed the SSRF.
+      const q = `SELECT * FROM url/**/('http://127.0.0.1:9/', CSV) WHERE TenantId = 'p_x'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/table function/i);
+    });
+
+    it("rejects table functions hidden behind a line comment", () => {
+      const q = `SELECT * FROM url --evil\n('http://x', CSV) WHERE TenantId = 'p_x'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/table function/i);
+    });
+
+    it("rejects a tenant predicate that only appears inside a block comment", () => {
+      // `/* TenantId = */` would satisfy the bare regex; after normalization
+      // the comment is gone and there's no real predicate.
+      const q = `SELECT * FROM stored_spans WHERE 1 = 1 /* TenantId = */`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/TenantId/);
+    });
+
+    it("rejects a tenant predicate that only appears inside a string literal", () => {
+      const q = `SELECT * FROM stored_spans WHERE name = 'TenantId = something'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/TenantId/);
+    });
+
+    it("rejects an obviously-DROP query even when split by a comment", () => {
+      // `DROP/**/TABLE` — the parser ignores the block comment, our regex
+      // pass should too. After normalization this becomes `DROP TABLE foo`
+      // which trips FORBIDDEN_KEYWORD_RE on DROP.
+      const q = `DROP/**/TABLE stored_spans`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/forbidden keyword/i);
+    });
+
+    it("still rejects bypasses that collapse to a different rejection path", () => {
+      // `INS/**/ERT INTO ... VALUES (1)`: after stripping the comment we
+      // have `INS ERT INTO stored_spans VALUES (1)`. The forbidden-keyword
+      // check no longer trips (neither `INS` nor `ERT` is on the list),
+      // but `VALUES (` is itself a ClickHouse table function and is on
+      // the table-function deny-list, so the query is still rejected.
+      // This test pins the layered-defense behaviour so a future regex
+      // tweak doesn't accidentally open a path through.
+      const q = `INS/**/ERT INTO stored_spans VALUES (1)`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(false);
+    });
+
+    it("does not treat a `;` inside a string literal as multi-statement", () => {
+      const q = `SELECT * FROM stored_spans WHERE TenantId = 'p_x' AND name = 'a;b;c'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(true);
+    });
+
+    it("does not treat the system.* check as triggered by a string literal", () => {
+      // `name = 'system.users'` is data, not a schema reference. Without
+      // normalization we'd false-reject this.
+      const q = `SELECT * FROM stored_spans WHERE TenantId = 'p_x' AND name = 'system.users'`;
+      const r = buildExplainQuery(q);
+      expect(r.ok).toBe(true);
+    });
+  });
+});
+
+describe("stripCommentsAndStrings", () => {
+  it("drops block comments", () => {
+    expect(stripCommentsAndStrings("SELECT /* x */ 1")).toMatch(/SELECT\s+\s+1/);
+  });
+  it("drops line comments", () => {
+    expect(stripCommentsAndStrings("SELECT 1 -- trailing\nFROM x")).not.toMatch(/trailing/);
+  });
+  it("collapses string literals to empty pairs", () => {
+    expect(stripCommentsAndStrings("SELECT 'abc', \"def\" FROM x")).toMatch(/SELECT '', "" FROM x/);
+  });
+  it("handles escaped quotes inside strings", () => {
+    expect(stripCommentsAndStrings(`SELECT 'a\\'b' FROM x`)).toMatch(/SELECT '' FROM x/);
+  });
+  it("removes /* TenantId = */ entirely so the predicate check is honest", () => {
+    expect(stripCommentsAndStrings("WHERE 1=1 /* TenantId = */")).not.toMatch(/TenantId/i);
   });
 });
 
@@ -191,5 +295,100 @@ describe("getOpsClickHouseClient", () => {
     const b = getOpsClickHouseClient();
     expect(a).not.toBeNull();
     expect(b).toBe(a);
+  });
+});
+
+/// Handler-level checks. Only the early-return paths (auth, body, fail-
+/// closed) are exercised here — happy-path responses go through the real
+/// ClickHouse driver and live in the integration suite. The point of these
+/// is to nail down the security boundaries that don't depend on a live DB:
+/// auth, prod fail-closed when CLICKHOUSE_OPS_URL is unset, and that the
+/// shared client is never invoked when the dedicated client is missing in
+/// production. Without those, the regex pass would be the only defense
+/// against a leaked API key — which the reviewer flagged as inadequate.
+describe("handler", () => {
+  const savedOps = process.env.CLICKHOUSE_OPS_URL;
+  const savedKey = process.env.LANGWATCH_OPS_API_KEY;
+  const savedEnv = process.env.NODE_ENV;
+
+  function mockRes(): NextApiResponse & { _status?: number; _body?: any } {
+    const res: any = {};
+    res.status = (s: number) => {
+      res._status = s;
+      return res;
+    };
+    res.json = (b: any) => {
+      res._body = b;
+      return res;
+    };
+    res.setHeader = () => res;
+    return res;
+  }
+
+  beforeEach(() => {
+    _resetOpsClickHouseClientForTesting();
+    process.env.LANGWATCH_OPS_API_KEY = "test-key";
+  });
+
+  afterEach(() => {
+    if (savedOps === undefined) delete process.env.CLICKHOUSE_OPS_URL;
+    else process.env.CLICKHOUSE_OPS_URL = savedOps;
+    if (savedKey === undefined) delete process.env.LANGWATCH_OPS_API_KEY;
+    else process.env.LANGWATCH_OPS_API_KEY = savedKey;
+    if (savedEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedEnv;
+    vi.restoreAllMocks();
+    _resetOpsClickHouseClientForTesting();
+  });
+
+  it("returns 503 in production when CLICKHOUSE_OPS_URL is unset — never reaches the shared client", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.CLICKHOUSE_OPS_URL;
+    const req = {
+      method: "POST",
+      headers: { authorization: "Bearer test-key" },
+      body: {
+        query: "SELECT count() FROM stored_spans WHERE TenantId = 'p_x'",
+        type: "PLAN",
+      },
+    } as unknown as NextApiRequest;
+    const res = mockRes();
+    await explainHandler(req, res);
+    expect(res._status).toBe(503);
+    expect(res._body?.message).toMatch(/CLICKHOUSE_OPS_URL/);
+    expect(res._body?.message).toMatch(/production/);
+  });
+
+  it("returns 401 when LANGWATCH_OPS_API_KEY is unset (fail closed)", async () => {
+    delete process.env.LANGWATCH_OPS_API_KEY;
+    const req = {
+      method: "POST",
+      headers: { authorization: "Bearer anything" },
+      body: { query: "x" },
+    } as unknown as NextApiRequest;
+    const res = mockRes();
+    await explainHandler(req, res);
+    expect(res._status).toBe(401);
+  });
+
+  it("returns 401 on a wrong key", async () => {
+    const req = {
+      method: "POST",
+      headers: { authorization: "Bearer not-the-key" },
+      body: { query: "x" },
+    } as unknown as NextApiRequest;
+    const res = mockRes();
+    await explainHandler(req, res);
+    expect(res._status).toBe(401);
+  });
+
+  it("returns 405 on non-POST", async () => {
+    const req = {
+      method: "GET",
+      headers: {},
+    } as unknown as NextApiRequest;
+    const res = mockRes();
+    await explainHandler(req, res);
+    expect(res._status).toBe(405);
   });
 });
