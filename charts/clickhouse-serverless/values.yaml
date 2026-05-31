@@ -75,8 +75,11 @@ autogen:
 # when autogen.enabled=false and auth.existingSecret is set (when the chart
 # materialises the Secret there is nothing to validate ahead of time).
 #
-# Image needs sh + kubectl. alpine/k8s ships both; registry.k8s.io/kubectl
-# is distroless and has no /bin/sh, which the script requires.
+# Image needs sh + kubectl + jq. alpine/k8s ships all three. The script
+# does a single `kubectl get -o json` per Secret + `jq` lookups so dotted
+# operator-configured key names resolve correctly. registry.k8s.io/kubectl
+# is distroless and has no /bin/sh; bitnami/kubectl has /bin/sh but no jq.
+# A startup guard inside the Job fails fast if jq is missing from the image.
 preflight:
   enabled: true
   image: alpine/k8s:1.30.0
