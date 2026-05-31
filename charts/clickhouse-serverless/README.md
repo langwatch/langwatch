@@ -4,8 +4,13 @@ Deploy ClickHouse with auto-tuning from CPU/RAM, tiered S3-compatible cold stora
 
 ## Quick Start
 
+The chart defaults to `autogen.enabled=false` (production-safe). Pick a credentials path before installing.
+
+**Dev / stock install — chart materialises the password Secret:**
+
 ```bash
 helm install clickhouse ./charts/clickhouse-serverless \
+  --set autogen.enabled=true \
   --set cpu=4 \
   --set memory=16Gi
 ```
@@ -14,10 +19,28 @@ For a 3-node replicated cluster with Keeper:
 
 ```bash
 helm install clickhouse ./charts/clickhouse-serverless \
+  --set autogen.enabled=true \
   --set cpu=4 \
   --set memory=16Gi \
   --set replicas=3
 ```
+
+**Production / GitOps install — operator owns the credentials Secret:**
+
+```bash
+# Pre-create the Secret (single-node needs only password; replicated also needs clusterSecret).
+kubectl create secret generic my-ch-creds \
+  --from-literal=password=$(openssl rand -hex 32) \
+  --from-literal=clusterSecret=$(openssl rand -hex 24)
+
+helm install clickhouse ./charts/clickhouse-serverless \
+  --set auth.existingSecret=my-ch-creds \
+  --set cpu=4 \
+  --set memory=16Gi \
+  --set replicas=3
+```
+
+A pre-install / pre-upgrade preflight Job verifies the required keys exist in the operator-owned Secret before pods roll. See [Secret Management](#secret-management) for the rationale.
 
 ## How It Works
 
@@ -90,9 +113,15 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 
 | Name | Description | Default |
 |------|-------------|---------|
-| `auth.password` | Default user password (auto-generated when empty + no existingSecret) | `""` |
-| `auth.existingSecret` | Name of existing secret containing the password | `""` |
-| `auth.secretKeys.passwordKey` | Key within the secret | `password` |
+| `autogen.enabled` | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set. | `false` |
+| `auth.password` | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set. | `""` |
+| `auth.clusterSecret` | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set. | `""` |
+| `auth.existingSecret` | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll. | `""` |
+| `auth.secretKeys.passwordKey` | Key name for the password in both autogen and existingSecret paths | `password` |
+| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret | `clusterSecret` |
+| `preflight.enabled` | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set | `true` |
+| `preflight.image` | Container image (needs `sh` + `kubectl` + `jq`) | `alpine/k8s:1.30.0` |
+| `preflight.activeDeadlineSeconds` | Hard timeout for the preflight Job | `60` |
 
 ### Users
 
@@ -150,9 +179,23 @@ This creates two users: `analyst` with read-only access to all databases, and `e
 
 ## Secret Management
 
-When `auth.password` is empty and no `auth.existingSecret` is set, the chart auto-generates a password and stores it in `<release>-clickhouse` secret. The password is preserved across `helm upgrade` via `lookup`.
+Two explicit paths, picked at install time:
 
-> **Note:** `helm template` always shows freshly-generated passwords since `lookup` returns empty without cluster access. The actual deployed secret will be preserved.
+**Autogen (`autogen.enabled=true`)**
+
+The chart materialises a `<release>-clickhouse` Secret on first install via `randAlphaNum` (or the values you supply for `auth.password` / `auth.clusterSecret`). On every subsequent `helm upgrade`, each required key is independently `lookup`-ed and the existing value reused verbatim — no rotation, no roll. A partially-populated Secret (e.g. an operator imported `password` but not `clusterSecret` during a single→replicated migration) is healed in place. The Secret carries `helm.sh/resource-policy: keep` so a `helm uninstall` does not drop the credentials.
+
+> **Important:** `helm lookup` returns empty for any renderer that lacks cluster access — most notably the ArgoCD repo-server. If your install runs under such a renderer, **do not use the autogen path**: the chart will render a fresh random password on every reconcile and rotate the credentials underneath your running pods. Use the operator-owned path below instead.
+
+**Operator-owned (`autogen.enabled=false`, the default)**
+
+You pre-create a Secret in the namespace with the required keys (`password`, plus `clusterSecret` when `replicas>1`), point `auth.existingSecret` at its name, and the chart skips materialising its own Secret entirely. A pre-install / pre-upgrade preflight Job runs as a Helm hook and verifies the required keys exist before the StatefulSet rolls — catches the trap where a chart bump adds a new required key or the operator imported the Secret without all the keys.
+
+This is the drift-safe path under GitOps controllers.
+
+**Neither set**
+
+Chart-render hard-fails with an actionable error naming both opt-ins. The chart never silently materialises a Secret it could later rotate.
 
 ## Examples
 

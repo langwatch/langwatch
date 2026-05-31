@@ -180,21 +180,30 @@ test_existing_secret_missing_key() {
     --from-literal=wrongkey="not-the-password"
 
   # helm install should FAIL: preflight detects the password key is missing.
+  # NOTE: the actionable error message lives in the preflight Job's pod logs,
+  # not in helm's stdout (helm just reports the hook exited non-zero). The
+  # chart's hook-delete-policy=before-hook-creation,hook-succeeded keeps the
+  # failed Job around so we can fetch its logs here.
   if helm_install \
     -f "$CHART_DIR/tests/values-single.yaml" \
     --set autogen.enabled=false \
     --set auth.existingSecret=ch-creds-broken \
     --set auth.secretKeys.passwordKey=password \
-    --set auth.password="" 2>&1 | tee /tmp/ch-preflight-out; then
+    --set auth.password="" 2>&1; then
     fail "Expected helm install to fail when preflight detects missing key"
   else
     pass "Preflight blocked install on missing key"
   fi
 
+  # Drain the preflight Job's pod logs (job/<name> selector covers all pods
+  # the Job ever spawned, regardless of which one currently exists). The
+  # --tail=-1 forces the full buffer rather than the kubectl default tail.
+  kc logs --tail=-1 "job/ch-clickhouse-preflight-secrets" > /tmp/ch-preflight-out 2>/dev/null || true
+
   if grep -q "preflight: required Secret keys missing" /tmp/ch-preflight-out; then
     pass "Preflight surfaced the missing-key error to the operator"
   else
-    fail "Preflight error message not found in helm output"
+    fail "Preflight error message not found in Job logs"
   fi
 
   # Clean up any partial release state so the next suite starts fresh.
