@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
@@ -35,14 +35,41 @@ type ExplainType = (typeof ALLOWED_TYPES)[number];
 const FORBIDDEN_KEYWORD_RE =
   /\b(ANALYZE|INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE|CREATE|RENAME|OPTIMIZE|SYSTEM|GRANT|REVOKE|ATTACH|DETACH|EXCHANGE|FREEZE|UNFREEZE|KILL)\b/i;
 
+/// ClickHouse table functions that can reach external/internal network
+/// targets or read arbitrary local files. `readonly=1` does NOT block
+/// these — read-only just means "no INSERT/ALTER/DROP", and table
+/// functions are read operations. An attacker with a leaked key + just
+/// `url(...)` could turn this endpoint into an SSRF surface against any
+/// host the prod ClickHouse server can reach. We deny them at the
+/// pre-check layer; the dedicated ClickHouse user should additionally
+/// have these revoked at the grant layer (future hardening, tracked).
+/// Matches `name(` so an unrelated identifier ending in e.g. "url" is
+/// not false-rejected.
+const TABLE_FUNCTION_RE =
+  /\b(url|urlCluster|s3|s3Cluster|remote|remoteSecure|cluster|clusterAllReplicas|file|fileCluster|hdfs|hdfsCluster|mysql|postgresql|mongodb|odbc|jdbc|sqlite|redis|deltaLake|deltaLakeCluster|iceberg|icebergCluster|hudi|hudiCluster|azureBlobStorage|azureBlobStorageCluster|executable|input|merge|loop|view|fuzzJSON|values|format|generateRandom|numbers|numbers_mt)\s*\(/i;
+
+/// `system.*` schema exposes server internals (users, settings, queries
+/// of other tenants, etc.). Reject any reference to it.
+const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
+
+/// Every ClickHouse query in this codebase MUST be scoped by TenantId
+/// (multitenancy invariant). EXPLAIN is no different — an unscoped
+/// EXPLAIN reveals partition stats across tenants. Soft check: the
+/// query body must mention `TenantId =` somewhere. The caller is
+/// trusted to pass the correct value; this just ensures the query is
+/// of the right shape and not a "SELECT count() FROM stored_spans".
+const TENANT_PREDICATE_RE = /\bTenantId\s*=/;
+
 /// Per-query ClickHouse-side guardrails. readonly=1 prevents writes even
 /// if the wrapping or pre-check is bypassed. max_execution_time caps a
 /// runaway EXPLAIN PIPELINE on a huge table. max_result_bytes caps the
 /// response so an EXPLAIN INDEXES on a wide table can't OOM the box.
+/// The ClickHouse settings type expects string values, even for the
+/// numeric ones — the server parses them.
 const CLICKHOUSE_GUARDRAILS = {
-  readonly: 1,
-  max_execution_time: 5,
-  max_result_bytes: 10_000_000,
+  readonly: "1",
+  max_execution_time: "5",
+  max_result_bytes: "10000000",
 } as const;
 
 const bodySchema = z.object({
@@ -76,9 +103,44 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   }
   const forbidden = FORBIDDEN_KEYWORD_RE.exec(trimmed);
   if (forbidden) {
-    return { ok: false, reason: `forbidden keyword in query: ${forbidden[1].toUpperCase()}` };
+    return { ok: false, reason: `forbidden keyword in query: ${(forbidden[1] ?? "").toUpperCase()}` };
+  }
+  const tableFn = TABLE_FUNCTION_RE.exec(trimmed);
+  if (tableFn) {
+    return {
+      ok: false,
+      reason: `table function not allowed (SSRF / external-read surface): ${(tableFn[1] ?? "").toLowerCase()}()`,
+    };
+  }
+  if (SYSTEM_SCHEMA_RE.test(trimmed)) {
+    return { ok: false, reason: "references to the system.* schema are not allowed" };
+  }
+  if (!TENANT_PREDICATE_RE.test(trimmed)) {
+    return {
+      ok: false,
+      reason: "query must include a `TenantId = ...` predicate (multitenancy invariant)",
+    };
   }
   return { ok: true, wrapped: `EXPLAIN ${type} ${trimmed}`, type };
+}
+
+/// Audit-safe fingerprint for the log. The query can contain TenantIds
+/// (acceptable to log internally) but also PII-bearing literals from a
+/// `WHERE` clause — names, emails, span attributes. Strip every quoted
+/// literal and number so what we keep is the SQL shape only, plus a
+/// hash to correlate identical queries across log lines.
+export function redactQueryForAudit(query: string): { shape: string; sha256: string } {
+  const shape = query
+    // Drop single- and double-quoted string literals.
+    .replace(/'(?:\\.|[^'\\])*'/g, "'?'")
+    .replace(/"(?:\\.|[^"\\])*"/g, '"?"')
+    // Drop bare numeric literals (durations, ids, partition keys, etc.).
+    .replace(/\b\d[\d_.]*\b/g, "?")
+    // Collapse whitespace so the log line is a single readable token.
+    .replace(/\s+/g, " ")
+    .trim();
+  const sha256 = createHash("sha256").update(query).digest("hex").slice(0, 16);
+  return { shape: shape.slice(0, 300), sha256 };
 }
 
 function isAuthorized(req: NextApiRequest): boolean {
@@ -87,7 +149,7 @@ function isAuthorized(req: NextApiRequest): boolean {
   const raw = req.headers.authorization;
   if (typeof raw !== "string") return false;
   const m = /^Bearer\s+(.+)$/i.exec(raw.trim());
-  if (!m) return false;
+  if (!m?.[1]) return false;
   const presented = m[1].trim();
   const a = Buffer.from(presented);
   const b = Buffer.from(expected);
@@ -117,10 +179,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(503).json({ message: "ClickHouse is not configured on this instance" });
   }
 
-  logger.info(
-    { type: built.type, queryPreview: parsed.data.query.slice(0, 200) },
-    "ops explain",
-  );
+  // Audit log: shape + hash only. Literals (tenant ids, span attributes,
+  // user-supplied values) are stripped so application logs don't become
+  // a PII sink. The hash lets us correlate repeated identical queries.
+  logger.info({ type: built.type, ...redactQueryForAudit(parsed.data.query) }, "ops explain");
 
   try {
     const result = await client.query({
