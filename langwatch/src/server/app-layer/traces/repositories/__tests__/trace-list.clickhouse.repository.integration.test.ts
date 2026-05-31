@@ -25,8 +25,8 @@ const base = Date.now() - 60 * 60 * 1000;
 
 const TOTAL_TRACES = 800;
 const PAGE_LIMIT = 200;
-const HEAVY_INPUT = "i".repeat(2000);
-const HEAVY_OUTPUT = "o".repeat(2000); // ~80KB of payload per trace
+const HEAVY_INPUT = "i".repeat(8000);
+const HEAVY_OUTPUT = "o".repeat(8000); // ~16KB of payload per trace
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -64,6 +64,12 @@ function makeTraceSummaryRow(i: number, overrides: Record<string, unknown> = {})
     OutputFromRootSpan: false,
     OutputSpanEndTimeMs: 0,
     BlockedByGuardrail: false,
+    TraceName: `trace-${i}`,
+    RootSpanType: "",
+    ContainsAi: false,
+    ContainsPrompt: false,
+    AnnotationIds: [],
+    LastEventOccurredAt: new Date(base + i),
     TopicId: null,
     SubTopicId: null,
     ...overrides,
