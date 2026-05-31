@@ -190,47 +190,6 @@ function dedupInTuple(extraInnerWhere: string): string {
 }
 
 /**
- * Read the earliest `limit` spans of a trace (ordered by StartTime) while
- * touching the heavy `SpanAttributes`/`Events.*`/`Links.*` columns for those
- * `limit` spans only.
- *
- * The straight `SELECT FULL_SPAN_SELECT … ORDER BY StartTimeMs LIMIT n` makes
- * ClickHouse materialize every heavy column for every deduped span in the
- * trace before the ORDER BY trims it down to `n`. A trace with tens of
- * thousands of spans (a leaked or pathological trace_id — the exact case
- * `clampSpanReadLimit` guards the row count for) reads all of those payloads
- * into memory and tips this path into MEMORY_LIMIT_EXCEEDED.
- *
- * The inner page selects only the SpanId set we keep — key columns plus
- * StartTime for the sort, no payload — then the outer scan reads the heavy
- * columns for that bounded SpanId set. For traces at or under `limit` spans
- * the result is identical to the single-scan form; the win is entirely on the
- * long traces.
- */
-function fullSpansByTraceIdQuery(partition: PartitionFragment): string {
-  return `
-    SELECT ${FULL_SPAN_SELECT}
-    FROM ${TABLE_NAME}
-    WHERE TenantId = {tenantId:String}
-      AND TraceId = {traceId:String}
-      ${partition.sqlAnd}
-      AND SpanId IN (
-        SELECT SpanId
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-          ${partition.sqlAnd}
-          AND ${dedupInTuple(partition.sqlAndInner)}
-        ORDER BY StartTime ASC
-        LIMIT {limit:UInt32}
-      )
-      AND ${dedupInTuple(partition.sqlAndInner)}
-    ORDER BY StartTimeMs ASC
-    LIMIT {limit:UInt32}
-  `;
-}
-
-/**
  * Per-bucket key matchers for the LangWatch signals projection. Each entry
  * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
  * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
@@ -702,7 +661,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
           const result = await client.query({
-            query: fullSpansByTraceIdQuery(partition),
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
             query_params: {
               tenantId,
               traceId,
@@ -759,7 +727,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
           const result = await client.query({
-            query: fullSpansByTraceIdQuery(partition),
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
             query_params: {
               tenantId,
               traceId,
