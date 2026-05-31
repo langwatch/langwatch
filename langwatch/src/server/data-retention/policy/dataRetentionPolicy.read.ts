@@ -150,13 +150,18 @@ export async function getRetentionPolicySnapshot(
   const teamName = new Map(orgTeams.map((t) => [t.id, t.name]));
   const projectName = new Map(orgProjects.map((p) => [p.id, p.name]));
 
-  // A caller can read a rule's scope if they can manage/update it. Org rules
-  // are visible to anyone who can read the org settings page (they reached
-  // here through a project they can view, in the same org).
+  // A caller can read a rule's scope only if they have the corresponding
+  // manage/update permission on it. Map.has() on the name maps only proves
+  // org membership, which would leak unrelated team/project rule names to
+  // any user who can view a single project in the org.
+  //
+  // Org rules remain visible to anyone who reached this snapshot (they hold
+  // project:view on some project in the same org); the chip picker still
+  // gates write access via `canManageOrg` for `available.organization`.
   const canReadScope = (scopeType: ScopeTier, scopeId: string): boolean => {
     if (scopeType === "ORGANIZATION") return true;
-    if (scopeType === "TEAM") return teamName.has(scopeId);
-    return projectName.has(scopeId);
+    if (scopeType === "TEAM") return teamManage.teams.get(scopeId) === true;
+    return projectUpdate.projects.get(scopeId) === true;
   };
 
   const scopeName = (scopeType: ScopeTier, scopeId: string): string => {
