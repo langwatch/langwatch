@@ -28,6 +28,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference, what each container does and how they communicate
 - [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
 - [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
+- [ArgoCD](https://langwatch.ai/docs/self-hosting/deployment/argocd.md): Deploy the LangWatch Helm chart via ArgoCD without rotating gateway credentials on every sync
 
 ## Infrastructure
 
