@@ -5,6 +5,8 @@ import type { TokenizerClient } from "./tokenizer.client";
 
 const logger = createLogger("langwatch:tiktoken");
 
+const DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS = 10000;
+
 type Tiktoken = { encode: (text: string) => Uint32Array; free: () => void };
 
 export class TiktokenClient implements TokenizerClient {
@@ -132,6 +134,44 @@ export class TiktokenClient implements TokenizerClient {
   }
 
   private async remoteFetch(url: string): Promise<string> {
+    const timeoutMs = this.resolveFetchTimeoutMs();
+    // A single controller/timer pair guards BOTH the cached-fetch attempt and
+    // the native-fetch fallback. The AbortController aborts fetches that honor
+    // `signal`; the Promise.race against a rejecting timer is the hard ceiling
+    // for any path that ignores the signal (e.g. some node-fetch-cache setups),
+    // so this method can never hang indefinitely.
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(
+          new Error(`tiktoken remote fetch timed out after ${timeoutMs}ms`),
+        );
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([this.doRemoteFetch(url, controller.signal), timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private resolveFetchTimeoutMs(): number {
+    const parsed = parseInt(
+      process.env.TIKTOKEN_FETCH_TIMEOUT_MS ?? "",
+      10,
+    );
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS;
+  }
+
+  private async doRemoteFetch(
+    url: string,
+    signal: AbortSignal,
+  ): Promise<string> {
     try {
       const nodeFetchCache = await import("node-fetch-cache");
       const cachedFetch = nodeFetchCache.default.create({
@@ -140,11 +180,14 @@ export class TiktokenClient implements TokenizerClient {
           ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
         }),
       });
-      const res = await cachedFetch(url);
+      const res = await cachedFetch(url, { signal });
       return res.text();
-    } catch {
+    } catch (error) {
+      // Re-throw aborts (timeout) instead of falling through to a second
+      // unbounded attempt — the timer has already fired and we must reject.
+      if (signal.aborted) throw error;
       // Fall back to native fetch when node-fetch-cache is unavailable
-      const res = await globalThis.fetch(url);
+      const res = await globalThis.fetch(url, { signal });
       return res.text();
     }
   }
