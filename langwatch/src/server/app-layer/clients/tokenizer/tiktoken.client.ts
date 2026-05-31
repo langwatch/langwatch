@@ -180,6 +180,9 @@ export class TiktokenClient implements TokenizerClient {
           ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
         }),
       });
+      // Passing { signal } changes node-fetch-cache's computed cache key, so the
+      // first call after this change re-fetches each encoding once; the key is
+      // stable thereafter and the 1-year disk cache applies as before.
       const res = await cachedFetch(url, { signal });
       return res.text();
     } catch (error) {
