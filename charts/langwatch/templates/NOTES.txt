@@ -97,69 +97,41 @@ docs/ai-gateway/self-hosting/helm.
 ──────────────────────────────────────────────────────────────────────
 6. Required Secrets — check before upgrading
 ──────────────────────────────────────────────────────────────────────
-Each chart bump may introduce new required keys on the umbrella
-Secrets. When upgrading, verify these are present in the Secrets the
-app + gateway pods mount, otherwise the pods crashloop at boot with
-a CreateContainerConfigError that hides the missing key behind a
-generic message.
+Each chart bump may introduce new required keys on the umbrella's app
+Secret. When upgrading, verify these are present in the Secret the app
++ gateway pods mount, otherwise the pods crashloop at boot with a
+CreateContainerConfigError that hides the missing key behind a generic
+message.
 
-  {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }} keys (always required):
+  {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
     - cronApiKey
     - nextAuthSecret
-    - virtualKeyPepper          (introduced in 3.3.0)
+    - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
+    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
+    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+{{- end }}
 
-  {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} keys (gateway.chartManaged=true):
-    - {{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}     (introduced in 3.3.0)
-    - {{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}          (introduced in 3.3.0)
+  When autogen.enabled=true the chart materialises this Secret on
+  first install via per-key lookup-or-rand and heals missing keys
+  on subsequent renders. When autogen.enabled=false the operator
+  pre-creates the Secret out-of-band and the preflight Job validates
+  the required keys are present before pods roll. The
+  operator-provided path is the only one that works cleanly under
+  GitOps controllers whose render step has no cluster access (ArgoCD
+  repo-server, etc.) because the chart never renders the Secret for
+  the controller to reconcile against. See
+  docs/self-hosting/deployment/argocd.mdx for the full guide.
 
-  The chart materialises this Secret automatically on first install
-  (lookup-or-rand, matching clickhouse / redis / pg). Subsequent
-  `helm upgrade` runs reuse the existing values via lookup so the
-  app + gateway pods do not roll. No operator-side Secret prep is
-  required for a stock `helm install`.
+  Pre-create command for the operator-provided path:
 
-  ArgoCD: the repo-server has no cluster access, so lookup returns
-  nil on every sync and the chart would re-generate the Secret each
-  time. Pin the data in the Application manifest to prevent rotation.
-  BOTH settings are required: ignoreDifferences hides /data from the
-  diff, and RespectIgnoreDifferences=true makes the sync itself skip
-  /data (without it, any ordinary sync still re-applies a fresh pair):
-
-    spec:
-      syncPolicy:
-        syncOptions:
-          - RespectIgnoreDifferences=true
-      ignoreDifferences:
-        - group: ""
-          kind: Secret
-          name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
-          jsonPointers: ["/data"]
-
-  See docs/self-hosting/deployment/argocd.mdx for the full guide.
-
-  Operators preferring out-of-band materialisation (PreSync hook,
-  external-secrets, SealedSecrets, vault-agent, manual kubectl):
-
-    kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
-      --from-literal={{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}="$(openssl rand -hex 32)" \
-      --from-literal={{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}="$(openssl rand -hex 32)"
-
-  When the Secret pre-exists and was not created by Helm, a one-time
-  ownership handoff lets Helm adopt it instead of failing the install
-  with "exists and cannot be imported":
-
-    kubectl -n {{ .Release.Namespace }} annotate secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
-      meta.helm.sh/release-name={{ .Release.Name }} \
-      meta.helm.sh/release-namespace={{ .Release.Namespace }} --overwrite
-    kubectl -n {{ .Release.Namespace }} label secret {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }} \
-      app.kubernetes.io/managed-by=Helm --overwrite
-
-  The Secret carries helm.sh/resource-policy=keep so it survives
-  `helm uninstall` (the app + gateway both depend on it; losing it
-  forces a full rotation). A reinstall in the same namespace will
-  therefore hit the same "exists and cannot be imported" error and
-  needs the same handoff. To opt out of the keep policy, override
-  the annotation in your values.
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
+      --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+      --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+      --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 {{- end }}
