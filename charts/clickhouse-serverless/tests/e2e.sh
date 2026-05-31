@@ -122,8 +122,12 @@ test_existing_secret() {
   kc create secret generic ch-creds \
     --from-literal=password="externally-managed" 2>/dev/null || true
 
+  # Exercise the production-shape operator-owned path: autogen.enabled=false
+  # gates off the chart-managed Secret render entirely AND triggers the
+  # preflight Job that validates the operator's Secret has the required keys.
   helm_install \
     -f "$CHART_DIR/tests/values-single.yaml" \
+    --set autogen.enabled=false \
     --set auth.existingSecret=ch-creds \
     --set auth.secretKeys.passwordKey=password \
     --set auth.password=""
@@ -136,6 +140,14 @@ test_existing_secret() {
   else
     pass "No chart-managed secret created"
   fi
+
+  # Helm's hook contract guarantees the pre-install preflight Job ran (and
+  # succeeded) before this point — helm install blocks until the Job
+  # completes, and the chart's hook-delete-policy=hook-succeeded cleans up
+  # the Job + Role + RoleBinding + ServiceAccount immediately afterwards.
+  # A failed preflight would have aborted helm_install with a non-zero exit
+  # before this assertion ran. The negative case is exercised separately
+  # by test_existing_secret_missing_key.
 
   # Verify the external secret is actually mounted and contains the expected value
   local pod="${RELEASE}-clickhouse-0"
@@ -152,6 +164,62 @@ test_existing_secret() {
   assert_eq "Query with external password succeeds" "$query_result" "1"
 
   helm_uninstall
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: existing secret missing the required key (preflight blocks)
+# Verifies: preflight Job hard-fails helm install when the operator-owned
+# Secret is missing a key the StatefulSet would mount.
+# ─────────────────────────────────────────────────────────────────────────────
+test_existing_secret_missing_key() {
+  sep; info "Suite: existing secret missing required key (preflight blocks)"
+
+  kubectl --context "$KUBE_CTX" create namespace "$NAMESPACE" 2>/dev/null || true
+  kc delete secret ch-creds-broken 2>/dev/null || true
+  kc create secret generic ch-creds-broken \
+    --from-literal=wrongkey="not-the-password"
+
+  # helm install should FAIL: preflight detects the password key is missing.
+  if helm_install \
+    -f "$CHART_DIR/tests/values-single.yaml" \
+    --set autogen.enabled=false \
+    --set auth.existingSecret=ch-creds-broken \
+    --set auth.secretKeys.passwordKey=password \
+    --set auth.password="" 2>&1 | tee /tmp/ch-preflight-out; then
+    fail "Expected helm install to fail when preflight detects missing key"
+  else
+    pass "Preflight blocked install on missing key"
+  fi
+
+  if grep -q "preflight: required Secret keys missing" /tmp/ch-preflight-out; then
+    pass "Preflight surfaced the missing-key error to the operator"
+  else
+    fail "Preflight error message not found in helm output"
+  fi
+
+  # Clean up any partial release state so the next suite starts fresh.
+  helm_uninstall || true
+  kc delete secret ch-creds-broken 2>/dev/null || true
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: stock install without autogen or existingSecret fails at render
+# Verifies: chart-time validateAuth catches the "no Secret configured" footgun.
+# ─────────────────────────────────────────────────────────────────────────────
+test_no_auth_config_fails() {
+  sep; info "Suite: no auth configured → chart-time render fail"
+
+  if helm template ch "$CHART_DIR" 2>&1 | tee /tmp/ch-validate-out; then
+    fail "Expected helm template to fail when neither autogen nor existingSecret is set"
+  else
+    pass "Chart render hard-failed on missing auth config"
+  fi
+
+  if grep -q "no credentials Secret configured" /tmp/ch-validate-out; then
+    pass "validateAuth surfaced the actionable error"
+  else
+    fail "validateAuth error message not found in helm template output"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -299,6 +367,8 @@ main() {
   test_single
   test_upgrade
   test_existing_secret
+  test_existing_secret_missing_key
+  test_no_auth_config_fails
   test_cold_storage
   test_backup
 

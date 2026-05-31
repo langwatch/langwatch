@@ -78,6 +78,7 @@ app.kubernetes.io/component: keeper
 
 {{/* Validation: fail early on invalid configuration */}}
 {{- define "clickhouse-serverless.validate" -}}
+  {{- include "clickhouse-serverless.validateAuth" . }}
   {{- if and (or .Values.cold.enabled .Values.backup.enabled) (not .Values.objectStorage.bucket) }}
     {{- fail "objectStorage.bucket is required when cold.enabled or backup.enabled is true" }}
   {{- end }}
@@ -89,21 +90,28 @@ app.kubernetes.io/component: keeper
   {{- end }}
 {{- end -}}
 
-{{/* Password secret key */}}
-{{- define "clickhouse-serverless.secretKey" -}}
-  {{- if .Values.auth.existingSecret -}}
-    {{- .Values.auth.secretKeys.passwordKey -}}
-  {{- else -}}
-    {{- "password" -}}
-  {{- end -}}
+{{/* Auth wiring fail-fast: hard-stop the render when neither path to a
+     credentials Secret is configured. Either autogen.enabled=true (the
+     chart materialises the Secret via lookup-or-rand) or
+     auth.existingSecret points at an operator-owned Secret. With both
+     unset the StatefulSet would mount a Secret name that never gets
+     created and the ClickHouse pods would crashloop with
+     CreateContainerConfigError. Catch it at chart-render time instead. */}}
+{{- define "clickhouse-serverless.validateAuth" -}}
+  {{- if and (not .Values.autogen.enabled) (empty .Values.auth.existingSecret) }}
+    {{- fail "clickhouse-serverless: no credentials Secret configured. Either set autogen.enabled=true (chart materialises the Secret on first install via lookup-or-rand) OR pre-create a Secret with `password` (and `clusterSecret` when replicas>1) and set auth.existingSecret to its name." -}}
+  {{- end }}
 {{- end -}}
 
-{{/* Cluster secret key */}}
+{{/* Password secret key (uses auth.secretKeys.passwordKey for both the
+     autogen and existing-secret paths so the StatefulSet env mapping
+     and the rendered Secret data key always agree). */}}
+{{- define "clickhouse-serverless.secretKey" -}}
+{{- default "password" .Values.auth.secretKeys.passwordKey -}}
+{{- end -}}
+
+{{/* Cluster secret key (same shape as secretKey above). */}}
 {{- define "clickhouse-serverless.clusterSecretKey" -}}
-  {{- if .Values.auth.existingSecret -}}
-    {{- .Values.auth.secretKeys.clusterSecretKey -}}
-  {{- else -}}
-    {{- "clusterSecret" -}}
-  {{- end -}}
+{{- default "clusterSecret" .Values.auth.secretKeys.clusterSecretKey -}}
 {{- end -}}
 
