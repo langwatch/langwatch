@@ -1,11 +1,12 @@
 import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ExternalLink, Link2 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as React from "react";
+import { SiSlack } from "react-icons/si";
 import dynamic from "~/utils/compat/next-dynamic";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
-import { Link } from "~/components/ui/link";
+import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   clearLiquidMarkers,
@@ -330,21 +331,7 @@ export function CompactSlackPreview({
   };
 
   if ("text" in payload) {
-    return (
-      <Box
-        bg="bg.subtle"
-        borderRadius="md"
-        padding={3}
-        height="200px"
-        minHeight="100px"
-        overflowY="auto"
-        css={{ resize: "vertical" }}
-      >
-        <Text whiteSpace="pre-wrap" textStyle="sm">
-          {renderSlackMrkdwn(payload.text)}
-        </Text>
-      </Box>
-    );
+    return <SlackTextPreviewCard text={payload.text} />;
   }
 
   const blockCount = payload.blocks.length;
@@ -402,47 +389,91 @@ export function CompactSlackPreview({
   );
 }
 
-function renderSlackMrkdwn(text: string): React.ReactNode[] {
-  const linkPattern = /<(https?:\/\/[^>|]+)(?:\|([^>]+))?>/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = linkPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(
-        <Fragment key={key++}>
-          {renderBold(text.slice(lastIndex, match.index))}
-        </Fragment>,
-      );
-    }
-    const url = match[1]!;
-    const label = match[2] ?? url;
-    nodes.push(
-      <Link key={key++} href={url} isExternal color="orange.400">
-        {label}
-      </Link>,
-    );
-    lastIndex = linkPattern.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    nodes.push(
-      <Fragment key={key++}>{renderBold(text.slice(lastIndex))}</Fragment>,
-    );
-  }
-  return nodes;
+/**
+ * Card-shaped preview for the plain-text Slack channel. Grows with the
+ * content (no fixed height, no resize handle) and runs the rendered text
+ * through `<Markdown>` so bold/italic/links/blockquotes look like the
+ * real Slack message — close enough to be useful, far less effort than
+ * approximating Slack's chrome.
+ */
+function SlackTextPreviewCard({ text }: { text: string }) {
+  const asMarkdown = useMemo(() => slackMrkdwnToCommonMark(text), [text]);
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      overflow="hidden"
+      bg="bg.panel"
+    >
+      <HStack
+        gap={2}
+        align="center"
+        paddingX={3}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border"
+        bg="bg.subtle"
+      >
+        <Box color="fg.muted">
+          <SiSlack size={12} />
+        </Box>
+        <Text
+          textStyle="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wide"
+        >
+          Preview
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          — how this message will appear in Slack
+        </Text>
+      </HStack>
+      <Box padding={4}>
+        <Markdown>{asMarkdown}</Markdown>
+      </Box>
+    </Box>
+  );
 }
 
-function renderBold(text: string): React.ReactNode[] {
-  return text.split(/(\*[^*]+\*)/g).map((segment, i) =>
-    segment.startsWith("*") && segment.endsWith("*") && segment.length > 2 ? (
-      <Text as="span" key={i} fontWeight="bold">
-        {segment.slice(1, -1)}
-      </Text>
-    ) : (
-      <Fragment key={i}>{segment}</Fragment>
-    ),
+/**
+ * Translate Slack mrkdwn to CommonMark so we can render it through our
+ * standard `<Markdown>` pipeline. Slack's flavour is close to Markdown but
+ * not identical — single-asterisk bold, angle-bracket links, mixed-case
+ * mentions — so we touch only the syntax that actually differs and let the
+ * rest fall through to the Markdown renderer.
+ *
+ * Intentional non-goals: Slack user/channel mentions (`<@U123>`, `<#C123>`),
+ * since the templates we render against don't produce them.
+ */
+function slackMrkdwnToCommonMark(input: string): string {
+  return (
+    input
+      // <https://url|label> → [label](url) ; <https://url> → <https://url>.
+      // CommonMark autolinks the bare form, so leaving the angle brackets is
+      // fine.
+      .replace(
+        /<(https?:\/\/[^>|\s]+)\|([^>]+)>/g,
+        (_match, url: string, label: string) => `[${label.trim()}](${url})`,
+      )
+      // *bold* → **bold**. Restricted to runs without spaces at the boundary
+      // (`*foo bar*` is bold; a stray `*` in prose like `2 * 3` won't match
+      // because the next char is whitespace).
+      .replace(
+        /(^|[^*\w])\*([^*\n][^*\n]*?[^*\n\s])\*(?=[^*\w]|$)/g,
+        (_match, lead: string, content: string) => `${lead}**${content}**`,
+      )
+      .replace(
+        /(^|[^*\w])\*([^*\s])\*(?=[^*\w]|$)/g,
+        (_match, lead: string, content: string) => `${lead}**${content}**`,
+      )
+      // ~strike~ → ~~strike~~ (GFM).
+      .replace(
+        /(^|[^~\w])~([^~\n][^~\n]*?[^~\n\s])~(?=[^~\w]|$)/g,
+        (_match, lead: string, content: string) => `${lead}~~${content}~~`,
+      )
   );
 }
 
