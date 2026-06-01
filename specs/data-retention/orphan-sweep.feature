@@ -79,10 +79,12 @@ Feature: PG orphan sweep for retention-deleted traces
     When the orphan-sweep chain step runs for the project
     Then the orphaned PublicShare is deleted from PostgreSQL
 
-  Scenario: Read-time lazy cleanup is still the read path's safety net
-    Given a tenant accesses their annotations list before the next chain step runs
-    Then orphaned annotations are excluded from the response at read time
-    And the orphaned Annotation is asynchronously deleted from PostgreSQL
+  # The chain is the sole orphan-cleanup mechanism. There is no read-time
+  # lazy cleanup wired into annotation lists, public shares, trigger history
+  # or queue items today — between chain steps, stale rows can briefly
+  # surface, and that's the accepted trade-off for the single, predictable
+  # 24h cadence. Reintroducing a read-time path would require touching every
+  # consumer; if it ever returns it gets its own feature file.
 
   Scenario: Chain step processes orphans in bounded batches scoped to the tenant
     When the orphan-sweep chain step runs for a tenant
