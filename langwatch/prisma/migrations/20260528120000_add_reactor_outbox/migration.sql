@@ -51,7 +51,12 @@ CREATE INDEX "ReactorOutbox_projectId_status_updatedAt_idx" ON "ReactorOutbox"("
 CREATE INDEX "ReactorOutbox_status_leasedUntil_idx" ON "ReactorOutbox"("status", "leasedUntil");
 
 -- AddForeignKey
-ALTER TABLE "ReactorOutbox" ADD CONSTRAINT "ReactorOutbox_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ON DELETE CASCADE (deviates from the Prisma default RESTRICT used by
+-- most per-project tables): a deleted project cannot receive dispatches,
+-- so pending/dead outbox rows have no meaning once the project is gone.
+-- RESTRICT would block project deletion until an operator manually
+-- cleaned out the table.
+ALTER TABLE "ReactorOutbox" ADD CONSTRAINT "ReactorOutbox_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- To roll back, uncomment and run manually:
 -- DROP TABLE "ReactorOutbox";

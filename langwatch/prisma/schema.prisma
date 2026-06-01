@@ -2662,7 +2662,11 @@ enum ReactorOutboxStatus {
 model ReactorOutbox {
     id             String              @id @default(nanoid())
     projectId      String
-    project        Project             @relation(fields: [projectId], references: [id])
+    // Cascade on project delete: pending/dead outbox rows have no
+    // meaning once the owning project is gone, and RESTRICT (the
+    // Prisma default for required relations) would block project
+    // deletion until an operator hand-cleaned the table.
+    project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
     // Stable identifier of the reactor that enqueued the row. Matches
     // the reactor's `name` in the pipeline builder.
     reactorName    String
