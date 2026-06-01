@@ -1,6 +1,9 @@
 import { testFireSlackBlock, testFireSlackText } from "./banner";
 import { filterBlockKit } from "./blockKitAllowlist";
-import { DEFAULT_SLACK_TEMPLATE } from "./defaults";
+import {
+  DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+  DEFAULT_SLACK_TEMPLATE,
+} from "./defaults";
 import { renderLiquid } from "./engine";
 import { errorMessage, renderWithFallback } from "./renderWithFallback";
 import type { TemplateContext } from "./templateContext";
@@ -37,10 +40,13 @@ function defaultSlackText({
 }
 
 /**
- * Renders a trigger Slack message. `block_kit` templates are parsed as JSON and
- * passed through the allowlist; any failure (render throw, invalid JSON, or no
- * surviving blocks) falls back to the default plain-text message. A test fire
- * prepends a non-suppressible banner.
+ * Renders a trigger Slack message. `templateType` (not the presence of
+ * `template`) decides which renderer runs — a null template paired with
+ * `templateType: "block_kit"` is "use the block_kit framework default",
+ * not "fall back to plain text." Block Kit templates are parsed as JSON
+ * and passed through the allowlist; any failure (render throw, invalid
+ * JSON, or no surviving blocks) falls back to the plain-text default. A
+ * test fire prepends a non-suppressible banner.
  */
 export async function renderTriggerSlack({
   templateType,
@@ -55,7 +61,7 @@ export async function renderTriggerSlack({
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
 
-  if (template == null || templateType !== "block_kit") {
+  if (templateType !== "block_kit") {
     const rendered = await renderWithFallback({
       template,
       fallback: DEFAULT_SLACK_TEMPLATE,
@@ -72,8 +78,13 @@ export async function renderTriggerSlack({
     };
   }
 
+  const effectiveTemplate = template ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
+  const usedDefaultTemplate = template == null;
   try {
-    const rendered = await renderLiquid({ template, context: ctx });
+    const rendered = await renderLiquid({
+      template: effectiveTemplate,
+      context: ctx,
+    });
     const parsed: unknown = JSON.parse(rendered.output);
     const blocksInput = Array.isArray(parsed)
       ? parsed
@@ -84,7 +95,7 @@ export async function renderTriggerSlack({
     }
     return {
       payload: { blocks: testFire ? [testFireSlackBlock(), ...blocks] : blocks },
-      usedDefault: false,
+      usedDefault: usedDefaultTemplate,
       missingVariables: rendered.missingVariables,
       errors: [],
     };

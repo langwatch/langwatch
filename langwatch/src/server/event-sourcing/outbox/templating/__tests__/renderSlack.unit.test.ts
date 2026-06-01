@@ -58,6 +58,20 @@ describe("renderTriggerSlack", () => {
     });
   });
 
+  describe("when type is block_kit but no template is provided", () => {
+    it("renders the block_kit default (not the plain-text default)", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: null,
+        context: makeContext(),
+      });
+      const blocks = asBlocks(slack.payload);
+      expect(slack.usedDefault).toBe(true);
+      expect(slack.errors).toEqual([]);
+      expect(blocks[0]?.type).toBe("header");
+    });
+  });
+
   describe("when a Block Kit template renders valid JSON", () => {
     it("sends a blocks payload through the allowlist", async () => {
       const template = JSON.stringify([

@@ -75,7 +75,12 @@ function templatesFromSlice(slice: SlackSlice) {
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
     slackTemplate: slice.template.usingDefault ? null : slice.template.value,
-    slackTemplateType: slice.template.usingDefault ? null : slice.templateType,
+    // Always carry the toggle. A null `slackTemplate` paired with a
+    // non-null `slackTemplateType` means "use the framework default for
+    // this type" — without this the server can't tell apart a user who
+    // wants the block_kit default from a user who wants the plain-text
+    // default, and falls back to text either way.
+    slackTemplateType: slice.templateType,
   };
 }
 
