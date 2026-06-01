@@ -1745,9 +1745,13 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
-        // Two parallel queries: trace summaries (with I/O) and spans (separate table)
-        const [summaryResult, spansResult] = await Promise.all([
-          clickHouseClient.query({
+        // Summaries first (light, one row per trace): they carry OccurredAt,
+        // which bounds the heavy stored_spans scan below to the traces' weekly
+        // partitions instead of cold-scanning every partition on S3. A span's
+        // StartTime always falls within its trace's lifetime, so a ±2-day window
+        // around the summaries' OccurredAt range is safe headroom; when no
+        // summary row is found we fall back to an unbounded span scan.
+        const summaryResult = await clickHouseClient.query({
             query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -1790,8 +1794,31 @@ export class ClickHouseTraceService {
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
-          }),
-          clickHouseClient.query({
+          });
+
+        const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
+
+        // Bound the stored_spans scan to the weeks the matched traces occurred
+        // in (the cold-scan cost driver). Empty -> unbounded fallback.
+        const SPAN_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+        const occurredAts = summaryRows
+          .map((r) => r.ts_OccurredAt)
+          .filter((t): t is number => typeof t === "number" && t > 0);
+        const hasWindow = occurredAts.length > 0;
+        const spanTimeFilterOuter = hasWindow
+          ? "AND t.StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
+          : "";
+        const spanTimeFilterInner = hasWindow
+          ? "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
+          : "";
+        const spanTimeParams = hasWindow
+          ? {
+              spanFromMs: Math.min(...occurredAts) - SPAN_PARTITION_WINDOW_MS,
+              spanToMs: Math.max(...occurredAts) + SPAN_PARTITION_WINDOW_MS,
+            }
+          : {};
+
+        const spansResult = await clickHouseClient.query({
             query: `
         SELECT
           SpanId,
@@ -1821,23 +1848,21 @@ export class ClickHouseTraceService {
         FROM stored_spans AS t
         WHERE t.TenantId = {tenantId:String}
           AND t.TraceId IN ({traceIds:Array(String)})
+          ${spanTimeFilterOuter}
           AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
             FROM stored_spans
             WHERE TenantId = {tenantId:String}
               AND TraceId IN ({traceIds:Array(String)})
+              ${spanTimeFilterInner}
             GROUP BY TenantId, TraceId, SpanId
           )
         ORDER BY t.TraceId, t.StartTime ASC
         LIMIT 200 BY t.TraceId
       `,
-            query_params: { tenantId: projectId, traceIds },
+            query_params: { tenantId: projectId, traceIds, ...spanTimeParams },
             format: "JSONEachRow",
-          }),
-        ]);
-
-        // Parse trace summaries (includes ComputedInput/Output)
-        const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
+          });
 
         // Parse spans
         type SpanRow = {
