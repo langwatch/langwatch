@@ -1,7 +1,11 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { RETENTION_MANAGED_TABLES, RETENTION_TABLE_CATEGORY_MAP, type RetentionCategory } from "../retentionPolicy.schema";
 import { createLogger } from "~/utils/logger/server";
+import {
+  RETENTION_MANAGED_TABLES,
+  RETENTION_TABLE_CATEGORY_MAP,
+  type RetentionCategory,
+} from "../retentionPolicy.schema";
 
 const logger = createLogger("langwatch:data-retention:metering");
 
@@ -40,7 +44,10 @@ export class StorageMeterService {
     tenantId: string;
   }): Promise<StorageBreakdown> {
     if (!this.resolveClickHouseClient) {
-      return { totalBytes: 0, byCategory: { traces: 0, scenarios: 0, experiments: 0 } };
+      return {
+        totalBytes: 0,
+        byCategory: { traces: 0, scenarios: 0, experiments: 0 },
+      };
     }
 
     const client = await this.resolveClickHouseClient(tenantId);

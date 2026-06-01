@@ -3,10 +3,13 @@ Feature: ClickHouse TTL activation for data retention
   I manage retention DELETE TTL rules alongside cold-storage tiering TTL
   So that expired rows are removed during background merges
 
+  # Retention values are whole weeks (multiples of 7 days), matching the
+  # weekly partition key. The cold-storage default is 49 days (7 weeks).
+
   Scenario: TTL expression evaluates correctly for active retention
-    Given a stored_spans row with _retention_days = 30 and StartTime = 35 days ago
+    Given a stored_spans row with _retention_days = 49 and StartTime = 56 days ago
     When ClickHouse evaluates the TTL expression during a background merge
-    Then the row is deleted because StartTime + 30 days is in the past
+    Then the row is deleted because StartTime + 49 days is in the past
 
   Scenario: TTL expression preserves indefinite rows
     Given a stored_spans row with _retention_days = 0
@@ -26,14 +29,14 @@ Feature: ClickHouse TTL activation for data retention
     And ClickHouse does NOT re-scan all existing parts
 
   Scenario: Row-level TTL precision in shared partitions
-    Given a weekly partition contains tenant A with 30-day retention and tenant B with 90-day retention
-    When the partition is merged after 35 days
+    Given a weekly partition contains tenant A with 49-day retention and tenant B with 91-day retention
+    When the partition is merged after 56 days
     Then tenant A's rows are deleted
     And tenant B's rows are preserved
 
   Scenario: ReplacingMergeTree dedup runs before TTL
     Given two versions of the same row exist (same ORDER BY key)
-    And both have _retention_days = 30 and are expired
+    And both have _retention_days = 49 and are expired
     When ClickHouse merges the part
     Then RMT deduplication keeps the latest version first
     And TTL evaluation deletes the surviving row because it is expired

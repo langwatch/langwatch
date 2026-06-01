@@ -1,9 +1,9 @@
-import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing";
-import type { OrphanSweepService } from "./orphanSweep.service";
-import type { RetentionPolicyCache } from "../retentionPolicyCache";
+import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import { createLogger } from "~/utils/logger/server";
+import type { RetentionPolicyCache } from "../retentionPolicyCache";
+import type { OrphanSweepService } from "./orphanSweep.service";
 
 const logger = createLogger("langwatch:data-retention:orphan-reactor");
 

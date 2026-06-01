@@ -1,6 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 import { incrementOrphansSwept } from "~/server/metrics";
+import { createLogger } from "~/utils/logger/server";
 import type { OrphanSweepRepository } from "./orphanSweep.repository";
 
 const logger = createLogger("langwatch:data-retention:orphan-sweep");

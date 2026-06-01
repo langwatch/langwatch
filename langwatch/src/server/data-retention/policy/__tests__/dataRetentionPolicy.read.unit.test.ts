@@ -49,9 +49,9 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
     vi.clearAllMocks();
 
     appMocks.getResolvedForProject.mockResolvedValue({
-      traces: 30,
-      scenarios: 30,
-      experiments: 30,
+      traces: 49,
+      scenarios: 49,
+      experiments: 49,
     });
 
     prisma.project.findUnique.mockResolvedValue({
@@ -79,26 +79,53 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
 
     appMocks.listOrganizationRules.mockResolvedValue([
       // Rules the user CAN see:
-      { scopeType: "ORGANIZATION", scopeId: "org_1", category: "traces", retentionDays: 90 },
-      { scopeType: "PROJECT", scopeId: "project_a", category: "traces", retentionDays: 7 },
+      {
+        scopeType: "ORGANIZATION",
+        scopeId: "org_1",
+        category: "traces",
+        retentionDays: 91,
+      },
+      {
+        scopeType: "PROJECT",
+        scopeId: "project_a",
+        category: "traces",
+        retentionDays: 7,
+      },
       // Rules the user MUST NOT see:
-      { scopeType: "PROJECT", scopeId: "project_b", category: "traces", retentionDays: 14 },
-      { scopeType: "PROJECT", scopeId: "project_c", category: "traces", retentionDays: 60 },
-      { scopeType: "TEAM", scopeId: "team_b", category: "traces", retentionDays: 30 },
+      {
+        scopeType: "PROJECT",
+        scopeId: "project_b",
+        category: "traces",
+        retentionDays: 14,
+      },
+      {
+        scopeType: "PROJECT",
+        scopeId: "project_c",
+        category: "traces",
+        retentionDays: 63,
+      },
+      {
+        scopeType: "TEAM",
+        scopeId: "team_b",
+        category: "traces",
+        retentionDays: 49,
+      },
     ]);
 
     // Caller is a project-only user, no org/team management.
     rbacMocks.hasOrganizationPermission.mockResolvedValue(false);
     rbacMocks.hasProjectPermission.mockResolvedValue(true);
-    rbacMocks.batchScopePermissions.mockImplementation(async (_ctx: any, args: any) => {
-      const teams = new Map<string, boolean>();
-      const projects = new Map<string, boolean>();
-      for (const id of args.teamIds) teams.set(id, false);
-      for (const id of args.projectIds) {
-        projects.set(id, id === "project_a");
-      }
-      return { teams, projects };
-    });
+    rbacMocks.batchScopePermissions.mockImplementation(
+      async (_ctx: any, args: any) => {
+        const teams = new Map<string, boolean>();
+        const projects = new Map<string, boolean>();
+        for (const id of args.teamIds) teams.set(id, false);
+        for (const id of args.projectIds) {
+          projects.set(id, id === "project_a");
+        }
+        return { teams, projects };
+      },
+    );
   });
 
   describe("when caller has project:update on one project only", () => {

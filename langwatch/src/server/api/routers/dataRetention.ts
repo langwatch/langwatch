@@ -1,17 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
 import { getApp } from "~/server/app-layer/app";
-import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
-import { SCOPE_TIERS } from "~/server/scopes/scope.types";
+import { assertCanWriteRetentionScope } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
+import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
+import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
 import {
+  type RetentionCategory,
   retentionCategorySchema,
   retentionDaysSchema,
-  type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
-import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
-import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
+import { SCOPE_TIERS } from "~/server/scopes/scope.types";
+import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({
   scopeType: z.enum(SCOPE_TIERS),
@@ -33,9 +33,10 @@ export const dataRetentionRouter = createTRPCRouter({
     }),
 
   /**
-   * Set one category's retention at one scope. Authorizes manage on the target
+   * Set one category's retention at one scope. Authorizes write on the target
    * scope (organization:manage / team:manage / project:update) — a project
-   * admin cannot push a policy up to the org.
+   * member can edit their own project's retention but cannot push a policy up
+   * to the org.
    */
   setForScope: protectedProcedure
     .input(
@@ -48,7 +49,7 @@ export const dataRetentionRouter = createTRPCRouter({
     )
     .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
-      await assertCanManageScope(
+      await assertCanWriteRetentionScope(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
@@ -77,7 +78,7 @@ export const dataRetentionRouter = createTRPCRouter({
     )
     .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
-      await assertCanManageScope(
+      await assertCanWriteRetentionScope(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );

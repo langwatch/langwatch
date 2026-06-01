@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { resolveRetention, type RetentionRow } from "../resolveRetentionDays";
+import { describe, expect, it } from "vitest";
 import { resolveScopeChain } from "../../scopes/resolveScopeChain";
+import { type RetentionRow, resolveRetention } from "../resolveRetentionDays";
 
 const CHAIN = resolveScopeChain({
   organizationId: "org-1",

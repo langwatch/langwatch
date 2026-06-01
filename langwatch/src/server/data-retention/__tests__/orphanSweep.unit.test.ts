@@ -76,8 +76,12 @@ describe("createRetentionOrphanSweepReactor()", () => {
           } as any,
         });
 
-        const id1 = reactor.options!.makeJobId!({ event: { tenantId: "p1" } } as any);
-        const id2 = reactor.options!.makeJobId!({ event: { tenantId: "p1" } } as any);
+        const id1 = reactor.options!.makeJobId!({
+          event: { tenantId: "p1" },
+        } as any);
+        const id2 = reactor.options!.makeJobId!({
+          event: { tenantId: "p1" },
+        } as any);
 
         expect(id1).toBe(id2);
         expect(id1).toContain("p1");
@@ -98,7 +102,11 @@ describe("createRetentionOrphanSweepReactor()", () => {
 
         await reactor.handle(
           { tenantId: "project-1" } as any,
-          { tenantId: "project-1", aggregateId: "trace-1", foldState: {} } as any,
+          {
+            tenantId: "project-1",
+            aggregateId: "trace-1",
+            foldState: {},
+          } as any,
         );
 
         expect(sweepProject).not.toHaveBeenCalled();
@@ -119,7 +127,11 @@ describe("createRetentionOrphanSweepReactor()", () => {
 
         await reactor.handle(
           { tenantId: "project-1" } as any,
-          { tenantId: "project-1", aggregateId: "trace-1", foldState: {} } as any,
+          {
+            tenantId: "project-1",
+            aggregateId: "trace-1",
+            foldState: {},
+          } as any,
         );
 
         expect(sweepProject).toHaveBeenCalledWith({ projectId: "project-1" });
@@ -141,7 +153,11 @@ describe("createRetentionOrphanSweepReactor()", () => {
         await expect(
           reactor.handle(
             { tenantId: "project-1" } as any,
-            { tenantId: "project-1", aggregateId: "trace-1", foldState: {} } as any,
+            {
+              tenantId: "project-1",
+              aggregateId: "trace-1",
+              foldState: {},
+            } as any,
           ),
         ).resolves.toBeUndefined();
       });

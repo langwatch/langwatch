@@ -1,9 +1,12 @@
-import { TtlCache } from "../utils/ttlCache";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
-import type { RetentionCategory, ResolvedRetention } from "./retentionPolicy.schema";
-import { resolveRetention, type RetentionRow } from "./resolveRetentionDays";
-import type { RetentionPolicyResolver } from "./retentionPolicyResolver";
+import { TtlCache } from "../utils/ttlCache";
 import type { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repository";
+import { type RetentionRow, resolveRetention } from "./resolveRetentionDays";
+import type {
+  ResolvedRetention,
+  RetentionCategory,
+} from "./retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "./retentionPolicyResolver";
 
 /**
  * Caches the resolved per-category retention for a project so the ingestion
@@ -40,7 +43,11 @@ export class RetentionPolicyCache implements RetentionPolicyResolver {
   }
 
   invalidate(projectId: string): void {
-    this.cache.delete(projectId).catch(() => {});
+    // Best-effort: a failed cache delete is self-healing because every entry
+    // expires on the 60s TTL anyway, so a stale resolution survives at most
+    // one TTL window rather than indefinitely. Swallow to keep invalidate()
+    // synchronous and non-throwing for its callers (the policy writer).
+    this.cache.delete(projectId).catch(() => undefined);
   }
 
   private async loadResolved(

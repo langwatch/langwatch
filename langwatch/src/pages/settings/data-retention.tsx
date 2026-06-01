@@ -6,28 +6,34 @@ import {
   Heading,
   HStack,
   Input,
+  Progress,
   Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, Folder, Trash2, Users } from "lucide-react";
-import { useState } from "react";
+import { Building2, Folder, History, Trash2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import SettingsLayout from "~/components/SettingsLayout";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
   type ScopeChipPickerScopeType,
 } from "~/components/settings/ScopeChipPicker";
-import SettingsLayout from "~/components/SettingsLayout";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
+  DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
   RETENTION_CATEGORIES,
+  RETENTION_WEEK_DAYS,
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
+import { classifyRetentionChange } from "~/server/data-retention/retroactive/retroactiveApply";
+import type { MutationProgress } from "~/server/data-retention/retroactive/retroactiveUpdate.service";
 import { api } from "~/utils/api";
 
 const CATEGORY_LABELS: Record<RetentionCategory, string> = {
@@ -102,6 +108,98 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
       }),
   });
 
+  // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
+  // effective retention. `baseline` approximates what existing data currently
+  // carries — the effective policy as first seen this session — so we can warn
+  // before a contraction makes old data deletable. It's captured before any
+  // edit and advanced only after a successful apply; the precise per-row value
+  // isn't queried, which a change-then-apply workflow keeps in sync.
+  const [baseline, setBaseline] = useState<Record<
+    RetentionCategory,
+    number
+  > | null>(null);
+  useEffect(() => {
+    if (rulesQuery.data && baseline === null) {
+      setBaseline(rulesQuery.data.effective);
+    }
+  }, [rulesQuery.data, baseline]);
+
+  const [confirmContraction, setConfirmContraction] = useState<{
+    category: RetentionCategory;
+    from: number;
+    to: number;
+  } | null>(null);
+
+  // Poll system.mutations while a retroactive apply is in flight, then idle.
+  const projectIsWritable =
+    rulesQuery.data?.available.projects.some((p) => p.id === projectId) ??
+    false;
+  const [pollMs, setPollMs] = useState<number | false>(false);
+  const progressQuery = api.dataRetention.getMutationProgress.useQuery(
+    { projectId },
+    { enabled: projectIsWritable, refetchInterval: pollMs },
+  );
+  const activeMutations = progressQuery.data ?? [];
+  useEffect(() => {
+    setPollMs(activeMutations.length > 0 ? 3000 : false);
+  }, [activeMutations.length]);
+
+  const triggerUpdate = api.dataRetention.triggerRetroactiveUpdate.useMutation({
+    onSuccess: (_data, variables) => {
+      setBaseline((b) =>
+        b ? { ...b, [variables.category]: variables.newRetentionDays } : b,
+      );
+      setPollMs(3000);
+      void progressQuery.refetch();
+      toaster.create({
+        title: "Applying retention to existing data…",
+        type: "info",
+      });
+    },
+    onError: (error) =>
+      toaster.create({
+        title: "Failed to apply retention to existing data",
+        description: error.message,
+        type: "error",
+      }),
+  });
+
+  const killMutation = api.dataRetention.killMutation.useMutation({
+    onSuccess: () => {
+      void progressQuery.refetch();
+      toaster.create({
+        title: "Retroactive update cancelled",
+        type: "success",
+      });
+    },
+    onError: (error) =>
+      toaster.create({
+        title: "Failed to cancel",
+        description: error.message,
+        type: "error",
+      }),
+  });
+
+  const applyToExistingData = (category: RetentionCategory) => {
+    const to = rulesQuery.data?.effective[category] ?? 0;
+    if (to <= 0) return; // indefinite — nothing finite to propagate
+    const from = baseline?.[category] ?? to;
+    const kind = classifyRetentionChange({ current: from, next: to });
+    if (kind === "noop") {
+      toaster.create({
+        title: "Existing data already uses this retention",
+        type: "info",
+      });
+      return;
+    }
+    if (kind === "contraction") {
+      setConfirmContraction({ category, from, to });
+      return;
+    }
+    // Expansion is safe — no data becomes deletable. Apply immediately.
+    triggerUpdate.mutate({ projectId, category, newRetentionDays: to });
+  };
+
   if (rulesQuery.isLoading) {
     return (
       <VStack width="full" padding={8}>
@@ -130,21 +228,38 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
             Effective Retention
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            What applies to this project today, after the
-            project → team → organization cascade. No override anywhere means
-            data is kept indefinitely.
+            What applies to this project today, after the project → team →
+            organization cascade. No override anywhere means data is kept
+            indefinitely.
           </Text>
         </Card.Header>
         <Card.Body>
           <VStack gap={3} align="stretch">
-            {RETENTION_CATEGORIES.map((category) => (
-              <HStack key={category} justifyContent="space-between">
-                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                <Text fontWeight="medium">
-                  {formatDays(snapshot?.effective[category] ?? 0)}
-                </Text>
-              </HStack>
-            ))}
+            {RETENTION_CATEGORIES.map((category) => {
+              const days = snapshot?.effective[category] ?? 0;
+              return (
+                <HStack key={category} justifyContent="space-between">
+                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                  <HStack gap={3}>
+                    <Text fontWeight="medium">{formatDays(days)}</Text>
+                    {projectIsWritable && days > 0 && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        loading={
+                          triggerUpdate.isLoading &&
+                          triggerUpdate.variables?.category === category
+                        }
+                        onClick={() => applyToExistingData(category)}
+                      >
+                        <History size={14} />
+                        Apply to existing data
+                      </Button>
+                    )}
+                  </HStack>
+                </HStack>
+              );
+            })}
           </VStack>
         </Card.Body>
       </Card.Root>
@@ -158,7 +273,8 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
               </Heading>
               <Text fontSize="sm" color="fg.muted">
                 Set a retention for a category at the organization, a team, or a
-                project. The most specific override wins. Minimum{" "}
+                project. The most specific override wins. Retention is set in
+                whole weeks (multiples of {RETENTION_WEEK_DAYS} days); minimum{" "}
                 {MIN_RETENTION_DAYS} days.
               </Text>
             </VStack>
@@ -236,6 +352,14 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
         </Card.Body>
       </Card.Root>
 
+      <RetroactiveProgressCard
+        mutations={activeMutations}
+        onCancel={(mutationId) =>
+          killMutation.mutate({ projectId, mutationId })
+        }
+        isCancelling={killMutation.isLoading}
+      />
+
       <StorageUsageCard
         isLoading={storageQuery.isLoading}
         data={storageQuery.data}
@@ -256,7 +380,127 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
           }
         />
       )}
+
+      <ContractionConfirmDialog
+        pending={confirmContraction}
+        isApplying={triggerUpdate.isLoading}
+        onCancel={() => setConfirmContraction(null)}
+        onConfirm={() => {
+          if (!confirmContraction) return;
+          triggerUpdate.mutate({
+            projectId,
+            category: confirmContraction.category,
+            newRetentionDays: confirmContraction.to,
+          });
+          setConfirmContraction(null);
+        }}
+      />
     </VStack>
+  );
+}
+
+function RetroactiveProgressCard({
+  mutations,
+  onCancel,
+  isCancelling,
+}: {
+  mutations: MutationProgress[];
+  onCancel: (mutationId: string) => void;
+  isCancelling: boolean;
+}) {
+  if (mutations.length === 0) return null;
+  return (
+    <Card.Root width="full">
+      <Card.Header>
+        <Heading as="h3" fontSize="lg">
+          Applying retention to existing data
+        </Heading>
+        <Text fontSize="sm" color="fg.muted">
+          ClickHouse rewrites the affected parts during background merges. Large
+          datasets can take a while; the count below is parts still pending.
+        </Text>
+      </Card.Header>
+      <Card.Body>
+        <VStack gap={4} align="stretch">
+          {mutations.map((m) => (
+            <VStack key={m.mutationId} gap={1} align="stretch">
+              <HStack justifyContent="space-between">
+                <Text>
+                  {m.table}
+                  {m.category ? ` · ${CATEGORY_LABELS[m.category]}` : ""}
+                </Text>
+                <HStack gap={3}>
+                  <Text fontSize="sm" color="fg.muted">
+                    {m.partsToDo} parts remaining
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    loading={isCancelling}
+                    onClick={() => onCancel(m.mutationId)}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
+              </HStack>
+              <Progress.Root value={null} size="xs" colorPalette="blue">
+                <Progress.Track>
+                  <Progress.Range />
+                </Progress.Track>
+              </Progress.Root>
+            </VStack>
+          ))}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+function ContractionConfirmDialog({
+  pending,
+  isApplying,
+  onCancel,
+  onConfirm,
+}: {
+  pending: { category: RetentionCategory; from: number; to: number } | null;
+  isApplying: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const fromLabel =
+    pending && pending.from > 0 ? `${pending.from} days` : "indefinitely";
+  return (
+    <Dialog.Root
+      open={!!pending}
+      onOpenChange={({ open }) => {
+        if (!open) onCancel();
+      }}
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>Apply shorter retention to existing data?</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          {pending && (
+            <Text>
+              {CATEGORY_LABELS[pending.category]} data is currently kept{" "}
+              {fromLabel}. Applying {pending.to} days to existing data will make
+              everything older than {pending.to} days eligible for deletion on
+              the next ClickHouse merge. This cannot be undone.
+            </Text>
+          )}
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button colorPalette="red" loading={isApplying} onClick={onConfirm}>
+            Apply to existing data
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 
@@ -325,12 +569,16 @@ function AddOverrideDrawer({
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
   const [category, setCategory] = useState<RetentionCategory>("traces");
-  const [days, setDays] = useState<string>(String(MIN_RETENTION_DAYS));
+  const [days, setDays] = useState<string>(String(DEFAULT_RETENTION_DAYS));
 
   const organizationId = available.organization?.id;
   const scope = scopes[scopes.length - 1];
   const daysNum = Number(days);
-  const daysValid = Number.isInteger(daysNum) && daysNum >= MIN_RETENTION_DAYS;
+  const daysValid =
+    Number.isInteger(daysNum) &&
+    daysNum >= MIN_RETENTION_DAYS &&
+    daysNum <= MAX_RETENTION_DAYS &&
+    daysNum % RETENTION_WEEK_DAYS === 0;
   const canSave = !!scope && daysValid;
 
   return (
@@ -378,13 +626,16 @@ function AddOverrideDrawer({
               <Input
                 type="number"
                 min={MIN_RETENTION_DAYS}
+                max={MAX_RETENTION_DAYS}
+                step={RETENTION_WEEK_DAYS}
                 value={days}
                 onChange={(e) => setDays(e.target.value)}
                 width="200px"
               />
               {days !== "" && !daysValid && (
                 <Field.ErrorText>
-                  Minimum {MIN_RETENTION_DAYS} days
+                  Whole weeks only (multiples of {RETENTION_WEEK_DAYS} days),
+                  between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days
                 </Field.ErrorText>
               )}
             </Field.Root>

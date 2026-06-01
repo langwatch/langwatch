@@ -42,7 +42,7 @@ export class RetroactiveMutationInProgressError extends Error {
 // Using position() instead of LIKE avoids `_` / `%` matching weirdness for
 // project ids that contain underscores (e.g. "project_xyz").
 const TENANT_FILTER_SQL =
-  "position(command, concat(\"WHERE TenantId = '\", {tenantId:String}, \"'\")) > 0";
+  'position(command, concat("WHERE TenantId = \'", {tenantId:String}, "\'")) > 0';
 
 export class RetroactiveUpdateService {
   constructor(

@@ -1,7 +1,7 @@
 import type { PrismaClient, RetentionPolicy } from "@prisma/client";
-import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
+import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import type { RetentionCategory } from "../retentionPolicy.schema";
 
 export interface ProjectScopeContext {

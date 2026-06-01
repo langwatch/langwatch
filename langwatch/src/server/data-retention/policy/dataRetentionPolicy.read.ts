@@ -1,15 +1,15 @@
 import type { PrismaClient } from "@prisma/client";
-import type { Session } from "~/server/auth";
 import {
   batchScopePermissions,
   hasOrganizationPermission,
   hasProjectPermission,
 } from "~/server/api/rbac";
-import type { ScopeTier } from "~/server/scopes/scope.types";
 import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
+import type { ScopeTier } from "~/server/scopes/scope.types";
 import type {
-  RetentionCategory,
   ResolvedRetention,
+  RetentionCategory,
 } from "../retentionPolicy.schema";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };

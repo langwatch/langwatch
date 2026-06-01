@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 import {
   RetroactiveMutationInProgressError,
   RetroactiveUpdateService,
 } from "../retroactive/retroactiveUpdate.service";
-import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 
 describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
@@ -19,7 +19,7 @@ describe("RetroactiveUpdateService", () => {
         await service.triggerUpdate({
           projectId: "project-1",
           category: "traces",
-          newRetentionDays: 90,
+          newRetentionDays: 91,
         });
 
         const issuedCalls = command.mock.calls.map(([request]) => request);
@@ -33,13 +33,20 @@ describe("RetroactiveUpdateService", () => {
           const call = issuedCalls.find((c) =>
             (c.query as string).includes(`ALTER TABLE ${table}`),
           );
-          expect(call, `expected uniform update for table: ${table}`).toBeDefined();
-          expect(call!.query).toContain("UPDATE _retention_days = {retentionDays:UInt16}");
+          expect(
+            call,
+            `expected uniform update for table: ${table}`,
+          ).toBeDefined();
+          expect(call!.query).toContain(
+            "UPDATE _retention_days = {retentionDays:UInt16}",
+          );
           expect(call!.query).toContain("WHERE TenantId = {tenantId:String}");
-          expect(call!.query).toContain("_retention_days != {retentionDays:UInt16}");
+          expect(call!.query).toContain(
+            "_retention_days != {retentionDays:UInt16}",
+          );
           expect(call!.query_params).toEqual({
             tenantId: "project-1",
-            retentionDays: 90,
+            retentionDays: 91,
           });
         }
 
@@ -75,7 +82,7 @@ describe("RetroactiveUpdateService", () => {
         await service.triggerUpdate({
           projectId: "project-1",
           category: "scenarios",
-          newRetentionDays: 60,
+          newRetentionDays: 63,
         });
 
         const issuedCalls = command.mock.calls.map(([request]) => request);
@@ -86,7 +93,7 @@ describe("RetroactiveUpdateService", () => {
         expect(simCall).toBeDefined();
         expect(simCall!.query_params).toEqual({
           tenantId: "project-1",
-          retentionDays: 60,
+          retentionDays: 63,
         });
 
         const suiteCall = issuedCalls.find((c) =>
@@ -95,7 +102,7 @@ describe("RetroactiveUpdateService", () => {
         expect(suiteCall).toBeDefined();
         expect(suiteCall!.query_params).toEqual({
           tenantId: "project-1",
-          retentionDays: 60,
+          retentionDays: 63,
         });
       });
     });
@@ -111,7 +118,7 @@ describe("RetroactiveUpdateService", () => {
         await service.triggerUpdate({
           projectId: "project-1",
           category: "experiments",
-          newRetentionDays: 120,
+          newRetentionDays: 119,
         });
 
         const issuedCalls = command.mock.calls.map(([request]) => request);
@@ -122,7 +129,7 @@ describe("RetroactiveUpdateService", () => {
         expect(runsCall).toBeDefined();
         expect(runsCall!.query_params).toEqual({
           tenantId: "project-1",
-          retentionDays: 120,
+          retentionDays: 119,
         });
 
         const itemsCall = issuedCalls.find((c) =>
@@ -131,7 +138,7 @@ describe("RetroactiveUpdateService", () => {
         expect(itemsCall).toBeDefined();
         expect(itemsCall!.query_params).toEqual({
           tenantId: "project-1",
-          retentionDays: 120,
+          retentionDays: 119,
         });
       });
     });
@@ -166,7 +173,7 @@ describe("RetroactiveUpdateService", () => {
           service.triggerUpdate({
             projectId: "project-1",
             category: "traces",
-            newRetentionDays: 30,
+            newRetentionDays: 49,
           }),
         ).rejects.toMatchObject({
           name: "RetroactiveMutationInProgressError",
@@ -176,7 +183,7 @@ describe("RetroactiveUpdateService", () => {
           await service.triggerUpdate({
             projectId: "project-1",
             category: "traces",
-            newRetentionDays: 30,
+            newRetentionDays: 49,
           });
         } catch (e) {
           expect(e).toBeInstanceOf(RetroactiveMutationInProgressError);

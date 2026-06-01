@@ -1,10 +1,10 @@
 import type { RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
-import type { RetentionPolicyCache } from "../retentionPolicyCache";
 import type {
-  RetentionCategory,
   ResolvedRetention,
+  RetentionCategory,
 } from "../retentionPolicy.schema";
+import type { RetentionPolicyCache } from "../retentionPolicyCache";
 import type { DataRetentionPolicyRepository } from "./dataRetentionPolicy.repository";
 
 export class ScopeTargetNotFoundError extends Error {
@@ -53,9 +53,8 @@ export class DataRetentionPolicyService {
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
-    const organizationId = await this.repository.findOrganizationForScope(
-      scope,
-    );
+    const organizationId =
+      await this.repository.findOrganizationForScope(scope);
     if (!organizationId) {
       throw new ScopeTargetNotFoundError("Scope target not found.");
     }

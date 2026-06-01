@@ -1,4 +1,4 @@
-import { PinSource, type PinnedTrace } from "@prisma/client";
+import { type PinnedTrace, PinSource } from "@prisma/client";
 import type { PinnedTraceRepository } from "./pinnedTrace.repository";
 
 interface PinTraceParams {
