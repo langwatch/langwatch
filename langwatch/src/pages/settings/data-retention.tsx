@@ -182,6 +182,25 @@ function renderPolicyValue(
     .join(" · ");
 }
 
+/** Top-line summary used in the Retention + Usage card. When all three
+ *  categories share the same value we show that number; when they diverge
+ *  the per-category rows below already carry the detail, so the summary
+ *  collapses to "Mixed" instead of repeating the breakdown twice. */
+function renderPolicySummary(
+  byCategory: Partial<Record<RetentionCategory, number>>,
+): string {
+  const present = RETENTION_CATEGORIES.filter(
+    (c) => byCategory[c] !== undefined,
+  );
+  if (present.length === 0) return "—";
+  const values = present.map((c) => byCategory[c]!);
+  const allSame = values.every((v) => v === values[0]);
+  if (allSame && present.length === RETENTION_CATEGORIES.length) {
+    return formatDays(values[0]!);
+  }
+  return "Mixed";
+}
+
 function DataRetentionSettings() {
   const { project, organization, team } = useOrganizationTeamProject();
   // Available scopes + URL-driven filter must be hooks (run unconditionally)
@@ -379,7 +398,7 @@ function DataRetentionPage({
       <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
         <HStack width="full" marginTop={2}>
           <Heading as="h2" fontSize="xl">
-            Data Retention Policies
+            Retention Policies
           </Heading>
           <Spacer />
           <ScopeFilterComponent
@@ -776,17 +795,29 @@ function RetentionAndUsageCard({
         </Text>
       </Card.Header>
       <Card.Body>
-        <VStack gap={3} align="stretch">
-          <HStack justifyContent="space-between">
-            <Text fontWeight="semibold">Data policy for this project</Text>
-            <Text fontWeight="bold" fontSize="lg">
-              {renderPolicyValue(effective)}
-            </Text>
-          </HStack>
+        <VStack gap={5} align="stretch">
+          <VStack gap={2} align="stretch">
+            <HStack justifyContent="space-between">
+              <Text fontWeight="semibold">Data policy for this project</Text>
+              <Text fontWeight="bold" fontSize="lg">
+                {renderPolicySummary(effective)}
+              </Text>
+            </HStack>
+            {RETENTION_CATEGORIES.map((category) => (
+              <HStack key={category} justifyContent="space-between">
+                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                <Text>
+                  {effective[category] !== undefined
+                    ? formatDays(effective[category]!)
+                    : "—"}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
           {isLoading ? (
             <Spinner />
           ) : data ? (
-            <>
+            <VStack gap={2} align="stretch">
               <HStack justifyContent="space-between">
                 <Text fontWeight="semibold">Total stored</Text>
                 <Text fontWeight="bold" fontSize="lg">
@@ -799,7 +830,7 @@ function RetentionAndUsageCard({
                   <Text>{formatBytes(data.byCategory[category])}</Text>
                 </HStack>
               ))}
-            </>
+            </VStack>
           ) : null}
         </VStack>
       </Card.Body>
