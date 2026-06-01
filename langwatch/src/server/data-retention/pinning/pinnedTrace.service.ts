@@ -1,4 +1,4 @@
-import type { PinnedTrace } from "@prisma/client";
+import { PinSource, type PinnedTrace } from "@prisma/client";
 import type { PinnedTraceRepository } from "./pinnedTrace.repository";
 
 interface PinTraceParams {
@@ -19,7 +19,7 @@ export class PinnedTraceService {
   async pin(params: PinTraceParams): Promise<PinnedTrace> {
     return this.repository.create({
       ...params,
-      source: "manual",
+      source: PinSource.manual,
     });
   }
 
@@ -37,7 +37,7 @@ export class PinnedTraceService {
     return this.repository.create({
       projectId,
       traceId,
-      source: "share",
+      source: PinSource.share,
     });
   }
 

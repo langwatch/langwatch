@@ -70,34 +70,21 @@ export class StorageMeterService {
     return { totalBytes, byCategory };
   }
 
-  async incrementCache({
-    tenantId,
-    additionalBytes,
-  }: {
-    tenantId: string;
-    additionalBytes: number;
-  }): Promise<void> {
-    const current = await this.cache.get(tenantId);
-    if (current !== undefined) {
-      await this.cache.set(tenantId, current + additionalBytes);
-    }
-  }
-
-  async invalidate(tenantId: string): Promise<void> {
-    await this.cache.delete(tenantId);
-  }
-
   private async queryTotalBytes(tenantId: string): Promise<number> {
     if (!this.resolveClickHouseClient) return 0;
 
     const client = await this.resolveClickHouseClient(tenantId);
+    // Aggregate per-table first, then sum the 11 scalars. The naive
+    // UNION ALL on raw rows materializes every _size_bytes value into the
+    // intermediate set before summing — explodes memory for tenants with
+    // tens of millions of rows.
     const unions = RETENTION_MANAGED_TABLES.map(
       (table) =>
-        `SELECT _size_bytes FROM ${table} WHERE TenantId = {tenantId:String}`,
+        `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
     ).join("\n  UNION ALL\n  ");
 
     const result = await client.query({
-      query: `SELECT sum(_size_bytes) AS total FROM (\n  ${unions}\n)`,
+      query: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
       query_params: { tenantId },
       format: "JSONEachRow",
     });

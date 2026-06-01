@@ -1,7 +1,5 @@
 import { PinSource, type PrismaClient, type PinnedTrace } from "@prisma/client";
 
-export { PinSource };
-
 interface CreatePinnedTraceParams {
   projectId: string;
   traceId: string;
