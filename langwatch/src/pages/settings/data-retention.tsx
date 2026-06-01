@@ -26,6 +26,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -36,7 +37,6 @@ import {
   RETENTION_WEEK_DAYS,
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
-import { classifyRetentionChange } from "~/server/data-retention/retroactive/retroactiveApply";
 import type { MutationProgress } from "~/server/data-retention/retroactive/retroactiveUpdate.service";
 import { api } from "~/utils/api";
 
@@ -224,24 +224,12 @@ function DataRetentionPage({
   });
 
   // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
-  // effective retention. `baseline` approximates what existing data currently
-  // carries — the effective policy as first seen this session — so we can warn
-  // before a contraction makes old data deletable. It's captured before any
-  // edit and advanced only after a successful apply; the precise per-row value
-  // isn't queried, which a change-then-apply workflow keeps in sync.
-  const [baseline, setBaseline] = useState<Record<
-    RetentionCategory,
-    number
-  > | null>(null);
-  useEffect(() => {
-    if (rulesQuery.data && baseline === null) {
-      setBaseline(rulesQuery.data.effective);
-    }
-  }, [rulesQuery.data, baseline]);
-
-  const [confirmContraction, setConfirmContraction] = useState<{
+  // effective retention. We don't know the stored _retention_days values
+  // without an extra query (they could still be the migration default), so we
+  // always route through the confirm dialog before mutating CH — the action is
+  // irreversible if it contracts.
+  const [pendingApply, setPendingApply] = useState<{
     category: RetentionCategory;
-    from: number;
     to: number;
   } | null>(null);
 
@@ -260,10 +248,7 @@ function DataRetentionPage({
   }, [activeMutations.length]);
 
   const triggerUpdate = api.dataRetention.triggerRetroactiveUpdate.useMutation({
-    onSuccess: (_data, variables) => {
-      setBaseline((b) =>
-        b ? { ...b, [variables.category]: variables.newRetentionDays } : b,
-      );
+    onSuccess: () => {
       setPollMs(3000);
       void progressQuery.refetch();
       toaster.create({
@@ -298,21 +283,7 @@ function DataRetentionPage({
   const applyToExistingData = (category: RetentionCategory) => {
     const to = rulesQuery.data?.effective[category] ?? 0;
     if (to <= 0) return; // indefinite — nothing finite to propagate
-    const from = baseline?.[category] ?? to;
-    const kind = classifyRetentionChange({ current: from, next: to });
-    if (kind === "noop") {
-      toaster.create({
-        title: "Existing data already uses this retention",
-        type: "info",
-      });
-      return;
-    }
-    if (kind === "contraction") {
-      setConfirmContraction({ category, from, to });
-      return;
-    }
-    // Expansion is safe — no data becomes deletable. Apply immediately.
-    triggerUpdate.mutate({ projectId, category, newRetentionDays: to });
+    setPendingApply({ category, to });
   };
 
   if (rulesQuery.isLoading) {
@@ -336,16 +307,6 @@ function DataRetentionPage({
     (!!available.organization ||
       available.teams.length > 0 ||
       available.projects.length > 0);
-
-  // Show "Apply to existing data" only when the effective value diverges from
-  // the baseline this session opened with. Once applied, baseline catches up
-  // and the row goes quiet again — no perpetual call-to-action.
-  const hasPendingApply = (category: RetentionCategory): boolean => {
-    if (!snapshot || !baseline) return false;
-    const to = snapshot.effective[category];
-    if (to <= 0) return false;
-    return baseline[category] !== to;
-  };
 
   return (
     <SettingsLayout>
@@ -386,7 +347,7 @@ function DataRetentionPage({
               {RETENTION_CATEGORIES.map((category) => {
                 const days = snapshot?.effective[category] ?? 0;
                 const showApply =
-                  canWrite && projectIsWritable && hasPendingApply(category);
+                  canWrite && projectIsWritable && days > 0;
                 return (
                   <HStack
                     key={category}
@@ -399,21 +360,23 @@ function DataRetentionPage({
                         {CATEGORY_COVERAGE[category]}
                       </Text>
                     </VStack>
-                    <HStack gap={3} flexShrink={0}>
+                    <HStack gap={2} flexShrink={0}>
                       <Text fontWeight="medium">{formatDays(days)}</Text>
                       {showApply && (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          loading={
-                            triggerUpdate.isLoading &&
-                            triggerUpdate.variables?.category === category
-                          }
-                          onClick={() => applyToExistingData(category)}
-                        >
-                          <History size={14} />
-                          Apply to existing data
-                        </Button>
+                        <Tooltip content="Apply this retention to existing data">
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Apply ${CATEGORY_LABELS[category]} retention to existing data`}
+                            loading={
+                              triggerUpdate.isLoading &&
+                              triggerUpdate.variables?.category === category
+                            }
+                            onClick={() => applyToExistingData(category)}
+                          >
+                            <History size={14} />
+                          </Button>
+                        </Tooltip>
                       )}
                     </HStack>
                   </HStack>
@@ -593,18 +556,18 @@ function DataRetentionPage({
           />
         )}
 
-        <ContractionConfirmDialog
-          pending={confirmContraction}
+        <ApplyToExistingConfirmDialog
+          pending={pendingApply}
           isApplying={triggerUpdate.isLoading}
-          onCancel={() => setConfirmContraction(null)}
+          onCancel={() => setPendingApply(null)}
           onConfirm={() => {
-            if (!confirmContraction) return;
+            if (!pendingApply) return;
             triggerUpdate.mutate({
               projectId,
-              category: confirmContraction.category,
-              newRetentionDays: confirmContraction.to,
+              category: pendingApply.category,
+              newRetentionDays: pendingApply.to,
             });
-            setConfirmContraction(null);
+            setPendingApply(null);
           }}
         />
       </VStack>
@@ -670,19 +633,17 @@ function RetroactiveProgressCard({
   );
 }
 
-function ContractionConfirmDialog({
+function ApplyToExistingConfirmDialog({
   pending,
   isApplying,
   onCancel,
   onConfirm,
 }: {
-  pending: { category: RetentionCategory; from: number; to: number } | null;
+  pending: { category: RetentionCategory; to: number } | null;
   isApplying: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const fromLabel =
-    pending && pending.from > 0 ? `${pending.from} days` : "indefinitely";
   return (
     <Dialog.Root
       open={!!pending}
@@ -692,15 +653,15 @@ function ContractionConfirmDialog({
     >
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Apply shorter retention to existing data?</Dialog.Title>
+          <Dialog.Title>Apply retention to existing data?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           {pending && (
             <Text>
-              {CATEGORY_LABELS[pending.category]} data is currently kept{" "}
-              {fromLabel}. Applying {pending.to} days to existing data will make
-              everything older than {pending.to} days eligible for deletion on
-              the next ClickHouse merge. This cannot be undone.
+              ClickHouse will rewrite existing {CATEGORY_LABELS[pending.category]} rows
+              to use {pending.to} days of retention. If any rows are currently
+              older than {pending.to} days, they become eligible for deletion
+              on the next background merge. This cannot be undone.
             </Text>
           )}
         </Dialog.Body>
