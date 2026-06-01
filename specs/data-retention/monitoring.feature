@@ -27,7 +27,7 @@ Feature: Data retention monitoring
     And data_retention_orphans_swept_total is incremented by 3 for model PublicShare
 
   Scenario: Project settings dashboard shows retention status
-    When the user opens project settings
-    Then they see the current retention policy per category
-    And the oldest data age per table
-    And active mutations with progress bars
+    When the user opens the Retention Policies settings page
+    Then the "Data Retention" section of the Retention + Usage card shows a single retention summary value when all categories share the same retention
+    And the section shows per-category retention rows only when categories diverge (summary reads "Mixed")
+    And active retroactive-update mutations render as a progress card below the policies table

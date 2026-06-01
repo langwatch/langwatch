@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   createListCollection,
+  EmptyState,
   Field,
   Heading,
   HStack,
@@ -15,7 +16,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, Folder, Trash2, Users } from "lucide-react";
+import {
+  Building2,
+  DatabaseBackup,
+  Folder,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
@@ -431,18 +439,44 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
+        {snapshot && (
+          <RetentionAndUsageCard
+            effective={snapshot.effective}
+            isLoading={storageQuery.isLoading}
+            data={storageQuery.data}
+          />
+        )}
+
         {snapshot && snapshot.rules.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
-              <VStack gap={1} paddingY={4}>
-                <Text fontSize="sm" color="fg.muted" textAlign="center">
-                  No retention policies configured.
-                </Text>
-                <Text fontSize="xs" color="fg.muted" textAlign="center">
-                  The platform default of {DEFAULT_RETENTION_DAYS} days applies
-                  to every category.
-                </Text>
-              </VStack>
+              <EmptyState.Root width="full">
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <DatabaseBackup size={24} />
+                  </EmptyState.Indicator>
+                  <VStack textAlign="center" gap={3}>
+                    <VStack textAlign="center" gap={1}>
+                      <EmptyState.Title>
+                        No retention policies
+                      </EmptyState.Title>
+                      <EmptyState.Description>
+                        Add a retention policy to override the platform default
+                        of {DEFAULT_RETENTION_DAYS} days.
+                      </EmptyState.Description>
+                    </VStack>
+                    {canWrite && (
+                      <Button
+                        colorPalette="blue"
+                        variant="outline"
+                        onClick={() => setDrawerOpen(true)}
+                      >
+                        <Plus /> Add retention policy
+                      </Button>
+                    )}
+                  </VStack>
+                </EmptyState.Content>
+              </EmptyState.Root>
             </Card.Body>
           </Card.Root>
         ) : snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
@@ -513,14 +547,6 @@ function DataRetentionPage({
           }
           isCancelling={killMutation.isLoading}
         />
-
-        {snapshot && (
-          <RetentionAndUsageCard
-            effective={snapshot.effective}
-            isLoading={storageQuery.isLoading}
-            data={storageQuery.data}
-          />
-        )}
 
         {available && (
           <AddOverrideDrawer
@@ -807,7 +833,7 @@ function RetentionAndUsageCard({
               Data Retention
             </Heading>
             <Text fontSize="sm" color="fg.muted">
-              The retention currently applied to current project.
+              How long this project's data is kept before deletion.
             </Text>
           </VStack>
           <Text fontWeight="semibold" flexShrink={0}>
@@ -831,35 +857,23 @@ function RetentionAndUsageCard({
               ))}
             </VStack>
           )}
-          <VStack gap={2} align="stretch">
-            <HStack width="full" justify="space-between" align="start">
-              <VStack align="start" gap={0}>
-                <Heading as="h3" fontSize="lg">
-                  Data Storage
-                </Heading>
-                <Text fontSize="sm" color="fg.muted">
-                  The storage that current project occupies today.
-                </Text>
-              </VStack>
-              {!isLoading && data && (
-                <Text fontWeight="semibold" flexShrink={0}>
-                  {formatBytes(data.totalBytes)}
-                </Text>
-              )}
-            </HStack>
+          <HStack width="full" justify="space-between" align="start">
+            <VStack align="start" gap={0}>
+              <Heading as="h3" fontSize="lg">
+                Data Storage
+              </Heading>
+              <Text fontSize="sm" color="fg.muted">
+                How much space this project's data uses today.
+              </Text>
+            </VStack>
             {isLoading ? (
-              <Spinner />
+              <Spinner size="sm" />
             ) : data ? (
-              <VStack gap={2} align="stretch" paddingTop={1}>
-                {RETENTION_CATEGORIES.map((category) => (
-                  <HStack key={category} justifyContent="space-between">
-                    <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                    <Text>{formatBytes(data.byCategory[category])}</Text>
-                  </HStack>
-                ))}
-              </VStack>
+              <Text fontWeight="semibold" flexShrink={0}>
+                {formatBytes(data.totalBytes)}
+              </Text>
             ) : null}
-          </VStack>
+          </HStack>
         </VStack>
       </Card.Body>
     </Card.Root>

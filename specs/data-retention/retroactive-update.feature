@@ -16,8 +16,8 @@ Feature: Retroactive retention changes
     And existing spans still have _retention_days = 49
 
   Scenario: Explicit retroactive update applies to existing data
-    When the admin changes trace retention to 91 days
-    And clicks "Apply to existing data"
+    When the admin adds a retention policy of 91 days with the "Apply this change to existing data" switch enabled
+    And confirms in the "Apply retention to existing data?" dialog
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
     And the update applies uniformly to every retention-managed table including event_log
@@ -39,20 +39,19 @@ Feature: Retroactive retention changes
     Then the conflict error lists the mutation_id and table of every blocking mutation
     And the caller can act on those ids without parsing the message text
 
-  Scenario: Contraction requires confirmation
-    Given trace retention is currently 91 days
-    When the admin changes retention to 49 days
-    Then a confirmation dialog warns that data between 49-91 days old will be eligible for deletion
-    And the retroactive update does not proceed until confirmed
+  Scenario: Retroactive apply requires confirmation
+    When the admin saves a retention policy with the "Apply this change to existing data" switch enabled
+    Then a confirmation dialog warns that any rows older than the new retention become eligible for deletion on the next background merge
+    And the retroactive update does not proceed until the admin confirms
 
-  Scenario: Expansion is safe and requires no confirmation
-    Given trace retention is currently 49 days
-    When the admin changes retention to 91 days
+  Scenario: Saving without retroactive apply leaves existing data untouched
+    When the admin saves a retention policy with the "Apply this change to existing data" switch disabled
     Then no confirmation dialog is shown
-    And the change is applied immediately
+    And the scope rule is persisted without issuing any ClickHouse mutation
+    And only newly ingested rows are stamped with the new _retention_days
 
   Scenario: Stuck mutation can be killed
     Given a retroactive mutation has been running for over 1 hour
-    When the admin clicks "Cancel mutation"
+    When the admin clicks "Cancel" on the mutation's row in the retroactive-progress card
     Then the system issues KILL MUTATION for that mutation_id
     And the mutation is stopped

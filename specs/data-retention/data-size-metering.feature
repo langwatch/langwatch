@@ -39,6 +39,5 @@ Feature: Data size metering for storage billing
     And the customer is billed at 3 EUR per GB above their plan's included amount
 
   Scenario: Storage display in settings UI
-    When the user opens project settings
-    Then they see current stored data formatted as "X.XX MB / Y.YY GB"
-    And a per-category breakdown showing traces, scenarios, and experiments separately
+    When the user opens the Retention Policies settings page
+    Then the "Data Storage" section of the Retention + Usage card shows the project's total stored bytes formatted with a binary unit (e.g. "1.96 GB")
