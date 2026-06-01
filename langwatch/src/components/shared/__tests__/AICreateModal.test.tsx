@@ -461,6 +461,7 @@ describe("<AICreateModal/>", () => {
       });
     });
 
+    /** @scenario "Close button is present after generation fails" */
     it("displays close button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
@@ -796,6 +797,7 @@ describe("<AICreateModal/>", () => {
   // the accumulation that gets aria-hidden and makes getByRole(/close/i) flake on
   // CI. With cleanup the DOM is clean between tests.
   describe("test isolation (regression guard for #4467)", () => {
+    /** @scenario "An open modal renders a dialog into the document" */
     it("renders a dialog", () => {
       render(
         <AICreateModal
@@ -814,6 +816,7 @@ describe("<AICreateModal/>", () => {
       ).toBeGreaterThan(0);
     });
 
+    /** @scenario "A new test starts with a clean DOM after the previous dialog is unmounted" */
     it("sees a clean DOM in the next test because the prior dialog was cleaned up", () => {
       expect(screen.queryAllByRole("dialog", { hidden: true })).toHaveLength(0);
     });
