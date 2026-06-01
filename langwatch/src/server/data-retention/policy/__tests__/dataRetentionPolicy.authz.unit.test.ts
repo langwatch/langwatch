@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rbacMocks = vi.hoisted(() => ({
   hasOrganizationPermission: vi.fn(),
@@ -20,6 +20,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 import {
+  assertCanDisableRetention,
   assertCanWriteRetentionScope,
   assertRetentionPlanForScope,
   requiredRetentionWritePermission,
@@ -138,6 +139,54 @@ describe("assertCanWriteRetentionScope", () => {
       ).rejects.toBeInstanceOf(TRPCError);
 
       expect(rbacMocks.hasProjectPermission).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("assertCanDisableRetention", () => {
+  // Disabling retention (indefinite) is gated on ADMIN_EMAILS — the platform
+  // admin allow-list, NOT org RBAC. isAdmin reads the env var at call time.
+  const ORIGINAL_ADMIN_EMAILS = process.env.ADMIN_EMAILS;
+  afterEach(() => {
+    process.env.ADMIN_EMAILS = ORIGINAL_ADMIN_EMAILS;
+  });
+
+  describe("given a platform admin whose email is in ADMIN_EMAILS", () => {
+    it("allows disabling retention", () => {
+      process.env.ADMIN_EMAILS = "ops@langwatch.ai,admin@langwatch.ai";
+      const adminCtx = {
+        prisma,
+        session: { user: { id: "u1", email: "admin@langwatch.ai" } },
+      } as any;
+      expect(() => assertCanDisableRetention(adminCtx)).not.toThrow();
+    });
+  });
+
+  describe("given an org admin who is not in ADMIN_EMAILS", () => {
+    it("throws FORBIDDEN with platform-administrator wording", () => {
+      process.env.ADMIN_EMAILS = "ops@langwatch.ai";
+      const orgAdminCtx = {
+        prisma,
+        session: { user: { id: "u2", email: "owner@acme.com" } },
+      } as any;
+      try {
+        assertCanDisableRetention(orgAdminCtx);
+        expect.unreachable("should have thrown");
+      } catch (e) {
+        expect(e).toBeInstanceOf(TRPCError);
+        const err = e as TRPCError;
+        expect(err.code).toBe("FORBIDDEN");
+        expect(err.message).toContain("platform administrators");
+      }
+    });
+  });
+
+  describe("given no session", () => {
+    it("throws FORBIDDEN", () => {
+      process.env.ADMIN_EMAILS = "ops@langwatch.ai";
+      expect(() =>
+        assertCanDisableRetention({ prisma, session: null } as any),
+      ).toThrow(TRPCError);
     });
   });
 });

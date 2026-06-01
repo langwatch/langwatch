@@ -77,3 +77,25 @@ Feature: Data retention policy configuration
     When an admin sets a team-level traces retention for "platform"
     Then the override is anchored to the organization that owns "platform"
     And it can never apply to a project in another organization
+
+  # "No retention" (keep data indefinitely, exempt from TTL deletion) is a
+  # platform-level capability, not a customer-configurable tier. Only a platform
+  # administrator — an email in the ADMIN_EMAILS allow-list, which is distinct
+  # from an organization admin — may set it, on a scope they can already write.
+
+  Scenario: A platform admin can disable retention for a scope
+    Given a platform administrator
+    When that administrator sets retention to "no retention" for project "web-app"
+    Then the override is accepted
+    And data for "web-app" is kept indefinitely with no automatic deletion
+
+  Scenario: An organization admin who is not a platform admin cannot disable retention
+    Given a user who can manage the organization but is not a platform administrator
+    When that user attempts to set retention to "no retention" at any scope
+    Then the request is rejected as forbidden
+    And the error indicates only platform administrators can disable retention
+
+  Scenario: The "no retention" option is hidden from non-platform-admins
+    Given a user who is not a platform administrator
+    When they open the add-retention-policy drawer
+    Then the retention options do not include "no retention"

@@ -1,9 +1,10 @@
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import type { PrismaClient } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import {
+  assertCanDisableRetention,
   assertCanWriteRetentionScope,
   assertRetentionPlan,
   assertRetentionPlanForScope,
@@ -34,10 +35,12 @@ async function assertRetentionPlanForProject(
   }
   await assertRetentionPlan(ctx, organizationId);
 }
+
 import {
+  INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
   retentionCategorySchema,
-  retentionDaysSchema,
+  retentionDaysInputSchema,
 } from "~/server/data-retention/retentionPolicy.schema";
 import { SCOPE_TIERS } from "~/server/scopes/scope.types";
 import { authorizeInResolver, checkProjectPermission } from "../rbac";
@@ -74,7 +77,7 @@ export const dataRetentionRouter = createTRPCRouter({
         projectId: z.string(),
         scope: scopeInput,
         category: retentionCategorySchema,
-        retentionDays: retentionDaysSchema,
+        retentionDays: retentionDaysInputSchema,
       }),
     )
     .use(authorizeInResolver)
@@ -89,6 +92,12 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
+      // Disabling retention (indefinite/keep-forever) is platform-admin only.
+      // The schema accepts the 0 sentinel structurally; this is where the
+      // capability is actually authorized — independent of org/team RBAC.
+      if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
+        assertCanDisableRetention({ prisma: ctx.prisma, session: ctx.session });
+      }
       try {
         return await getApp().dataRetention.policy.setForScope({
           scope: input.scope,
@@ -142,9 +151,10 @@ export const dataRetentionRouter = createTRPCRouter({
       // newRetentionDays would let a project:update caller rewrite existing
       // rows to any value, irreversibly contracting data without a matching
       // saved rule. The effective policy is the only legitimate target.
-      const effective = await getApp().dataRetention.policy.getResolvedForProject(
-        input.projectId,
-      );
+      const effective =
+        await getApp().dataRetention.policy.getResolvedForProject(
+          input.projectId,
+        );
       const category = input.category as RetentionCategory;
       const newRetentionDays = effective[category];
       if (newRetentionDays === undefined) {

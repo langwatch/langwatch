@@ -1,3 +1,4 @@
+import { isAdmin } from "@ee/admin/isAdmin";
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
@@ -5,8 +6,8 @@ import {
   hasProjectPermission,
   hasTeamPermission,
 } from "~/server/api/rbac";
-import type { Session } from "~/server/auth";
 import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 
 type RBACContext = { prisma: PrismaClient; session: Session | null };
@@ -72,6 +73,24 @@ export async function assertCanWriteRetentionScope(
     message: `You need ${requiredRetentionWritePermission(
       scope.scopeType,
     )} on this ${scope.scopeType.toLowerCase()} to change its data retention.`,
+  });
+}
+
+/**
+ * Disabling retention (keep data indefinitely, exempt from TTL deletion) is a
+ * platform-level capability, NOT a customer tier. Restrict it to platform
+ * administrators — the `ADMIN_EMAILS` allow-list, distinct from organization
+ * admins: an org admin configures finite retention, but only a platform admin
+ * may opt data out of deletion entirely. The UI hides the option from everyone
+ * else; this is the matching server-side enforcement (never trust the client).
+ */
+export function assertCanDisableRetention(ctx: RBACContext): void {
+  if (isAdmin({ email: ctx.session?.user?.email })) return;
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message:
+      "Only platform administrators can disable data retention " +
+      "(keep data indefinitely).",
   });
 }
 

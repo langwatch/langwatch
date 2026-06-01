@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
+  retentionDaysInputSchema,
   retentionDaysSchema,
 } from "../retentionPolicy.schema";
 
@@ -63,6 +65,42 @@ describe("retentionDaysSchema", () => {
   describe("when the value is not an integer", () => {
     it("rejects it", () => {
       expect(retentionDaysSchema.safeParse(49.5).success).toBe(false);
+    });
+  });
+});
+
+describe("retentionDaysInputSchema", () => {
+  // The mutation input accepts the indefinite sentinel (0) IN ADDITION to a
+  // finite override; the route authorizes the indefinite case (platform admins
+  // only). The plain `retentionDaysSchema` (a tier value) still rejects 0.
+  describe("given the indefinite sentinel", () => {
+    it("accepts 0 (keep forever)", () => {
+      expect(
+        retentionDaysInputSchema.safeParse(INDEFINITE_RETENTION_DAYS).success,
+      ).toBe(true);
+    });
+
+    it("is rejected by the plain tier-value schema", () => {
+      expect(
+        retentionDaysSchema.safeParse(INDEFINITE_RETENTION_DAYS).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a finite value", () => {
+    it("accepts a whole-week value at or above the minimum", () => {
+      expect(
+        retentionDaysInputSchema.safeParse(MIN_RETENTION_DAYS).success,
+      ).toBe(true);
+      expect(retentionDaysInputSchema.safeParse(91).success).toBe(true);
+    });
+
+    it("still rejects a sub-minimum non-zero value", () => {
+      expect(retentionDaysInputSchema.safeParse(30).success).toBe(false);
+    });
+
+    it("still rejects a value that isn't a whole number of weeks", () => {
+      expect(retentionDaysInputSchema.safeParse(50).success).toBe(false);
     });
   });
 });

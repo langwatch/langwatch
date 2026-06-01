@@ -74,6 +74,28 @@ export const retentionDaysSchema = z
     message: `Retention must be a whole number of weeks (a multiple of ${RETENTION_WEEK_DAYS} days), to align with weekly ClickHouse partitions.`,
   });
 
+/**
+ * The sentinel day-count meaning "keep data indefinitely" — exempt from TTL
+ * deletion. The TTL expression maps 0 to the year-2106 sentinel, so a row
+ * stamped 0 is never deleted (see ttlReconciler). This is NOT a
+ * customer-configurable tier: `retentionDaysSchema` (a tier override's value)
+ * rejects it. Only `retentionDaysInputSchema` accepts it, and the mutation
+ * route authorizes the indefinite case for platform admins only — see
+ * `assertCanDisableRetention`.
+ */
+export const INDEFINITE_RETENTION_DAYS = 0;
+
+/**
+ * Accepted input for setting an override: either a finite retention (≥ 49 days,
+ * whole weeks) or the indefinite sentinel (0 = keep forever). Allowing 0 here
+ * is structural only — authorization for the indefinite case is enforced
+ * separately in the route (platform admins only), never by this schema.
+ */
+export const retentionDaysInputSchema = z.union([
+  z.literal(INDEFINITE_RETENTION_DAYS),
+  retentionDaysSchema,
+]);
+
 export const RETENTION_CATEGORIES = [
   "traces",
   "scenarios",

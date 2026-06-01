@@ -24,7 +24,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   ScopeChipPicker,
@@ -32,21 +32,18 @@ import {
   type ScopeChipPickerScopeType,
 } from "~/components/settings/ScopeChipPicker";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
-import { useAvailableScopes } from "~/hooks/useAvailableScopes";
-import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
-import {
-  isScopeInFilter,
-  resolveScopeFilter,
-} from "~/utils/filterProvidersByScope";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
   DEFAULT_RETENTION_DAYS,
+  INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
   RETENTION_CATEGORIES,
@@ -55,6 +52,10 @@ import {
 } from "~/server/data-retention/retentionPolicy.schema";
 import type { MutationProgress } from "~/server/data-retention/retroactive/retroactiveUpdate.service";
 import { api } from "~/utils/api";
+import {
+  isScopeInFilter,
+  resolveScopeFilter,
+} from "~/utils/filterProvidersByScope";
 
 const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   traces: "Traces & Spans",
@@ -101,12 +102,10 @@ const RETENTION_PRESETS: Array<{ value: string; label: string; days: number }> =
 
 const CUSTOM_PRESET_VALUE = "custom";
 
-const retentionPresetCollection = createListCollection({
-  items: [
-    ...RETENTION_PRESETS.map((p) => ({ value: p.value, label: p.label })),
-    { value: CUSTOM_PRESET_VALUE, label: "Custom…" },
-  ],
-});
+/** The "keep forever" option's select value — the stringified indefinite
+ *  sentinel. Only offered to platform admins (see AddOverrideDrawer); the
+ *  mutation route authorizes it independently. */
+const INDEFINITE_PRESET_VALUE = String(INDEFINITE_RETENTION_DAYS);
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -257,6 +256,10 @@ function DataRetentionPage({
   const storageQuery = api.dataRetention.getStorageBreakdown.useQuery({
     projectId,
   });
+  // Platform admin = email in ADMIN_EMAILS (NOT an org admin). Only they may
+  // disable retention; the route enforces this independently. We use it solely
+  // to decide whether to surface the "No retention" option in the drawer.
+  const isPlatformAdmin = api.user.isAdmin.useQuery({}).data?.isAdmin ?? false;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -351,8 +354,9 @@ function DataRetentionPage({
       available.projects.length > 0);
 
   const removeScopeGroup = async (group: RetentionScopeGroup) => {
-    const categories = (Object.keys(group.byCategory) as RetentionCategory[])
-      .filter((c) => group.byCategory[c] !== undefined);
+    const categories = (
+      Object.keys(group.byCategory) as RetentionCategory[]
+    ).filter((c) => group.byCategory[c] !== undefined);
     const results = await Promise.all(
       categories.map((category) =>
         removeForScope
@@ -436,8 +440,8 @@ function DataRetentionPage({
                 Configurable retention is a paid-plan feature
               </Alert.Title>
               <Alert.Description>
-                Your plan applies the platform default to every project.
-                Upgrade to configure per-organization, per-team, or per-project
+                Your plan applies the platform default to every project. Upgrade
+                to configure per-organization, per-team, or per-project
                 retention overrides.
               </Alert.Description>
             </Alert.Content>
@@ -462,9 +466,7 @@ function DataRetentionPage({
                   </EmptyState.Indicator>
                   <VStack textAlign="center" gap={3}>
                     <VStack textAlign="center" gap={1}>
-                      <EmptyState.Title>
-                        No retention policies
-                      </EmptyState.Title>
+                      <EmptyState.Title>No retention policies</EmptyState.Title>
                       <EmptyState.Description>
                         Add a retention policy to override the platform default
                         of {DEFAULT_RETENTION_DAYS} days.
@@ -484,7 +486,9 @@ function DataRetentionPage({
               </EmptyState.Root>
             </Card.Body>
           </Card.Root>
-        ) : snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
+        ) : snapshot &&
+          snapshot.rules.length > 0 &&
+          scopeGroups.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
               <Text fontSize="sm" color="fg.muted" textAlign="center">
@@ -492,57 +496,58 @@ function DataRetentionPage({
               </Text>
             </Card.Body>
           </Card.Root>
-        ) : snapshot && scopeGroups.length > 0 && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0}>
-              <Table.Root variant="line" size="md" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                    <Table.ColumnHeader>Policy</Table.ColumnHeader>
-                    <Table.ColumnHeader />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {scopeGroups.map((group) => {
-                    const Icon = SCOPE_ICON[group.scopeType];
-                    return (
-                      <Table.Row
-                        key={`${group.scopeType}:${group.scopeId}`}
-                      >
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Icon size={14} />
-                            <Text>{group.name}</Text>
-                            <Badge size="sm" colorPalette="gray">
-                              {group.scopeType.toLowerCase()}
-                            </Badge>
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {renderPolicyValue(group.byCategory)}
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          {canWrite && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              colorPalette="red"
-                              loading={removeForScope.isLoading}
-                              onClick={() => void removeScopeGroup(group)}
-                              aria-label="Remove retention policy"
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+        ) : (
+          snapshot &&
+          scopeGroups.length > 0 && (
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0}>
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                      <Table.ColumnHeader>Policy</Table.ColumnHeader>
+                      <Table.ColumnHeader />
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {scopeGroups.map((group) => {
+                      const Icon = SCOPE_ICON[group.scopeType];
+                      return (
+                        <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
+                          <Table.Cell>
+                            <HStack gap={2}>
+                              <Icon size={14} />
+                              <Text>{group.name}</Text>
+                              <Badge size="sm" colorPalette="gray">
+                                {group.scopeType.toLowerCase()}
+                              </Badge>
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {renderPolicyValue(group.byCategory)}
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            {canWrite && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                colorPalette="red"
+                                loading={removeForScope.isLoading}
+                                onClick={() => void removeScopeGroup(group)}
+                                aria-label="Remove retention policy"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
+          )
         )}
 
         <RetroactiveProgressCard
@@ -561,9 +566,8 @@ function DataRetentionPage({
             currentOrganizationId={organizationId}
             currentTeamId={teamId}
             currentProjectId={projectId}
-            isSaving={
-              setForScope.isLoading || triggerUpdate.isLoading
-            }
+            isPlatformAdmin={isPlatformAdmin}
+            isSaving={setForScope.isLoading || triggerUpdate.isLoading}
             onSave={async (scopes, retentionDays, applyToExisting) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
@@ -639,8 +643,7 @@ function DataRetentionPage({
               }
 
               const savedScopeWiderThanCurrentProject = scopes.some(
-                (s) =>
-                  !(s.scopeType === "PROJECT" && s.scopeId === projectId),
+                (s) => !(s.scopeType === "PROJECT" && s.scopeId === projectId),
               );
               setPendingConfirm({
                 retentionDays,
@@ -651,9 +654,7 @@ function DataRetentionPage({
 
                   const succeededCategories = Array.from(
                     new Set(
-                      result.results
-                        .filter((r) => r.ok)
-                        .map((r) => r.category),
+                      result.results.filter((r) => r.ok).map((r) => r.category),
                     ),
                   );
                   if (succeededCategories.length > 0) {
@@ -676,9 +677,7 @@ function DataRetentionPage({
                           ),
                       ),
                     );
-                    const triggerFailed = triggerResults.filter(
-                      (r) => !r.ok,
-                    );
+                    const triggerFailed = triggerResults.filter((r) => !r.ok);
                     if (triggerFailed.length === 0) {
                       toaster.create({
                         title: "Applying retention to existing data…",
@@ -804,13 +803,21 @@ function ApplyToExistingConfirmDialog({
         <Dialog.Body>
           {pending && (
             <VStack align="stretch" gap={3}>
-              <Text>
-                We will rewrite <strong>this project's</strong> existing data
-                to use {pending.retentionDays} days of retention. If any rows
-                are currently older than {pending.retentionDays} days, they
-                become eligible for deletion on the next background merge.
-                After deletion, this cannot be undone.
-              </Text>
+              {pending.retentionDays === INDEFINITE_RETENTION_DAYS ? (
+                <Text>
+                  We will rewrite <strong>this project's</strong> existing data
+                  to be kept indefinitely. No rows are deleted — this removes
+                  the retention limit from already-stored data.
+                </Text>
+              ) : (
+                <Text>
+                  We will rewrite <strong>this project's</strong> existing data
+                  to use {pending.retentionDays} days of retention. If any rows
+                  are currently older than {pending.retentionDays} days, they
+                  become eligible for deletion on the next background merge.
+                  After deletion, this cannot be undone.
+                </Text>
+              )}
               {pending.savedScopeWiderThanCurrentProject && (
                 <Alert.Root status="warning">
                   <Alert.Indicator />
@@ -833,7 +840,11 @@ function ApplyToExistingConfirmDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="red"
+            colorPalette={
+              pending?.retentionDays === INDEFINITE_RETENTION_DAYS
+                ? "blue"
+                : "red"
+            }
             loading={isApplying}
             onClick={() => void onConfirm()}
           >
@@ -918,6 +929,7 @@ function AddOverrideDrawer({
   currentOrganizationId,
   currentTeamId,
   currentProjectId,
+  isPlatformAdmin,
   isSaving,
   onSave,
 }: {
@@ -931,6 +943,7 @@ function AddOverrideDrawer({
   currentOrganizationId: string | undefined;
   currentTeamId: string | undefined;
   currentProjectId: string;
+  isPlatformAdmin: boolean;
   isSaving: boolean;
   onSave: (
     scopes: ScopeChipPickerEntry[],
@@ -943,6 +956,27 @@ function AddOverrideDrawer({
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
   const [applyToExisting, setApplyToExisting] = useState<boolean>(true);
+
+  // Platform admins get an extra "No retention (keep forever)" option. The 0
+  // sentinel is structurally valid input; the route authorizes it admin-only.
+  const presetCollection = useMemo(
+    () =>
+      createListCollection({
+        items: [
+          ...RETENTION_PRESETS.map((p) => ({ value: p.value, label: p.label })),
+          ...(isPlatformAdmin
+            ? [
+                {
+                  value: INDEFINITE_PRESET_VALUE,
+                  label: "No retention (keep forever)",
+                },
+              ]
+            : []),
+          { value: CUSTOM_PRESET_VALUE, label: "Custom…" },
+        ],
+      }),
+    [isPlatformAdmin],
+  );
 
   useEffect(() => {
     if (open) {
@@ -970,11 +1004,14 @@ function AddOverrideDrawer({
   })();
 
   const daysValid =
-    Number.isFinite(resolvedDays) &&
-    Number.isInteger(resolvedDays) &&
-    resolvedDays >= MIN_RETENTION_DAYS &&
-    resolvedDays <= MAX_RETENTION_DAYS &&
-    resolvedDays % RETENTION_WEEK_DAYS === 0;
+    // Indefinite (0) is only reachable via the admin-only preset; the route
+    // re-checks the capability, so the UI just needs to treat it as valid.
+    resolvedDays === INDEFINITE_RETENTION_DAYS ||
+    (Number.isFinite(resolvedDays) &&
+      Number.isInteger(resolvedDays) &&
+      resolvedDays >= MIN_RETENTION_DAYS &&
+      resolvedDays <= MAX_RETENTION_DAYS &&
+      resolvedDays % RETENTION_WEEK_DAYS === 0);
 
   const canSave = scopes.length > 0 && daysValid && !isSaving;
 
@@ -1017,7 +1054,7 @@ function AddOverrideDrawer({
             <Field.Root>
               <Field.Label>Retention</Field.Label>
               <Select.Root
-                collection={retentionPresetCollection}
+                collection={presetCollection}
                 value={[preset]}
                 onValueChange={(details) => {
                   const v = details.value[0];
@@ -1028,7 +1065,7 @@ function AddOverrideDrawer({
                   <Select.ValueText placeholder="Pick a retention" />
                 </Select.Trigger>
                 <Select.Content>
-                  {retentionPresetCollection.items.map((item) => (
+                  {presetCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
@@ -1067,11 +1104,15 @@ function AddOverrideDrawer({
                 </HStack>
               )}
               <Field.HelperText>
-                {preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
-                  ? `Stored as ${resolvedDays} days.`
-                  : preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid
-                    ? `Must be between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days.`
-                    : `Minimum ${MIN_RETENTION_DAYS} days (7 weeks). Retention is partition-aligned and rounded to whole weeks under the hood.`}
+                {preset === INDEFINITE_PRESET_VALUE
+                  ? "Data will be kept indefinitely — exempt from automatic deletion."
+                  : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
+                    ? `Stored as ${resolvedDays} days.`
+                    : preset === CUSTOM_PRESET_VALUE &&
+                        customAmount &&
+                        !daysValid
+                      ? `Must be between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days.`
+                      : `Minimum ${MIN_RETENTION_DAYS} days (7 weeks). Retention is partition-aligned and rounded to whole weeks under the hood.`}
               </Field.HelperText>
             </Field.Root>
 
