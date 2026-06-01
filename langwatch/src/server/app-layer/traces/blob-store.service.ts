@@ -59,15 +59,17 @@ const spanAttributeSchema = z.object({
   value: z.object({ stringValue: z.string() }),
 });
 
-/** Parsed EventPayload structure (ADR-022: full event as stored by the command worker). */
+/**
+ * Parsed EventPayload structure (ADR-022: full event as stored by the command worker).
+ *
+ * EventPayload IS event.data (stored as `event.data ?? {}` by eventToRecord).
+ * The real write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`.
+ * Span is at the TOP level — there is NO outer `data` wrapper.
+ */
 const eventPayloadSchema = z.object({
-  data: z
+  span: z
     .object({
-      span: z
-        .object({
-          attributes: z.array(spanAttributeSchema),
-        })
-        .optional(),
+      attributes: z.array(spanAttributeSchema),
     })
     .optional(),
 });
@@ -168,10 +170,10 @@ export class BlobStore {
     }
 
     // Extract span attribute by field name from the parsed EventPayload.
-    // ADR-022: EventPayload contains the full event as stored by the command worker.
+    // ADR-022: EventPayload IS event.data (span at top level, no outer `data` wrapper).
     const payloadParse = eventPayloadSchema.safeParse(parsedPayload);
     const spanAttributes = payloadParse.success
-      ? payloadParse.data.data?.span?.attributes
+      ? payloadParse.data.span?.attributes
       : undefined;
 
     if (!spanAttributes || spanAttributes.length === 0) {

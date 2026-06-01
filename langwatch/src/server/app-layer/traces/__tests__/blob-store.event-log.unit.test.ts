@@ -84,12 +84,10 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
   describe("when getFromEventLog is called with matching (TenantId, AggregateType, AggregateId, EventId) and field", () => {
     it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
       const eventPayload = JSON.stringify({
-        data: {
-          span: {
-            attributes: [
-              { key: FIELD, value: { stringValue: FULL_VALUE } },
-            ],
-          },
+        span: {
+          attributes: [
+            { key: FIELD, value: { stringValue: FULL_VALUE } },
+          ],
         },
       });
       const { client, sqlCaptures } = makeMockChClient({
@@ -122,7 +120,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 
     it("SQL contains 'TenantId' as the first predicate (substring assertion)", async () => {
       const eventPayload = JSON.stringify({
-        data: { span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] } },
+        span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
       });
       const { client, sqlCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
@@ -202,7 +200,7 @@ describe("given a valid event_log row whose EventPayload does not contain the re
   describe("when getFromEventLog is called for the missing field", () => {
     it("throws BlobFieldNotFoundError", async () => {
       const eventPayload = JSON.stringify({
-        data: { span: { attributes: [] } },
+        span: { attributes: [] },
       });
       const { client } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
@@ -291,12 +289,10 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
   describe("when getFromEventLog is called with a valid event_log row", () => {
     it("reads the field from event_log without touching S3", async () => {
       const eventPayload = JSON.stringify({
-        data: {
-          span: {
-            attributes: [
-              { key: FIELD, value: { stringValue: FULL_VALUE } },
-            ],
-          },
+        span: {
+          attributes: [
+            { key: FIELD, value: { stringValue: FULL_VALUE } },
+          ],
         },
       });
       const { client } = makeMockChClient({
