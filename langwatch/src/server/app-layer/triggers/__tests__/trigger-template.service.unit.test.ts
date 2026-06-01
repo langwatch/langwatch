@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
-} from "~/server/event-sourcing/outbox/templating/banner";
+} from "~/shared/templating/banner";
 import {
   type DraftIdentity,
   type DraftProject,
@@ -20,7 +20,6 @@ const PROJECT: DraftProject = { name: "Acme", slug: "acme" };
 const TRIGGER: DraftIdentity = {
   name: "High latency",
   alertType: AlertType.WARNING,
-  message: "p95 over budget",
 };
 
 function makeNotifier() {
@@ -75,95 +74,6 @@ describe("validateTemplateDraft", () => {
 describe("TriggerTemplateService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("getScaffold", () => {
-    it("returns the defaults, the variable contract, and an example context", () => {
-      const { notifier } = makeNotifier();
-      const service = makeService(notifier);
-
-      const scaffold = service.getScaffold({ project: PROJECT });
-
-      expect(scaffold.defaults.emailSubject).toMatch(/Trigger/);
-      expect(scaffold.variables.map((v) => v.path)).toContain("trigger.name");
-      expect(scaffold.variables.map((v) => v.path)).toContain("match.trace.url");
-      expect(scaffold.example.project.slug).toBe("acme");
-      expect(scaffold.example.match).not.toBeNull();
-    });
-  });
-
-  describe("renderPreview", () => {
-    describe("when an email body references a variable the context omits", () => {
-      it("renders it empty and reports the missing variable", async () => {
-        const { notifier } = makeNotifier();
-        const service = makeService(notifier);
-
-        const preview = await service.renderPreview({
-          channel: "email",
-          trigger: TRIGGER,
-          project: PROJECT,
-          draft: { emailBodyTemplate: "Owner: {{ owner.name }}" },
-        });
-
-        if (preview.channel !== "email") throw new Error("expected email");
-        expect(preview.missingVariables).toContain("owner");
-        expect(preview.html).not.toContain("owner.name");
-      });
-    });
-
-    describe("when a Block Kit template includes an interactive block", () => {
-      it("keeps allowed blocks and drops the interactive one", async () => {
-        const { notifier } = makeNotifier();
-        const service = makeService(notifier);
-
-        const template = JSON.stringify([
-          {
-            type: "header",
-            text: { type: "plain_text", text: "{{ trigger.name }}" },
-          },
-          { type: "divider" },
-          { type: "actions", elements: [{ type: "button", text: "x" }] },
-        ]);
-
-        const preview = await service.renderPreview({
-          channel: "slack",
-          trigger: TRIGGER,
-          project: PROJECT,
-          draft: { slackTemplate: template, slackTemplateType: "block_kit" },
-        });
-
-        if (preview.channel !== "slack") throw new Error("expected slack");
-        if (!("blocks" in preview.payload)) {
-          throw new Error("expected a blocks payload");
-        }
-        expect(preview.payload.blocks.map((b) => b.type)).toEqual([
-          "header",
-          "divider",
-        ]);
-      });
-    });
-
-    describe("when a Block Kit template renders invalid JSON", () => {
-      it("falls back to the default and reports the failure", async () => {
-        const { notifier } = makeNotifier();
-        const service = makeService(notifier);
-
-        const preview = await service.renderPreview({
-          channel: "slack",
-          trigger: TRIGGER,
-          project: PROJECT,
-          draft: {
-            slackTemplate: "not json at all",
-            slackTemplateType: "block_kit",
-          },
-        });
-
-        if (preview.channel !== "slack") throw new Error("expected slack");
-        expect(preview.usedDefault).toBe(true);
-        expect("text" in preview.payload).toBe(true);
-        expect(preview.errors.length).toBeGreaterThan(0);
-      });
-    });
   });
 
   describe("testFire", () => {

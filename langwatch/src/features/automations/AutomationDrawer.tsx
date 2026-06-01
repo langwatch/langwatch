@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Heading, Spacer, Text } from "@chakra-ui/react";
 import { Mail } from "lucide-react";
 import type { TriggerAction } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/client";
 import { type ConfigFormCtx, isNotifyEntry } from "~/automations/providers/types";
 import { Drawer } from "~/components/ui/drawer";
@@ -16,6 +16,16 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
+import {
+  EXAMPLE_MATCHES,
+  TEMPLATE_VARIABLES,
+} from "~/shared/templating/exampleContext";
+import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderTriggerSlack } from "~/shared/templating/renderSlack";
+import {
+  buildTemplateContext,
+  type TemplateContext,
+} from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
@@ -37,9 +47,6 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
-import { buildClientScaffold } from "./templates/scaffold";
-
-const PREVIEW_DEBOUNCE_MS = 400;
 
 function saveDisabledReason(
   conditionsSet: boolean,
@@ -139,7 +146,6 @@ export function AutomationDrawer({
           id: row.id,
           name: row.name,
           alertType: row.alertType,
-          message: row.message ?? null,
           action,
           actionParams: row.actionParams,
           emailSubjectTemplate: row.emailSubjectTemplate,
@@ -152,44 +158,106 @@ export function AutomationDrawer({
     hydrate(next);
   }, [triggerQuery.data, automationId, hydrate]);
 
-  // Scaffold (defaults + variables + example) is static client data.
-  const scaffold = useMemo(
+  // Build the example TemplateContext the preview pane (and autocomplete)
+  // render against. Static-ish — only depends on the project identity, so the
+  // example URLs come out plausible (`/<slug>/messages/<trace>`). Pulled
+  // directly from the shared templating module — no more parallel client copy.
+  const exampleContext = useMemo(
     () =>
-      buildClientScaffold({
-        name: project?.name ?? "Project",
-        slug: project?.slug ?? "project",
+      buildTemplateContext({
+        trigger: {
+          id: "preview",
+          name: "Your automation",
+          alertType: null,
+        },
+        project: {
+          name: project?.name ?? "Project",
+          slug: project?.slug ?? "project",
+        },
+        baseHost:
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "https://app.langwatch.ai",
+        matches: EXAMPLE_MATCHES,
       }),
     [project?.name, project?.slug],
   );
 
   // Live preview for the active notify channel.
+  //
+  // Renders fully client-side via the shared templating module. No tRPC,
+  // no debounce — Liquid renders are sub-millisecond on a draft-sized
+  // template, so we can update on every keystroke and stay responsive.
+  // A monotonically increasing token guards against the rare race where
+  // a slow render returns out of order.
   const channel = notifyChannel(draft);
-  const preview = api.automation.previewTemplate.useMutation();
+  const [preview, setPreview] = useState<NotifyPreview | undefined>(undefined);
+  const previewToken = useRef(0);
+  const previewContext = useMemo<TemplateContext>(
+    () => ({
+      ...exampleContext,
+      trigger: {
+        ...exampleContext.trigger,
+        name: draft.name || "Your automation",
+        alertType: draft.alertType,
+      },
+    }),
+    [exampleContext, draft.name, draft.alertType],
+  );
+
   useEffect(() => {
-    if (!channel || !projectId || section !== "configuration") return;
-    const timer = setTimeout(() => {
-      preview.mutate({
-        projectId,
-        channel,
-        trigger: {
-          name: draft.name || "Your automation",
-          alertType: draft.alertType,
-          message: null,
-        },
-        draft: templatesFromDraft(draft),
-      });
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    channel,
-    projectId,
-    section,
-    draft.name,
-    draft.alertType,
-    draft.action,
-    draft.slices,
-  ]);
+    if (!channel || section !== "configuration") {
+      setPreview(undefined);
+      return;
+    }
+    const token = ++previewToken.current;
+    const templates = templatesFromDraft(draft);
+    (async () => {
+      try {
+        if (channel === "email") {
+          const rendered = await renderTriggerEmail({
+            subjectTemplate: templates.emailSubjectTemplate,
+            bodyTemplate: templates.emailBodyTemplate,
+            context: previewContext,
+          });
+          if (token === previewToken.current) {
+            setPreview({
+              channel: "email",
+              subject: rendered.subject,
+              html: rendered.html,
+              usedDefault: rendered.usedDefault,
+              missingVariables: rendered.missingVariables,
+              errors: rendered.errors,
+            });
+          }
+        } else {
+          const rendered = await renderTriggerSlack({
+            templateType:
+              templates.slackTemplateType === "block_kit"
+                ? "block_kit"
+                : templates.slackTemplateType === "string"
+                  ? "string"
+                  : null,
+            template: templates.slackTemplate,
+            context: previewContext,
+          });
+          if (token === previewToken.current) {
+            setPreview({
+              channel: "slack",
+              payload: rendered.payload,
+              usedDefault: rendered.usedDefault,
+              missingVariables: rendered.missingVariables,
+              errors: rendered.errors,
+            });
+          }
+        }
+      } catch {
+        // Render failures fall back inside the templating module; the
+        // outer catch is just a belt for unanticipated throws.
+        if (token === previewToken.current) setPreview(undefined);
+      }
+    })();
+  }, [channel, section, draft.action, draft.slices, previewContext]);
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -209,7 +277,6 @@ export function AutomationDrawer({
         trigger: {
           name: draft.name || "Your automation",
           alertType: draft.alertType,
-          message: null,
         },
         draft: templatesFromDraft(draft),
         recipients: target.recipients,
@@ -269,7 +336,6 @@ export function AutomationDrawer({
         name: draft.name,
         action: draft.action,
         alertType: draft.alertType ?? undefined,
-        message: null,
         filters: draft.source === "customGraph" ? {} : draft.filters,
         customGraphId:
           draft.source === "customGraph" ? draft.customGraphId : null,
@@ -316,20 +382,13 @@ export function AutomationDrawer({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
-      variables: scaffold.variables,
-      example: scaffold.example,
-      preview: preview.data as NotifyPreview | undefined,
-      previewLoading: preview.isLoading,
+      variables: TEMPLATE_VARIABLES,
+      example: exampleContext,
+      preview,
+      // Synchronous render — there is never a loading state to show.
+      previewLoading: false,
     }),
-    [
-      projectId,
-      organization?.id,
-      team?.slug,
-      scaffold.variables,
-      scaffold.example,
-      preview.data,
-      preview.isLoading,
-    ],
+    [projectId, organization?.id, team?.slug, exampleContext, preview],
   );
 
   return (

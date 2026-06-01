@@ -26,7 +26,6 @@ export interface TemplateContext {
 export interface TemplateTriggerVars {
   id: string;
   name: string;
-  message: string;
   alertType: AlertType | null;
   /** Deep link to the automation's edit page — `{{ project.url }}/automations`
    *  with `drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`,

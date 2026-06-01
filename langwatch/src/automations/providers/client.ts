@@ -35,7 +35,7 @@ export interface PreviewFor {
 }
 
 /** The sum of every notify provider's render-time preview shape — the
- *  type the orchestrator's `previewTemplate` mutation returns and the
+ *  type the drawer's client-side template render produces and the
  *  type every notify ConfigForm narrows from. Built from the registry,
  *  not enumerated here. */
 export type NotifyPreview = PreviewFor[keyof PreviewFor];

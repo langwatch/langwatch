@@ -5,7 +5,6 @@ const baseArgs = {
   trigger: {
     id: "trg_1",
     name: "High latency",
-    message: "",
     alertType: null,
   },
   project: { name: "Acme", slug: "acme" },

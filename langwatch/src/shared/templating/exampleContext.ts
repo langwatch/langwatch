@@ -56,11 +56,6 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
     description: "The automation's configured name.",
   },
   {
-    path: "trigger.message",
-    type: "string",
-    description: "Optional free-form message stored on the automation.",
-  },
-  {
     path: "trigger.alertType",
     type: "'INFO' | 'WARNING' | 'CRITICAL' | null",
     description: "Severity label, or null if unset.",
@@ -146,3 +141,22 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
     description: "Display name of the evaluator that ran.",
   },
 ];
+
+/** Notification cadence the variable surface is filtered for. Only "immediate"
+ *  is live today; "digest" is reserved for ADR-025. */
+export type TemplateCadence = "immediate" | "digest";
+
+/** Filters the variable list down to what's *actually available* at the given
+ *  cadence. Immediate fires expose `match.*` (singular) and `digest.count = 1`;
+ *  `digest.windowStart` / `digest.windowEnd` are null and only meaningful in a
+ *  digest payload, so we hide them so authors don't reach for variables that
+ *  always render empty. Digest will later additionally expose `matches[]`. */
+export function filterVariablesForCadence(
+  variables: VariableInfo[],
+  cadence: TemplateCadence,
+): VariableInfo[] {
+  if (cadence === "digest") return variables;
+  return variables.filter(
+    (v) => v.path !== "digest.windowStart" && v.path !== "digest.windowEnd",
+  );
+}

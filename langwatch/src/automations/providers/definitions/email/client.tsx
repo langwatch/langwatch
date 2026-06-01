@@ -11,8 +11,8 @@ import {
 import {
   DEFAULT_EMAIL_BODY_TEMPLATE,
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
-  filterVariablesForCadence,
-} from "~/features/automations/templates/scaffold";
+} from "~/shared/templating/defaults";
+import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import type {
   ConfigFormProps,
   NotifyClientDef,

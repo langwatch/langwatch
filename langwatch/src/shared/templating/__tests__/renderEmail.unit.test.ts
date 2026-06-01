@@ -86,7 +86,6 @@ describe("renderTriggerEmail", () => {
           trigger: {
             id: "t",
             name: "x".repeat(300),
-            message: "",
             alertType: null,
           },
         }),

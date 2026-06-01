@@ -12,10 +12,6 @@ export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
 export const DEFAULT_EMAIL_BODY_TEMPLATE = `# {% if trigger.alertType %}({{ trigger.alertType }}) {% endif %}{{ trigger.name }}
 
 This automation fired against a matching trace.
-{% if trigger.message %}
-
-> {{ trigger.message }}
-{% endif %}
 {% if match.evaluation and match.evaluation.evaluatorName %}
 
 **{{ match.evaluation.evaluatorName }}**{% if match.evaluation.score != null %} — score {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% if match.evaluation.passed == false %} — **failed**{% endif %}
@@ -30,9 +26,6 @@ This automation fired against a matching trace.
 [View matched trace ↗]({{ match.trace.url }})`;
 
 export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'WARNING' %}⚠️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🔔{% endif %} *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
-{% if trigger.message %}
-> {{ trigger.message }}
-{% endif %}
 *Input:* {{ match.trace.input | truncate: 200 }}
 *Output:* {{ match.trace.output | truncate: 200 }}{% if match.evaluation and match.evaluation.evaluatorName %}
 *{{ match.evaluation.evaluatorName }}:*{% if match.evaluation.score != null %} {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% endif %}`;
@@ -62,12 +55,6 @@ export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
     "elements": [
       { "type": "mrkdwn", "text": "*Alert type:* {{ trigger.alertType }}" }
     ]
-  },
-  {% endif %}
-  {% if trigger.message %}
-  {
-    "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ trigger.message | json }} }
   },
   {% endif %}
   {

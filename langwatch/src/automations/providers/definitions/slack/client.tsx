@@ -12,8 +12,8 @@ import {
 import {
   DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_SLACK_TEMPLATE,
-  filterVariablesForCadence,
-} from "~/features/automations/templates/scaffold";
+} from "~/shared/templating/defaults";
+import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import type {
   ConfigFormProps,
   NotifyClientDef,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEMPLATE_VARIABLES } from "~/server/event-sourcing/outbox/templating/exampleContext";
+import { TEMPLATE_VARIABLES } from "~/shared/templating/exampleContext";
 import { detectUnknownVariables, positionInsideLiquid } from "../liquidMonaco";
 
 const VARS = TEMPLATE_VARIABLES;

@@ -37,7 +37,6 @@ const templateDraftSchema = z.object({
 const triggerIdentitySchema = z.object({
   name: z.string(),
   alertType: z.nativeEnum(AlertType).nullable().default(null),
-  message: z.string().nullable().default(null),
 });
 
 const actionParamsSchema = z.object({
@@ -245,34 +244,6 @@ export const automationRouter = createTRPCRouter({
 
       return { success: true };
     }),
-  addCustomMessage: protectedProcedure
-    .input(
-      z.object({
-        triggerId: z.string(),
-        message: z.string(),
-        projectId: z.string(),
-        alertType: z
-          .union([z.nativeEnum(AlertType), z.literal("")])
-          .optional()
-          .nullable(),
-        name: z.string().optional(),
-      }),
-    )
-    .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
-      const trigger = await ctx.prisma.trigger.update({
-        where: { id: input.triggerId, projectId: input.projectId },
-        data: {
-          message: input.message,
-          alertType: input.alertType ? input.alertType : null,
-          name: input.name,
-        },
-      });
-
-      await getApp().triggers.invalidate(input.projectId);
-
-      return trigger;
-    }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
@@ -396,36 +367,6 @@ export const automationRouter = createTRPCRouter({
 
       return trigger;
     }),
-  getTemplateScaffold: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
-    .query(async ({ input }) => {
-      const project = await resolveProjectIdentity(input.projectId);
-      return getApp().triggerTemplates.getScaffold({ project });
-    }),
-  previewTemplate: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        channel: z.enum(["email", "slack"]),
-        trigger: triggerIdentitySchema,
-        draft: templateDraftSchema,
-      }),
-    )
-    .use(checkProjectPermission("triggers:view"))
-    .mutation(async ({ input }) => {
-      try {
-        const project = await resolveProjectIdentity(input.projectId);
-        return await getApp().triggerTemplates.renderPreview({
-          channel: input.channel,
-          trigger: input.trigger,
-          project,
-          draft: input.draft,
-        });
-      } catch (err) {
-        throw toTemplateTRPCError(err);
-      }
-    }),
   testFireTemplate: protectedProcedure
     .input(
       z.object({
@@ -464,7 +405,6 @@ export const automationRouter = createTRPCRouter({
         name: z.string().min(1),
         action: z.nativeEnum(TriggerAction),
         alertType: z.nativeEnum(AlertType).nullable().optional(),
-        message: z.string().nullable().optional(),
         filters: triggerFiltersSchema,
         customGraphId: z.string().nullable().optional(),
         actionParams: actionParamsSchema,
@@ -503,7 +443,6 @@ export const automationRouter = createTRPCRouter({
         name: input.name,
         action: input.action,
         alertType: input.alertType ?? null,
-        message: input.message ?? null,
         filters: JSON.stringify(input.filters),
         customGraphId: input.customGraphId ?? null,
         actionParams: input.actionParams,

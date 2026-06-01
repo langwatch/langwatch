@@ -1,26 +1,16 @@
 import type { AlertType } from "@prisma/client";
-import {
-  DEFAULT_EMAIL_BODY_TEMPLATE,
-  DEFAULT_EMAIL_SUBJECT_TEMPLATE,
-  DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
-  DEFAULT_SLACK_TEMPLATE,
-} from "~/server/event-sourcing/outbox/templating/defaults";
-import {
-  EXAMPLE_MATCHES,
-  TEMPLATE_VARIABLES,
-  type VariableInfo,
-} from "~/server/event-sourcing/outbox/templating/exampleContext";
-import { renderTriggerEmail } from "~/server/event-sourcing/outbox/templating/renderEmail";
+import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
+import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
   type SlackPayload,
   type SlackTemplateType,
   renderTriggerSlack,
-} from "~/server/event-sourcing/outbox/templating/renderSlack";
+} from "~/shared/templating/renderSlack";
 import {
   buildTemplateContext,
   type TemplateContext,
-} from "~/server/event-sourcing/outbox/templating/templateContext";
-import { validateLiquid } from "~/server/event-sourcing/outbox/templating/validate";
+} from "~/shared/templating/templateContext";
+import { validateLiquid } from "~/shared/templating/validate";
 import {
   TemplateValidationError,
   TestFireUnavailableError,
@@ -53,52 +43,16 @@ export interface TemplateDraft {
 }
 
 /** The trigger identity a template renders against, supplied by the draft so
- *  preview/test-fire work before the automation is saved. */
+ *  test-fire works before the automation is saved. */
 export interface DraftIdentity {
   name: string;
   alertType: AlertType | null;
-  message: string | null;
 }
 
 export interface DraftProject {
   name: string;
   slug: string;
 }
-
-export interface TemplateDefaults {
-  emailSubject: string;
-  emailBody: string;
-  slackString: string;
-  slackBlockKit: string;
-}
-
-export interface TemplateScaffold {
-  defaults: TemplateDefaults;
-  /** Rich variable info — path + type + description — for autocomplete and the
-   *  variable reference panel. */
-  variables: VariableInfo[];
-  /** The example data preview renders against, for the author to inspect. */
-  example: TemplateContext;
-}
-
-export interface EmailPreview {
-  channel: "email";
-  subject: string;
-  html: string;
-  usedDefault: boolean;
-  missingVariables: string[];
-  errors: string[];
-}
-
-export interface SlackPreview {
-  channel: "slack";
-  payload: SlackPayload;
-  usedDefault: boolean;
-  missingVariables: string[];
-  errors: string[];
-}
-
-export type TemplatePreview = EmailPreview | SlackPreview;
 
 export interface TestFireResult {
   channel: TemplateChannel;
@@ -113,12 +67,6 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "emailSubjectTemplate",
   "emailBodyTemplate",
 ] as const satisfies readonly (keyof TemplateDraft)[];
-
-const PLACEHOLDER_IDENTITY: DraftIdentity = {
-  name: "Your automation",
-  alertType: null,
-  message: null,
-};
 
 function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
   if (raw === "block_kit") return "block_kit";
@@ -157,12 +105,12 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
 }
 
 /**
- * Renders trigger-notification templates for the authoring drawer. Operates
- * purely on the draft payload — the trigger/project identity and template
- * sources are supplied by the caller (see ADR-028), so preview and test fire
- * work identically before a trigger is saved (create) and after (edit). The
- * rendering itself lives in the `outbox/templating` module; this service builds
- * the example context around it and dispatches a test fire via the notifier.
+ * Dispatches the "Send test" notification from the authoring drawer. Lives
+ * server-side because it touches credentials (SES, Slack webhooks). Live
+ * preview rendering happens entirely client-side via the same shared
+ * templating module — the renderers below are imported from
+ * `~/shared/templating/*` so both sides see identical output for any given
+ * draft.
  */
 export class TriggerTemplateService {
   private readonly baseHost: string;
@@ -171,62 +119,6 @@ export class TriggerTemplateService {
   constructor(deps: { baseHost: string; notifier: TriggerNotifier }) {
     this.baseHost = deps.baseHost;
     this.notifier = deps.notifier;
-  }
-
-  getScaffold({ project }: { project: DraftProject }): TemplateScaffold {
-    return {
-      defaults: {
-        emailSubject: DEFAULT_EMAIL_SUBJECT_TEMPLATE,
-        emailBody: DEFAULT_EMAIL_BODY_TEMPLATE,
-        slackString: DEFAULT_SLACK_TEMPLATE,
-        slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
-      },
-      variables: TEMPLATE_VARIABLES,
-      example: this.context(PLACEHOLDER_IDENTITY, project),
-    };
-  }
-
-  async renderPreview({
-    channel,
-    trigger,
-    project,
-    draft,
-  }: {
-    channel: TemplateChannel;
-    trigger: DraftIdentity;
-    project: DraftProject;
-    draft: TemplateDraft;
-  }): Promise<TemplatePreview> {
-    const context = this.context(trigger, project);
-
-    if (channel === "email") {
-      const rendered = await renderTriggerEmail({
-        subjectTemplate: draft.emailSubjectTemplate ?? null,
-        bodyTemplate: draft.emailBodyTemplate ?? null,
-        context,
-      });
-      return {
-        channel: "email",
-        subject: rendered.subject,
-        html: rendered.html,
-        usedDefault: rendered.usedDefault,
-        missingVariables: rendered.missingVariables,
-        errors: rendered.errors,
-      };
-    }
-
-    const rendered = await renderTriggerSlack({
-      templateType: normalizeSlackType(draft.slackTemplateType),
-      template: draft.slackTemplate ?? null,
-      context,
-    });
-    return {
-      channel: "slack",
-      payload: rendered.payload,
-      usedDefault: rendered.usedDefault,
-      missingVariables: rendered.missingVariables,
-      errors: rendered.errors,
-    };
   }
 
   async testFire({
@@ -303,7 +195,6 @@ export class TriggerTemplateService {
       trigger: {
         id: "preview",
         name: identity.name,
-        message: identity.message ?? "",
         alertType: identity.alertType,
       },
       project,

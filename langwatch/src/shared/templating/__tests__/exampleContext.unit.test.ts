@@ -21,7 +21,6 @@ describe("template variable contract", () => {
     trigger: {
       id: "tr_1",
       name: "High latency",
-      message: "p95 over budget",
       alertType: AlertType.WARNING,
     },
     project: { name: "Acme", slug: "acme" },

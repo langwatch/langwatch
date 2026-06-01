@@ -40,7 +40,6 @@ export interface SavedTriggerRow {
   id: string;
   name: string;
   alertType: AlertType | null;
-  message: string | null;
   action: TriggerAction;
   actionParams: unknown;
   emailSubjectTemplate: string | null;
