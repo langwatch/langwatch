@@ -431,7 +431,21 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
-        {snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
+        {snapshot && snapshot.rules.length === 0 ? (
+          <Card.Root width="full">
+            <Card.Body>
+              <VStack gap={1} paddingY={4}>
+                <Text fontSize="sm" color="fg.muted" textAlign="center">
+                  No retention policies configured.
+                </Text>
+                <Text fontSize="xs" color="fg.muted" textAlign="center">
+                  The platform default of {DEFAULT_RETENTION_DAYS} days applies
+                  to every category.
+                </Text>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        ) : snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
               <Text fontSize="sm" color="fg.muted" textAlign="center">
