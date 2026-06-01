@@ -257,6 +257,9 @@ describe("collectAuthDiagnostics", () => {
 
   /** @scenario Diagnostic fields are safe to log */
   it("never includes a raw token value", () => {
+    // Covers the "Diagnostic fields are safe to log" scenario: the serialised
+    // diagnostic object must not leak the credential even if the header
+    // was parsed — only metadata (path, method, presence flags) is logged.
     const c = mockHonoCtx({
       headers: {
         "x-auth-token": "sk-lw-SUPER-SECRET-VALUE",
