@@ -1,4 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// auth-middleware → api/rbac → ~/server/auth → ~/server/better-auth → redis + db.
+// Mock both to prevent the persistent Redis socket from keeping the Vite process
+// alive after tests complete (causes shard 2 to hang until runner cancels it).
+// Established pattern: see better-auth/__tests__/fallbackName.test.ts.
+vi.mock("~/server/db", () => ({ prisma: {} }));
+vi.mock("~/server/redis", () => ({ connection: undefined }));
+
 import { extractCredentials, collectAuthDiagnostics } from "../auth-middleware";
 
 function mockGetHeader(headers: Record<string, string>) {
