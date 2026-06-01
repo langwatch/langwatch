@@ -500,13 +500,11 @@ function DataRetentionPage({
           isCancelling={killMutation.isLoading}
         />
 
-        {snapshot && (
-          <RetentionAndUsageCard
-            isLoading={storageQuery.isLoading}
-            data={storageQuery.data}
-            effective={snapshot.effective}
-          />
-        )}
+        {snapshot && <DataRetentionCard effective={snapshot.effective} />}
+        <DataStorageCard
+          isLoading={storageQuery.isLoading}
+          data={storageQuery.data}
+        />
 
         {available && (
           <AddOverrideDrawer
@@ -774,35 +772,32 @@ function ApplyToExistingConfirmDialog({
   );
 }
 
-function RetentionAndUsageCard({
-  isLoading,
-  data,
+function DataRetentionCard({
   effective,
 }: {
-  isLoading: boolean;
-  data?: { totalBytes: number; byCategory: Record<RetentionCategory, number> };
   effective: Partial<Record<RetentionCategory, number>>;
 }) {
+  const summary = renderPolicySummary(effective);
   return (
     <Card.Root width="full">
       <Card.Header>
-        <Heading as="h3" fontSize="lg">
-          Data retention and usage
-        </Heading>
-        <Text fontSize="sm" color="fg.muted">
-          The retention currently applied to this project, and the storage it
-          occupies today.
-        </Text>
+        <HStack width="full" justify="space-between" align="start">
+          <VStack align="start" gap={0}>
+            <Heading as="h3" fontSize="lg">
+              Data retention and usage
+            </Heading>
+            <Text fontSize="sm" color="fg.muted">
+              The retention currently applied to current project.
+            </Text>
+          </VStack>
+          <Text fontWeight="bold" fontSize="lg" flexShrink={0}>
+            {summary}
+          </Text>
+        </HStack>
       </Card.Header>
-      <Card.Body>
-        <VStack gap={5} align="stretch">
+      {summary === "Mixed" && (
+        <Card.Body>
           <VStack gap={2} align="stretch">
-            <HStack justifyContent="space-between">
-              <Text fontWeight="semibold">Data policy for this project</Text>
-              <Text fontWeight="bold" fontSize="lg">
-                {renderPolicySummary(effective)}
-              </Text>
-            </HStack>
             {RETENTION_CATEGORIES.map((category) => (
               <HStack key={category} justifyContent="space-between">
                 <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
@@ -814,25 +809,48 @@ function RetentionAndUsageCard({
               </HStack>
             ))}
           </VStack>
-          {isLoading ? (
-            <Spinner />
-          ) : data ? (
-            <VStack gap={2} align="stretch">
-              <HStack justifyContent="space-between">
-                <Text fontWeight="semibold">Total stored</Text>
-                <Text fontWeight="bold" fontSize="lg">
-                  {formatBytes(data.totalBytes)}
-                </Text>
+        </Card.Body>
+      )}
+    </Card.Root>
+  );
+}
+
+function DataStorageCard({
+  isLoading,
+  data,
+}: {
+  isLoading: boolean;
+  data?: { totalBytes: number; byCategory: Record<RetentionCategory, number> };
+}) {
+  return (
+    <Card.Root width="full">
+      <Card.Header>
+        <Heading as="h3" fontSize="lg">
+          Data storage
+        </Heading>
+        <Text fontSize="sm" color="fg.muted">
+          The storage that current project occupies today.
+        </Text>
+      </Card.Header>
+      <Card.Body>
+        {isLoading ? (
+          <Spinner />
+        ) : data ? (
+          <VStack gap={2} align="stretch">
+            <HStack justifyContent="space-between">
+              <Text fontWeight="semibold">Total stored</Text>
+              <Text fontWeight="bold" fontSize="lg">
+                {formatBytes(data.totalBytes)}
+              </Text>
+            </HStack>
+            {RETENTION_CATEGORIES.map((category) => (
+              <HStack key={category} justifyContent="space-between">
+                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                <Text>{formatBytes(data.byCategory[category])}</Text>
               </HStack>
-              {RETENTION_CATEGORIES.map((category) => (
-                <HStack key={category} justifyContent="space-between">
-                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                  <Text>{formatBytes(data.byCategory[category])}</Text>
-                </HStack>
-              ))}
-            </VStack>
-          ) : null}
-        </VStack>
+            ))}
+          </VStack>
+        ) : null}
       </Card.Body>
     </Card.Root>
   );
