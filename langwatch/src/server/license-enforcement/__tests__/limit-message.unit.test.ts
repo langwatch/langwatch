@@ -56,7 +56,7 @@ describe("buildUpgradeAction", () => {
       );
     });
 
-    /** @scenario "Paid org on SaaS told to upgrade with traces unit" */
+    /** @scenario "Paid TIERED org on SaaS told to upgrade with traces unit" */
     it("tells paid orgs to upgrade their plan at app.langwatch.ai", () => {
       const action = buildUpgradeAction("subscription");
       expect(action).toContain(
@@ -72,7 +72,7 @@ describe("buildUpgradeAction", () => {
         "https://my-langwatch.example.com";
     });
 
-    /** @scenario "Free-tier org on self-hosted told to get a license" */
+    /** @scenario "Free-tier org on self-hosted told to buy a license" */
     it("tells free-tier orgs to get a license at the configured BASE_HOST", () => {
       const action = buildUpgradeAction("free");
       expect(action).toContain(
@@ -80,7 +80,7 @@ describe("buildUpgradeAction", () => {
       );
     });
 
-    /** @scenario "Licensed org on self-hosted told to upgrade their license" */
+    /** @scenario "Paid TIERED org on self-hosted told to buy a license" */
     it("tells licensed orgs to upgrade their license at the configured BASE_HOST", () => {
       const action = buildUpgradeAction("license");
       expect(action).toContain(
