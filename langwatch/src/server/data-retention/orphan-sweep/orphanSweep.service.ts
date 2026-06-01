@@ -1,12 +1,21 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { incrementOrphansSwept } from "~/server/metrics";
 import { createLogger } from "~/utils/logger/server";
-import type { OrphanSweepRepository } from "./orphanSweep.repository";
+import type {
+  OrphanCandidateCursor,
+  OrphanSweepRepository,
+} from "./orphanSweep.repository";
 
 const logger = createLogger("langwatch:data-retention:orphan-sweep");
 
 const BATCH_SIZE = 1000;
 const CANDIDATE_LIMIT = 1000;
+
+// Safety bound on how many candidate pages one sweep walks. A project with
+// more referencing rows than this resumes from the start on the next sweep
+// (we don't persist the cursor across runs) — generous enough that real
+// projects drain in a single sweep, so this is a backstop, not the norm.
+const MAX_SWEEP_PAGES = 100;
 
 export class OrphanSweepService {
   constructor(
@@ -72,18 +81,33 @@ export class OrphanSweepService {
   }
 
   async sweepProject({ projectId }: { projectId: string }): Promise<void> {
-    const traceIds = await this.repository.findCandidateTraceIds({
-      projectId,
-      limit: CANDIDATE_LIMIT,
-    });
-    if (traceIds.length === 0) return;
+    let cursor: OrphanCandidateCursor | undefined;
 
-    const { orphaned } = await this.filterOrphanedTraceIds({
-      projectId,
-      traceIds,
-    });
+    for (let page = 0; page < MAX_SWEEP_PAGES; page++) {
+      const { traceIds, nextCursor } =
+        await this.repository.findCandidateTraceIds({
+          projectId,
+          limit: CANDIDATE_LIMIT,
+          cursor,
+        });
 
-    await this.cleanupOrphans({ projectId, orphanedTraceIds: orphaned });
+      if (traceIds.length > 0) {
+        const { orphaned } = await this.filterOrphanedTraceIds({
+          projectId,
+          traceIds,
+        });
+        await this.cleanupOrphans({ projectId, orphanedTraceIds: orphaned });
+      }
+
+      // null cursor = every source drained; we've walked the whole project.
+      if (!nextCursor) return;
+      cursor = nextCursor;
+    }
+
+    logger.warn(
+      { projectId, maxPages: MAX_SWEEP_PAGES, pageSize: CANDIDATE_LIMIT },
+      "Orphan sweep hit the per-run page cap; remaining candidates will be revisited on the next sweep",
+    );
   }
 
   private async cleanupBatch({

@@ -1,5 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
 import type {
   DspyStepData,
@@ -88,7 +89,22 @@ function mergeByHash<T extends { hash: string }>(
 }
 
 export class DspyStepClickHouseRepository implements DspyStepRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(
+    private readonly resolveClient: ClickHouseClientResolver,
+    // dspy_steps is a traces-category retention table. Without a resolver the
+    // tenant's policy can't be read, so rows fall back to indefinite (0).
+    private readonly retentionResolver: RetentionPolicyResolver | null = null,
+  ) {}
+
+  /**
+   * The tenant's resolved traces retention, stamped on every write so DSPy
+   * rows age out under the same policy as the rest of the trace family. 0
+   * (indefinite) when no resolver is wired or the project has no policy.
+   */
+  private async resolveTracesRetentionDays(tenantId: string): Promise<number> {
+    const resolved = await this.retentionResolver?.resolve(tenantId);
+    return resolved?.traces ?? 0;
+  }
 
   /**
    * Direct insert without read-merge-write. Use for migration where the
@@ -97,6 +113,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   async insertStepDirect(data: DspyStepData): Promise<void> {
     const summary = computeLlmSummary(data.llmCalls);
     const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
+    const retentionDays = await this.resolveTracesRetentionDays(data.tenantId);
 
     const record: ClickHouseWriteRecord = {
       Id: id,
@@ -118,7 +135,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       CreatedAt: new Date(data.createdAt),
       InsertedAt: new Date(data.insertedAt),
       UpdatedAt: new Date(data.updatedAt),
-      _retention_days: 0,
+      _retention_days: retentionDays,
     };
 
     const client = await this.resolveClient(data.tenantId);
@@ -137,6 +154,9 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         data.experimentId,
         data.runId,
         data.stepIndex,
+      );
+      const retentionDays = await this.resolveTracesRetentionDays(
+        data.tenantId,
       );
 
       let mergedExamples: DspyExampleData[];
@@ -173,7 +193,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         CreatedAt: new Date(existing?.createdAt ?? data.createdAt),
         InsertedAt: new Date(existing?.insertedAt ?? data.insertedAt),
         UpdatedAt: new Date(data.updatedAt),
-        _retention_days: 0,
+        _retention_days: retentionDays,
       };
 
       const client = await this.resolveClient(data.tenantId);

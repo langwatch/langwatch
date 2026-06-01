@@ -119,6 +119,60 @@ describe("RepositoryFoldStore", () => {
           expect.objectContaining({ tenantId: "proj_xyz" }),
         );
       });
+
+      it("passes the shared retentionPolicy as write metadata", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+        const retentionPolicy = { traces: 49, scenarios: 63, experiments: 91 };
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", retentionPolicy }) },
+          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", retentionPolicy }) },
+        ]);
+
+        expect(batchSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ metadata: { retentionPolicy } }),
+        );
+        expect(repo.storeProjection).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when batch context is not uniform", () => {
+      it("falls back to per-entry writes for mixed tenantIds", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", tenantId: "tenant-1" as TenantId }) },
+          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", tenantId: "tenant-2" as TenantId }) },
+        ]);
+
+        // Native batch would stamp tenant-1 onto both rows — must not run.
+        expect(batchSpy).not.toHaveBeenCalled();
+        expect(repo.storeProjection).toHaveBeenCalledTimes(2);
+        expect(repo.storedProjections[0]!.tenantId).toBe("tenant-1");
+        expect(repo.storedProjections[1]!.tenantId).toBe("tenant-2");
+      });
+
+      it("falls back to per-entry writes for mixed retentionPolicies", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", retentionPolicy: { traces: 49, scenarios: 0, experiments: 0 } }) },
+          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", retentionPolicy: { traces: 91, scenarios: 0, experiments: 0 } }) },
+        ]);
+
+        expect(batchSpy).not.toHaveBeenCalled();
+        expect(repo.storeProjection).toHaveBeenCalledTimes(2);
+      });
     });
 
     describe("when repository does not support storeProjectionBatch", () => {

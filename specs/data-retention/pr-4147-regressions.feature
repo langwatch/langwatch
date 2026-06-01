@@ -57,3 +57,10 @@ Feature: Data retention regression safety
     Given the proactive orphan sweep fails before cleanup completes
     When the next proactive sweep is requested for the same tenant
     Then the tenant is eligible for cleanup again
+
+  @regression @unit
+  Scenario: Proactive orphan sweep advances past a fully-live first page
+    Given the first page of candidate traces is entirely live in ClickHouse
+    And an orphaned trace exists only on a later page
+    When the proactive orphan sweep runs for the tenant
+    Then the sweep pages past the live prefix and removes the later orphan

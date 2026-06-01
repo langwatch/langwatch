@@ -5,41 +5,85 @@ export interface OrphanCleanupResult {
   count: number;
 }
 
+/**
+ * Per-source `id` watermark for candidate pagination. Each referencing table
+ * advances independently — a source that returns a short page is drained while
+ * others keep paging. Cursoring by the immutable `id` PK is stable under the
+ * deletes the sweep performs (we only delete rows at `id <= cursor`, so the
+ * `id > cursor` window never shifts).
+ */
+export interface OrphanCandidateCursor {
+  annotationId?: string;
+  annotationQueueItemId?: string;
+  publicShareId?: string;
+  triggerSentId?: string;
+  pinnedTraceId?: string;
+}
+
+export interface OrphanCandidatePage {
+  traceIds: string[];
+  /** Cursor for the next page, or null once every source is drained. */
+  nextCursor: OrphanCandidateCursor | null;
+}
+
 export class OrphanSweepRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * One page of trace ids referenced by PG records, advancing past `cursor`.
+   * Returns a `nextCursor` so callers can walk the whole project across pages
+   * rather than re-scanning the same prefix every sweep (which would starve
+   * any record beyond the first page when that page stays live).
+   */
   async findCandidateTraceIds({
     projectId,
     limit = 1000,
+    cursor,
   }: {
     projectId: string;
     limit?: number;
-  }): Promise<string[]> {
+    cursor?: OrphanCandidateCursor;
+  }): Promise<OrphanCandidatePage> {
+    const after = (id: string | undefined) => (id ? { id: { gt: id } } : {});
+
     const [annotations, queueItems, publicShares, triggerSents, pinnedTraces] =
       await Promise.all([
         this.prisma.annotation.findMany({
-          where: { projectId },
-          select: { traceId: true },
+          where: { projectId, ...after(cursor?.annotationId) },
+          select: { id: true, traceId: true },
+          orderBy: { id: "asc" },
           take: limit,
         }),
         this.prisma.annotationQueueItem.findMany({
-          where: { projectId },
-          select: { traceId: true },
+          where: { projectId, ...after(cursor?.annotationQueueItemId) },
+          select: { id: true, traceId: true },
+          orderBy: { id: "asc" },
           take: limit,
         }),
         this.prisma.publicShare.findMany({
-          where: { projectId, resourceType: "TRACE" },
-          select: { resourceId: true },
+          where: {
+            projectId,
+            resourceType: "TRACE",
+            ...after(cursor?.publicShareId),
+          },
+          select: { id: true, resourceId: true },
+          orderBy: { id: "asc" },
           take: limit,
         }),
         this.prisma.triggerSent.findMany({
-          where: { projectId, traceId: { not: null } },
-          select: { traceId: true },
+          where: {
+            projectId,
+            traceId: { not: null },
+            ...after(cursor?.triggerSentId),
+          },
+          select: { id: true, traceId: true },
+          orderBy: { id: "asc" },
           take: limit,
         }),
         this.prisma.pinnedTrace.findMany({
-          where: { projectId },
-          select: { traceId: true },
+          where: { projectId, ...after(cursor?.pinnedTraceId) },
+          select: { id: true, traceId: true },
+          orderBy: { id: "asc" },
           take: limit,
         }),
       ]);
@@ -53,7 +97,32 @@ export class OrphanSweepRepository {
     }
     for (const row of pinnedTraces) traceIds.add(row.traceId);
 
-    return [...traceIds].slice(0, limit);
+    // A full page means a source may have more rows; a short page drains it.
+    // We keep paging until every source is drained.
+    const hasMore =
+      annotations.length === limit ||
+      queueItems.length === limit ||
+      publicShares.length === limit ||
+      triggerSents.length === limit ||
+      pinnedTraces.length === limit;
+
+    const lastId = (rows: { id: string }[], previous: string | undefined) =>
+      rows.length > 0 ? rows[rows.length - 1]!.id : previous;
+
+    const nextCursor: OrphanCandidateCursor | null = hasMore
+      ? {
+          annotationId: lastId(annotations, cursor?.annotationId),
+          annotationQueueItemId: lastId(
+            queueItems,
+            cursor?.annotationQueueItemId,
+          ),
+          publicShareId: lastId(publicShares, cursor?.publicShareId),
+          triggerSentId: lastId(triggerSents, cursor?.triggerSentId),
+          pinnedTraceId: lastId(pinnedTraces, cursor?.pinnedTraceId),
+        }
+      : null;
+
+    return { traceIds: [...traceIds], nextCursor };
   }
 
   async deleteAnnotations({

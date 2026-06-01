@@ -247,9 +247,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationExecutionService",
   );
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table) and the data-retention
+  // services wired further below.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
+
   const dspySteps = traced(
     new DspyStepService(
-      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient) : new NullDspyStepRepository(),
+      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient, retentionPolicyCache) : new NullDspyStepRepository(),
     ),
     "DspyStepService",
   );
@@ -346,8 +352,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
   const dataRetentionPolicyService = new DataRetentionPolicyService(
     dataRetentionPolicyRepo,
     retentionPolicyCache,

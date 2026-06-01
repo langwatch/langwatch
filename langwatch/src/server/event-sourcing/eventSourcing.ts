@@ -541,12 +541,14 @@ export class EventSourcing {
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
     processRole?: ProcessRole;
+    retentionPolicyResolver?: RetentionPolicyResolver;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
       processRole: options.processRole,
+      retentionPolicyResolver: options.retentionPolicyResolver,
     });
 
     es._initialized = true;

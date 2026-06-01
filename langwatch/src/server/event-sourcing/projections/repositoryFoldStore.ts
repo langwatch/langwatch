@@ -1,9 +1,22 @@
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { Projection } from "../domain/types";
 import type {
   ProjectionStore,
 } from "../stores/projectionStore.types";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+
+/** Treats absent and null retention as equal (both mean indefinite). */
+function sameRetention(
+  a: ResolvedRetention | null | undefined,
+  b: ResolvedRetention | null | undefined,
+): boolean {
+  return (
+    (a?.traces ?? null) === (b?.traces ?? null) &&
+    (a?.scenarios ?? null) === (b?.scenarios ?? null) &&
+    (a?.experiments ?? null) === (b?.experiments ?? null)
+  );
+}
 
 /**
  * Generic adapter that wraps a ProjectionStore (repository) into a FoldProjectionStore.
@@ -56,8 +69,12 @@ export class RepositoryFoldStore<TData>
 
     const firstContext = entries[0]!.context;
 
-    // Use native batch insert if the repository supports it
-    if (this.repo.storeProjectionBatch) {
+    // The native batch insert stamps ONE tenantId + retentionPolicy onto every
+    // row, so it's only correct when the batch is uniform. Callers group by
+    // tenant today, but guard regardless: a mixed batch must fall back to
+    // per-entry writes rather than silently tagging later rows with the first
+    // entry's tenant/retention (a multitenancy + retention correctness hazard).
+    if (this.repo.storeProjectionBatch && this.isUniformContext(entries)) {
       const projections = entries.map((entry) => ({
         id: entry.context.aggregateId,
         aggregateId: entry.context.aggregateId,
@@ -74,10 +91,21 @@ export class RepositoryFoldStore<TData>
       return;
     }
 
-    // Fallback: sequential store calls
+    // Fallback: sequential store calls (also the mixed-context safe path).
     for (const entry of entries) {
       await this.store(entry.state, entry.context);
     }
+  }
+
+  private isUniformContext(
+    entries: Array<{ context: ProjectionStoreContext }>,
+  ): boolean {
+    const first = entries[0]!.context;
+    return entries.every(
+      (entry) =>
+        entry.context.tenantId === first.tenantId &&
+        sameRetention(entry.context.retentionPolicy, first.retentionPolicy),
+    );
   }
 
   async get(

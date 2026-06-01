@@ -7,7 +7,9 @@ describe("OrphanSweepService", () => {
     /** @scenario Proactive orphan sweep removes discovered orphan records */
     it("discovers candidate trace ids and cleans those missing from ClickHouse", async () => {
       const repository = {
-        findCandidateTraceIds: vi.fn().mockResolvedValue(["missing", "live"]),
+        findCandidateTraceIds: vi
+          .fn()
+          .mockResolvedValue({ traceIds: ["missing", "live"], nextCursor: null }),
         deleteAnnotations: vi.fn().mockResolvedValue(1),
         deleteAnnotationQueueItems: vi.fn().mockResolvedValue(0),
         deletePublicShares: vi.fn().mockResolvedValue(1),
@@ -39,7 +41,9 @@ describe("OrphanSweepService", () => {
     /** @scenario Failed proactive orphan sweep can be retried */
     it("reports cleanup failures so the caller can retry", async () => {
       const repository = {
-        findCandidateTraceIds: vi.fn().mockResolvedValue(["missing"]),
+        findCandidateTraceIds: vi
+          .fn()
+          .mockResolvedValue({ traceIds: ["missing"], nextCursor: null }),
         deleteAnnotations: vi
           .fn()
           .mockRejectedValue(new Error("postgres unavailable")),
@@ -61,6 +65,54 @@ describe("OrphanSweepService", () => {
       await expect(
         service.sweepProject({ projectId: "project-1" }),
       ).rejects.toThrow(/Failed to clean orphaned PG records/);
+    });
+
+    /** @scenario Proactive orphan sweep advances past a fully-live first page */
+    it("pages past a fully-live first page to clean an orphan on a later page", async () => {
+      // First page: every candidate is live in CH, so nothing is cleaned —
+      // but the cursor must advance. Second page surfaces the real orphan.
+      const findCandidateTraceIds = vi
+        .fn()
+        .mockResolvedValueOnce({
+          traceIds: ["live-1", "live-2"],
+          nextCursor: { annotationId: "ann-2" },
+        })
+        .mockResolvedValueOnce({
+          traceIds: ["missing"],
+          nextCursor: null,
+        });
+      const repository = {
+        findCandidateTraceIds,
+        deleteAnnotations: vi.fn().mockResolvedValue(1),
+        deleteAnnotationQueueItems: vi.fn().mockResolvedValue(0),
+        deletePublicShares: vi.fn().mockResolvedValue(0),
+        nullifyTriggerSentTraceIds: vi.fn().mockResolvedValue(0),
+        deletePinnedTraces: vi.fn().mockResolvedValue(0),
+      };
+      // CH says live-1/live-2 exist; "missing" does not.
+      const service = new OrphanSweepService(
+        repository as any,
+        async () =>
+          ({
+            query: vi.fn().mockResolvedValue({
+              json: async () => [{ TraceId: "live-1" }, { TraceId: "live-2" }],
+            }),
+          }) as any,
+      );
+
+      await service.sweepProject({ projectId: "project-1" });
+
+      expect(findCandidateTraceIds).toHaveBeenCalledTimes(2);
+      expect(findCandidateTraceIds).toHaveBeenLastCalledWith({
+        projectId: "project-1",
+        limit: 1000,
+        cursor: { annotationId: "ann-2" },
+      });
+      expect(repository.deleteAnnotations).toHaveBeenCalledTimes(1);
+      expect(repository.deleteAnnotations).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceIds: ["missing"],
+      });
     });
   });
 });
