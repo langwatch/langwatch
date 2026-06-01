@@ -66,7 +66,7 @@ describe("evaluatePreconditions()", () => {
     });
 
     describe("when a trace arrives with no origin attribute", () => {
-      /** @scenario 'Origin "is" application matches explicit "application" plus missing origin (backward-compat)' */
+      /** @scenario Origin "is" application treats missing origin as application (legacy default) */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ origin: undefined });
         expect(
@@ -710,7 +710,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no userId set", () => {
-      /** @scenario 'Missing field values fail "is" and "contains" checks' */
+      /** @scenario Missing field values fail "is" checks */
       it("fails the precondition", () => {
         const traceData = makeTraceData({ userId: undefined });
         expect(
