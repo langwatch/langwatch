@@ -214,6 +214,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has explicit application origin", () => {
+    /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
     it("dispatches evaluation commands", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -310,6 +311,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
+    /** @scenario "Evaluation trigger dispatches for any known origin (preconditions filter)" */
     it("dispatches normally — preconditions filter, not the reactor", async () => {
       // Per user direction post-2026-05-11 plan-mode debate: origin is a
       // user-configurable precondition, not a hardcoded reactor guard.
@@ -388,6 +390,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has no origin", () => {
+    /** @scenario "Evaluation trigger skips traces with empty origin and no SDK info" */
     it("returns early without dispatching evaluations", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
