@@ -3,6 +3,7 @@ import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/tra
 import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import { createLogger } from "~/utils/logger/server";
 import type { RetentionPolicyCache } from "../retentionPolicyCache";
+import { INDEFINITE_RETENTION_DAYS } from "../retentionPolicy.schema";
 
 const logger = createLogger("langwatch:data-retention:orphan-reactor");
 
@@ -50,7 +51,9 @@ export function createRetentionOrphanSweepReactor(
         tenantId,
         "traces",
       );
-      if (retentionDays === 0) return;
+      // INDEFINITE retention (platform-admin only): CH never deletes, so the
+      // orphan sweep has nothing to do — skip the seed entirely.
+      if (retentionDays === INDEFINITE_RETENTION_DAYS) return;
 
       try {
         await deps.seedChain({ tenantId });
