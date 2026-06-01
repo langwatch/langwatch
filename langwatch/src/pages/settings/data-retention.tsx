@@ -9,13 +9,13 @@ import {
   HStack,
   Input,
   Progress,
+  Spacer,
   Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Building2, Folder, Trash2, Users } from "lucide-react";
-import { Checkbox } from "~/components/ui/checkbox";
 import { useEffect, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
@@ -33,6 +33,7 @@ import {
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -51,15 +52,6 @@ const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   traces: "Traces & Spans",
   scenarios: "Scenarios",
   experiments: "Experiments",
-};
-
-// Each category covers several ClickHouse tables. Surface the coverage so the
-// page doesn't read as "only 3 things are retained" when the underlying
-// stamping reaches 11 tables.
-const CATEGORY_COVERAGE: Record<RetentionCategory, string> = {
-  traces: "Spans, logs, metrics, summaries, evaluations and DSPy steps.",
-  scenarios: "Simulation runs and suite runs.",
-  experiments: "Experiment runs and run items.",
 };
 
 const SCOPE_ICON: Record<ScopeChipPickerScopeType, typeof Building2> = {
@@ -101,22 +93,6 @@ const RETENTION_PRESETS: Array<{ value: string; label: string; days: number }> =
 
 const CUSTOM_PRESET_VALUE = "custom";
 
-const ALL_CATEGORIES_VALUE = "__all__";
-type CategoryPick = typeof ALL_CATEGORIES_VALUE | RetentionCategory;
-
-// One Select with "All categories" pinned at the top followed by each
-// individual category. Two ItemGroups render a visual divider between the
-// shortcut and the specific picks without us having to inject a separator.
-const categoryPickCollection = createListCollection({
-  items: [
-    { value: ALL_CATEGORIES_VALUE, label: "All categories" },
-    ...RETENTION_CATEGORIES.map((c) => ({
-      value: c,
-      label: CATEGORY_LABELS[c],
-    })),
-  ],
-});
-
 const retentionPresetCollection = createListCollection({
   items: [
     ...RETENTION_PRESETS.map((p) => ({ value: p.value, label: p.label })),
@@ -144,18 +120,20 @@ type RetentionRuleRow = {
   retentionDays: number;
 };
 
-type RetentionRuleGroup = {
+type RetentionScopeGroup = {
   scopeType: ScopeChipPickerScopeType;
   scopeId: string;
   name: string;
+  byCategory: Partial<Record<RetentionCategory, number>>;
   rules: RetentionRuleRow[];
 };
 
-/** Groups override rows by (scopeType, scopeId) preserving first-seen order
- *  so the table renders one logical block per scope instead of repeating the
- *  scope name once per category. */
-function groupRulesByScope(rules: RetentionRuleRow[]): RetentionRuleGroup[] {
-  const groups: RetentionRuleGroup[] = [];
+/** Groups override rows by (scopeType, scopeId), preserving first-seen order.
+ *  We collapse the three category rows per scope into a single logical group
+ *  so the Scope|Policy table renders one row per scope — categories almost
+ *  always share the same value in practice. */
+function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGroup[] {
+  const groups: RetentionScopeGroup[] = [];
   const indexByKey = new Map<string, number>();
   for (const r of rules) {
     const key = `${r.scopeType}:${r.scopeId}`;
@@ -166,13 +144,42 @@ function groupRulesByScope(rules: RetentionRuleRow[]): RetentionRuleGroup[] {
         scopeType: r.scopeType,
         scopeId: r.scopeId,
         name: r.name,
+        byCategory: { [r.category]: r.retentionDays },
         rules: [r],
       });
     } else {
-      groups[idx]!.rules.push(r);
+      const group = groups[idx]!;
+      group.rules.push(r);
+      group.byCategory[r.category] = r.retentionDays;
     }
   }
   return groups;
+}
+
+const SCOPE_TIER_ORDER: Record<ScopeChipPickerScopeType, number> = {
+  ORGANIZATION: 0,
+  TEAM: 1,
+  PROJECT: 2,
+};
+
+/** Render a single Policy cell value. If all three categories share the same
+ *  retention, show one number ("1820 days"). Otherwise show the per-category
+ *  breakdown so a divergent legacy override is still legible. */
+function renderPolicyValue(
+  byCategory: Partial<Record<RetentionCategory, number>>,
+): string {
+  const present = RETENTION_CATEGORIES.filter(
+    (c) => byCategory[c] !== undefined,
+  );
+  if (present.length === 0) return "—";
+  const values = present.map((c) => byCategory[c]!);
+  const allSame = values.every((v) => v === values[0]);
+  if (allSame && present.length === RETENTION_CATEGORIES.length) {
+    return formatDays(values[0]!);
+  }
+  return present
+    .map((c) => `${CATEGORY_LABELS[c]}: ${formatDays(byCategory[c]!)}`)
+    .join(" · ");
 }
 
 function DataRetentionSettings() {
@@ -229,36 +236,22 @@ function DataRetentionPage({
   const invalidate = () =>
     utils.dataRetention.getRules.invalidate({ projectId });
 
-  // Per-call toasts are intentionally omitted — the Add-override drawer
-  // fans out one setForScope per (scope × category) pair and stacks the
-  // toaster column with identical "saved" messages. The drawer's onSave
-  // emits a single aggregated toast after the batch resolves.
+  // Per-call toasts are intentionally omitted — the Add-policy drawer fans
+  // out one setForScope per (scope × category) pair and stacks the toaster
+  // column with identical "saved" messages. The drawer's onSave emits a
+  // single aggregated toast after the batch resolves.
   const setForScope = api.dataRetention.setForScope.useMutation();
 
-  const removeForScope = api.dataRetention.removeForScope.useMutation({
-    onSuccess: () => {
-      void invalidate();
-      toaster.create({ title: "Override removed", type: "success" });
-    },
-    onError: (error) =>
-      toaster.create({
-        title: "Failed to remove override",
-        description: error.message,
-        type: "error",
-      }),
-  });
+  // Removing a scope's policy fans out one removeForScope call per category,
+  // so we mirror the save-flow pattern: aggregate the result and emit a
+  // single toast at the call site instead of one per mutation.
+  const removeForScope = api.dataRetention.removeForScope.useMutation();
 
   // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
   // effective retention. We don't know the stored _retention_days values
   // without an extra query (they could still be the migration default), so we
   // always route through the confirm dialog before mutating CH — the action is
   // irreversible if it contracts.
-  //
-  // The dialog is shared between two flows: the per-row icon button (triggers
-  // a single retroactive update) and the drawer save with "apply to existing
-  // data" checked (saves overrides AND triggers retroactive updates). Both
-  // hand the dialog an opaque onConfirm so the dialog stays a thin
-  // confirmation surface.
   const [pendingConfirm, setPendingConfirm] = useState<{
     retentionDays: number;
     onConfirm: () => void | Promise<void>;
@@ -279,8 +272,7 @@ function DataRetentionPage({
   }, [activeMutations.length]);
 
   // Per-call toasts intentionally omitted — the drawer flow fans this out one
-  // call per category and the per-row icon flow batches it via the same
-  // confirm dialog. Call sites emit a single aggregated toast.
+  // call per category. Call sites emit a single aggregated toast.
   const triggerUpdate = api.dataRetention.triggerRetroactiveUpdate.useMutation({
     onSuccess: () => {
       setPollMs(3000);
@@ -326,12 +318,83 @@ function DataRetentionPage({
       available.teams.length > 0 ||
       available.projects.length > 0);
 
+  const removeScopeGroup = async (group: RetentionScopeGroup) => {
+    const categories = (Object.keys(group.byCategory) as RetentionCategory[])
+      .filter((c) => group.byCategory[c] !== undefined);
+    const results = await Promise.all(
+      categories.map((category) =>
+        removeForScope
+          .mutateAsync({
+            projectId,
+            scope: { scopeType: group.scopeType, scopeId: group.scopeId },
+            category,
+          })
+          .then(
+            () => ({ ok: true as const }),
+            (error: Error) => ({ ok: false as const, error }),
+          ),
+      ),
+    );
+    void invalidate();
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length === 0) {
+      toaster.create({
+        title:
+          categories.length === 1
+            ? "Override removed"
+            : "Retention policy removed",
+        type: "success",
+      });
+    } else {
+      const firstError = failed.find(
+        (r): r is { ok: false; error: Error } => !r.ok,
+      );
+      toaster.create({
+        title: "Failed to remove policy",
+        description: firstError?.error.message,
+        type: "error",
+      });
+    }
+  };
+
+  const resolved = resolveScopeFilter(scopeFilter, {
+    currentTeamId: teamId,
+    currentProjectId: projectId,
+  });
+  const filteredRules = (snapshot?.rules ?? []).filter((r) =>
+    isScopeInFilter(
+      { scopeType: r.scopeType, scopeId: r.scopeId },
+      resolved,
+      filterAvailable.hierarchy,
+    ),
+  );
+  const scopeGroups = groupRulesByScope(filteredRules).sort(
+    (a, b) =>
+      SCOPE_TIER_ORDER[a.scopeType] - SCOPE_TIER_ORDER[b.scopeType] ||
+      a.name.localeCompare(b.name),
+  );
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-        <Heading as="h2" fontSize="xl" marginTop={2}>
-          Data Retention
-        </Heading>
+        <HStack width="full" marginTop={2}>
+          <Heading as="h2" fontSize="xl">
+            Data Retention
+          </Heading>
+          <Spacer />
+          <ScopeFilterComponent
+            value={scopeFilter}
+            onChange={onScopeFilterChange}
+            available={filterAvailable}
+            currentTeamId={teamId}
+            currentProjectId={projectId}
+          />
+          {canWrite && (
+            <Button colorPalette="blue" onClick={() => setDrawerOpen(true)}>
+              Add retention policy
+            </Button>
+          )}
+        </HStack>
 
         {!canConfigureRetention && snapshot && (
           <Alert.Root status="info">
@@ -349,166 +412,67 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
-        <Card.Root width="full">
-          <Card.Header>
-            <Heading as="h3" fontSize="lg">
-              Effective Retention
-            </Heading>
-            <Text fontSize="sm" color="fg.muted">
-              What applies to this project today, after the project → team →
-              organization cascade. No override anywhere means the platform
-              default applies.
-            </Text>
-          </Card.Header>
-          <Card.Body>
-            <VStack gap={4} align="stretch">
-              {RETENTION_CATEGORIES.map((category) => {
-                const days = snapshot?.effective[category] ?? 0;
-                return (
-                  <HStack
-                    key={category}
-                    justifyContent="space-between"
-                    align="start"
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text>{CATEGORY_LABELS[category]}</Text>
-                      <Text fontSize="xs" color="fg.muted">
-                        {CATEGORY_COVERAGE[category]}
-                      </Text>
-                    </VStack>
-                    <Text fontWeight="medium" flexShrink={0}>
-                      {formatDays(days)}
-                    </Text>
-                  </HStack>
-                );
-              })}
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-
-        {canConfigureRetention && snapshot && (
-          <Card.Root width="full">
-            <Card.Header>
-              <HStack justifyContent="space-between" width="full">
-                <VStack align="start" gap={0}>
-                  <Heading as="h3" fontSize="lg">
-                    Overrides
-                  </Heading>
-                  <Text fontSize="sm" color="fg.muted">
-                    Set a retention for a category at the organization, a team,
-                    or a project. The most specific override wins. Retention is
-                    set in whole weeks (multiples of {RETENTION_WEEK_DAYS}{" "}
-                    days); minimum {MIN_RETENTION_DAYS} days.
-                  </Text>
-                </VStack>
-                <HStack gap={2} flexShrink={0}>
-                  <ScopeFilterComponent
-                    value={scopeFilter}
-                    onChange={onScopeFilterChange}
-                    available={filterAvailable}
-                    currentTeamId={teamId}
-                    currentProjectId={projectId}
-                  />
-                  {canWrite && (
-                    <Button
-                      colorPalette="blue"
-                      onClick={() => setDrawerOpen(true)}
-                    >
-                      Add override
-                    </Button>
-                  )}
-                </HStack>
-              </HStack>
-            </Card.Header>
-            <Card.Body>
-              {(() => {
-                const resolved = resolveScopeFilter(scopeFilter, {
-                  currentTeamId: teamId,
-                  currentProjectId: projectId,
-                });
-                const filteredRules = snapshot.rules.filter((r) =>
-                  isScopeInFilter(
-                    { scopeType: r.scopeType, scopeId: r.scopeId },
-                    resolved,
-                    filterAvailable.hierarchy,
-                  ),
-                );
-                if (filteredRules.length === 0) {
-                  return (
-                    <Text fontSize="sm" color="fg.muted">
-                      {snapshot.rules.length === 0
-                        ? "No overrides yet — the platform default applies."
-                        : "No overrides match the current scope filter."}
-                    </Text>
-                  );
-                }
-                return (
-                <Table.Root size="sm">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                      <Table.ColumnHeader>Category</Table.ColumnHeader>
-                      <Table.ColumnHeader>Retention</Table.ColumnHeader>
-                      <Table.ColumnHeader />
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {groupRulesByScope(filteredRules).map((group) => {
-                      const Icon = SCOPE_ICON[group.scopeType];
-                      return group.rules.map((rule, idx) => (
-                        <Table.Row
-                          key={`${rule.scopeType}:${rule.scopeId}:${rule.category}`}
-                        >
-                          {idx === 0 && (
-                            <Table.Cell
-                              rowSpan={group.rules.length}
-                              verticalAlign="top"
+        {snapshot && (
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0}>
+              <Table.Root variant="line" size="md" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                    <Table.ColumnHeader>Policy</Table.ColumnHeader>
+                    <Table.ColumnHeader />
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {scopeGroups.map((group) => {
+                    const Icon = SCOPE_ICON[group.scopeType];
+                    return (
+                      <Table.Row
+                        key={`${group.scopeType}:${group.scopeId}`}
+                      >
+                        <Table.Cell>
+                          <HStack gap={2}>
+                            <Icon size={14} />
+                            <Text>{group.name}</Text>
+                            <Badge size="sm" colorPalette="gray">
+                              {group.scopeType.toLowerCase()}
+                            </Badge>
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {renderPolicyValue(group.byCategory)}
+                        </Table.Cell>
+                        <Table.Cell textAlign="end">
+                          {canWrite && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              colorPalette="red"
+                              loading={removeForScope.isLoading}
+                              onClick={() => void removeScopeGroup(group)}
+                              aria-label="Remove retention policy"
                             >
-                              <HStack gap={2}>
-                                <Icon size={14} />
-                                <Text>{group.name}</Text>
-                                <Badge size="sm" colorPalette="gray">
-                                  {group.scopeType.toLowerCase()}
-                                </Badge>
-                              </HStack>
-                            </Table.Cell>
+                              <Trash2 size={14} />
+                            </Button>
                           )}
-                          <Table.Cell>
-                            {CATEGORY_LABELS[rule.category]}
-                          </Table.Cell>
-                          <Table.Cell>
-                            {formatDays(rule.retentionDays)}
-                          </Table.Cell>
-                          <Table.Cell textAlign="end">
-                            {canWrite && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                colorPalette="red"
-                                loading={removeForScope.isLoading}
-                                onClick={() =>
-                                  removeForScope.mutate({
-                                    projectId,
-                                    scope: {
-                                      scopeType: rule.scopeType,
-                                      scopeId: rule.scopeId,
-                                    },
-                                    category: rule.category,
-                                  })
-                                }
-                                aria-label="Remove override"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            )}
-                          </Table.Cell>
-                        </Table.Row>
-                      ));
-                    })}
-                  </Table.Body>
-                </Table.Root>
-                );
-              })()}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                  <Table.Row
+                    bg="bg.subtle"
+                    fontWeight="medium"
+                  >
+                    <Table.Cell>
+                      <Text>Effective for this project</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {renderPolicyValue(snapshot.effective)}
+                    </Table.Cell>
+                    <Table.Cell />
+                  </Table.Row>
+                </Table.Body>
+              </Table.Root>
             </Card.Body>
           </Card.Root>
         )}
@@ -534,13 +498,11 @@ function DataRetentionPage({
             currentOrganizationId={organizationId}
             currentTeamId={teamId}
             currentProjectId={projectId}
-            isSaving={setForScope.isLoading}
-            onSave={async (
-              scopes,
-              categories,
-              retentionDays,
-              applyToExisting,
-            ) => {
+            isSaving={
+              setForScope.isLoading || triggerUpdate.isLoading
+            }
+            onSave={async (scopes, retentionDays, applyToExisting) => {
+              const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
                 const pairs = scopes.flatMap((scope) =>
                   categories.map((category) => ({ scope, category })),
@@ -576,22 +538,27 @@ function DataRetentionPage({
                 if (failed.length === 0) {
                   toaster.create({
                     title:
-                      pairs.length === 1
-                        ? "Retention override saved"
-                        : `${pairs.length} retention overrides saved`,
+                      scopes.length === 1
+                        ? "Retention policy saved"
+                        : `Retention policy saved for ${scopes.length} scopes`,
                     type: "success",
                   });
                   return { success: true, failed: [] };
                 }
                 const firstError = failed.find(
-                  (r): r is { ok: false; category: RetentionCategory; error: Error } =>
-                    !r.ok,
+                  (
+                    r,
+                  ): r is {
+                    ok: false;
+                    category: RetentionCategory;
+                    error: Error;
+                  } => !r.ok,
                 );
                 toaster.create({
                   title:
                     failed.length === pairs.length
-                      ? "Failed to save overrides"
-                      : `Saved ${pairs.length - failed.length} of ${pairs.length} overrides`,
+                      ? "Failed to save retention policy"
+                      : `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
                   description: firstError?.error.message,
                   type: "error",
                 });
@@ -639,7 +606,9 @@ function DataRetentionPage({
                           ),
                       ),
                     );
-                    const triggerFailed = triggerResults.filter((r) => !r.ok);
+                    const triggerFailed = triggerResults.filter(
+                      (r) => !r.ok,
+                    );
                     if (triggerFailed.length === 0) {
                       toaster.create({
                         title: "Applying retention to existing data…",
@@ -851,18 +820,12 @@ function AddOverrideDrawer({
   isSaving: boolean;
   onSave: (
     scopes: ScopeChipPickerEntry[],
-    categories: RetentionCategory[],
     retentionDays: number,
     applyToExisting: boolean,
   ) => void;
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
-  const [categoryPick, setCategoryPick] = useState<CategoryPick>(
-    ALL_CATEGORIES_VALUE,
-  );
-  const [preset, setPreset] = useState<string>(
-    String(DEFAULT_RETENTION_DAYS),
-  );
+  const [preset, setPreset] = useState<string>(String(DEFAULT_RETENTION_DAYS));
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
   const [applyToExisting, setApplyToExisting] = useState<boolean>(true);
@@ -876,18 +839,12 @@ function AddOverrideDrawer({
           ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
           : [],
       );
-      setCategoryPick(ALL_CATEGORIES_VALUE);
       setPreset(String(DEFAULT_RETENTION_DAYS));
       setCustomAmount("");
       setCustomUnit("weeks");
       setApplyToExisting(true);
     }
   }, [open, currentProjectId, available.projects]);
-
-  const categories: RetentionCategory[] =
-    categoryPick === ALL_CATEGORIES_VALUE
-      ? [...RETENTION_CATEGORIES]
-      : [categoryPick];
 
   const resolvedDays = (() => {
     if (preset === CUSTOM_PRESET_VALUE) {
@@ -918,7 +875,7 @@ function AddOverrideDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Add retention override</Heading>
+          <Heading size="md">Add retention policy</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -943,47 +900,6 @@ function AddOverrideDrawer({
                 currentProjectId={currentProjectId}
               />
             </VStack>
-
-            <Field.Root>
-              <Field.Label>Category</Field.Label>
-              <Select.Root
-                collection={categoryPickCollection}
-                value={[categoryPick]}
-                onValueChange={(details) => {
-                  const v = details.value[0] as CategoryPick | undefined;
-                  if (v) setCategoryPick(v);
-                }}
-              >
-                <Select.Trigger background="bg">
-                  <Select.ValueText placeholder="Select category" />
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.ItemGroup label="">
-                    <Select.Item
-                      item={categoryPickCollection.items[0]!}
-                      key={ALL_CATEGORIES_VALUE}
-                    >
-                      All categories
-                    </Select.Item>
-                  </Select.ItemGroup>
-                  <Select.ItemGroup label="">
-                    {RETENTION_CATEGORIES.map((c, i) => (
-                      <Select.Item
-                        key={c}
-                        item={categoryPickCollection.items[i + 1]!}
-                      >
-                        {CATEGORY_LABELS[c]}
-                      </Select.Item>
-                    ))}
-                  </Select.ItemGroup>
-                </Select.Content>
-              </Select.Root>
-              <Field.HelperText>
-                {categoryPick === ALL_CATEGORIES_VALUE
-                  ? "Creates one override per category at each picked scope."
-                  : "You can add another override afterwards for a different category."}
-              </Field.HelperText>
-            </Field.Root>
 
             <Field.Root>
               <Field.Label>Retention</Field.Label>
@@ -1046,12 +962,13 @@ function AddOverrideDrawer({
               </Field.HelperText>
             </Field.Root>
 
-            <Checkbox
-              checked={applyToExisting}
-              onCheckedChange={({ checked }) =>
-                setApplyToExisting(checked === true)
-              }
-            >
+            <HStack gap={3} align="start">
+              <Switch
+                checked={applyToExisting}
+                onCheckedChange={({ checked }) =>
+                  setApplyToExisting(checked === true)
+                }
+              />
               <VStack align="start" gap={0}>
                 <Text fontWeight="600" fontSize="sm">
                   Apply this change to existing data
@@ -1061,23 +978,21 @@ function AddOverrideDrawer({
                   takes effect immediately, not just for new ingestion.
                 </Text>
               </VStack>
-            </Checkbox>
+            </HStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full" justify="end" gap={2}>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
             <Button
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
-              onClick={() =>
-                onSave(scopes, categories, resolvedDays, applyToExisting)
-              }
+              onClick={() => onSave(scopes, resolvedDays, applyToExisting)}
             >
-              Save
+              Create
             </Button>
           </HStack>
         </Drawer.Footer>
