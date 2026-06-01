@@ -11,8 +11,10 @@ import {
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
+import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import {
   dispatchTriggerAction,
+  NOTIFY_TRIGGER_ACTIONS,
   type TriggerActionDispatchDeps,
 } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
@@ -87,7 +89,30 @@ export function createAlertTriggerReactor(
           // Skip triggers that require evaluation results (handled by evaluationAlertTrigger)
           if (hasEvaluationFilters) continue;
 
-          // Skip if no trace filters match
+          // Outbox path: notify-class triggers route through the unified
+          // outbox queue (`stage: "settle"`). The settle dispatcher re-reads
+          // the now-settled fold after `traceDebounceMs`, re-runs filters
+          // against fresh state, claims TriggerSent, and re-enqueues as
+          // cadence on match. Skip the inline filter check + claim here so
+          // a half-formed early match doesn't shoot first.
+          if (
+            deps.enqueueSettle &&
+            NOTIFY_TRIGGER_ACTIONS.has(trigger.action)
+          ) {
+            await deps.enqueueSettle({
+              projectId: tenantId,
+              triggerId: trigger.id,
+              traceId,
+              foldState,
+              traceDebounceMs: trigger.traceDebounceMs,
+            });
+            continue;
+          }
+
+          // Inline path: persist-class actions (dataset, annotation queue)
+          // and the legacy unwired notify path. Filter check + claim +
+          // dispatch all happen here against the current (possibly
+          // half-formed) fold state.
           if (
             Object.keys(traceFilters).length > 0 &&
             !matchesTriggerFilters(traceData, traceFilters)
@@ -114,11 +139,17 @@ export function createAlertTriggerReactor(
             foldState,
           });
         } catch (error) {
+          // A failed dispatch now throws (DispatchError) rather than being
+          // swallowed; surface its retryable classification for operators. The
+          // claim already landed, so the in-line path does not retry — the
+          // outbox migration is what adds durable retry.
+          const retryable = isDispatchError(error) ? error.retryable : undefined;
           logger.error(
             {
               tenantId,
               traceId,
               triggerId: trigger.id,
+              retryable,
               error: error instanceof Error ? error.message : String(error),
             },
             "Failed to evaluate trigger",
@@ -129,6 +160,7 @@ export function createAlertTriggerReactor(
               traceId,
               triggerId: trigger.id,
               triggerAction: trigger.action,
+              retryable,
             },
           });
         }

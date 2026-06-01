@@ -11,6 +11,7 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { isDispatchError } from "../../../outbox/dispatchError";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -24,6 +25,7 @@ import {
 } from "../schemas/typeGuards";
 import {
   dispatchTriggerAction,
+  NOTIFY_TRIGGER_ACTIONS,
   type TriggerActionDispatchDeps,
 } from "../../shared/triggerActionDispatch";
 
@@ -129,7 +131,57 @@ export function createEvaluationAlertTriggerReactor(
         return;
       }
 
-      // Load all evaluations for this trace
+      // Split triggers by routing. Outbox-bound triggers (notify class, settle
+      // wired) skip the inline filter + claim + dispatch path here — settle
+      // re-reads the now-settled fold *and* re-loads evaluations after
+      // `traceDebounceMs`, so we don't pay the cost of either here.
+      const outboxBound: typeof triggersWithEvalFilters = [];
+      const inlineBound: typeof triggersWithEvalFilters = [];
+      for (const t of triggersWithEvalFilters) {
+        if (deps.enqueueSettle && NOTIFY_TRIGGER_ACTIONS.has(t.action)) {
+          outboxBound.push(t);
+        } else {
+          inlineBound.push(t);
+        }
+      }
+
+      for (const trigger of outboxBound) {
+        try {
+          await deps.enqueueSettle!({
+            projectId: tenantId,
+            triggerId: trigger.id,
+            traceId,
+            foldState: traceSummary,
+            traceDebounceMs: trigger.traceDebounceMs,
+          });
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              traceId,
+              triggerId: trigger.id,
+              evaluationId: evalRun.evaluationId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to enqueue settle stage for trigger",
+          );
+          captureException(error, {
+            extra: {
+              tenantId,
+              traceId,
+              triggerId: trigger.id,
+              evaluationId: evalRun.evaluationId,
+              triggerAction: trigger.action,
+            },
+          });
+        }
+      }
+
+      // Nothing left for the inline path — skip the expensive cross-pipeline
+      // evaluation load + events derivation entirely.
+      if (inlineBound.length === 0) return;
+
+      // Load all evaluations for this trace (inline path only)
       const allEvaluations = await deps.evaluationRuns.findByTraceId(
         tenantId,
         traceId,
@@ -137,7 +189,7 @@ export function createEvaluationAlertTriggerReactor(
 
       // Derive the trace-level events list only if one of these triggers filters
       // on event fields (the trace-level half of its filter set).
-      const needsEvents = triggersWithEvalFilters.some((t) =>
+      const needsEvents = inlineBound.some((t) =>
         triggerFiltersReferenceEvents(classifyTriggerFilters(t.filters).traceFilters),
       );
       const events = needsEvents
@@ -154,7 +206,7 @@ export function createEvaluationAlertTriggerReactor(
         events,
       );
 
-      for (const trigger of triggersWithEvalFilters) {
+      for (const trigger of inlineBound) {
         try {
           const { traceFilters, evaluationFilters } =
             classifyTriggerFilters(trigger.filters);
@@ -188,12 +240,18 @@ export function createEvaluationAlertTriggerReactor(
             foldState: traceSummary,
           });
         } catch (error) {
+          // A failed dispatch now throws (DispatchError) rather than being
+          // swallowed; surface its retryable classification for operators. The
+          // claim already landed, so the in-line path does not retry — the
+          // outbox migration is what adds durable retry.
+          const retryable = isDispatchError(error) ? error.retryable : undefined;
           logger.error(
             {
               tenantId,
               traceId,
               triggerId: trigger.id,
               evaluationId: evalRun.evaluationId,
+              retryable,
               error: error instanceof Error ? error.message : String(error),
             },
             "Failed to evaluate trigger on evaluation completion",
@@ -205,6 +263,7 @@ export function createEvaluationAlertTriggerReactor(
               triggerId: trigger.id,
               evaluationId: evalRun.evaluationId,
               triggerAction: trigger.action,
+              retryable,
             },
           });
         }

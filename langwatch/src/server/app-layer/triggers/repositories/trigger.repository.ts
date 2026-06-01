@@ -1,4 +1,5 @@
 import type { AlertType, TriggerAction } from "@prisma/client";
+import type { NotificationCadence } from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {
@@ -11,6 +12,10 @@ export interface TriggerSummary {
   alertType: AlertType | null;
   message: string | null;
   customGraphId: string | null;
+  notificationCadence: NotificationCadence;
+  /** Per-trigger trace-readiness debounce in ms (ADR-030). Always populated by
+   *  the repository — the column is `NOT NULL DEFAULT 30000`. */
+  traceDebounceMs: number;
 }
 
 export interface TriggerRepository {
