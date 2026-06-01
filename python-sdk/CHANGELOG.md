@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.24.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.23.0...python-sdk@v0.24.0) (2026-06-01)
+
+
+### Features
+
+* **cli:** make experiment results/status slug-first, defaulting to latest run ([#4411](https://github.com/langwatch/langwatch/issues/4411)) ([791ddc7](https://github.com/langwatch/langwatch/commit/791ddc7f53ba817cffc6673c5c8a86ffe7b99976))
+
+
+### Bug Fixes
+
+* **python-sdk:** tidy non-IANA status fix follow-ups from review ([#4413](https://github.com/langwatch/langwatch/issues/4413)) ([99bc3b9](https://github.com/langwatch/langwatch/commit/99bc3b9d2aee3ff3d915e4d54ff1ed94761562b7))
+* **python-sdk:** tolerate non-IANA HTTP status codes in generated REST client ([#4403](https://github.com/langwatch/langwatch/issues/4403)) ([a4a5149](https://github.com/langwatch/langwatch/commit/a4a51499ecd1b12418e2b69ba858dd3140779ef8))
+
+
+### Miscellaneous
+
+* **deps:** bump cryptography ([d5dc5ab](https://github.com/langwatch/langwatch/commit/d5dc5ab5456a192148dbd6e27974c105e601bbbf))
+* **deps:** bump cryptography from 45.0.6 to 46.0.7 in /python-sdk in the uv group across 1 directory ([#3889](https://github.com/langwatch/langwatch/issues/3889)) ([d5dc5ab](https://github.com/langwatch/langwatch/commit/d5dc5ab5456a192148dbd6e27974c105e601bbbf))
+* **deps:** bump opentelemetry-api from 1.40.0 to 1.42.1 in /python-sdk ([#4318](https://github.com/langwatch/langwatch/issues/4318)) ([3129823](https://github.com/langwatch/langwatch/commit/312982302afc14446c5d4b08129c7567363a5a3d))
+
 ## [0.23.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.22.0...python-sdk@v0.23.0) (2026-05-27)
 
 
