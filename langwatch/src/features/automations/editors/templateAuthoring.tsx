@@ -350,7 +350,7 @@ export function CompactSlackPreview({
       {builderUrl ? (
         <HStack gap={2} align="center" flexWrap="wrap">
           <Tooltip
-            content="Opens Slack's Block Kit Builder in a new tab with this template's current JSON. Standalone — won't track further edits."
+            content="Preview your blocks in Slack's Block Kit Builder. Opens once in a new tab."
             positioning={{ placement: "top" }}
           >
             <Button size="xs" variant="outline" onClick={openOnce}>
@@ -358,7 +358,7 @@ export function CompactSlackPreview({
             </Button>
           </Tooltip>
           <Tooltip
-            content="Opens Slack's Block Kit Builder in a popup window that follows your edits live."
+            content="Live preview in Slack's Block Kit Builder. Updates as you edit."
             positioning={{ placement: "top" }}
           >
             <Button size="xs" variant="outline" onClick={openSynced}>
