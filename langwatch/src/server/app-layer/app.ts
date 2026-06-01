@@ -20,6 +20,7 @@ export class App {
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
+  readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -48,6 +49,7 @@ export class App {
     this.config = deps.config;
     this.experiments = deps.experiments;
     this.triggers = deps.triggers;
+    this.triggerTemplates = deps.triggerTemplates;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
@@ -114,14 +116,6 @@ export function getApp(): App {
   return globalForApp.__langwatch_app;
 }
 
-export async function resetApp(): Promise<void> {
-  // Close the previous App before dropping the singleton so its EventSourcing
-  // and graceful-closeable handles (Redis, BullMQ workers, etc.) don't leak
-  // into the next test. Without this the prior App is orphaned and its open
-  // handles keep vitest's single fork worker from exiting between files.
-  const existing = globalForApp.__langwatch_app;
+export function resetApp(): void {
   globalForApp.__langwatch_app = null;
-  if (existing) {
-    await existing.close();
-  }
 }

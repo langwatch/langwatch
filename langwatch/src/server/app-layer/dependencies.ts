@@ -33,6 +33,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
+import type { TriggerTemplateService } from "./triggers/trigger-template.service";
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -72,6 +73,7 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
+  triggerTemplates: TriggerTemplateService;
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;

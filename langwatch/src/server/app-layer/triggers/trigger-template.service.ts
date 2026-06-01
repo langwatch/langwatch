@@ -1,0 +1,205 @@
+import type { AlertType } from "@prisma/client";
+import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
+import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import {
+  type SlackPayload,
+  type SlackTemplateType,
+  renderTriggerSlack,
+} from "~/shared/templating/renderSlack";
+import {
+  buildTemplateContext,
+  type TemplateContext,
+} from "~/shared/templating/templateContext";
+import { validateLiquid } from "~/shared/templating/validate";
+import {
+  TemplateValidationError,
+  TestFireUnavailableError,
+} from "./errors";
+
+export { TemplateValidationError, TestFireUnavailableError };
+
+export type TemplateChannel = "email" | "slack";
+
+export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
+
+/** Sends a test-fire notification. Injected so the service is testable without
+ *  hitting SES/SendGrid or a real Slack webhook. */
+export interface TriggerNotifier {
+  sendEmail(args: {
+    to: string[];
+    subject: string;
+    html: string;
+  }): Promise<void>;
+  sendSlack(args: { webhook: string; payload: SlackPayload }): Promise<void>;
+}
+
+/** The four template columns, as edited in the drawer. Each may be null
+ *  ("use the framework default") or omitted. */
+export interface TemplateDraft {
+  slackTemplateType?: string | null;
+  slackTemplate?: string | null;
+  emailSubjectTemplate?: string | null;
+  emailBodyTemplate?: string | null;
+}
+
+/** The trigger identity a template renders against, supplied by the draft so
+ *  test-fire works before the automation is saved. */
+export interface DraftIdentity {
+  name: string;
+  alertType: AlertType | null;
+}
+
+export interface DraftProject {
+  name: string;
+  slug: string;
+}
+
+export interface TestFireResult {
+  channel: TemplateChannel;
+  recipientCount: number;
+  usedDefault: boolean;
+  missingVariables: string[];
+  errors: string[];
+}
+
+const LIQUID_TEMPLATE_COLUMNS = [
+  "slackTemplate",
+  "emailSubjectTemplate",
+  "emailBodyTemplate",
+] as const satisfies readonly (keyof TemplateDraft)[];
+
+function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
+  if (raw === "block_kit") return "block_kit";
+  if (raw === "string") return "string";
+  return null;
+}
+
+/**
+ * Validates a template draft before it is persisted: every non-empty Liquid
+ * column must parse, and `slackTemplateType` must be a recognised discriminator.
+ * Throws `TemplateValidationError` on the first problem. Pure, so the save path
+ * (route) and unit tests can both call it.
+ */
+export function validateTemplateDraft(draft: TemplateDraft): void {
+  if (
+    draft.slackTemplateType != null &&
+    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(draft.slackTemplateType)
+  ) {
+    throw new TemplateValidationError(
+      "slackTemplateType",
+      `Invalid Slack template type "${draft.slackTemplateType}". Allowed: ${SLACK_TEMPLATE_TYPES.join(", ")}.`,
+    );
+  }
+  for (const column of LIQUID_TEMPLATE_COLUMNS) {
+    const source = draft[column];
+    if (typeof source === "string" && source.trim() !== "") {
+      const result = validateLiquid(source);
+      if (!result.valid) {
+        throw new TemplateValidationError(
+          column,
+          result.error ?? "Invalid Liquid syntax",
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Dispatches the "Send test" notification from the authoring drawer. Lives
+ * server-side because it touches credentials (SES, Slack webhooks). Live
+ * preview rendering happens entirely client-side via the same shared
+ * templating module — the renderers below are imported from
+ * `~/shared/templating/*` so both sides see identical output for any given
+ * draft.
+ */
+export class TriggerTemplateService {
+  private readonly baseHost: string;
+  private readonly notifier: TriggerNotifier;
+
+  constructor(deps: { baseHost: string; notifier: TriggerNotifier }) {
+    this.baseHost = deps.baseHost;
+    this.notifier = deps.notifier;
+  }
+
+  async testFire({
+    channel,
+    trigger,
+    project,
+    draft,
+    recipients,
+    webhook,
+  }: {
+    channel: TemplateChannel;
+    trigger: DraftIdentity;
+    project: DraftProject;
+    draft: TemplateDraft;
+    recipients: string[];
+    webhook: string | null;
+  }): Promise<TestFireResult> {
+    const context = this.context(trigger, project);
+
+    if (channel === "email") {
+      if (recipients.length === 0) {
+        throw new TestFireUnavailableError(
+          "email",
+          "This automation has no email recipients to test-fire to.",
+        );
+      }
+      const rendered = await renderTriggerEmail({
+        subjectTemplate: draft.emailSubjectTemplate ?? null,
+        bodyTemplate: draft.emailBodyTemplate ?? null,
+        context,
+        testFire: true,
+      });
+      await this.notifier.sendEmail({
+        to: recipients,
+        subject: rendered.subject,
+        html: rendered.html,
+      });
+      return {
+        channel: "email",
+        recipientCount: recipients.length,
+        usedDefault: rendered.usedDefault,
+        missingVariables: rendered.missingVariables,
+        errors: rendered.errors,
+      };
+    }
+
+    if (!webhook) {
+      throw new TestFireUnavailableError(
+        "slack",
+        "This automation has no Slack webhook to test-fire to.",
+      );
+    }
+    const rendered = await renderTriggerSlack({
+      templateType: normalizeSlackType(draft.slackTemplateType),
+      template: draft.slackTemplate ?? null,
+      context,
+      testFire: true,
+    });
+    await this.notifier.sendSlack({ webhook, payload: rendered.payload });
+    return {
+      channel: "slack",
+      recipientCount: 1,
+      usedDefault: rendered.usedDefault,
+      missingVariables: rendered.missingVariables,
+      errors: rendered.errors,
+    };
+  }
+
+  private context(
+    identity: DraftIdentity,
+    project: DraftProject,
+  ): TemplateContext {
+    return buildTemplateContext({
+      trigger: {
+        id: "preview",
+        name: identity.name,
+        alertType: identity.alertType,
+      },
+      project,
+      baseHost: this.baseHost,
+      matches: EXAMPLE_MATCHES,
+    });
+  }
+}

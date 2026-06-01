@@ -4,6 +4,7 @@ import { prisma as globalPrisma } from "~/server/db";
 import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
+import { setupOutbox } from "../event-sourcing/outbox/setup";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { App, getApp, globalForApp, initializeApp } from "./app";
@@ -31,8 +32,10 @@ import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluati
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { TriggerService } from "./triggers/trigger.service";
+import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
+import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
@@ -320,6 +323,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "MonitorService",
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const triggerTemplates = new TriggerTemplateService({
+    baseHost: env.BASE_HOST,
+    notifier: liveTriggerNotifier,
+  });
   const tokenizer = new TokenizerService(
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
@@ -391,6 +398,23 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }
     : undefined;
 
+  // Outbox stack: worker-only consumer loop, but the send-side handle is
+  // wired into the registry so reactors can enqueue settle payloads. Web
+  // processes don't build this (no settle traffic; no consumer to drain).
+  const outbox =
+    config.processRole === "worker"
+      ? setupOutbox({
+          prisma,
+          redis: redis ?? null,
+          processRole: config.processRole,
+          triggers,
+          projects,
+          evaluations: { runs: evaluations.runs },
+          traces: { spans: spanStorage },
+          traceSummaryRepository: repositories.traceSummaryFold,
+        })
+      : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -410,6 +434,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     gatewayBudgetSync,
     governanceKpisSync,
     governanceOcsfEventsSync,
+    outbox,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -480,6 +505,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       await broadcast.close();
     },
   });
+  if (outbox) {
+    gracefulCloseables.push({
+      name: "outbox-queue",
+      close: () => outbox.queue.close(),
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -533,6 +564,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     evaluations,
     experiments,
     triggers,
+    triggerTemplates,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -621,6 +653,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
+    triggerTemplates: new TriggerTemplateService({
+      baseHost: env.BASE_HOST,
+      notifier: {
+        sendEmail: async () => {},
+        sendSlack: async () => {},
+      },
+    }),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
