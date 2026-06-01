@@ -261,7 +261,7 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
                   <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
                   <HStack gap={3}>
                     <Text fontWeight="medium">{formatDays(days)}</Text>
-                    {projectIsWritable && days > 0 && (
+                    {canWrite && projectIsWritable && days > 0 && (
                       <Button
                         size="xs"
                         variant="outline"
@@ -338,25 +338,27 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
                       <Table.Cell>{CATEGORY_LABELS[rule.category]}</Table.Cell>
                       <Table.Cell>{formatDays(rule.retentionDays)}</Table.Cell>
                       <Table.Cell textAlign="end">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="red"
-                          loading={removeForScope.isLoading}
-                          onClick={() =>
-                            removeForScope.mutate({
-                              projectId,
-                              scope: {
-                                scopeType: rule.scopeType,
-                                scopeId: rule.scopeId,
-                              },
-                              category: rule.category,
-                            })
-                          }
-                          aria-label="Remove override"
-                        >
-                          <Trash2 size={14} />
-                        </Button>
+                        {canWrite && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="red"
+                            loading={removeForScope.isLoading}
+                            onClick={() =>
+                              removeForScope.mutate({
+                                projectId,
+                                scope: {
+                                  scopeType: rule.scopeType,
+                                  scopeId: rule.scopeId,
+                                },
+                                category: rule.category,
+                              })
+                            }
+                            aria-label="Remove override"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
                       </Table.Cell>
                     </Table.Row>
                   );
