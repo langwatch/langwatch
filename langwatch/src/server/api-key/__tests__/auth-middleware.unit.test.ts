@@ -255,6 +255,7 @@ describe("collectAuthDiagnostics", () => {
     expect(diag.forwardedFor).toBeNull();
   });
 
+  /** @scenario "Diagnostic fields are safe to log" */
   it("never includes a raw token value", () => {
     const c = mockHonoCtx({
       headers: {
