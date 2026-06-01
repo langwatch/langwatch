@@ -1,5 +1,6 @@
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import {
+  DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
   type ResolvedRetention,
 } from "./retentionPolicy.schema";
@@ -22,7 +23,10 @@ export interface RetentionRow {
  * the chain and take the first scope that has a row; categories resolve
  * independently, so a project can override `traces` while `scenarios` inherits
  * from the team and `experiments` from the org. A category with no row anywhere
- * in the chain resolves to 0 — indefinite retention (the cascade fell through).
+ * in the chain falls back to `DEFAULT_RETENTION_DAYS` — the platform-wide
+ * floor applied uniformly to every tenant (free and paid). Overrides are a
+ * paid-plan feature; absence of overrides does NOT mean indefinite retention,
+ * it means "use the platform default".
  */
 export function resolveRetention({
   rows,
@@ -32,9 +36,9 @@ export function resolveRetention({
   chain: ScopeAssignment[];
 }): ResolvedRetention {
   const resolved: ResolvedRetention = {
-    traces: 0,
-    scenarios: 0,
-    experiments: 0,
+    traces: DEFAULT_RETENTION_DAYS,
+    scenarios: DEFAULT_RETENTION_DAYS,
+    experiments: DEFAULT_RETENTION_DAYS,
   };
 
   for (const category of RETENTION_CATEGORIES) {

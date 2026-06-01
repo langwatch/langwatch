@@ -202,25 +202,44 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
 
   if (rulesQuery.isLoading) {
     return (
-      <VStack width="full" padding={8}>
-        <Spinner />
-      </VStack>
+      <SettingsLayout>
+        <VStack width="full" padding={8}>
+          <Spinner />
+        </VStack>
+      </SettingsLayout>
     );
   }
 
   const snapshot = rulesQuery.data;
   const available = snapshot?.available;
+  const canConfigureRetention = !!snapshot?.canConfigureRetention;
+  // Configurable retention is a paid-plan feature — even an org admin on
+  // the free plan can't add overrides. Both gates must pass.
   const canWrite =
+    canConfigureRetention &&
     !!available &&
     (!!available.organization ||
       available.teams.length > 0 ||
       available.projects.length > 0);
 
   return (
-    <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-      <Heading as="h2" fontSize="xl" marginTop={2}>
-        Data Retention
-      </Heading>
+    <SettingsLayout>
+      <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
+        <Heading as="h2" fontSize="xl" marginTop={2}>
+          Data Retention
+        </Heading>
+
+      {!canConfigureRetention && snapshot && (
+        <Card.Root width="full" borderColor="border.info" borderWidth="1px">
+          <Card.Body>
+            <Text fontSize="sm">
+              Your plan applies the platform default to every project. Upgrade
+              to configure per-organization, per-team, or per-project retention
+              overrides.
+            </Text>
+          </Card.Body>
+        </Card.Root>
+      )}
 
       <Card.Root width="full">
         <Card.Header>
@@ -229,8 +248,8 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
           </Heading>
           <Text fontSize="sm" color="fg.muted">
             What applies to this project today, after the project → team →
-            organization cascade. No override anywhere means data is kept
-            indefinitely.
+            organization cascade. No override anywhere means the platform
+            default applies.
           </Text>
         </Card.Header>
         <Card.Body>
@@ -395,7 +414,8 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
           setConfirmContraction(null);
         }}
       />
-    </VStack>
+      </VStack>
+    </SettingsLayout>
   );
 }
 

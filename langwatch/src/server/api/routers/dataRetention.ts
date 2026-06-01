@@ -1,9 +1,38 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { assertCanWriteRetentionScope } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
+import type { PrismaClient } from "@prisma/client";
+import type { Session } from "~/server/auth";
+import {
+  assertCanWriteRetentionScope,
+  assertRetentionPlan,
+} from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
+
+/**
+ * Plan-gate the retention mutations via the project's owning organization.
+ * Throws FORBIDDEN if the org is on a free plan. Centralised so every
+ * write endpoint stays consistent — overrides, retroactive updates, and
+ * mutation kills all need a paid plan.
+ */
+async function assertRetentionPlanForProject(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+): Promise<void> {
+  const project = await ctx.prisma.project.findFirst({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  const organizationId = project?.team?.organizationId;
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Project does not belong to any organization.",
+    });
+  }
+  await assertRetentionPlan(ctx, organizationId);
+}
 import {
   type RetentionCategory,
   retentionCategorySchema,
@@ -53,6 +82,7 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
+      await assertRetentionPlanForProject(ctx, input.projectId);
       try {
         return await getApp().dataRetention.policy.setForScope({
           scope: input.scope,
@@ -82,6 +112,7 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
+      await assertRetentionPlanForProject(ctx, input.projectId);
       await getApp().dataRetention.policy.removeForScope({
         scope: input.scope,
         category: input.category as RetentionCategory,
@@ -97,7 +128,8 @@ export const dataRetentionRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertRetentionPlanForProject(ctx, input.projectId);
       return getApp().dataRetention.retroactive.triggerUpdate({
         projectId: input.projectId,
         category: input.category as RetentionCategory,
@@ -122,7 +154,8 @@ export const dataRetentionRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertRetentionPlanForProject(ctx, input.projectId);
       await getApp().dataRetention.retroactive.killMutation({
         projectId: input.projectId,
         mutationId: input.mutationId,

@@ -40,9 +40,16 @@ export class RetroactiveMutationInProgressError extends Error {
 // Mutation filter: substring-match the WHERE TenantId clause inside
 // system.mutations.command so we only see mutations for this tenant.
 // Using position() instead of LIKE avoids `_` / `%` matching weirdness for
-// project ids that contain underscores (e.g. "project_xyz").
+// project ids that contain underscores (e.g. "project_xyz"). The search
+// needle is built in app code and passed via query_params — building it
+// inside ClickHouse with concat() ran into double-vs-single-quote escaping
+// (CH treats "..." as identifier names).
 const TENANT_FILTER_SQL =
-  'position(command, concat("WHERE TenantId = \'", {tenantId:String}, "\'")) > 0';
+  "position(command, {tenantFilterNeedle:String}) > 0";
+
+function tenantFilterParams(projectId: string): Record<string, string> {
+  return { tenantFilterNeedle: `WHERE TenantId = '${projectId}'` };
+}
 
 export class RetroactiveUpdateService {
   constructor(
@@ -115,7 +122,7 @@ export class RetroactiveUpdateService {
           AND is_done = 0
         ORDER BY create_time DESC
       `,
-      query_params: { tenantId: projectId },
+      query_params: tenantFilterParams(projectId),
       format: "JSONEachRow",
     });
 
@@ -144,7 +151,7 @@ export class RetroactiveUpdateService {
       query:
         `KILL MUTATION WHERE mutation_id = {mutationId:String} ` +
         `AND ${TENANT_FILTER_SQL}`,
-      query_params: { mutationId, tenantId: projectId },
+      query_params: { mutationId, ...tenantFilterParams(projectId) },
     });
   }
 
@@ -171,7 +178,7 @@ export class RetroactiveUpdateService {
           AND ${TENANT_FILTER_SQL}
           AND is_done = 0
       `,
-      query_params: { tables, tenantId: projectId },
+      query_params: { tables, ...tenantFilterParams(projectId) },
       format: "JSONEachRow",
     });
 

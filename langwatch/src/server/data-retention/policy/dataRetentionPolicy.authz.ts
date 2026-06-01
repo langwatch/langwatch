@@ -6,6 +6,7 @@ import {
   hasTeamPermission,
 } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
+import { getApp } from "~/server/app-layer/app";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 
 type RBACContext = { prisma: PrismaClient; session: Session | null };
@@ -71,5 +72,43 @@ export async function assertCanWriteRetentionScope(
     message: `You need ${requiredRetentionWritePermission(
       scope.scopeType,
     )} on this ${scope.scopeType.toLowerCase()} to change its data retention.`,
+  });
+}
+
+/**
+ * Whether the organization's plan unlocks per-scope retention overrides.
+ * Free plans get the platform-wide default (DEFAULT_RETENTION_DAYS) and
+ * cannot configure anything else. Read snapshots and the chip picker also
+ * call this, so the UI never offers a control the save will reject.
+ */
+export async function canConfigureRetention(
+  organizationId: string | null,
+  user: Session["user"] | null,
+): Promise<boolean> {
+  if (!organizationId) return false;
+  const plan = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: user ?? undefined,
+  });
+  return !plan.free;
+}
+
+/**
+ * Throws FORBIDDEN if the org is on a free plan. Retention overrides and
+ * retroactive mutations are paid-tier features; free plans use the platform
+ * default uniformly. Called from every mutation that writes retention state.
+ */
+export async function assertRetentionPlan(
+  ctx: RBACContext,
+  organizationId: string,
+): Promise<void> {
+  if (await canConfigureRetention(organizationId, ctx.session?.user ?? null)) {
+    return;
+  }
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message:
+      "Configuring data retention is a paid-plan feature. " +
+      "All projects use the platform default until the organization upgrades.",
   });
 }

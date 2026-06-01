@@ -251,7 +251,11 @@ describe("RetroactiveUpdateService", () => {
 
         // Tenant filter flows through query_params, not raw SQL.
         const [request] = query.mock.calls[0]!;
-        expect(request.query_params).toEqual({ tenantId: "project-1" });
+        expect(request.query_params).toEqual({
+          tenantFilterNeedle: "WHERE TenantId = 'project-1'",
+        });
+        // Raw projectId only appears inside the parameter value, not in the
+        // query body itself (which references {tenantFilterNeedle:String}).
         expect(request.query).not.toContain("'project-1'");
       });
     });
@@ -274,10 +278,9 @@ describe("RetroactiveUpdateService", () => {
       expect(request.query).toContain("mutation_id = {mutationId:String}");
       expect(request.query_params).toEqual({
         mutationId: "mut-xyz",
-        tenantId: "project-1",
+        tenantFilterNeedle: "WHERE TenantId = 'project-1'",
       });
       expect(request.query).not.toContain("'mut-xyz'");
-      expect(request.query).not.toContain("'project-1'");
     });
   });
 });

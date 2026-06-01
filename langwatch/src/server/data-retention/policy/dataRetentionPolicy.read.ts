@@ -6,6 +6,7 @@ import {
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { canConfigureRetention } from "./dataRetentionPolicy.authz";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 import type {
   ResolvedRetention,
@@ -38,12 +39,16 @@ export type ScopeAvailable = {
 
 export type RetentionPolicySnapshot = {
   projectId: string;
-  /** Effective per-category retention for this project (0 = indefinite). */
+  /** Effective per-category retention for this project, falling back to the
+   *  platform-wide default when no override is set. */
   effective: ResolvedRetention;
   /** Override rows the caller can read, one per (scope, category). */
   rules: RetentionRule[];
   /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
   available: ScopeAvailable;
+  /** Whether the org's plan unlocks configurable retention. Free plans see
+   *  the snapshot but the UI must hide the add/edit/delete controls. */
+  canConfigureRetention: boolean;
 };
 
 /**
@@ -105,27 +110,31 @@ export async function getRetentionPolicySnapshot(
           ? [{ id: projectId, name, teamId: project?.teamId ?? "" }]
           : [],
       },
+      // Personal-account projects have no org → no paid plan → no overrides.
+      canConfigureRetention: false,
     };
   }
 
-  const [orgTeams, orgProjects, rows, canManageOrg] = await Promise.all([
-    ctx.prisma.team.findMany({
-      where: { organizationId },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    ctx.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true, name: true, teamId: true },
-      orderBy: { name: "asc" },
-    }),
-    app.dataRetention.policy.listOrganizationRules(organizationId),
-    hasOrganizationPermission(
-      ctx as AuthedCtx,
-      organizationId,
-      "organization:manage",
-    ),
-  ]);
+  const [orgTeams, orgProjects, rows, canManageOrg, canConfigureRetentionFlag] =
+    await Promise.all([
+      ctx.prisma.team.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      ctx.prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true, name: true, teamId: true },
+        orderBy: { name: "asc" },
+      }),
+      app.dataRetention.policy.listOrganizationRules(organizationId),
+      hasOrganizationPermission(
+        ctx as AuthedCtx,
+        organizationId,
+        "organization:manage",
+      ),
+      canConfigureRetention(organizationId, ctx.session?.user ?? null),
+    ]);
 
   const projectTeamId: Record<string, string> = {};
   for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
@@ -193,5 +202,11 @@ export async function getRetentionPolicySnapshot(
       .map(({ id, name, teamId }) => ({ id, name, teamId })),
   };
 
-  return { projectId, effective, rules, available };
+  return {
+    projectId,
+    effective,
+    rules,
+    available,
+    canConfigureRetention: canConfigureRetentionFlag,
+  };
 }

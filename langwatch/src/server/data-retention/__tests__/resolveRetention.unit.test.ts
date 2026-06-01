@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveScopeChain } from "../../scopes/resolveScopeChain";
 import { type RetentionRow, resolveRetention } from "../resolveRetentionDays";
+import { DEFAULT_RETENTION_DAYS } from "../retentionPolicy.schema";
 
 const CHAIN = resolveScopeChain({
   organizationId: "org-1",
@@ -78,23 +79,23 @@ describe("resolveRetention", () => {
   });
 
   describe("given no row for a category", () => {
-    it("resolves to 0 (indefinite)", () => {
+    it("falls back to the platform default", () => {
       const resolved = resolveRetention({
-        rows: [row("PROJECT", "proj-1", "traces", 90)],
+        rows: [row("PROJECT", "proj-1", "traces", 91)],
         chain: CHAIN,
       });
-      expect(resolved.scenarios).toBe(0);
-      expect(resolved.experiments).toBe(0);
+      expect(resolved.scenarios).toBe(DEFAULT_RETENTION_DAYS);
+      expect(resolved.experiments).toBe(DEFAULT_RETENTION_DAYS);
     });
   });
 
   describe("given a row from a sibling scope not in the chain", () => {
     it("is ignored", () => {
       const resolved = resolveRetention({
-        rows: [row("PROJECT", "other-project", "traces", 90)],
+        rows: [row("PROJECT", "other-project", "traces", 91)],
         chain: CHAIN,
       });
-      expect(resolved.traces).toBe(0);
+      expect(resolved.traces).toBe(DEFAULT_RETENTION_DAYS);
     });
   });
 });

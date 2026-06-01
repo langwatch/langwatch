@@ -12,6 +12,7 @@ vi.mock("~/server/api/rbac", () => rbacMocks);
 const appMocks = vi.hoisted(() => ({
   getResolvedForProject: vi.fn(),
   listOrganizationRules: vi.fn(),
+  getActivePlan: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -21,6 +22,9 @@ vi.mock("~/server/app-layer/app", () => ({
         getResolvedForProject: appMocks.getResolvedForProject,
         listOrganizationRules: appMocks.listOrganizationRules,
       },
+    },
+    planProvider: {
+      getActivePlan: appMocks.getActivePlan,
     },
   }),
 }));
@@ -53,6 +57,10 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
       scenarios: 49,
       experiments: 49,
     });
+
+    // Default: paid plan so overrides aren't blocked by the plan gate.
+    // Individual tests override this to assert free-plan behavior.
+    appMocks.getActivePlan.mockResolvedValue({ free: false });
 
     prisma.project.findUnique.mockResolvedValue({
       teamId: "team_a",
