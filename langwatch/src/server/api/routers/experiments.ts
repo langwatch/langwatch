@@ -838,40 +838,43 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ input }) => {
-      const experiment = await prisma.experiment.findUnique({
-        where: {
-          id: input.experimentId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!experiment) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Experiment not found",
-        });
-      }
-
-      // Idempotent: a duplicate click on an already-archived experiment is
-      // a no-op (we do not refresh the timestamp, to avoid spurious writes).
-      if (experiment.archivedAt) {
-        return { success: true };
-      }
-
-      const now = new Date();
-      // Rename the slug on archive so a future experiment can reuse the
-      // original slug; the unique [projectId, slug] index would otherwise
-      // collide. Mirrors the pattern in dataset.ts deleteById.
-      const archivedSlug = `${experiment.slug}-archived-${nanoid()}`;
-
-      await prisma.$transaction(async (tx) => {
-        await tx.experiment.update({
+      return await prisma.$transaction(async (tx) => {
+        const experiment = await tx.experiment.findUnique({
           where: {
             id: input.experimentId,
             projectId: input.projectId,
           },
-          data: { archivedAt: now, slug: archivedSlug },
         });
+
+        if (!experiment) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Experiment not found",
+          });
+        }
+
+        // Rename the slug on archive so a future experiment can reuse the
+        // original slug; the unique [projectId, slug] index would otherwise
+        // collide. Mirrors the pattern in dataset.ts deleteById.
+        const archivedSlug = `${experiment.slug}-archived-${nanoid()}`;
+
+        // Race-safe idempotency: gate the archive write on archivedAt: null
+        // INSIDE the transaction so two concurrent clicks cannot both win
+        // the check. If updateMany.count === 0 the row was already archived
+        // by a sibling request, so we return success without re-running the
+        // cascade (the winning request already did it).
+        const result = await tx.experiment.updateMany({
+          where: {
+            id: input.experimentId,
+            projectId: input.projectId,
+            archivedAt: null,
+          },
+          data: { archivedAt: new Date(), slug: archivedSlug },
+        });
+
+        if (result.count === 0) {
+          return { success: true };
+        }
 
         if (experiment.workflowId) {
           await tx.workflow.update({
@@ -879,24 +882,24 @@ export const experimentsRouter = createTRPCRouter({
               id: experiment.workflowId,
               projectId: input.projectId,
             },
-            data: { archivedAt: now },
+            data: { archivedAt: new Date() },
           });
         }
 
-        // Monitor is a small relational row with no ClickHouse / S3 footprint,
-        // and the Monitor model does not have an archivedAt column, so we
-        // keep the original hard-delete behaviour for it. The cost-driving
-        // path is the ClickHouse delete on experiment_runs / experiment_run_items
-        // / dspy_steps — that is what this PR removes.
+        // Monitor is a small relational row with no ClickHouse / S3 footprint
+        // and the Monitor model has no archivedAt column, so the original
+        // hard-delete behaviour stays. The cost-driving path was the
+        // ClickHouse delete on experiment_runs / experiment_run_items /
+        // dspy_steps, which is what this PR removes.
         await tx.monitor.deleteMany({
           where: {
             experimentId: input.experimentId,
             projectId: input.projectId,
           },
         });
-      });
 
-      return { success: true };
+        return { success: true };
+      });
     }),
 
   copy: protectedProcedure

@@ -3,19 +3,13 @@
  *
  * Integration tests for experiment archive (formerly delete).
  *
- * Covers specs/experiments-v3/experiment-archive.feature. No mocks: runs the
- * real tRPC mutation against a real Postgres test instance and asserts on the
- * persisted rows directly.
- *
- * Rationale: the old deleteExperiment path was hard-deleting Postgres rows
- * AND issuing DELETE FROM in ClickHouse plus deleteByQuery in Elasticsearch.
- * Every click cost ~$1-2 in S3 request churn (mask writes on every cold-tier
- * part + merge fallout). The codebase had already standardised on archivedAt
- * for Workflow/Monitor/Dataset/Evaluator/Agent/Project/Team; Experiment was
- * the outlier. This file pins the new soft-archive behaviour so future edits
- * cannot silently regress to hard delete.
+ * Covers specs/experiments-v3/experiment-archive.feature. The Postgres
+ * layer is the real test instance and the tRPC mutation runs end to end;
+ * only the licence-enforcement boundary is stubbed so the test does not
+ * require a licensed organisation row to be seeded.
  */
 import { ExperimentType } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
@@ -34,17 +28,33 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   };
 });
 
-describe("Experiment archive (formerly delete)", () => {
-  const projectId = "test-project-id";
+const PROJECT_ID = "test-project-id";
+
+async function expectTRPCError(
+  promise: Promise<unknown>,
+  code: TRPCError["code"],
+) {
+  let captured: unknown;
+  try {
+    await promise;
+  } catch (e) {
+    captured = e;
+  }
+  expect(captured, "expected the promise to reject").toBeInstanceOf(TRPCError);
+  expect((captured as TRPCError).code).toBe(code);
+}
+
+describe("experiments.deleteExperiment", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   const testNamespace = `exparch-${nanoid(8)}`;
 
-  // Track resources so the suite cleans up after itself even if an assertion
-  // fails mid-test. We use the Prisma client directly here (not the router)
-  // because the router's archive flow now leaves rows behind on purpose.
+  // Tracked so the suite cleans up after itself even when an assertion
+  // fails mid-test. Use the Prisma client directly here, not the router,
+  // because the archive flow leaves rows behind on purpose.
   const createdExperimentIds: string[] = [];
   const createdWorkflowIds: string[] = [];
   const createdMonitorIds: string[] = [];
+  const createdProjectIds: string[] = [];
 
   let previousApp: typeof globalForApp.__langwatch_app;
 
@@ -61,34 +71,44 @@ describe("Experiment archive (formerly delete)", () => {
   afterAll(async () => {
     globalForApp.__langwatch_app = previousApp;
     for (const id of createdMonitorIds) {
-      await prisma.monitor.delete({ where: { id, projectId } }).catch(() => {});
+      await prisma.monitor
+        .delete({ where: { id, projectId: PROJECT_ID } })
+        .catch(() => {});
     }
     for (const id of createdExperimentIds) {
       await prisma.experiment
-        .delete({ where: { id, projectId } })
+        .delete({ where: { id, projectId: PROJECT_ID } })
         .catch(() => {});
     }
     for (const id of createdWorkflowIds) {
       await prisma.workflow
         .update({
-          where: { id, projectId },
+          where: { id, projectId: PROJECT_ID },
           data: { currentVersionId: null, latestVersionId: null },
         })
         .catch(() => {});
       await prisma.workflowVersion
-        .deleteMany({ where: { workflowId: id, projectId } })
+        .deleteMany({ where: { workflowId: id, projectId: PROJECT_ID } })
         .catch(() => {});
       await prisma.workflow
-        .delete({ where: { id, projectId } })
+        .delete({ where: { id, projectId: PROJECT_ID } })
         .catch(() => {});
+    }
+    for (const pid of createdProjectIds) {
+      await prisma.experiment
+        .deleteMany({ where: { projectId: pid } })
+        .catch(() => {});
+      await prisma.project.delete({ where: { id: pid } }).catch(() => {});
     }
   });
 
   async function createExperiment(opts: {
     slug: string;
+    projectId?: string;
     withWorkflow?: boolean;
     withMonitor?: boolean;
   }) {
+    const projectId = opts.projectId ?? PROJECT_ID;
     let workflowId: string | undefined;
     if (opts.withWorkflow) {
       workflowId = `workflow_${nanoid()}`;
@@ -101,7 +121,7 @@ describe("Experiment archive (formerly delete)", () => {
           description: "test",
         },
       });
-      createdWorkflowIds.push(workflowId);
+      if (projectId === PROJECT_ID) createdWorkflowIds.push(workflowId);
     }
     const id = `experiment_${nanoid()}`;
     await prisma.experiment.create({
@@ -114,7 +134,7 @@ describe("Experiment archive (formerly delete)", () => {
         workflowId,
       },
     });
-    createdExperimentIds.push(id);
+    if (projectId === PROJECT_ID) createdExperimentIds.push(id);
     if (opts.withMonitor) {
       const monitorId = `monitor_${nanoid()}`;
       await prisma.monitor.create({
@@ -129,212 +149,317 @@ describe("Experiment archive (formerly delete)", () => {
           parameters: {},
         },
       });
-      createdMonitorIds.push(monitorId);
+      if (projectId === PROJECT_ID) createdMonitorIds.push(monitorId);
     }
     return { id, workflowId };
   }
 
-  /** @scenario Archiving an experiment sets archivedAt and preserves the row */
-  it("archives the experiment row instead of deleting it", async () => {
-    const { id } = await createExperiment({
-      slug: `${testNamespace}-basic-${nanoid(6)}`,
+  describe("given an unarchived experiment", () => {
+    describe("when the user calls deleteExperiment", () => {
+      let experimentId: string;
+      let originalSlug: string;
+
+      beforeAll(async () => {
+        originalSlug = `${testNamespace}-basic-${nanoid(6)}`;
+        const created = await createExperiment({ slug: originalSlug });
+        experimentId = created.id;
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId,
+        });
+      });
+
+      /** @scenario Archiving an experiment sets archivedAt and preserves the row */
+      it("preserves the row in Postgres", async () => {
+        const row = await prisma.experiment.findFirst({
+          where: { id: experimentId, projectId: PROJECT_ID },
+        });
+        expect(row).not.toBeNull();
+      });
+
+      it("sets archivedAt to a recent timestamp", async () => {
+        const row = await prisma.experiment.findFirst({
+          where: { id: experimentId, projectId: PROJECT_ID },
+        });
+        expect(row!.archivedAt!.getTime()).toBeGreaterThan(Date.now() - 10_000);
+      });
+
+      it("renames the slug so the original can be reused", async () => {
+        const row = await prisma.experiment.findFirst({
+          where: { id: experimentId, projectId: PROJECT_ID },
+        });
+        expect(row?.slug).toMatch(/-archived-/);
+      });
     });
-
-    await caller.experiments.deleteExperiment({ projectId, experimentId: id });
-
-    const row = await prisma.experiment.findFirst({ where: { id, projectId } });
-    expect(row).not.toBeNull();
-    expect(row?.archivedAt).not.toBeNull();
-    expect(row!.archivedAt!.getTime()).toBeGreaterThan(Date.now() - 10_000);
-    // Slug was renamed so a future experiment can reuse the original slug.
-    expect(row?.slug).toMatch(/-archived-/);
   });
 
-  /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
-  it("cascade-archives the linked workflow and hard-deletes the monitor", async () => {
-    const { id, workflowId } = await createExperiment({
-      slug: `${testNamespace}-cascade-${nanoid(6)}`,
-      withWorkflow: true,
-      withMonitor: true,
-    });
+  describe("given an experiment with a workflow and a monitor", () => {
+    describe("when the user calls deleteExperiment", () => {
+      let experimentId: string;
+      let workflowId: string;
 
-    await caller.experiments.deleteExperiment({ projectId, experimentId: id });
+      beforeAll(async () => {
+        const created = await createExperiment({
+          slug: `${testNamespace}-cascade-${nanoid(6)}`,
+          withWorkflow: true,
+          withMonitor: true,
+        });
+        experimentId = created.id;
+        workflowId = created.workflowId!;
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId,
+        });
+      });
 
-    const wf = await prisma.workflow.findFirst({
-      where: { id: workflowId!, projectId },
-    });
-    expect(wf?.archivedAt).not.toBeNull();
+      /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
+      it("cascade-archives the workflow", async () => {
+        const wf = await prisma.workflow.findFirst({
+          where: { id: workflowId, projectId: PROJECT_ID },
+        });
+        expect(wf?.archivedAt).not.toBeNull();
+      });
 
-    // Monitor has no archivedAt column; we keep the historical hard-delete
-    // because monitors are small relational rows with no S3 implication.
-    const mon = await prisma.monitor.findFirst({
-      where: { experimentId: id, projectId },
+      it("hard-deletes the monitor", async () => {
+        const mon = await prisma.monitor.findFirst({
+          where: { experimentId, projectId: PROJECT_ID },
+        });
+        expect(mon).toBeNull();
+      });
     });
-    expect(mon).toBeNull();
   });
 
-  /** @scenario Archiving without a workflow or monitor still succeeds */
-  it("handles an experiment with no workflow or monitor without erroring", async () => {
-    const { id } = await createExperiment({
-      slug: `${testNamespace}-nowf-${nanoid(6)}`,
-    });
+  describe("given an experiment with no workflow or monitor", () => {
+    describe("when the user calls deleteExperiment", () => {
+      /** @scenario Archiving without a workflow or monitor still succeeds */
+      it("resolves with success", async () => {
+        const { id } = await createExperiment({
+          slug: `${testNamespace}-nowf-${nanoid(6)}`,
+        });
 
-    await expect(
-      caller.experiments.deleteExperiment({ projectId, experimentId: id }),
-    ).resolves.toEqual({ success: true });
+        await expect(
+          caller.experiments.deleteExperiment({
+            projectId: PROJECT_ID,
+            experimentId: id,
+          }),
+        ).resolves.toEqual({ success: true });
+      });
+    });
   });
 
-  /** @scenario A second click on the same already-archived experiment is a no-op */
-  it("is idempotent - a second click does not overwrite archivedAt", async () => {
-    const { id } = await createExperiment({
-      slug: `${testNamespace}-idem-${nanoid(6)}`,
+  describe("given an already-archived experiment", () => {
+    describe("when the user calls deleteExperiment a second time", () => {
+      let experimentId: string;
+      let firstArchivedAt: Date;
+
+      beforeAll(async () => {
+        const created = await createExperiment({
+          slug: `${testNamespace}-idem-${nanoid(6)}`,
+        });
+        experimentId = created.id;
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId,
+        });
+        firstArchivedAt = (
+          await prisma.experiment.findFirstOrThrow({
+            where: { id: experimentId, projectId: PROJECT_ID },
+          })
+        ).archivedAt!;
+        await new Promise((r) => setTimeout(r, 20));
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId,
+        });
+      });
+
+      /** @scenario A second click on the same already-archived experiment is a no-op */
+      it("does not overwrite the original archivedAt timestamp", async () => {
+        const row = await prisma.experiment.findFirst({
+          where: { id: experimentId, projectId: PROJECT_ID },
+        });
+        expect(row?.archivedAt?.getTime()).toBe(firstArchivedAt.getTime());
+      });
     });
-
-    await caller.experiments.deleteExperiment({ projectId, experimentId: id });
-    const firstArchive = (
-      await prisma.experiment.findFirst({ where: { id, projectId } })
-    )?.archivedAt;
-
-    // Tiny pause so a re-set timestamp would observably differ.
-    await new Promise((r) => setTimeout(r, 20));
-
-    await caller.experiments.deleteExperiment({ projectId, experimentId: id });
-    const secondArchive = (
-      await prisma.experiment.findFirst({ where: { id, projectId } })
-    )?.archivedAt;
-
-    expect(firstArchive).toEqual(secondArchive);
   });
 
-  /** @scenario Archived experiments are hidden from the standard list query */
-  it("hides archived experiments from the project-wide list (Postgres path)", async () => {
-    const liveSlug = `${testNamespace}-live-${nanoid(6)}`;
-    const archivedSlug = `${testNamespace}-arch-${nanoid(6)}`;
-    const { id: liveId } = await createExperiment({ slug: liveSlug });
-    const { id: archivedId } = await createExperiment({ slug: archivedSlug });
+  describe("given a project with one archived and one live experiment", () => {
+    describe("when the user lists experiments", () => {
+      let liveId: string;
+      let archivedId: string;
 
-    await caller.experiments.deleteExperiment({
-      projectId,
-      experimentId: archivedId,
+      beforeAll(async () => {
+        const live = await createExperiment({
+          slug: `${testNamespace}-live-${nanoid(6)}`,
+        });
+        const arch = await createExperiment({
+          slug: `${testNamespace}-arch-${nanoid(6)}`,
+        });
+        liveId = live.id;
+        archivedId = arch.id;
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId: archivedId,
+        });
+      });
+
+      /** @scenario Archived experiments are hidden from the standard list query */
+      it("returns the live experiment", async () => {
+        const list = await caller.experiments.getAllByProjectId({
+          projectId: PROJECT_ID,
+        });
+        expect(list.map((e: { id: string }) => e.id)).toContain(liveId);
+      });
+
+      it("omits the archived experiment", async () => {
+        const list = await caller.experiments.getAllByProjectId({
+          projectId: PROJECT_ID,
+        });
+        expect(list.map((e: { id: string }) => e.id)).not.toContain(archivedId);
+      });
     });
-
-    // getAllByProjectId goes through the repository's findAll, which is
-    // pure Postgres, no ClickHouse enrichment. That is the layer we need
-    // to verify here (the run-count enrichment in getAllForEvaluationsList
-    // happens after this list filter and is tested elsewhere).
-    const list = await caller.experiments.getAllByProjectId({ projectId });
-
-    const ids = list.map((e: { id: string }) => e.id);
-    expect(ids).toContain(liveId);
-    expect(ids).not.toContain(archivedId);
   });
 
-  /** @scenario A single getExperiment by id returns archived experiments as not-found */
-  it("returns NOT_FOUND when fetching an archived experiment by slug", async () => {
-    const slug = `${testNamespace}-notfound-${nanoid(6)}`;
-    const { id } = await createExperiment({ slug });
-    await caller.experiments.deleteExperiment({ projectId, experimentId: id });
+  describe("given an archived experiment", () => {
+    describe("when the user fetches it by the original slug", () => {
+      /** @scenario A single getExperiment by id returns archived experiments as not-found */
+      it("rejects with NOT_FOUND", async () => {
+        const slug = `${testNamespace}-notfound-${nanoid(6)}`;
+        const { id } = await createExperiment({ slug });
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId: id,
+        });
 
-    // The slug was rewritten on archive, so the original slug should now
-    // resolve to null/NOT_FOUND.
-    await expect(
-      caller.experiments.getExperimentBySlugOrId({
-        projectId,
-        experimentSlug: slug,
-      }),
-    ).rejects.toThrow();
+        await expectTRPCError(
+          caller.experiments.getExperimentBySlugOrId({
+            projectId: PROJECT_ID,
+            experimentSlug: slug,
+          }),
+          "NOT_FOUND",
+        );
+      });
+    });
   });
 
-  it("frees up the original slug so a new experiment can take it", async () => {
-    const slug = `${testNamespace}-reuse-${nanoid(6)}`;
-    const { id: firstId } = await createExperiment({ slug });
+  describe("given an experiment whose slug was already used and archived", () => {
+    describe("when a new experiment is created with the same original slug", () => {
+      it("succeeds and the new row owns the slug", async () => {
+        const slug = `${testNamespace}-reuse-${nanoid(6)}`;
+        const { id: firstId } = await createExperiment({ slug });
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId: firstId,
+        });
 
-    await caller.experiments.deleteExperiment({
-      projectId,
-      experimentId: firstId,
+        const { id: secondId } = await createExperiment({ slug });
+        const row = await prisma.experiment.findFirst({
+          where: { id: secondId, projectId: PROJECT_ID },
+        });
+        expect(row?.slug).toBe(slug);
+        expect(row?.archivedAt).toBeNull();
+      });
     });
-
-    const { id: secondId } = await createExperiment({ slug });
-    const row = await prisma.experiment.findFirst({
-      where: { id: secondId, projectId },
-    });
-    expect(row?.slug).toBe(slug);
-    expect(row?.archivedAt).toBeNull();
   });
 
   // The archive path used to issue three side-effect calls that the feature
   // file forbids: a ClickHouse mass-delete (lightweight-delete masks on
   // cold-tier S3 parts), an Elasticsearch deleteByQuery on the
-  // batch_evaluation index, and an in-process DSpy step cleanup. We
-  // removed all three by deleting the imports from the router. The most
-  // reliable proof is a source-level check: with the imports gone there
-  // is no path by which the archive procedure can reach those services.
-  // Runtime fail-on-call mocks were considered but rejected because
-  // getClickHouseClientForProject is still used by sibling list and
-  // enrichment procedures in the same router and globally mocking it
+  // batch_evaluation index, and an in-process DSpy step cleanup. All three
+  // were removed by deleting the corresponding imports from the router.
+  // The most reliable proof is a source-level check: with the imports gone
+  // there is no path by which the archive procedure can reach those
+  // services. Runtime fail-on-call mocks were considered but rejected
+  // because getClickHouseClientForProject is still used by sibling
+  // list/enrichment procedures in the same router and globally mocking it
   // would break unrelated tests.
-  /** @scenario The delete-experiment code path does NOT contact ClickHouse */
-  /** @scenario The delete-experiment code path does NOT contact Elasticsearch */
-  /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */
-  it("does not import ClickHouse, Elasticsearch, or DSpy cleanup in the router", async () => {
-    const routerSrc = await import("node:fs/promises").then((fs) =>
-      fs.readFile(
-        require.resolve("../experiments.ts"),
-        "utf8",
-      ),
-    );
-    expect(routerSrc).not.toMatch(/getClickHouseClientForProject/);
-    expect(routerSrc).not.toMatch(/from\s+["'][^"']*server\/elasticsearch["']/);
-    expect(routerSrc).not.toMatch(/BATCH_EVALUATION_INDEX/);
-    expect(routerSrc).not.toMatch(/dspySteps\.steps\.deleteByExperiment/);
+  describe("the router source file", () => {
+    /** @scenario The delete-experiment code path does NOT contact ClickHouse */
+    it("does not import getClickHouseClientForProject", async () => {
+      const src = await import("node:fs/promises").then((fs) =>
+        fs.readFile(require.resolve("../experiments.ts"), "utf8"),
+      );
+      expect(src).not.toMatch(/getClickHouseClientForProject/);
+    });
+
+    /** @scenario The delete-experiment code path does NOT contact Elasticsearch */
+    it("does not import the Elasticsearch client or the batch_evaluation index", async () => {
+      const src = await import("node:fs/promises").then((fs) =>
+        fs.readFile(require.resolve("../experiments.ts"), "utf8"),
+      );
+      expect(src).not.toMatch(/from\s+["'][^"']*server\/elasticsearch["']/);
+      expect(src).not.toMatch(/BATCH_EVALUATION_INDEX/);
+    });
+
+    /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */
+    it("does not call dspySteps.steps.deleteByExperiment", async () => {
+      const src = await import("node:fs/promises").then((fs) =>
+        fs.readFile(require.resolve("../experiments.ts"), "utf8"),
+      );
+      expect(src).not.toMatch(/dspySteps\.steps\.deleteByExperiment/);
+    });
   });
 
-  /** @scenario An experiment from another project cannot be archived */
-  it("returns NOT_FOUND when archiving an experiment that belongs to a different project", async () => {
-    const otherProjectId = `${projectId}-other-${nanoid(6)}`;
-    await prisma.project.create({
-      data: {
-        id: otherProjectId,
-        name: `Other Project ${otherProjectId}`,
-        slug: otherProjectId,
-        teamId: (await prisma.project.findFirstOrThrow({
-          where: { id: projectId },
+  describe("given an experiment that belongs to a different project", () => {
+    describe("when the user calls deleteExperiment with their own projectId", () => {
+      let foreignProjectId: string;
+      let foreignExperimentId: string;
+
+      beforeAll(async () => {
+        foreignProjectId = `${PROJECT_ID}-other-${nanoid(6)}`;
+        const sourceProject = await prisma.project.findFirstOrThrow({
+          where: { id: PROJECT_ID },
           select: { teamId: true },
-        })).teamId,
-        language: "python",
-        framework: "openai",
-        apiKey: `qa-key-${otherProjectId}`,
-      },
-    });
+        });
+        await prisma.project.create({
+          data: {
+            id: foreignProjectId,
+            name: `Other ${foreignProjectId}`,
+            slug: foreignProjectId,
+            teamId: sourceProject.teamId,
+            language: "python",
+            framework: "openai",
+            apiKey: `qa-key-${foreignProjectId}`,
+          },
+        });
+        createdProjectIds.push(foreignProjectId);
 
-    const foreignId = `experiment_${nanoid()}`;
-    await prisma.experiment.create({
-      data: {
-        id: foreignId,
-        name: "Foreign experiment",
-        slug: `foreign-${nanoid(6)}`,
-        projectId: otherProjectId,
-        type: ExperimentType.BATCH_EVALUATION_V2,
-      },
-    });
-
-    try {
-      await expect(
-        caller.experiments.deleteExperiment({
-          projectId,
-          experimentId: foreignId,
-        }),
-      ).rejects.toThrow(/not found|forbidden|access/i);
-
-      const stillThere = await prisma.experiment.findFirst({
-        where: { id: foreignId, projectId: otherProjectId },
+        const created = await createExperiment({
+          slug: `foreign-${nanoid(6)}`,
+          projectId: foreignProjectId,
+        });
+        foreignExperimentId = created.id;
       });
-      expect(stillThere?.archivedAt).toBeNull();
-    } finally {
-      await prisma.experiment
-        .delete({ where: { id: foreignId, projectId: otherProjectId } })
-        .catch(() => {});
-      await prisma.project.delete({ where: { id: otherProjectId } }).catch(() => {});
-    }
+
+      /** @scenario An experiment from another project cannot be archived */
+      it("rejects with NOT_FOUND", async () => {
+        await expectTRPCError(
+          caller.experiments.deleteExperiment({
+            projectId: PROJECT_ID,
+            experimentId: foreignExperimentId,
+          }),
+          "NOT_FOUND",
+        );
+      });
+
+      it("leaves archivedAt null on the row in the other project", async () => {
+        // Make a fresh attempt before reading so this assertion is independent
+        // of test ordering.
+        await caller.experiments
+          .deleteExperiment({
+            projectId: PROJECT_ID,
+            experimentId: foreignExperimentId,
+          })
+          .catch(() => {});
+
+        const row = await prisma.experiment.findFirst({
+          where: {
+            id: foreignExperimentId,
+            projectId: foreignProjectId,
+          },
+        });
+        expect(row?.archivedAt).toBeNull();
+      });
+    });
   });
 });
