@@ -122,6 +122,52 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
+// Event-bearing fixtures for the events-only readers below. Isolated under a
+// distinct tenant/trace so the heavy single-trace dataset above is untouched.
+const eventsTenantId = `test-span-events-${nanoid()}`;
+const eventsTraceId = `trace-${nanoid()}`;
+
+function makeEventRow(
+  spanId: string,
+  events: { ts: Date; name: string; attrs: Record<string, string> }[],
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    ProjectionId: `proj-${nanoid()}`,
+    TenantId: eventsTenantId,
+    TraceId: eventsTraceId,
+    SpanId: spanId,
+    ParentSpanId: null,
+    ParentTraceId: null,
+    ParentIsRemote: null,
+    Sampled: 1,
+    StartTime: new Date(base),
+    EndTime: new Date(base + 50),
+    DurationMs: 50,
+    SpanName: "events-span",
+    SpanKind: 1,
+    ServiceName: "test-service",
+    ResourceAttributes: {},
+    SpanAttributes: {},
+    StatusCode: 1,
+    StatusMessage: null,
+    ScopeName: "test",
+    ScopeVersion: null,
+    "Events.Timestamp": events.map((e) => e.ts),
+    "Events.Name": events.map((e) => e.name),
+    "Events.Attributes": events.map((e) => e.attrs),
+    "Links.TraceId": [],
+    "Links.SpanId": [],
+    "Links.Attributes": [],
+    DroppedAttributesCount: 0,
+    DroppedEventsCount: 0,
+    DroppedLinksCount: 0,
+    CreatedAt: new Date(base),
+    UpdatedAt: new Date(base),
+    ...overrides,
+  };
+}
+
 describe("SpanStorageClickHouseRepository single-trace reads (integration)", () => {
   describe("when reading a trace under the per-query memory cap", () => {
     it("returns the earliest `limit` spans ordered by StartTime", async () => {
@@ -162,6 +208,76 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       const sample = spans[10]!;
       expect(Object.keys(sample.spanAttributes)).toContain("k0");
       expect(sample.spanAttributes.k0).toBe(ATTR_VALUE);
+    });
+  });
+
+  // Regression: both readers below previously placed `ARRAY JOIN` after `WHERE`
+  // (`getEventsByTraceId` additionally carried a second `WHERE` clause), which
+  // ClickHouse rejects with Code 62 SYNTAX_ERROR. The old string-pattern unit
+  // test couldn't observe the parse failure — these execute the queries.
+  describe("when reading a trace with OTel events", () => {
+    const baseTs = new Date(base + 200);
+    const t = (offsetMs: number) => new Date(baseTs.getTime() + offsetMs);
+
+    beforeAll(async () => {
+      await insertRows([
+        makeEventRow("evt-span-1", [
+          { ts: t(0), name: "span.start", attrs: { phase: "init" } },
+          { ts: t(10), name: "exception", attrs: { type: "TimeoutError" } },
+          { ts: t(20), name: "span.end", attrs: { phase: "done" } },
+        ]) as ReturnType<typeof makeSpanRow>,
+        makeEventRow("evt-span-2", [
+          { ts: t(5), name: "process.tick", attrs: { iter: "1" } },
+        ]) as ReturnType<typeof makeSpanRow>,
+        // Stale earlier version of evt-span-1 — dedup must drop it.
+        makeEventRow(
+          "evt-span-1",
+          [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }],
+          {
+            UpdatedAt: new Date(base - 60_000),
+            CreatedAt: new Date(base - 60_000),
+          },
+        ) as ReturnType<typeof makeSpanRow>,
+      ]);
+    });
+
+    afterAll(async () => {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: eventsTenantId },
+      });
+    });
+
+    it("getTraceEventsByTraceId returns all events incl. exceptions in StartTime order, latest version only", async () => {
+      const events = await repo.getTraceEventsByTraceId({
+        tenantId: eventsTenantId,
+        traceId: eventsTraceId,
+      });
+
+      expect(events.map((e) => e.name)).toEqual([
+        "span.start",
+        "process.tick",
+        "exception",
+        "span.end",
+      ]);
+      // Stale row was older than the live one — it must not appear.
+      expect(events.find((e) => e.name === "stale.skip")).toBeUndefined();
+    });
+
+    it("getEventsByTraceId filters out exception events and orders DESC, latest version only", async () => {
+      const events = await repo.getEventsByTraceId({
+        tenantId: eventsTenantId,
+        traceId: eventsTraceId,
+      });
+
+      expect(events.map((e) => e.event_type)).toEqual([
+        "span.end",
+        "process.tick",
+        "span.start",
+      ]);
+      expect(events.find((e) => e.event_type === "exception")).toBeUndefined();
+      expect(events.find((e) => e.event_type === "stale.skip")).toBeUndefined();
     });
   });
 });

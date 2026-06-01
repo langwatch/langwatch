@@ -922,14 +922,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS name,
                 event_attrs AS attributes
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
               ARRAY JOIN
                 "Events.Timestamp" AS event_timestamp,
                 "Events.Name" AS event_name,
                 "Events.Attributes" AS event_attrs
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
               ORDER BY event_timestamp ASC
             `,
             query_params: { tenantId, traceId, ...partition.params },
@@ -991,15 +991,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS event_type,
                 event_attrs AS attributes
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
               ARRAY JOIN
                 "Events.Timestamp" AS event_timestamp,
                 "Events.Name" AS event_name,
                 "Events.Attributes" AS event_attrs
-              WHERE event_name != 'exception'
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+                AND event_name != 'exception'
               ORDER BY event_timestamp DESC
             `,
             query_params: { tenantId, traceId, ...partition.params },
