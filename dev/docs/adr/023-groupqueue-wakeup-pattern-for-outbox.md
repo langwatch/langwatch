@@ -26,17 +26,26 @@ The naive alternative is a polling drainer (a 30-second cron that `SELECT … FO
 
 ## Decision
 
-Use the existing `GroupQueue` infrastructure for outbox dispatch. Define a single dedicated queue, `outboxDispatchQueue` — **separate from the main event-sourcing queue** — registered globally (not inside any one domain pipeline) under `src/server/event-sourcing/outbox/outboxDispatchQueue.ts`.
+Use the existing `GroupQueue` infrastructure for outbox dispatch. Define one dedicated queue, `langwatch:outbox` — **separate from the main event-sourcing queue** — registered globally (not inside any one domain pipeline) under `src/server/event-sourcing/outbox/setup.ts`.
 
-**Queue payload is the full dispatch context** (trigger identity, target identity, the matched-trace identity, alert metadata — everything the dispatcher needs to fire). The queue is the source of truth for dispatch scheduling and execution; PG is the audit projection (see [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) revision).
+The queue carries **two stages as a discriminated payload union**, not two queues:
 
-**Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: the outbox dispatch queue is a free-standing global queue, not a pipeline command/projection, so `queueManager`'s automatic `${tenantId}/` wrapping does not apply — the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
+- `SettleStagePayload { stage: "settle", projectId, triggerId, traceId, … }` — per-(trigger, trace) Debounce Mode entry. The trace-readiness debounce from ADR-030 lives here. New events on the same (trigger, trace) collapse onto the existing pending job and reset the TTL. When the TTL elapses, the dispatcher re-reads the now-settled fold, runs filters, claims `TriggerSent`, and on match re-enqueues as `cadence`.
+- `CadenceStagePayload { stage: "cadence", projectId, triggerId, match, … }` — per-trigger group, windowed delay snapped to the next wall-clock cadence boundary. The queue's `processBatch` + `coalesceMaxBatch` fold every cadence job for the same trigger landing in the same boundary into one digest invocation.
+
+Per-stage queue behavior (dedup mode, delay, group key, coalescing) is driven by the payload's `stage` discriminator so one queue serves both timing primitives without merging them — the operator's `traceDebounceMs` and `notificationCadence` knobs stay independently tunable.
+
+The earlier draft of this ADR proposed two separate queues for this. They were merged on 2026-06-01 because the maintenance surface (Redis prefixes, metrics, deploy gates, audit adapter wiring) doubles with no behavior gain — a `stage:` field in the payload achieves the same thing with one queue.
+
+**Queue payload is the full dispatch context** (trigger identity, trace identity, alert metadata — everything the dispatcher needs to fire). The queue is the source of truth for dispatch scheduling and execution; PG is the audit projection (see [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) revision).
+
+**Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: the outbox queue is a free-standing global queue, not a pipeline command/projection, so `queueManager`'s automatic `${tenantId}/` wrapping does not apply — the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
 
 **Cadence windows** are handled natively by setting `delay = scheduledFor - now()` on send. The queue dispatches the job when the delay elapses; no polling needed.
 
 **Digest coalescing** is handled by the queue's `processBatch` + `coalesceMaxBatch` configuration: when the cadence window flushes for a trigger, the queue invokes the dispatcher with every same-`groupKey` job currently ready, in one batch. The dispatcher renders one digest from the array of payloads. No application-level `SELECT … FOR UPDATE` against PG.
 
-**Replay dedup** is handled by `deduplication: { makeId: payload => '${reactorName}:${dedupKey}', extend: false, replace: false }`. The original event re-firing (from a replay or a cross-pipeline race) collapses onto the existing pending job; the cadence window stays anchored to the first match's enqueue time.
+**Dedup is stage-aware.** The settle stage uses Debounce Mode (`makeId: settleDedupId, extend: true, replace: true`) — every new event on the same (projectId, triggerId, traceId) collapses onto the pending job and resets the TTL, so an in-flight trace stays uncommitted as long as spans keep arriving. The cadence stage uses a different `makeId` so digest members don't dedup against each other; the cadence window stays anchored to the boundary, not to the first match. Both modes are configured in the one `deduplication.makeId` resolver via the `stage` discriminator.
 
 **Audit projection.** The queue is constructed with a `PgOutboxAuditAdapter` (see [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) revision) so every lifecycle event (`onEnqueue`, `onLeased`, `onDispatched`, `onFailed`, `onDead`) writes/updates a row in `ReactorOutbox`. Operator dashboards read PG, not Redis.
 
@@ -64,15 +73,13 @@ Reasons for the flip:
 
 The cost is that the queue payload is bigger and Redis is now load-bearing for payload durability — but the GroupQueue's existing heartbeat + recovery already cover that, and `PgOutboxAuditAdapter` provides a parallel durable record for the cases where Redis loses a job (the adapter's `onEnqueue` ran, no subsequent transition fires within a configurable timeout → operator gets paged).
 
-### Why `deduplication: { extend: false, replace: false }`
+### Why two dedup modes share one queue
 
-The dispatch window is anchored at **first-match time + cadence**. Subsequent matches must join that existing window, not push it out. `extend: true` (the debounce default) would extend the window every time a match arrives, indefinitely. `replace: true` would replace the existing job's payload, which we don't want for cadence: each match is its own logical row in the digest, so we need the *batch* of matches at flush time, not the latest. `extend: false, replace: false` means "first match opens the window; subsequent matches enqueue alongside, the queue's `processBatch` folds them at flush" — exactly what we want.
-
-If runtime testing in Phase 1 reveals that `extend: false` doesn't behave as the docs imply, fall back to emulating it in app code: check via a small per-trigger Redis SETNX before calling `groupQueue.send`.
+Settle and cadence want opposite dedup semantics: settle wants Debounce Mode (collapse + reset TTL on every new span), cadence wants no dedup across digest members (each match is its own row in the digest). Sharing one queue would be a problem only if dedup were globally configured — but `DeduplicationConfig.makeId` is a function of payload, so the same queue can return Debounce Mode keys for settle payloads and per-job keys for cadence payloads. The earlier draft of this ADR side-stepped this by using two queues; the unification on 2026-06-01 dropped that constraint.
 
 ## Consequences
 
-- **Operational consistency.** Outbox dispatch shares queue infrastructure with the rest of event sourcing — same Redis, same Grafana panels, same crash recovery code paths. The outbox dispatch queue and the main event-sourcing queue are distinct `GroupQueueProcessor` instances; they share the runtime but not state.
+- **Operational consistency.** Outbox dispatch shares queue infrastructure with the rest of event sourcing — same Redis, same Grafana panels, same crash recovery code paths. The outbox queue and the main event-sourcing queue are distinct `GroupQueueProcessor` instances; they share the runtime but not state. The outbox queue itself carries both stages — one queue, not two.
 - **Redis outage halts new dispatches.** Audit rows do not accumulate (no producer side, no consumer side) — the prior "PG keeps a backlog" property goes away with wakeup-only payloads. The compensation is that Redis outages are short and the queue's recovery semantics handle resume cleanly; long outages page operators via the audit-lag metric.
 - **PG outage degrades the audit projection but does not block dispatch.** The queue keeps running; the `PgOutboxAuditAdapter` retries adapter writes and the projection eventually catches up. Operator dashboards show audit lag when reconciliation falls behind.
 - **The dispatch worker is a `GroupQueue` processor with an audit adapter**, not a standalone polling drainer. Its process role is `worker` (same as other event-sourcing workers).

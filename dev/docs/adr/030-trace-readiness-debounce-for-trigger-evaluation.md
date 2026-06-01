@@ -60,7 +60,7 @@ A new column on `Trigger`:
 
 ```sql
 ALTER TABLE "Trigger"
-  ADD COLUMN "evaluationDebounceMs" INTEGER NOT NULL DEFAULT 30000;
+  ADD COLUMN "traceDebounceMs" INTEGER NOT NULL DEFAULT 30000;
 -- Allowed values surfaced in the UI: 0 (off), 15000, 30000, 60000, 120000, 300000.
 ```
 
@@ -88,35 +88,47 @@ who wants today's eager behavior can flip the trigger to 0.
 
 ### Evaluation queue
 
-A new GroupQueue, `trigger-evaluation`, with this definition:
+The debounce lives on the **unified outbox queue** (`langwatch:outbox`,
+ADR-023 revision) as its `stage: "settle"` payload. There is **not**
+a separate `langwatch:trigger-evaluation` queue — folding both stages
+onto one queue halves the operational surface (one Redis prefix, one
+audit adapter, one Grafana panel, one consumer loop) without losing
+the per-stage tuning: stage-specific group key, coalescing, and dedup
+mode are driven by the payload discriminator. See ADR-023 for the
+full queue definition.
+
+The settle payload uses Debounce Mode keyed on
+`(projectId, triggerId, traceId)`:
 
 ```ts
-defineEventSourcedQueue<TriggerEvaluationRequest>({
-  name: "langwatch:trigger-evaluation",
-  process: async (req) => {
-    // Settled — evaluate filters now, dispatch on match.
-    await evaluateAndDispatchTrigger(req);
-  },
-  groupKey: (req) => `${req.projectId}/${req.triggerId}`,
-  deduplication: {
-    makeId: (req) => `${req.projectId}:${req.triggerId}:${req.traceId}`,
-    ttlMs: 30_000,              // overridden per-trigger via req.debounceMs at enqueue time
-    extend: true,               // every new event resets the timer
-    replace: true,              // latest payload (latest event ref) wins
-  },
-});
+// Inside the unified outbox queue's deduplication.makeId resolver:
+makeId: (payload) =>
+  isSettle(payload)
+    ? settleDedupId(payload)            // per-(trigger, trace)
+    : `${payload.projectId}/cadence/${payload.auditDedupKey}`,
+// extend: true, replace: true — Debounce Mode.
+// ttlMs defaults to DEFAULT_TRACE_DEBOUNCE_MS, overridden per trigger
+// via the per-send `deduplication.ttlMs` override.
 ```
 
-The reactor's job collapses to **enqueue an evaluation request** for
-every (active trigger × incoming event). It no longer evaluates
-filters or dispatches inline:
+The reactor's job collapses to **enqueue a settle payload** for every
+(active trigger × incoming event). It no longer evaluates filters or
+dispatches inline:
 
 ```ts
 // inside alertTrigger / evaluationAlertTrigger:
 for (const trigger of triggers) {
-  await triggerEvaluationQueue.send(
-    { projectId: tenantId, triggerId: trigger.id, traceId },
-    { deduplication: { ttlMs: trigger.evaluationDebounceMs } },
+  await outboxQueue.send(
+    {
+      stage: "settle",
+      projectId: tenantId,
+      triggerId: trigger.id,
+      traceId,
+      reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+      auditDedupKey: auditDedupKey({ projectId: tenantId, triggerId: trigger.id, traceId }),
+      foldSnapshotAtEnqueue: { computedInput, computedOutput },
+    },
+    { deduplication: { ttlMs: trigger.traceDebounceMs } },
   );
 }
 ```
@@ -132,6 +144,12 @@ The GroupQueue's Debounce Mode ensures:
 - The deduplication key is `(projectId, triggerId, traceId)` so two
   different triggers on the same trace settle independently with
   potentially different debounce windows.
+
+When the settle process callback matches, it re-enqueues a
+`stage: "cadence"` payload with `delay = computeScheduledFor(
+trigger.action, trigger.notificationCadence, now) - now`. The same
+queue carries it; the audit row identified by `auditDedupKey` follows
+it through the cadence boundary.
 
 ### Where filter evaluation moves
 
@@ -238,10 +256,10 @@ Two debounce-shaped knobs sit at different points in the pipeline:
 
 | Knob | When it fires | What it does |
 |---|---|---|
-| ADR-030 `evaluationDebounceMs` | Before filter evaluation | Wait for trace to settle so the filter sees the final state |
+| ADR-030 `traceDebounceMs` | Before filter evaluation | Wait for trace to settle so the filter sees the final state |
 | ADR-025 `notificationCadence` | After dispatch decision | Batch matches inside a wall-clock window into one digest |
 
-A trigger configured `evaluationDebounceMs: 60000` +
+A trigger configured `traceDebounceMs: 60000` +
 `notificationCadence: 5min_digest` means "wait 60s for the trace to
 settle, then if it matches, hold the notification for the next
 5-minute digest boundary." Each knob solves a different operator
@@ -259,18 +277,18 @@ persist; debounce makes sense for both.
 
 ## Consequences
 
-- **New `Trigger.evaluationDebounceMs` column.** Single `ALTER TABLE`
+- **New `Trigger.traceDebounceMs` column.** Single `ALTER TABLE`
   with a default; instant on PG ≥ 11.
 - **Existing triggers default to 30s.** Operators who were depending
   on eager evaluation see a one-time change — flip to 0 if needed.
   The drawer surfaces the value on the next edit.
 - **Reactor shape changes.** `alertTrigger` /
   `evaluationAlertTrigger` no longer evaluate filters; they emit
-  `triggerEvaluationQueue.send(...)`. The unit tests for those
+  `outboxQueue.send({ stage: "settle", … })`. The unit tests for those
   reactors collapse to "the right number of enqueues for the right
   triggers" — the heavy filter-matching tests move onto the new
   `evaluateAndDispatchTrigger` function.
-- **Worker-only.** The trigger-evaluation queue is part of the
+- **Worker-only.** The settle stage runs on the unified outbox queue, which is part of the
   outbox-adjacent worker stack
   ([feedback-outbox-worker-only](../../feedback-outbox-worker-only.md)),
   so web is unaffected.
