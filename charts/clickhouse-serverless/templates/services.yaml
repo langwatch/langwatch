@@ -9,6 +9,13 @@ metadata:
     {{- include "clickhouse-serverless.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
+  # Prefer same-AZ ClickHouse endpoint when one is ready, falling back to any endpoint
+  # otherwise. Eliminates the random cross-AZ hop on the app→ClickHouse query path —
+  # the main controllable driver of cross-AZ data-transfer cost on a multi-AZ replicated
+  # cluster. PreferClose is stable from Kubernetes 1.31.
+  {{- if .Values.service.preferCloseTrafficDistribution }}
+  trafficDistribution: PreferClose
+  {{- end }}
   ports:
     - name: http
       port: 8123

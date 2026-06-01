@@ -45,6 +45,12 @@ type Computed struct {
 	PoolFreeEntryLowerMerge        int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_LOWER_MAX_SIZE_OF_MERGE"`
 	PoolFreeEntryOptimizePartition int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_OPTIMIZE_ENTIRE_PARTITION"`
 
+	// Zero-copy replication for S3-backed parts. Replicas share S3 objects with
+	// refcounts in Keeper rather than each re-uploading merged parts and cross-AZ
+	// transferring them. Largest cost lever on S3-backed multi-replica clusters.
+	// 1 = enabled (default), 0 = disabled.
+	AllowRemoteFsZeroCopyReplication int `env:"ALLOW_REMOTE_FS_ZERO_COPY_REPLICATION"`
+
 	// Async Insert
 	AsyncInsertEnabled       int `env:"ASYNC_INSERT_ENABLED"`
 	AsyncInsertWait          int `env:"ASYNC_INSERT_WAIT"`
@@ -130,6 +136,11 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	c.PoolFreeEntryMutation = max(1, c.BackgroundPoolSize/2)
 	c.PoolFreeEntryLowerMerge = max(1, c.BackgroundPoolSize/4)
 	c.PoolFreeEntryOptimizePartition = max(1, c.BackgroundPoolSize/2)
+
+	// Zero-copy S3 replication on by default. Only meaningful when the cluster
+	// is replicated AND a remote object-storage disk is configured; ClickHouse
+	// ignores it for purely local MergeTrees so it's safe to enable globally.
+	c.AllowRemoteFsZeroCopyReplication = 1
 
 	// --- Async Insert (constants) ---
 	c.AsyncInsertEnabled = 1

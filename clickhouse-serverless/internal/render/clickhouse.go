@@ -86,12 +86,19 @@ func renderLogging(input *config.Input, configD string) error {
 }
 
 // renderNetwork writes network.yaml with connection and timeout settings.
+//
+// network_compression_method=zstd compresses inter-server traffic — replication
+// INSERTs and distributed query payloads. ClickHouse columnar payloads typically
+// hit 5-8x with zstd, which directly reduces cross-AZ data-transfer bytes on the
+// mandatory replication write path. Level 3 trades a little CPU for high ratio.
 func renderNetwork(c *config.Computed, configD string) error {
 	return writeYAML(filepath.Join(configD, "network.yaml"), map[string]any{
-		"listen_host":        "0.0.0.0",
-		"max_connections":    c.MaxConnections,
-		"keep_alive_timeout": c.KeepAliveTimeout,
-		"listen_backlog":     c.ListenBacklog,
+		"listen_host":                   "0.0.0.0",
+		"max_connections":               c.MaxConnections,
+		"keep_alive_timeout":            c.KeepAliveTimeout,
+		"listen_backlog":                c.ListenBacklog,
+		"network_compression_method":    "zstd",
+		"network_zstd_compression_level": 3,
 	})
 }
 

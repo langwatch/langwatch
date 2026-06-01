@@ -23,6 +23,7 @@ type mergeTreeConfig struct {
 	FreeEntriesMutation               int   `yaml:"number_of_free_entries_in_pool_to_execute_mutation"`
 	FreeEntriesLowerMerge             int   `yaml:"number_of_free_entries_in_pool_to_lower_max_size_of_merge"`
 	FreeEntriesOptimize               int   `yaml:"number_of_free_entries_in_pool_to_execute_optimize_entire_partition"`
+	AllowRemoteFsZeroCopyReplication  int   `yaml:"allow_remote_fs_zero_copy_replication"`
 }
 
 // systemLogDef defines a ClickHouse system log table with its configuration knobs.
@@ -52,6 +53,7 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 			FreeEntriesMutation:               c.PoolFreeEntryMutation,
 			FreeEntriesLowerMerge:             c.PoolFreeEntryLowerMerge,
 			FreeEntriesOptimize:               c.PoolFreeEntryOptimizePartition,
+			AllowRemoteFsZeroCopyReplication:  c.AllowRemoteFsZeroCopyReplication,
 		},
 		"max_server_memory_usage":                       c.MaxServerMemoryUsage,
 		"max_server_memory_usage_to_ram_ratio":          c.MaxServerMemoryRatio,

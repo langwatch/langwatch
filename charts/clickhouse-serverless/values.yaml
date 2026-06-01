@@ -89,6 +89,15 @@ preflight:
 # Advanced: override any computed value (applied last)
 env: {}
 
+# Kubernetes Service settings
+service:
+  # Set the ClusterIP Service's trafficDistribution to PreferClose so kube-proxy
+  # routes in-cluster app→ClickHouse traffic to a same-AZ endpoint when one is
+  # ready. Cuts cross-AZ data transfer cost on multi-AZ replicated clusters.
+  # Requires Kubernetes 1.31+ (stable from 1.31). Disable on older clusters —
+  # the field is rejected by older kube-apiservers.
+  preferCloseTrafficDistribution: true
+
 # Keeper resources (only used when replicas > 1)
 keeper:
   resources:
