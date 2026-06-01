@@ -129,6 +129,45 @@ function formatDays(days: number): string {
   return days === 0 ? "Indefinite" : `${days} days`;
 }
 
+type RetentionRuleRow = {
+  scopeType: ScopeChipPickerScopeType;
+  scopeId: string;
+  name: string;
+  category: RetentionCategory;
+  retentionDays: number;
+};
+
+type RetentionRuleGroup = {
+  scopeType: ScopeChipPickerScopeType;
+  scopeId: string;
+  name: string;
+  rules: RetentionRuleRow[];
+};
+
+/** Groups override rows by (scopeType, scopeId) preserving first-seen order
+ *  so the table renders one logical block per scope instead of repeating the
+ *  scope name once per category. */
+function groupRulesByScope(rules: RetentionRuleRow[]): RetentionRuleGroup[] {
+  const groups: RetentionRuleGroup[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const r of rules) {
+    const key = `${r.scopeType}:${r.scopeId}`;
+    const idx = indexByKey.get(key);
+    if (idx === undefined) {
+      indexByKey.set(key, groups.length);
+      groups.push({
+        scopeType: r.scopeType,
+        scopeId: r.scopeId,
+        name: r.name,
+        rules: [r],
+      });
+    } else {
+      groups[idx]!.rules.push(r);
+    }
+  }
+  return groups;
+}
+
 function DataRetentionSettings() {
   const { project, organization, team } = useOrganizationTeamProject();
   if (!project) return null;
@@ -422,21 +461,26 @@ function DataRetentionPage({
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {snapshot.rules.map((rule) => {
-                      const Icon = SCOPE_ICON[rule.scopeType];
-                      return (
+                    {groupRulesByScope(snapshot.rules).map((group) => {
+                      const Icon = SCOPE_ICON[group.scopeType];
+                      return group.rules.map((rule, idx) => (
                         <Table.Row
                           key={`${rule.scopeType}:${rule.scopeId}:${rule.category}`}
                         >
-                          <Table.Cell>
-                            <HStack gap={2}>
-                              <Icon size={14} />
-                              <Text>{rule.name}</Text>
-                              <Badge size="sm" colorPalette="gray">
-                                {rule.scopeType.toLowerCase()}
-                              </Badge>
-                            </HStack>
-                          </Table.Cell>
+                          {idx === 0 && (
+                            <Table.Cell
+                              rowSpan={group.rules.length}
+                              verticalAlign="top"
+                            >
+                              <HStack gap={2}>
+                                <Icon size={14} />
+                                <Text>{group.name}</Text>
+                                <Badge size="sm" colorPalette="gray">
+                                  {group.scopeType.toLowerCase()}
+                                </Badge>
+                              </HStack>
+                            </Table.Cell>
+                          )}
                           <Table.Cell>
                             {CATEGORY_LABELS[rule.category]}
                           </Table.Cell>
@@ -467,7 +511,7 @@ function DataRetentionPage({
                             )}
                           </Table.Cell>
                         </Table.Row>
-                      );
+                      ));
                     })}
                   </Table.Body>
                 </Table.Root>
