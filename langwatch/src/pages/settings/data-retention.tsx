@@ -14,7 +14,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Building2, Folder, History, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -94,6 +93,22 @@ const RETENTION_PRESETS: Array<{ value: string; label: string; days: number }> =
   ];
 
 const CUSTOM_PRESET_VALUE = "custom";
+
+const ALL_CATEGORIES_VALUE = "__all__";
+type CategoryPick = typeof ALL_CATEGORIES_VALUE | RetentionCategory;
+
+// One Select with "All categories" pinned at the top followed by each
+// individual category. Two ItemGroups render a visual divider between the
+// shortcut and the specific picks without us having to inject a separator.
+const categoryPickCollection = createListCollection({
+  items: [
+    { value: ALL_CATEGORIES_VALUE, label: "All categories" },
+    ...RETENTION_CATEGORIES.map((c) => ({
+      value: c,
+      label: CATEGORY_LABELS[c],
+    })),
+  ],
+});
 
 const retentionPresetCollection = createListCollection({
   items: [
@@ -711,9 +726,9 @@ function AddOverrideDrawer({
   ) => void;
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
-  const [categories, setCategories] = useState<RetentionCategory[]>([
-    ...RETENTION_CATEGORIES,
-  ]);
+  const [categoryPick, setCategoryPick] = useState<CategoryPick>(
+    ALL_CATEGORIES_VALUE,
+  );
   const [preset, setPreset] = useState<string>(
     String(DEFAULT_RETENTION_DAYS),
   );
@@ -729,12 +744,17 @@ function AddOverrideDrawer({
           ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
           : [],
       );
-      setCategories([...RETENTION_CATEGORIES]);
+      setCategoryPick(ALL_CATEGORIES_VALUE);
       setPreset(String(DEFAULT_RETENTION_DAYS));
       setCustomAmount("");
       setCustomUnit("weeks");
     }
   }, [open, currentProjectId, available.projects]);
+
+  const categories: RetentionCategory[] =
+    categoryPick === ALL_CATEGORIES_VALUE
+      ? [...RETENTION_CATEGORIES]
+      : [categoryPick];
 
   const resolvedDays = (() => {
     if (preset === CUSTOM_PRESET_VALUE) {
@@ -752,22 +772,7 @@ function AddOverrideDrawer({
     resolvedDays <= MAX_RETENTION_DAYS &&
     resolvedDays % RETENTION_WEEK_DAYS === 0;
 
-  const allCategoriesPicked = categories.length === RETENTION_CATEGORIES.length;
-
-  const toggleCategory = (cat: RetentionCategory, checked: boolean) => {
-    setCategories((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(cat);
-      else next.delete(cat);
-      return RETENTION_CATEGORIES.filter((c) => next.has(c));
-    });
-  };
-
-  const canSave =
-    scopes.length > 0 &&
-    categories.length > 0 &&
-    daysValid &&
-    !isSaving;
+  const canSave = scopes.length > 0 && daysValid && !isSaving;
 
   return (
     <Drawer.Root
@@ -807,29 +812,44 @@ function AddOverrideDrawer({
             </VStack>
 
             <Field.Root>
-              <Field.Label>Categories</Field.Label>
-              <VStack align="start" gap={2}>
-                <Checkbox
-                  checked={allCategoriesPicked}
-                  onCheckedChange={({ checked }) => {
-                    if (checked) setCategories([...RETENTION_CATEGORIES]);
-                    else setCategories([]);
-                  }}
-                >
-                  <Text fontWeight="600">All categories</Text>
-                </Checkbox>
-                {RETENTION_CATEGORIES.map((c) => (
-                  <Checkbox
-                    key={c}
-                    checked={categories.includes(c)}
-                    onCheckedChange={({ checked }) =>
-                      toggleCategory(c, checked === true)
-                    }
-                  >
-                    {CATEGORY_LABELS[c]}
-                  </Checkbox>
-                ))}
-              </VStack>
+              <Field.Label>Category</Field.Label>
+              <Select.Root
+                collection={categoryPickCollection}
+                value={[categoryPick]}
+                onValueChange={(details) => {
+                  const v = details.value[0] as CategoryPick | undefined;
+                  if (v) setCategoryPick(v);
+                }}
+              >
+                <Select.Trigger background="bg">
+                  <Select.ValueText placeholder="Select category" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.ItemGroup label="">
+                    <Select.Item
+                      item={categoryPickCollection.items[0]!}
+                      key={ALL_CATEGORIES_VALUE}
+                    >
+                      All categories
+                    </Select.Item>
+                  </Select.ItemGroup>
+                  <Select.ItemGroup label="">
+                    {RETENTION_CATEGORIES.map((c, i) => (
+                      <Select.Item
+                        key={c}
+                        item={categoryPickCollection.items[i + 1]!}
+                      >
+                        {CATEGORY_LABELS[c]}
+                      </Select.Item>
+                    ))}
+                  </Select.ItemGroup>
+                </Select.Content>
+              </Select.Root>
+              <Field.HelperText>
+                {categoryPick === ALL_CATEGORIES_VALUE
+                  ? "Creates one override per category at each picked scope."
+                  : "You can add another override afterwards for a different category."}
+              </Field.HelperText>
             </Field.Root>
 
             <Field.Root>
