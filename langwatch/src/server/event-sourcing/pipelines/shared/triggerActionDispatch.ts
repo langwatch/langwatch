@@ -89,6 +89,22 @@ export function computeScheduledFor({
   return new Date(now.getTime() + CADENCE_WINDOW_MS[cadence]);
 }
 
+/**
+ * Wired by the registry on the worker (composition root), `undefined`
+ * on the web process and in unit tests that don't care about the
+ * outbox. When set, NOTIFY-class matches route through the unified
+ * outbox queue (`stage: "settle"`) so the settle dispatcher does the
+ * filter recheck + claim + cadence enqueue. Persist-class actions
+ * always run inline regardless of this setting — they want every
+ * match to land immediately.
+ */
+export type EnqueueSettle = (params: {
+  projectId: string;
+  triggerId: string;
+  traceId: string;
+  foldState: TraceSummaryData;
+}) => Promise<void>;
+
 export interface TriggerActionDispatchDeps {
   triggers: TriggerService;
   projects: ProjectService;
@@ -104,6 +120,7 @@ export interface TriggerActionDispatchDeps {
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
   }) => Promise<void>;
+  enqueueSettle?: EnqueueSettle;
 }
 
 interface ActionParams {
