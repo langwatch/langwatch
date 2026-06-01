@@ -473,9 +473,19 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   // Raw queries ($queryRaw / $executeRaw) carry no model and no
   // structured `where` clause for this guard to inspect — tenancy is
-  // the SQL author's responsibility (e.g. the outbox lease query filters
-  // by projectId in its SQL text). Mirrors guardOrganizationId, which
-  // also short-circuits when there is no model.
+  // the SQL author's responsibility. The outbox lease query is the
+  // first in-tree use case (it filters by projectId in its SQL text),
+  // but the exemption applies to ALL raw queries: any future
+  // $queryRaw / $executeRaw call must include the tenancy predicate
+  // inline; this middleware will no longer catch a missing one.
+  //
+  // Mirrors `guardOrganizationId` (dbOrganizationIdProtection.ts),
+  // which also short-circuits when there is no model. The prior
+  // behaviour (fall through with `params.model === undefined`) was
+  // load-bearing only by accident — the create/findMany checks below
+  // throw on an undefined model, which would have surfaced as a
+  // confusing `The undefined action on the undefined model …` error
+  // rather than a real tenancy violation.
   if (!params.model) return;
   if (EXEMPT_MODELS.includes(params.model)) return;
 
