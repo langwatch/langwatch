@@ -55,7 +55,24 @@ export async function renderTriggerSlack({
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
 
-  if (template == null || templateType !== "block_kit") {
+  // Custom template supplied without an explicit type → operator error.
+  // We refuse to guess whether the body is plain text or Block Kit JSON
+  // because either choice silently mis-renders the other (treating a JSON
+  // doc as text leaks braces into Slack; treating plain text as Block Kit
+  // crashes JSON.parse). Fall back to the default and surface the issue.
+  if (template != null && templateType == null) {
+    const fallback = await defaultSlackText({ context: ctx, testFire });
+    return {
+      payload: { text: fallback.text },
+      usedDefault: true,
+      missingVariables: fallback.missingVariables,
+      errors: [
+        'Slack template was provided without a templateType — set "string" or "block_kit" to disambiguate.',
+      ],
+    };
+  }
+
+  if (template == null || templateType === "string") {
     const rendered = await renderWithFallback({
       template,
       fallback: DEFAULT_SLACK_TEMPLATE,

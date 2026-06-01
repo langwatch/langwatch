@@ -48,6 +48,17 @@ export interface TemplateTraceVars {
   output: string;
   url: string;
   metadata: Record<string, unknown>;
+  /**
+   * Pre-computed display label for the match link, so the default template can
+   * preserve the legacy "View Graph" / `traceId` / "View" choice without having
+   * to discriminate on `graphId` in Liquid. Authors may still override this in
+   * a custom template — it's a default convenience, not a hard contract.
+   */
+  label: string;
+  /** True when this match is a custom-graph dispatch rather than a trace match.
+   *  Surfaced so templates can vary per-source body (e.g. omit input/output for
+   *  custom graphs, which carry no trace payload). */
+  isCustomGraph: boolean;
 }
 
 export interface TemplateEvaluationVars {
@@ -117,20 +128,28 @@ export function buildTemplateContext({
       windowStart: window?.start ? window.start.toISOString() : null,
       windowEnd: window?.end ? window.end.toISOString() : null,
     },
-    matches: matches.map((match) => ({
-      trace: {
-        id: match.traceId ?? null,
-        input: match.input ?? "",
-        output: match.output ?? "",
-        url: matchUrl({
-          baseHost,
-          projectSlug: project.slug,
-          traceId: match.traceId,
-          graphId: match.graphId,
-        }),
-        metadata: match.metadata ?? {},
-      },
-      evaluation: match.evaluation ?? null,
-    })),
+    matches: matches.map((match) => {
+      const isCustomGraph = !!match.graphId;
+      const label = isCustomGraph
+        ? "View Graph"
+        : (match.traceId ?? "View");
+      return {
+        trace: {
+          id: match.traceId ?? null,
+          input: match.input ?? "",
+          output: match.output ?? "",
+          url: matchUrl({
+            baseHost,
+            projectSlug: project.slug,
+            traceId: match.traceId,
+            graphId: match.graphId,
+          }),
+          metadata: match.metadata ?? {},
+          label,
+          isCustomGraph,
+        },
+        evaluation: match.evaluation ?? null,
+      };
+    }),
   };
 }

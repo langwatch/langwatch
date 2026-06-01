@@ -85,11 +85,15 @@ export async function renderLiquid({
     timer = setTimeout(() => reject(new RenderTimeoutError(timeoutMs)), timeoutMs);
   });
 
+  const renderPromise = getLiquidEngine().parseAndRender(template, context);
+  // When the deadline wins the race we abandon the render — swallow any
+  // late rejection here so it doesn't surface as an unhandled rejection
+  // on the worker. The race itself still observes a rejection that
+  // resolves earlier than the deadline.
+  renderPromise.catch(() => {});
+
   try {
-    const output = await Promise.race([
-      getLiquidEngine().parseAndRender(template, context),
-      deadline,
-    ]);
+    const output = await Promise.race([renderPromise, deadline]);
     return { output, missingVariables };
   } finally {
     if (timer) clearTimeout(timer);

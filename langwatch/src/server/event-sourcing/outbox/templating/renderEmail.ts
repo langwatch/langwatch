@@ -29,6 +29,22 @@ function clipSubject(subject: string): string {
   return `${oneLine.slice(0, EMAIL_SUBJECT_MAX_LENGTH - 1).trimEnd()}…`;
 }
 
+/** Clip after the test-fire prefix is applied so the final subject (including
+ *  the prefix) honours `EMAIL_SUBJECT_MAX_LENGTH`. Clipping the rendered
+ *  subject *first* and then prepending the prefix would let a long subject
+ *  push the total well past the documented cap. */
+function clipFinalSubject({
+  rendered,
+  testFire,
+}: {
+  rendered: string;
+  testFire: boolean;
+}): string {
+  return clipSubject(
+    testFire ? `${TEST_FIRE_EMAIL_SUBJECT_PREFIX}${rendered}` : rendered,
+  );
+}
+
 /**
  * Renders a trigger email from optional customer templates, falling back to the
  * framework default per part. Body is Liquid → Markdown → sanitized HTML →
@@ -59,10 +75,10 @@ export async function renderTriggerEmail({
     context: ctx,
   });
 
-  const clipped = clipSubject(subjectRender.output);
-  const subject = testFire
-    ? `${TEST_FIRE_EMAIL_SUBJECT_PREFIX}${clipped}`
-    : clipped;
+  const subject = clipFinalSubject({
+    rendered: subjectRender.output,
+    testFire,
+  });
 
   const html = wrapEmailHtml({
     bodyHtml: markdownToEmailHtml(bodyRender.output),

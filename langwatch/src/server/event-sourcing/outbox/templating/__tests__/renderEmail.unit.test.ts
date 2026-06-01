@@ -81,9 +81,9 @@ describe("renderTriggerEmail", () => {
         context: makeContext({
           digest: { count: 3, windowStart: null, windowEnd: null },
           matches: [
-            makeMatch({ trace: { id: "trace-aaa", input: "", output: "", url: "#", metadata: {} } }),
-            makeMatch({ trace: { id: "trace-bbb", input: "", output: "", url: "#", metadata: {} } }),
-            makeMatch({ trace: { id: "trace-ccc", input: "", output: "", url: "#", metadata: {} } }),
+            makeMatch({ trace: { id: "trace-aaa", input: "", output: "", url: "#", metadata: {}, label: "trace-aaa", isCustomGraph: false } }),
+            makeMatch({ trace: { id: "trace-bbb", input: "", output: "", url: "#", metadata: {}, label: "trace-bbb", isCustomGraph: false } }),
+            makeMatch({ trace: { id: "trace-ccc", input: "", output: "", url: "#", metadata: {}, label: "trace-ccc", isCustomGraph: false } }),
           ],
         }),
       });
@@ -128,6 +128,18 @@ describe("renderTriggerEmail", () => {
       });
       expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(true);
       expect(email.html).toContain(TEST_FIRE_NOTICE);
+    });
+
+    it("clips the final subject including the prefix to the cap", async () => {
+      const email = await renderTriggerEmail({
+        subjectTemplate: "X".repeat(300),
+        bodyTemplate: null,
+        context: makeContext(),
+        testFire: true,
+      });
+      expect(email.subject.length).toBe(EMAIL_SUBJECT_MAX_LENGTH);
+      expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(true);
+      expect(email.subject.endsWith("…")).toBe(true);
     });
   });
 });

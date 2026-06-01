@@ -13,6 +13,8 @@ export function makeMatch(
       output: "it is sunny",
       url: "https://app.langwatch.ai/acme/messages/trace_1",
       metadata: {},
+      label: "trace_1",
+      isCustomGraph: false,
     },
     evaluation: null,
     ...overrides,

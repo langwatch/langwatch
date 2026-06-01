@@ -73,6 +73,21 @@ describe("renderTriggerSlack", () => {
     });
   });
 
+  describe("when a custom template is supplied without a templateType", () => {
+    it("falls back to the default and surfaces an operator error", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: null,
+        template: "Alert for {{ project.name }}",
+        context: makeContext(),
+      });
+      expect("text" in slack.payload).toBe(true);
+      expect(slack.usedDefault).toBe(true);
+      expect(slack.errors.length).toBeGreaterThan(0);
+      // The error message tells the operator how to disambiguate.
+      expect(slack.errors[0]).toMatch(/templateType/i);
+    });
+  });
+
   describe("when a string template throws while rendering", () => {
     it("falls back to the default text", async () => {
       const slack = await renderTriggerSlack({

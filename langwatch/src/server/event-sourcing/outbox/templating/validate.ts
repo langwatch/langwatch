@@ -1,4 +1,5 @@
 import { getLiquidEngine } from "./engine";
+import { errorMessage } from "./renderWithFallback";
 
 export interface LiquidValidationResult {
   valid: boolean;
@@ -18,7 +19,7 @@ export function validateLiquid(template: string): LiquidValidationResult {
   } catch (err) {
     return {
       valid: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMessage(err),
     };
   }
 }

@@ -37,6 +37,27 @@ describe("buildTemplateContext", () => {
         "https://app.langwatch.ai/acme/analytics/custom/graph_1",
       );
     });
+
+    it("labels the match 'View Graph' and flags isCustomGraph", () => {
+      const ctx = buildTemplateContext({
+        ...baseArgs,
+        matches: [{ graphId: "graph_1" }],
+      });
+      expect(ctx.matches[0]?.trace.label).toBe("View Graph");
+      expect(ctx.matches[0]?.trace.isCustomGraph).toBe(true);
+    });
+  });
+
+  describe("when a match has neither a traceId nor a graphId", () => {
+    it("falls back to the '#' placeholder URL and the 'View' label", () => {
+      const ctx = buildTemplateContext({
+        ...baseArgs,
+        matches: [{}],
+      });
+      expect(ctx.matches[0]?.trace.url).toBe("#");
+      expect(ctx.matches[0]?.trace.label).toBe("View");
+      expect(ctx.matches[0]?.trace.isCustomGraph).toBe(false);
+    });
   });
 
   describe("when given several matches", () => {

@@ -64,23 +64,29 @@ Feature: Liquid templates for trigger notifications
 
   Rule: Slack templates declare their type explicitly
 
-    Scenario: A string Slack template is sent as plain text
-      Given a Slack template typed as a plain string
+    Scenario: A plain-text Slack template appears as an unformatted message
+      Given a Slack template authored as plain text
       When the Slack notification is rendered
-      Then the message is sent as text with no blocks
+      Then the message appears in Slack as an unformatted text post
 
-    Scenario: A Block Kit Slack template is sent as blocks
-      Given a Slack template typed as Block Kit that renders valid JSON blocks
+    Scenario: A structured Slack template appears with the authored layout
+      Given a Slack template authored as a structured layout that renders successfully
       When the Slack notification is rendered
-      Then the message is sent as a blocks payload
+      Then the message appears in Slack with the authored sections, dividers, and text laid out
+
+    Scenario: A Slack template without an explicit type falls back to the default
+      Given a Slack template authored without declaring whether it is plain text or structured layout
+      When the Slack notification is rendered
+      Then the default Slack notification appears instead
+      And the operator is told to declare the template type before it can be used
 
   Rule: Block Kit output is restricted to a safe allowlist
 
-    Scenario: Disallowed and interactive blocks are stripped
-      Given a Block Kit template that renders section, divider, and an interactive actions block
+    Scenario: Interactive controls in a structured template are not shown
+      Given a structured Slack template that includes interactive controls alongside content
       When the Slack notification is rendered
-      Then the section and divider blocks are kept
-      And the interactive actions block is removed
+      Then the content is shown in Slack
+      And no interactive control is shown to the recipient
 
   Rule: Template failures fall back to the default and are surfaced
 
@@ -90,11 +96,11 @@ Feature: Liquid templates for trigger notifications
       Then the default notification is rendered instead
       And the render error is reported for operator visibility
 
-    Scenario: Block Kit that is not valid JSON falls back to the default
-      Given a Block Kit template whose output is not valid JSON
+    Scenario: A structured Slack template that fails to render falls back to the default
+      Given a structured Slack template whose rendered output cannot be displayed
       When the Slack notification is rendered
-      Then the default Slack notification is rendered instead
-      And the parse failure is reported for operator visibility
+      Then the default Slack notification appears instead
+      And the operator is told why the structured template could not be used
 
     Scenario: A missing variable renders empty rather than failing
       Given a custom template that references a variable the context does not provide
