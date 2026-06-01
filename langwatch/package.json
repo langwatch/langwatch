@@ -348,7 +348,8 @@
       "@opentelemetry/sdk-node": ">=0.217.0",
       "tmp": ">=0.2.6",
       "hono@<4.12.18": ">=4.12.18",
-      "@hono/node-server@<1.19.13": ">=1.19.13"
+      "@hono/node-server@<1.19.13": ">=1.19.13",
+      "uuid@<11.1.1": ">=11.1.1 <12"
     }
   },
   "ct3aMetadata": {
