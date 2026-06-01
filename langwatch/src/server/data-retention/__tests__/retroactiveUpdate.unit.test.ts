@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { RetroactiveUpdateService } from "../retroactive/retroactiveUpdate.service";
+import {
+  RetroactiveMutationInProgressError,
+  RetroactiveUpdateService,
+} from "../retroactive/retroactiveUpdate.service";
 import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 
 describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
     describe("given the traces category is updated", () => {
       /** @scenario Retroactive retention update applies uniformly across all retention-managed tables */
-      it("issues the same WHERE clause shape for every retention-managed traces table including event_log", async () => {
+      it("issues a parametrized ALTER TABLE per traces table including event_log", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
         const service = new RetroactiveUpdateService(
@@ -19,9 +22,7 @@ describe("RetroactiveUpdateService", () => {
           newRetentionDays: 90,
         });
 
-        const issuedQueries = command.mock.calls.map(
-          ([request]) => request.query as string,
-        );
+        const issuedCalls = command.mock.calls.map(([request]) => request);
 
         // Every traces-category table should be updated
         const tracesTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
@@ -29,37 +30,42 @@ describe("RetroactiveUpdateService", () => {
           .map(([table]) => table);
 
         for (const table of tracesTables) {
-          expect(
-            issuedQueries.some(
-              (sql) =>
-                sql.includes(`ALTER TABLE ${table}`) &&
-                sql.includes("_retention_days = 90") &&
-                sql.includes("WHERE TenantId = 'project-1'") &&
-                sql.includes("_retention_days != 90"),
-            ),
-            `expected uniform update for table: ${table}`,
-          ).toBe(true);
+          const call = issuedCalls.find((c) =>
+            (c.query as string).includes(`ALTER TABLE ${table}`),
+          );
+          expect(call, `expected uniform update for table: ${table}`).toBeDefined();
+          expect(call!.query).toContain("UPDATE _retention_days = {retentionDays:UInt16}");
+          expect(call!.query).toContain("WHERE TenantId = {tenantId:String}");
+          expect(call!.query).toContain("_retention_days != {retentionDays:UInt16}");
+          expect(call!.query_params).toEqual({
+            tenantId: "project-1",
+            retentionDays: 90,
+          });
         }
 
         // event_log is in traces category and must NOT have a TraceId clause
         expect(
-          issuedQueries.some(
-            (sql) =>
-              sql.includes("ALTER TABLE event_log") &&
-              sql.includes("TraceId"),
+          issuedCalls.some(
+            (c) =>
+              (c.query as string).includes("ALTER TABLE event_log") &&
+              (c.query as string).includes("TraceId"),
           ),
         ).toBe(false);
 
         // No NOT IN clause anywhere — no pin exclusion
-        expect(issuedQueries.some((sql) => sql.includes("NOT IN"))).toBe(false);
+        expect(
+          issuedCalls.some((c) => (c.query as string).includes("NOT IN")),
+        ).toBe(false);
 
-        // No isNull anywhere
-        expect(issuedQueries.some((sql) => sql.includes("isNull"))).toBe(false);
+        // No literal projectId interpolation anywhere
+        expect(
+          issuedCalls.some((c) => (c.query as string).includes("'project-1'")),
+        ).toBe(false);
       });
     });
 
     describe("given the scenarios category is updated", () => {
-      it("issues uniform updates across simulation_runs and suite_runs", async () => {
+      it("issues parametrized updates across simulation_runs and suite_runs", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
         const service = new RetroactiveUpdateService(
@@ -72,31 +78,30 @@ describe("RetroactiveUpdateService", () => {
           newRetentionDays: 60,
         });
 
-        const issuedQueries = command.mock.calls.map(
-          ([request]) => request.query as string,
+        const issuedCalls = command.mock.calls.map(([request]) => request);
+
+        const simCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE simulation_runs"),
         );
+        expect(simCall).toBeDefined();
+        expect(simCall!.query_params).toEqual({
+          tenantId: "project-1",
+          retentionDays: 60,
+        });
 
-        expect(
-          issuedQueries.some(
-            (sql) =>
-              sql.includes("ALTER TABLE simulation_runs") &&
-              sql.includes("_retention_days = 60") &&
-              sql.includes("WHERE TenantId = 'project-1'"),
-          ),
-        ).toBe(true);
-
-        expect(
-          issuedQueries.some(
-            (sql) =>
-              sql.includes("ALTER TABLE suite_runs") &&
-              sql.includes("_retention_days = 60"),
-          ),
-        ).toBe(true);
+        const suiteCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE suite_runs"),
+        );
+        expect(suiteCall).toBeDefined();
+        expect(suiteCall!.query_params).toEqual({
+          tenantId: "project-1",
+          retentionDays: 60,
+        });
       });
     });
 
     describe("given the experiments category is updated", () => {
-      it("issues uniform updates across experiment_runs and experiment_run_items", async () => {
+      it("issues parametrized updates across experiment_runs and experiment_run_items", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
         const service = new RetroactiveUpdateService(
@@ -109,25 +114,84 @@ describe("RetroactiveUpdateService", () => {
           newRetentionDays: 120,
         });
 
-        const issuedQueries = command.mock.calls.map(
-          ([request]) => request.query as string,
+        const issuedCalls = command.mock.calls.map(([request]) => request);
+
+        const runsCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE experiment_runs"),
+        );
+        expect(runsCall).toBeDefined();
+        expect(runsCall!.query_params).toEqual({
+          tenantId: "project-1",
+          retentionDays: 120,
+        });
+
+        const itemsCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE experiment_run_items"),
+        );
+        expect(itemsCall).toBeDefined();
+        expect(itemsCall!.query_params).toEqual({
+          tenantId: "project-1",
+          retentionDays: 120,
+        });
+      });
+    });
+
+    describe("when a mutation is already in progress for a table", () => {
+      /** @scenario Conflict error names the mutation IDs callers can kill */
+      it("throws RetroactiveMutationInProgressError listing mutationId + table for every blocker", async () => {
+        const command = vi.fn().mockResolvedValue(undefined);
+        const query = vi.fn().mockResolvedValue({
+          json: async () => [
+            {
+              mutationId: "mut-1",
+              table: "stored_spans",
+              isDone: 0,
+              partsToDo: 5,
+              createTime: "2026-01-01T00:00:00",
+            },
+            {
+              mutationId: "mut-2",
+              table: "trace_summaries",
+              isDone: 0,
+              partsToDo: 2,
+              createTime: "2026-01-01T00:01:00",
+            },
+          ],
+        });
+        const service = new RetroactiveUpdateService(
+          async () => ({ command, query }) as any,
         );
 
-        expect(
-          issuedQueries.some(
-            (sql) =>
-              sql.includes("ALTER TABLE experiment_runs") &&
-              sql.includes("_retention_days = 120"),
-          ),
-        ).toBe(true);
+        await expect(
+          service.triggerUpdate({
+            projectId: "project-1",
+            category: "traces",
+            newRetentionDays: 30,
+          }),
+        ).rejects.toMatchObject({
+          name: "RetroactiveMutationInProgressError",
+        });
 
-        expect(
-          issuedQueries.some(
-            (sql) =>
-              sql.includes("ALTER TABLE experiment_run_items") &&
-              sql.includes("_retention_days = 120"),
-          ),
-        ).toBe(true);
+        try {
+          await service.triggerUpdate({
+            projectId: "project-1",
+            category: "traces",
+            newRetentionDays: 30,
+          });
+        } catch (e) {
+          expect(e).toBeInstanceOf(RetroactiveMutationInProgressError);
+          const err = e as RetroactiveMutationInProgressError;
+          // Caller can now act on the IDs without scraping the message.
+          expect(err.blocked.map((b) => b.mutationId)).toEqual([
+            "mut-1",
+            "mut-2",
+          ]);
+          expect(err.message).toContain("mut-1");
+          expect(err.message).toContain("mut-2");
+        }
+
+        // No ALTER TABLE was attempted
+        expect(command).not.toHaveBeenCalled();
       });
     });
   });
@@ -177,7 +241,36 @@ describe("RetroactiveUpdateService", () => {
         expect(storedSpans?.category).toBe("traces");
         expect(eventLog?.category).toBe("traces");
         expect(simRuns?.category).toBe("scenarios");
+
+        // Tenant filter flows through query_params, not raw SQL.
+        const [request] = query.mock.calls[0]!;
+        expect(request.query_params).toEqual({ tenantId: "project-1" });
+        expect(request.query).not.toContain("'project-1'");
       });
+    });
+  });
+
+  describe("killMutation()", () => {
+    it("parametrizes mutation_id and tenant filter", async () => {
+      const command = vi.fn().mockResolvedValue(undefined);
+      const service = new RetroactiveUpdateService(
+        async () => ({ command }) as any,
+      );
+
+      await service.killMutation({
+        projectId: "project-1",
+        mutationId: "mut-xyz",
+      });
+
+      expect(command).toHaveBeenCalledTimes(1);
+      const [request] = command.mock.calls[0]!;
+      expect(request.query).toContain("mutation_id = {mutationId:String}");
+      expect(request.query_params).toEqual({
+        mutationId: "mut-xyz",
+        tenantId: "project-1",
+      });
+      expect(request.query).not.toContain("'mut-xyz'");
+      expect(request.query).not.toContain("'project-1'");
     });
   });
 });
