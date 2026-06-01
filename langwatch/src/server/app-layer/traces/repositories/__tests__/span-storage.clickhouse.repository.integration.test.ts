@@ -131,7 +131,7 @@ function makeEventRow(
   spanId: string,
   events: { ts: Date; name: string; attrs: Record<string, string> }[],
   overrides: Record<string, unknown> = {},
-) {
+): ReturnType<typeof makeSpanRow> {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: eventsTenantId,
@@ -225,10 +225,10 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           { ts: t(0), name: "span.start", attrs: { phase: "init" } },
           { ts: t(10), name: "exception", attrs: { type: "TimeoutError" } },
           { ts: t(20), name: "span.end", attrs: { phase: "done" } },
-        ]) as ReturnType<typeof makeSpanRow>,
+        ]),
         makeEventRow("evt-span-2", [
           { ts: t(5), name: "process.tick", attrs: { iter: "1" } },
-        ]) as ReturnType<typeof makeSpanRow>,
+        ]),
         // Stale earlier version of evt-span-1 — dedup must drop it.
         makeEventRow(
           "evt-span-1",
@@ -237,7 +237,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
             UpdatedAt: new Date(base - 60_000),
             CreatedAt: new Date(base - 60_000),
           },
-        ) as ReturnType<typeof makeSpanRow>,
+        ),
       ]);
     });
 
@@ -249,7 +249,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       });
     });
 
-    it("getTraceEventsByTraceId returns all events incl. exceptions in StartTime order, latest version only", async () => {
+    it("getTraceEventsByTraceId returns all events incl. exceptions in event_timestamp ASC order, latest span version only", async () => {
       const events = await repo.getTraceEventsByTraceId({
         tenantId: eventsTenantId,
         traceId: eventsTraceId,
@@ -265,7 +265,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       expect(events.find((e) => e.name === "stale.skip")).toBeUndefined();
     });
 
-    it("getEventsByTraceId filters out exception events and orders DESC, latest version only", async () => {
+    it("getEventsByTraceId filters out exception events and orders by event_timestamp DESC, latest span version only", async () => {
       const events = await repo.getEventsByTraceId({
         tenantId: eventsTenantId,
         traceId: eventsTraceId,
