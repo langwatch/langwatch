@@ -23,21 +23,15 @@ Feature: BetterAuth config (unmounted)
     Then email-and-password signin is enabled
     And no social providers are configured
 
-  # @unimplemented: requires a parameterized re-import of `~/server/better-auth`
-  # under env-mocked conditions. The current unit tests in
-  # `langwatch/src/server/better-auth/__tests__/index.test.ts` exercise a single
-  # env at a time; a per-scenario env-override harness would let us assert each
-  # provider matrix without spinning up a full integration fixture.
-  @unimplemented
+  @unit
   Scenario: Auth0 enterprise mode
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ISSUER are set
     When I inspect the BetterAuth instance
     Then the generic-oauth plugin lists an "auth0" provider
-    And email-and-password is still enabled for admin fallback
+    And email-and-password is disabled (SSO-only enforcement — no email/password bypass)
 
-  # @unimplemented: same env-override harness gap as "Auth0 enterprise mode".
-  @unimplemented
+  @unit
   Scenario: Google mode
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set
@@ -83,10 +77,12 @@ Feature: BetterAuth config (unmounted)
 
   # @unimplemented: the BetterAuth OAuth-callback hook chain is wired but the
   # guard logic for the "active-session-with-different-email" path lives across
-  # `before*` hooks and a session-cookie check that requires an integration
-  # harness (cookie + BetterAuth handler). Worth a follow-up integration test
-  # in `langwatch/src/server/better-auth/__tests__/`.
-  @unimplemented
+  # Bound at config-layer: `accountLinking.allowDifferentEmails` defaults to
+  # false, which causes BetterAuth to fire LINKING_DIFFERENT_EMAILS_NOT_ALLOWED
+  # (surfaced as DIFFERENT_EMAIL_NOT_ALLOWED in the UI). A full integration test
+  # (cookie + OAuth callback) would cover the end-to-end flow; this unit test
+  # locks in the config invariant that prevents the guard from being bypassed.
+  @unit
   Scenario: DIFFERENT_EMAIL_NOT_ALLOWED guard
     Given a logged-in user with email "a@example.com" and an active session cookie
     When an OAuth callback returns a profile with email "b@example.com"
@@ -138,19 +134,17 @@ Feature: BetterAuth config (unmounted)
   # bcrypt-compatible password verification
   # ============================================================================
 
-  # @unimplemented: bcrypt verify is wired via
-  # `emailAndPassword.password.verify` in `~/server/better-auth/index.ts`,
-  # but a green-path integration test would need a Postgres + Account row
-  # fixture. Tracked for when the integration harness lands.
-  @unimplemented
+  # Bound at verify-function layer: tests call `options.emailAndPassword.password.verify`
+  # directly with a real bcrypt hash, bypassing the Postgres + Account row fixture.
+  # A full integration test (actual signin API call + DB row) is a follow-up.
+  @unit
   Scenario: Legacy bcrypt hashes still verify
     Given an existing user has a bcrypt hash from the NextAuth system stored in the database
     When that user tries to sign in with the correct plaintext password
     Then BetterAuth's credentials provider verifies the bcrypt hash successfully
     And the signin succeeds
 
-  # @unimplemented: same bcrypt-verify integration harness gap as above.
-  @unimplemented
+  @unit
   Scenario: Wrong password is rejected
     Given an existing user has a bcrypt hash
     When that user signs in with the wrong plaintext password
