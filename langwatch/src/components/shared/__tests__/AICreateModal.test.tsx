@@ -57,7 +57,7 @@ describe("<AICreateModal/>", () => {
   // focus management, and role-based queries (getByRole) then intermittently fail to
   // find the now-hidden dialog/close button — the CI-only flake. Unmounting after each
   // test keeps exactly one live dialog.
-  afterEach(() => cleanup());
+  afterEach(cleanup);
 
   describe("when open", () => {
     it("displays the provided title", () => {
@@ -517,21 +517,16 @@ describe("<AICreateModal/>", () => {
         within(dialog).getByRole("button", { name: /generate with ai/i })
       );
 
-      // Wait for the error state to render the Try again button. Re-resolve
-      // the dialog node afterwards because Chakra's portal can leave the
-      // original `dialog` reference pointing at a stale element across the
-      // idle → generating → error state transition (CI-only flake; locally
-      // the portal stays stable but on CI the timing exposes the swap).
       await waitFor(() => {
         expect(
-          within(getDialogContent()).getByRole("button", {
+          within(dialog).getByRole("button", {
             name: /try again/i,
           })
         ).toBeInTheDocument();
       });
 
       fireEvent.click(
-        within(getDialogContent()).getByRole("button", { name: /try again/i })
+        within(dialog).getByRole("button", { name: /try again/i })
       );
 
       await waitFor(() => {
@@ -792,6 +787,35 @@ describe("<AICreateModal/>", () => {
           expect(configureBtn).toHaveAttribute("target", "_blank");
         });
       });
+    });
+  });
+
+  // Regression guard for #4467: proves the suite's afterEach(cleanup) actually
+  // unmounts each test's portaled Chakra dialog. Without cleanup the first test's
+  // dialog leaks into document.body and the second test sees it (length > 0) —
+  // the accumulation that gets aria-hidden and makes getByRole(/close/i) flake on
+  // CI. With cleanup the DOM is clean between tests.
+  describe("test isolation (regression guard for #4467)", () => {
+    it("renders a dialog", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      expect(
+        screen.queryAllByRole("dialog", { hidden: true }).length
+      ).toBeGreaterThan(0);
+    });
+
+    it("sees a clean DOM in the next test because the prior dialog was cleaned up", () => {
+      expect(screen.queryAllByRole("dialog", { hidden: true })).toHaveLength(0);
     });
   });
 
