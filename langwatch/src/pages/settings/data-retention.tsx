@@ -818,22 +818,25 @@ function RetentionAndUsageCard({
             </VStack>
           )}
           <VStack gap={2} align="stretch">
-            <VStack align="start" gap={0}>
-              <Heading as="h3" fontSize="lg">
-                Data Storage
-              </Heading>
-              <Text fontSize="sm" color="fg.muted">
-                The storage that current project occupies today.
-              </Text>
-            </VStack>
+            <HStack width="full" justify="space-between" align="start">
+              <VStack align="start" gap={0}>
+                <Heading as="h3" fontSize="lg">
+                  Data Storage
+                </Heading>
+                <Text fontSize="sm" color="fg.muted">
+                  The storage that current project occupies today.
+                </Text>
+              </VStack>
+              {!isLoading && data && (
+                <Text fontWeight="bold" fontSize="lg" flexShrink={0}>
+                  {formatBytes(data.totalBytes)}
+                </Text>
+              )}
+            </HStack>
             {isLoading ? (
               <Spinner />
             ) : data ? (
               <VStack gap={2} align="stretch" paddingTop={1}>
-                <HStack justifyContent="space-between">
-                  <Text fontWeight="semibold">Total stored</Text>
-                  <Text fontWeight="bold">{formatBytes(data.totalBytes)}</Text>
-                </HStack>
                 {RETENTION_CATEGORIES.map((category) => (
                   <HStack key={category} justifyContent="space-between">
                     <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
