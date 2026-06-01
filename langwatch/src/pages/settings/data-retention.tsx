@@ -1,11 +1,9 @@
 import {
   Alert,
   Badge,
-  Box,
   Button,
   Card,
   createListCollection,
-  EmptyState,
   Field,
   Heading,
   HStack,
@@ -414,43 +412,7 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
-        {snapshot && snapshot.rules.length === 0 ? (
-          // No overrides anywhere — surface the platform default front-and-
-          // centre so an empty table doesn't read as a config bug. The
-          // "Effective for this project" row alone was too quiet about
-          // what the number means.
-          <Card.Root width="full">
-            <Card.Body>
-              <EmptyState.Root>
-                <EmptyState.Content>
-                  <VStack textAlign="center" gap={2}>
-                    <EmptyState.Title>
-                      Using the platform default
-                    </EmptyState.Title>
-                    <EmptyState.Description>
-                      No retention policies configured. Every category in this
-                      project uses{" "}
-                      <Box as="span" fontWeight="semibold">
-                        {renderPolicyValue(snapshot.effective)}
-                      </Box>
-                      .
-                    </EmptyState.Description>
-                    {canWrite && (
-                      <Button
-                        colorPalette="blue"
-                        size="sm"
-                        onClick={() => setDrawerOpen(true)}
-                        marginTop={2}
-                      >
-                        Add retention policy
-                      </Button>
-                    )}
-                  </VStack>
-                </EmptyState.Content>
-              </EmptyState.Root>
-            </Card.Body>
-          </Card.Root>
-        ) : snapshot && scopeGroups.length === 0 ? (
+        {snapshot && (snapshot.rules.length > 0 && scopeGroups.length === 0) ? (
           <Card.Root width="full">
             <Card.Body>
               <Text fontSize="sm" color="fg.muted" textAlign="center">
@@ -510,7 +472,19 @@ function DataRetentionPage({
                     fontWeight="medium"
                   >
                     <Table.Cell>
-                      <Text>Effective for this project</Text>
+                      <VStack align="start" gap={0}>
+                        <Text>
+                          {scopeGroups.length === 0
+                            ? "Platform default"
+                            : "Effective for this project"}
+                        </Text>
+                        {scopeGroups.length === 0 && (
+                          <Text fontSize="xs" color="fg.muted" fontWeight="normal">
+                            No overrides — applies to every category in this
+                            project.
+                          </Text>
+                        )}
+                      </VStack>
                     </Table.Cell>
                     <Table.Cell>
                       {renderPolicyValue(snapshot.effective)}
