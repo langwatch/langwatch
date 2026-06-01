@@ -204,9 +204,9 @@ describe("OrphanSweepService", () => {
 describe("createRetentionOrphanSweepReactor()", () => {
   describe("given the reactor is configured", () => {
     describe("when the reactor's options are inspected", () => {
-      it("returns a stable per-tenant job id so the queue dedups concurrent sweeps", () => {
+      it("returns a stable per-tenant job id so bursty ingest dedups to one seed", () => {
         const reactor = createRetentionOrphanSweepReactor({
-          orphanSweep: { sweepProject: vi.fn() } as any,
+          seedChain: vi.fn(),
           retentionPolicyCache: {
             getRetentionDays: vi.fn().mockResolvedValue(30),
           } as any,
@@ -227,10 +227,10 @@ describe("createRetentionOrphanSweepReactor()", () => {
 
   describe("given retention is set to 0 (indefinite)", () => {
     describe("when the reactor handles an event", () => {
-      it("skips sweeping for the tenant", async () => {
-        const sweepProject = vi.fn().mockResolvedValue(undefined);
+      it("does not seed the chain", async () => {
+        const seedChain = vi.fn().mockResolvedValue(undefined);
         const reactor = createRetentionOrphanSweepReactor({
-          orphanSweep: { sweepProject } as any,
+          seedChain,
           retentionPolicyCache: {
             getRetentionDays: vi.fn().mockResolvedValue(0),
           } as any,
@@ -245,17 +245,17 @@ describe("createRetentionOrphanSweepReactor()", () => {
           } as any,
         );
 
-        expect(sweepProject).not.toHaveBeenCalled();
+        expect(seedChain).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("given retention is finite", () => {
     describe("when the reactor handles an event", () => {
-      it("invokes orphanSweep.sweepProject for the tenant", async () => {
-        const sweepProject = vi.fn().mockResolvedValue(undefined);
+      it("seeds the per-tenant orphan-sweep chain", async () => {
+        const seedChain = vi.fn().mockResolvedValue(undefined);
         const reactor = createRetentionOrphanSweepReactor({
-          orphanSweep: { sweepProject } as any,
+          seedChain,
           retentionPolicyCache: {
             getRetentionDays: vi.fn().mockResolvedValue(30),
           } as any,
@@ -270,17 +270,19 @@ describe("createRetentionOrphanSweepReactor()", () => {
           } as any,
         );
 
-        expect(sweepProject).toHaveBeenCalledWith({ projectId: "project-1" });
+        expect(seedChain).toHaveBeenCalledWith({ tenantId: "project-1" });
       });
     });
 
-    describe("when sweepProject throws", () => {
-      it("logs the error and does not rethrow", async () => {
-        const sweepProject = vi
+    describe("when seedChain throws", () => {
+      it("logs the error and does not rethrow — next ingest retries", async () => {
+        // Reactor failure must not propagate into the trace-processing
+        // pipeline; the chain is a maintenance loop, not on the hot path.
+        const seedChain = vi
           .fn()
-          .mockRejectedValue(new Error("temporary failure"));
+          .mockRejectedValue(new Error("redis unavailable"));
         const reactor = createRetentionOrphanSweepReactor({
-          orphanSweep: { sweepProject } as any,
+          seedChain,
           retentionPolicyCache: {
             getRetentionDays: vi.fn().mockResolvedValue(30),
           } as any,

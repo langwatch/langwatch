@@ -128,6 +128,7 @@ import {
   InMemoryOrphanCursorStore,
   RedisOrphanCursorStore,
 } from "../data-retention/orphan-sweep/orphanSweepCursor.store";
+import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
 import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
@@ -381,8 +382,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     orphanCursorStore,
   );
   const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
-    orphanSweep: orphanSweepService,
     retentionPolicyCache,
+    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
   });
 
   const dataRetention: DataRetentionDependencies = {

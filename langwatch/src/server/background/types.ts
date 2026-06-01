@@ -100,10 +100,11 @@ export type AnomalyDetectionJob = {
   timestamp: number;
 };
 
-export type DataRetentionOrphanSweepJob = {
-  /** Wall-clock dispatch time (ms since epoch). Persisted on the job so
-   *  re-runs for the same scheduled tick are deterministic / dedup-able. */
-  timestamp: number;
+export type OrphanSweepChainJob = {
+  /** Tenant (project) the chain step targets. The whole chain is per-tenant
+   *  — one job in flight at a time per tenant, re-enqueued every 24h by the
+   *  worker's `completed` listener. */
+  tenantId: string;
 };
 
 export type IngestionPullerJob = {

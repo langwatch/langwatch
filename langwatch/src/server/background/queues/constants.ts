@@ -57,14 +57,21 @@ export const PULLER_QUEUE = {
 } as const;
 
 /**
- * Data-retention orphan-sweep tick — sweeps dangling PG rows whose
- * underlying CH trace rows have aged out via retention TTL. The
- * ingestion reactor only fires for active tenants; this tick catches
- * tenants that have stopped ingesting but whose CH rows are still
- * being deleted by ClickHouse TTL.
+ * Per-tenant orphan-sweep chain — a self-perpetuating BullMQ chain that
+ * sweeps dangling PG rows whose underlying CH trace rows have been TTL'd.
+ *
+ * Lifecycle:
+ *   - Seeded by the ingestion reactor (first ingest per tenant).
+ *   - Each chain step sweeps, then re-enqueues itself with a 24h delay via
+ *     the worker's `completed` listener — that's why this is an event
+ *     chain, not a cron.
+ *   - Stops when the project is archived or hard-deleted; the worker
+ *     simply doesn't re-enqueue.
+ *   - Stable jobId per tenant gives natural dedup: bursty ingest only
+ *     ever holds one job per tenant in the queue.
  */
-export const DATA_RETENTION_ORPHAN_SWEEP_QUEUE = {
-  NAME: makeQueueName("data_retention_orphan_sweep"),
-  JOB: "data_retention_orphan_sweep",
+export const ORPHAN_SWEEP_CHAIN_QUEUE = {
+  NAME: makeQueueName("orphan_sweep_chain"),
+  JOB: "orphan_sweep_chain",
 } as const;
 
