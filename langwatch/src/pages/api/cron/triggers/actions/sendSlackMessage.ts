@@ -19,6 +19,10 @@ export const handleSendSlackMessage = async (context: TriggerContext) => {
 
     await sendSlackWebhook(triggerInfo);
   } catch (error) {
+    // Capture with action-specific context, then rethrow so the caller skips
+    // recording the alert as sent. sendSlackWebhook now throws DispatchError
+    // (see dispatch-error-contract.feature) — swallowing here would undo the
+    // contract for the legacy customGraphTrigger path.
     captureException(error, {
       extra: {
         triggerId: trigger.id,
@@ -26,5 +30,6 @@ export const handleSendSlackMessage = async (context: TriggerContext) => {
         action: TriggerAction.SEND_SLACK_MESSAGE,
       },
     });
+    throw error;
   }
 };

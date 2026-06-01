@@ -45,7 +45,7 @@ describe("sendTriggerEmail", () => {
 
   describe("when the provider throttles the send", () => {
     it("raises a retryable DispatchError", async () => {
-      sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 500 } });
+      sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 429 } });
       const err = await callEmail().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(true);

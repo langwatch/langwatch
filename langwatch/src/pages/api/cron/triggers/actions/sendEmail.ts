@@ -19,6 +19,10 @@ export const handleSendEmail = async (context: TriggerContext) => {
 
     await sendTriggerEmail(triggerInfo);
   } catch (error) {
+    // Capture with action-specific context, then rethrow so the caller skips
+    // recording the alert as sent. sendTriggerEmail now throws DispatchError
+    // (see dispatch-error-contract.feature) — swallowing here would undo the
+    // contract for the legacy customGraphTrigger path.
     captureException(error, {
       extra: {
         triggerId: trigger.id,
@@ -26,5 +30,6 @@ export const handleSendEmail = async (context: TriggerContext) => {
         action: TriggerAction.SEND_EMAIL,
       },
     });
+    throw error;
   }
 };

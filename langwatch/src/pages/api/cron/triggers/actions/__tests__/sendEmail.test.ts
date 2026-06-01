@@ -83,7 +83,7 @@ describe("handleSendEmail", () => {
   });
 
   describe("when sendTriggerEmail throws an error", () => {
-    it("captures the exception with full context", async () => {
+    it("captures the exception with full context and rethrows", async () => {
       const error = new Error("Email send failed");
       vi.mocked(sendTriggerEmail).mockRejectedValue(error);
 
@@ -99,7 +99,7 @@ describe("handleSendEmail", () => {
         projectSlug: "test-project",
       };
 
-      await handleSendEmail(context);
+      await expect(handleSendEmail(context)).rejects.toBe(error);
 
       expect(captureException).toHaveBeenCalledWith(error, {
         extra: {

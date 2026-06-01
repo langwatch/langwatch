@@ -66,3 +66,12 @@ Feature: DispatchError contract for dispatch endpoints
     Given an email provider that accepts the send
     When the email dispatch endpoint runs
     Then it returns normally and raises nothing
+
+  # Callers must uphold the contract (legacy cron path)
+
+  Scenario: Dispatch wrappers in the cron path propagate failures
+    Given the legacy custom-graph cron path dispatches a trigger action
+    And the underlying dispatch endpoint raises a DispatchError
+    When the action wrapper handles the failure
+    Then it captures the exception with action-specific context
+    And it rethrows so the caller does not record the alert as sent

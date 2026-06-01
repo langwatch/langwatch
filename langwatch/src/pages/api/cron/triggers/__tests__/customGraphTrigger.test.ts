@@ -49,7 +49,7 @@ import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "../actions/sendEmail";
 import { handleSendSlackMessage } from "../actions/sendSlackMessage";
-import { checkThreshold, updateAlert } from "../utils";
+import { addTriggersSent, checkThreshold, updateAlert } from "../utils";
 
 describe("processCustomGraphTrigger", () => {
   const mockProjects: Project[] = [
@@ -402,6 +402,52 @@ describe("processCustomGraphTrigger", () => {
       await processCustomGraphTrigger(trigger, mockProjects);
 
       expect(handleSendSlackMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the action wrapper throws", () => {
+    it("does not record the alert as sent and returns an error result", async () => {
+      const trigger = {
+        id: "trigger-1",
+        name: "Test Alert",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          members: ["user@example.com"],
+          seriesName: "0/count/count",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
+        },
+        filters: {},
+      } as any);
+
+      mockGetTimeseries.mockResolvedValue({
+        currentPeriod: [{ "0/count/count": 15 }],
+        previousPeriod: [],
+      } as any);
+      vi.mocked(checkThreshold).mockReturnValue(true);
+      vi.mocked(handleSendEmail).mockRejectedValueOnce(
+        new Error("Email dispatch failed"),
+      );
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(addTriggersSent).not.toHaveBeenCalled();
+      expect(updateAlert).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        triggerId: "trigger-1",
+        status: "error",
+      });
     });
   });
 

@@ -85,7 +85,7 @@ describe("handleSendSlackMessage", () => {
   });
 
   describe("when sendSlackWebhook throws an error", () => {
-    it("captures the exception with full context", async () => {
+    it("captures the exception with full context and rethrows", async () => {
       const error = new Error("Slack webhook failed");
       vi.mocked(sendSlackWebhook).mockRejectedValue(error);
 
@@ -101,7 +101,7 @@ describe("handleSendSlackMessage", () => {
         projectSlug: "test-project",
       };
 
-      await handleSendSlackMessage(context);
+      await expect(handleSendSlackMessage(context)).rejects.toBe(error);
 
       expect(captureException).toHaveBeenCalledWith(error, {
         extra: {
