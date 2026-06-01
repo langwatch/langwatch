@@ -5,7 +5,6 @@ import { useState } from "react";
 import { createInitialState } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -24,7 +23,6 @@ export function NewEvaluationMenu({ open, onOpenChange }: NewEvaluationMenuProps
   const router = useRouter();
   const [isCreatingExperiment, setIsCreatingExperiment] = useState(false);
   const utils = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("experiments");
 
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
@@ -41,29 +39,27 @@ export function NewEvaluationMenu({ open, onOpenChange }: NewEvaluationMenuProps
   if (!enabled) return null;
 
   const handleCreateExperiment = () => {
-    checkAndProceed(() => {
-      if (!project?.id || isCreatingExperiment) return;
+    if (!project?.id || isCreatingExperiment) return;
 
-      setIsCreatingExperiment(true);
+    setIsCreatingExperiment(true);
 
-      // Generate human-readable name like "swift-bright-fox"
-      const name = generateHumanReadableId();
+    // Generate human-readable name like "swift-bright-fox"
+    const name = generateHumanReadableId();
 
-      // Create initial state with the generated name
-      const initialState = createInitialState();
-      initialState.name = name;
+    // Create initial state with the generated name
+    const initialState = createInitialState();
+    initialState.name = name;
 
-      // Extract persisted state for saving
-      const persistedState = extractPersistedState(initialState);
+    // Extract persisted state for saving
+    const persistedState = extractPersistedState(initialState);
 
-      createExperiment.mutate({
-        projectId: project.id,
-        experimentId: undefined,
-        state: {
-          ...persistedState,
-          experimentSlug: name, // Use the name as the slug (already unique)
-        } as Parameters<typeof createExperiment.mutate>[0]["state"],
-      });
+    createExperiment.mutate({
+      projectId: project.id,
+      experimentId: undefined,
+      state: {
+        ...persistedState,
+        experimentSlug: name, // Use the name as the slug (already unique)
+      } as Parameters<typeof createExperiment.mutate>[0]["state"],
     });
   };
 

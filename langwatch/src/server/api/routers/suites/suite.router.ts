@@ -14,7 +14,6 @@ import { ProjectRepository } from "~/server/projects/project.repository";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -23,7 +22,6 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.create(input);
     }),
@@ -70,7 +68,6 @@ export const suiteRouter = createTRPCRouter({
       if (!source) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
       }
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       try {
         return await service.duplicate(input);
       } catch (error) {

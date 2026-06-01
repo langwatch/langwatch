@@ -9,19 +9,8 @@ import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 export const UNLIMITED_MESSAGES = 999_999_999;
 
 const PAID_FEATURES = {
-  maxWorkflows: 9999,
-  maxPrompts: 9999,
-  maxEvaluators: 9999,
-  maxScenarios: 9999,
-  maxExperiments: 9999,
-  maxOnlineEvaluations: 9999,
-  maxAgents: 9999,
   maxTeams: 9999,
   maxMembersLite: 9999,
-  maxDatasets: 9999,
-  maxDashboards: 9999,
-  maxCustomGraphs: 9999,
-  maxAutomations: 9999,
   canPublish: true,
 } as const;
 
@@ -93,19 +82,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMembers: 2,
     maxProjects: 2,
     maxMessagesPerMonth: 50_000,
-    maxWorkflows: 3,
-    maxPrompts: 3,
-    maxEvaluators: 3,
-    maxScenarios: 3,
-    maxExperiments: 3,
-    maxOnlineEvaluations: 3,
-    maxAgents: 3,
     maxTeams: 1,
     maxMembersLite: 0,
-    maxDatasets: 3,
-    maxDashboards: 3,
-    maxCustomGraphs: 3,
-    maxAutomations: 3,
     canPublish: true,
     prices: {
       USD: 0,

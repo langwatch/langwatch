@@ -7,7 +7,6 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
@@ -194,7 +193,6 @@ secured.access(requires("evaluations:view")).get(
 // ── Create Monitor ──────────────────────────────────────────
 secured.access(requires("evaluations:manage")).post(
     "/",
-    resourceLimitMiddleware("onlineEvaluations"),
     describeRoute({
       description: "Create a new online evaluation monitor",
       responses: {

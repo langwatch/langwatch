@@ -19,7 +19,6 @@ import { AddParticipants } from "~/components/traces/AddParticipants";
 import { useDrawer } from "~/hooks/useDrawer";
 
 import { useFilterParams } from "~/hooks/useFilterParams";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
@@ -44,7 +43,6 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 export function AutomationDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, open } = useDisclosure();
-  const { checkAndProceed } = useLicenseEnforcement("automations");
 
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
@@ -190,53 +188,50 @@ export function AutomationDrawer() {
       };
     }
 
-    // Check license limit before creating automation
-    checkAndProceed(() => {
-      createTrigger.mutate(
-        {
-          projectId: project?.id ?? "",
-          name: data.name,
-          action: data.action,
-          filters: filterParams.filters,
-          actionParams: {
-            ...actionParams,
-            datasetMapping: actionParams.datasetMapping
-              ? {
-                  mapping: actionParams.datasetMapping.mapping,
-                  expansions: Array.from(
-                    actionParams.datasetMapping.expansions ?? [],
-                  ),
-                }
-              : undefined,
-          },
+    createTrigger.mutate(
+      {
+        projectId: project?.id ?? "",
+        name: data.name,
+        action: data.action,
+        filters: filterParams.filters,
+        actionParams: {
+          ...actionParams,
+          datasetMapping: actionParams.datasetMapping
+            ? {
+                mapping: actionParams.datasetMapping.mapping,
+                expansions: Array.from(
+                  actionParams.datasetMapping.expansions ?? [],
+                ),
+              }
+            : undefined,
         },
-        {
-          onSuccess: () => {
-            toaster.create({
-              title: "Automation Created",
-              description: "You have successfully created an automation",
-              type: "success",
-              meta: {
-                closable: true,
-              },
-            });
-            reset();
-            closeDrawer();
-          },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error",
-              description: "Error creating automation",
-              type: "error",
-              meta: {
-                closable: true,
-              },
-            });
-          },
+      },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Automation Created",
+            description: "You have successfully created an automation",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+          });
+          reset();
+          closeDrawer();
         },
-      );
-    });
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
+          toaster.create({
+            title: "Error",
+            description: "Error creating automation",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+          });
+        },
+      },
+    );
   };
 
   const MultiSelect = () => {

@@ -7,8 +7,6 @@ import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
-import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
@@ -75,9 +73,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectSlug: project?.slug,
   });
   const scenarioId = props.scenarioId;
-
-  // License enforcement for scenario creation
-  const scenarioEnforcement = useLicenseEnforcement("scenarios");
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -217,33 +212,24 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       }
 
       // Create mode: no scenarioId in URL yet
-      return new Promise((resolve) => {
-        checkCompoundLimits([scenarioEnforcement], async () => {
-          try {
-            const result = await createMutation.mutateAsync({
-              projectId: project.id,
-              ...data,
-              ...(models ?? {}),
-            });
-            // Transition to edit mode to prevent double-create on subsequent saves.
-            // Skip when the drawer is about to close (save-without-running).
-            if (!skipTransition) {
-              transitionToEditMode(result.id);
-            }
-            resolve(result);
-          } catch {
-            // Error already handled by global mutation cache if license error
-            resolve(null);
-          }
+      try {
+        const result = await createMutation.mutateAsync({
+          projectId: project.id,
+          ...data,
+          ...(models ?? {}),
         });
-
-        // If limit exceeded, modal is shown and callback won't run - resolve null
-        if (!scenarioEnforcement.isAllowed) {
-          resolve(null);
+        // Transition to edit mode to prevent double-create on subsequent saves.
+        // Skip when the drawer is about to close (save-without-running).
+        if (!skipTransition) {
+          transitionToEditMode(result.id);
         }
-      });
+        return result;
+      } catch {
+        // Error already handled by global mutation cache
+        return null;
+      }
     },
-    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement, transitionToEditMode],
+    [project?.id, scenario, createMutation, updateMutation, transitionToEditMode],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {

@@ -12,12 +12,10 @@ describe("LIMIT_TYPE_LABELS", () => {
   });
 
   it("has the expected labels for each limit type", () => {
-    expect(LIMIT_TYPE_LABELS.workflows).toBe("workflows");
-    expect(LIMIT_TYPE_LABELS.prompts).toBe("prompts");
-    expect(LIMIT_TYPE_LABELS.evaluators).toBe("evaluators");
-    expect(LIMIT_TYPE_LABELS.scenarios).toBe("scenarios");
     expect(LIMIT_TYPE_LABELS.projects).toBe("projects");
+    expect(LIMIT_TYPE_LABELS.teams).toBe("teams");
     expect(LIMIT_TYPE_LABELS.members).toBe("team members");
+    expect(LIMIT_TYPE_LABELS.membersLite).toBe("lite members");
   });
 
   it("is a complete Record with no missing keys", () => {
@@ -36,12 +34,10 @@ describe("LIMIT_TYPE_DISPLAY_LABELS", () => {
   });
 
   it("has the expected display labels for each limit type (title case)", () => {
-    expect(LIMIT_TYPE_DISPLAY_LABELS.workflows).toBe("Workflows");
-    expect(LIMIT_TYPE_DISPLAY_LABELS.prompts).toBe("Prompts");
-    expect(LIMIT_TYPE_DISPLAY_LABELS.evaluators).toBe("Evaluators");
-    expect(LIMIT_TYPE_DISPLAY_LABELS.scenarios).toBe("Scenarios");
     expect(LIMIT_TYPE_DISPLAY_LABELS.projects).toBe("Projects");
+    expect(LIMIT_TYPE_DISPLAY_LABELS.teams).toBe("Teams");
     expect(LIMIT_TYPE_DISPLAY_LABELS.members).toBe("Team Members");
+    expect(LIMIT_TYPE_DISPLAY_LABELS.membersLite).toBe("Lite Members");
   });
 
   it("is a complete Record with no missing keys", () => {

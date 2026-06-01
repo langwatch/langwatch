@@ -70,7 +70,6 @@ import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -680,7 +679,6 @@ function CustomGraphForm({
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("customGraphs");
 
   // Get dashboardId from URL query param
   const dashboardId = router.query.dashboard as string | undefined;
@@ -979,9 +977,7 @@ function CustomGraphForm({
               colorPalette="orange"
               loading={addNewGraph.isLoading}
               onClick={() => {
-                checkAndProceed(() => {
-                  addGraph();
-                });
+                addGraph();
               }}
               marginX={2}
               minWidth="fit-content"

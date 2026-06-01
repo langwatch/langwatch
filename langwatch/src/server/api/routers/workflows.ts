@@ -19,7 +19,6 @@ import {
 } from "../../../optimization_studio/utils/dslUtils";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
@@ -60,9 +59,6 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce workflow limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "workflows");
-
       const workflow = await ctx.prisma.workflow.create({
         data: {
           id: `workflow_${nanoid()}`,
@@ -126,9 +122,6 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce workflow limit before copying
-      await enforceLicenseLimit(ctx, input.projectId, "workflows");
-
       // Check that the user has at least workflows:create permission on the source project
       const hasSourcePermission = await hasProjectPermission(
         ctx,

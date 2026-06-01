@@ -5,7 +5,6 @@ import { z } from "zod";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
@@ -83,8 +82,6 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce evaluator limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "evaluators");
 
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
@@ -406,7 +403,6 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "evaluators");
 
       const hasSourcePermission = await hasProjectPermission(
         ctx,

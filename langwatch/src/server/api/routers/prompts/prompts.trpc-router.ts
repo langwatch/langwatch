@@ -12,7 +12,6 @@ import {
   runtimeParametersSchema,
 } from "~/prompts/schemas";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
-import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
@@ -217,8 +216,6 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce prompt limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "prompts");
 
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -432,8 +429,6 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce prompt limit before copying
-      await enforceLicenseLimit(ctx, input.projectId, "prompts");
 
       // Check that the user has at least prompts:create permission on the source project
       const hasSourcePermission = await hasProjectPermission(

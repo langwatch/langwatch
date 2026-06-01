@@ -3,7 +3,6 @@ import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
-import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DashboardServiceMiddlewareVariables,
   dashboardServiceMiddleware,
@@ -110,7 +109,6 @@ secured.access(requires("analytics:manage")).post(
   describeRoute({
     description: "Create a new dashboard",
   }),
-  resourceLimitMiddleware("dashboards"),
   zValidator("json", createDashboardSchema, validationHook),
   async (c) => {
       const project = c.get("project");

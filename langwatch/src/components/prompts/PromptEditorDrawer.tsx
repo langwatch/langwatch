@@ -14,7 +14,6 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import {
   type AvailableSource,
@@ -177,8 +176,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
 
-  // License enforcement for prompt creation
-  const { checkAndProceed } = useLicenseEnforcement("prompts");
   const openLiteMemberRestriction = useUpgradeModalStore(
     (state) => state.openLiteMemberRestriction,
   );
@@ -783,21 +780,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         });
       } else if (newPromptData) {
-        // Create new prompt - check RBAC first, then license limit
+        // Create new prompt - check RBAC first
         if (!hasPermission("prompts:create")) {
           openLiteMemberRestriction({ resource: "prompts" });
           return;
         }
-        checkAndProceed(() => {
-          createMutation.mutate({
-            projectId: project.id,
-            data: {
-              ...saveData,
-              handle: newPromptData.handle,
-              scope: newPromptData.scope,
-              commitMessage,
-            },
-          });
+        createMutation.mutate({
+          projectId: project.id,
+          data: {
+            ...saveData,
+            handle: newPromptData.handle,
+            scope: newPromptData.scope,
+            commitMessage,
+          },
         });
       }
     },
@@ -807,7 +802,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       promptQuery.data?.id,
       createMutation,
       updateMutation,
-      checkAndProceed,
       hasPermission,
       openLiteMemberRestriction,
     ],
