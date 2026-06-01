@@ -124,6 +124,8 @@ describe("better-auth config", () => {
 // Provider-mode tests require resetting the module cache so `index.ts` top-level
 // code re-runs with the stubbed env vars. These run AFTER the main describe
 // to avoid interfering with its cached module instance.
+// Note: vi.unstubAllEnvs() in afterAll restores process.env; vi.resetModules()
+// ensures the fresh import picks up the stubbed values rather than the cache.
 describe("better-auth config — env-mocked provider modes", () => {
   describe("when NEXTAUTH_PROVIDER is auth0", () => {
     let authModule: Awaited<typeof import("../index")>;
