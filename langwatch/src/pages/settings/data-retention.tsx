@@ -790,7 +790,7 @@ function RetentionAndUsageCard({
         <HStack width="full" justify="space-between" align="start">
           <VStack align="start" gap={0}>
             <Heading as="h3" fontSize="lg">
-              Data retention and usage
+              Data Retention
             </Heading>
             <Text fontSize="sm" color="fg.muted">
               The retention currently applied to current project.
@@ -819,7 +819,9 @@ function RetentionAndUsageCard({
           )}
           <VStack gap={2} align="stretch">
             <VStack align="start" gap={0}>
-              <Text fontWeight="semibold">Data storage</Text>
+              <Heading as="h3" fontSize="lg">
+                Data Storage
+              </Heading>
               <Text fontSize="sm" color="fg.muted">
                 The storage that current project occupies today.
               </Text>
