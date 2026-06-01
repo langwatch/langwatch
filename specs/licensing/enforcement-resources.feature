@@ -23,7 +23,7 @@ Feature: Resource Limit Enforcement (Teams)
   # Teams: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows team creation when under limit
     Given the organization has a license with maxTeams 5
     And the organization has 3 teams

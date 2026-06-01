@@ -152,7 +152,6 @@ describe("LicenseEnforcementService", () => {
       ).resolves.toBeUndefined();
     });
 
-    /** @scenario Blocks project creation when at limit */
     it("throws LimitExceededError when limit is reached", async () => {
       vi.mocked(mockRepository.getProjectCount).mockResolvedValue(10);
 
@@ -161,7 +160,6 @@ describe("LicenseEnforcementService", () => {
       );
     });
 
-    /** @scenario Blocks project creation when at limit */
     it("includes current, max, and projects label in LimitExceededError", async () => {
       vi.mocked(mockRepository.getProjectCount).mockResolvedValue(10);
 
