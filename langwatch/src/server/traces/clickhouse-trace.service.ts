@@ -1798,8 +1798,16 @@ export class ClickHouseTraceService {
 
         const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
 
+        // No matched summaries: the result map is built solely from summary
+        // rows, so the spans would be discarded anyway. Return early to skip the
+        // (otherwise unbounded) stored_spans scan — the very cold scan this path
+        // is meant to avoid.
+        if (summaryRows.length === 0) {
+          return new Map();
+        }
+
         // Bound the stored_spans scan to the weeks the matched traces occurred
-        // in (the cold-scan cost driver). Empty -> unbounded fallback.
+        // in (the cold-scan cost driver).
         const SPAN_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
         const occurredAts = summaryRows
           .map((r) => r.ts_OccurredAt)
