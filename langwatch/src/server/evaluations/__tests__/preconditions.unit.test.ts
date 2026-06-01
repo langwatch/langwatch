@@ -53,6 +53,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin attribute", () => {
+      /** @scenario Origin "is" application treats missing origin as application (legacy default) */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ origin: undefined });
         expect(
@@ -635,6 +636,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin and input 'I need help'", () => {
+      /** @scenario "All preconditions must pass (AND logic)" */
       it("passes because undefined origin defaults to 'application' and input contains 'help'", () => {
         const traceData = makeTraceData({
           origin: undefined,
