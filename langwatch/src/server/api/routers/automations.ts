@@ -1,9 +1,30 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
+import { generate as ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
+import { DomainError } from "~/server/app-layer/domain-error";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import {
+  DEFAULT_TRACE_DEBOUNCE_MS,
+  MAX_TRACE_DEBOUNCE_MS,
+  MIN_TRACE_DEBOUNCE_MS,
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "~/automations/cadences";
+import {
+  InvalidEmailRecipientError,
+  MissingAnnotatorError,
+  MissingSlackWebhookError,
+  ProjectNotFoundError,
+} from "~/server/app-layer/triggers/errors";
+import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
+import {
+  type DraftProject,
+  validateTemplateDraft,
+} from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
   sanitizeTriggerFilters,
@@ -14,6 +35,131 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
+const templateDraftSchema = z.object({
+  slackTemplateType: z.string().nullable().optional(),
+  slackTemplate: z.string().nullable().optional(),
+  emailSubjectTemplate: z.string().nullable().optional(),
+  emailBodyTemplate: z.string().nullable().optional(),
+});
+
+const notificationCadenceSchema = z.enum(NOTIFICATION_CADENCES);
+
+// ADR-030: per-trigger trace-readiness debounce. Constrained on the wire so a
+// hostile or buggy client can't pin a trace in the settle stage indefinitely.
+const traceDebounceMsSchema = z
+  .number()
+  .int()
+  .min(MIN_TRACE_DEBOUNCE_MS)
+  .max(MAX_TRACE_DEBOUNCE_MS);
+
+// ADR-025: cadence applies to notify actions only. New notify triggers default
+// to a 5-minute digest (operator-friendly storm protection); persist actions
+// are pinned to immediate at the storage boundary so a stale value can't leak
+// into the dispatch path.
+function resolveCadenceForCreate(
+  action: TriggerAction,
+  requested: NotificationCadence | undefined,
+): NotificationCadence {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  return requested ?? "5min_digest";
+}
+
+function resolveCadenceForUpdate(
+  action: TriggerAction,
+  requested: NotificationCadence | undefined,
+): NotificationCadence | undefined {
+  if (requested === undefined) return undefined;
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  return requested;
+}
+
+const triggerIdentitySchema = z.object({
+  name: z.string(),
+  alertType: z.nativeEnum(AlertType).nullable().default(null),
+});
+
+const actionParamsSchema = z.object({
+  createdByUserId: z.string().optional(),
+  members: z.string().array().optional(),
+  slackWebhook: z.string().optional(),
+  datasetId: z.string().optional(),
+  datasetMapping: z
+    .object({ mapping: z.any(), expansions: z.array(z.string()).optional() })
+    .optional(),
+  annotators: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .optional(),
+});
+
+type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
+
+function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
+  switch (httpStatus) {
+    case 400:
+      return "BAD_REQUEST";
+    case 401:
+      return "UNAUTHORIZED";
+    case 403:
+      return "FORBIDDEN";
+    case 404:
+      return "NOT_FOUND";
+    case 409:
+      return "CONFLICT";
+    case 422:
+      return "UNPROCESSABLE_CONTENT";
+    case 429:
+      return "TOO_MANY_REQUESTS";
+    default:
+      return "INTERNAL_SERVER_ERROR";
+  }
+}
+
+/**
+ * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
+ * value is a `DomainError`. The shared `errorFormatter` in `trpc.ts` serialises
+ * that cause as `error.data.domainError = { kind, meta, telemetry, … }` so the
+ * client gets the full structured payload — that is the "incredibly good error
+ * handling" surface (see ADR-028 follow-up).
+ */
+function toTemplateTRPCError(err: unknown): TRPCError {
+  if (err instanceof TRPCError) return err;
+  if (err instanceof DomainError) {
+    return new TRPCError({
+      code: httpStatusToTRPCCode(err.httpStatus),
+      message: err.message,
+      cause: err,
+    });
+  }
+  return new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: err instanceof Error ? err.message : "Unexpected error",
+    cause: err instanceof Error ? err : undefined,
+  });
+}
+
+async function resolveProjectIdentity(projectId: string): Promise<DraftProject> {
+  const project = await getApp().projects.getById(projectId);
+  if (!project) throw new ProjectNotFoundError(projectId);
+  return { name: project.name, slug: project.slug };
+}
+
+/**
+ * Mirrors the team-membership check the create procedure already does: every
+ * Recipients are validated by RFC shape only — external addresses are
+ * intentionally allowed (Slack's "email to a channel" pattern). The UI
+ * surfaces an "External" warning badge for non-team addresses.
+ *
+ * A future per-project "strict mode" flag will re-enable team-membership
+ * enforcement via `RecipientNotInTeamError`; that gate is not in this PR.
+ */
+function validateEmailRecipientFormats(recipients: string[]): void {
+  for (const email of recipients) {
+    if (!EMAIL_RX.test(email)) {
+      throw new InvalidEmailRecipientError(email);
+    }
+  }
+}
+
 export const automationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -22,6 +168,7 @@ export const automationRouter = createTRPCRouter({
         name: z.string(),
         action: z.nativeEnum(TriggerAction),
         filters: triggerFiltersSchema,
+        notificationCadence: notificationCadenceSchema.optional(),
         actionParams: z.object({
           createdByUserId: z.string().optional(),
           members: z.string().array().optional(),
@@ -104,13 +251,17 @@ export const automationRouter = createTRPCRouter({
 
       const trigger = await ctx.prisma.trigger.create({
         data: {
-          id: nanoid(),
+          id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
           name: input.name,
           action: input.action,
           actionParams: input.actionParams,
           filters: JSON.stringify(input.filters),
           projectId: input.projectId,
           lastRunAt: new Date().getTime(),
+          notificationCadence: resolveCadenceForCreate(
+            input.action,
+            input.notificationCadence,
+          ),
         },
       });
 
@@ -136,34 +287,6 @@ export const automationRouter = createTRPCRouter({
       await getApp().triggers.invalidate(input.projectId);
 
       return { success: true };
-    }),
-  addCustomMessage: protectedProcedure
-    .input(
-      z.object({
-        triggerId: z.string(),
-        message: z.string(),
-        projectId: z.string(),
-        alertType: z
-          .union([z.nativeEnum(AlertType), z.literal("")])
-          .optional()
-          .nullable(),
-        name: z.string().optional(),
-      }),
-    )
-    .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
-      const trigger = await ctx.prisma.trigger.update({
-        where: { id: input.triggerId, projectId: input.projectId },
-        data: {
-          message: input.message,
-          alertType: input.alertType ? input.alertType : null,
-          name: input.name,
-        },
-      });
-
-      await getApp().triggers.invalidate(input.projectId);
-
-      return trigger;
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -286,6 +409,131 @@ export const automationRouter = createTRPCRouter({
 
       await getApp().triggers.invalidate(input.projectId);
 
+      return trigger;
+    }),
+  testFireTemplate: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        channel: z.enum(["email", "slack"]),
+        trigger: triggerIdentitySchema,
+        draft: templateDraftSchema,
+        recipients: z.string().array().default([]),
+        webhook: z.string().nullable().default(null),
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        if (input.channel === "email") {
+          validateEmailRecipientFormats(input.recipients);
+        }
+        const project = await resolveProjectIdentity(input.projectId);
+        return await getApp().triggerTemplates.testFire({
+          channel: input.channel,
+          trigger: input.trigger,
+          project,
+          draft: input.draft,
+          recipients: input.recipients,
+          webhook: input.webhook,
+        });
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+    }),
+  upsert: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string().optional(),
+        name: z.string().min(1),
+        action: z.nativeEnum(TriggerAction),
+        alertType: z.nativeEnum(AlertType).nullable().optional(),
+        filters: triggerFiltersSchema,
+        customGraphId: z.string().nullable().optional(),
+        actionParams: actionParamsSchema,
+        templates: templateDraftSchema,
+        notificationCadence: notificationCadenceSchema.optional(),
+        traceDebounceMs: traceDebounceMsSchema.optional(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        validateTemplateDraft(input.templates);
+        if (
+          input.action === TriggerAction.SEND_EMAIL &&
+          input.actionParams.members &&
+          input.actionParams.members.length > 0
+        ) {
+          validateEmailRecipientFormats(input.actionParams.members);
+        }
+        if (
+          input.action === TriggerAction.SEND_SLACK_MESSAGE &&
+          !input.actionParams.slackWebhook
+        ) {
+          throw new MissingSlackWebhookError();
+        }
+        if (
+          input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+          (!input.actionParams.annotators ||
+            input.actionParams.annotators.length === 0)
+        ) {
+          throw new MissingAnnotatorError();
+        }
+      } catch (err) {
+        throw toTemplateTRPCError(err);
+      }
+
+      const data = {
+        name: input.name,
+        action: input.action,
+        alertType: input.alertType ?? null,
+        filters: JSON.stringify(input.filters),
+        customGraphId: input.customGraphId ?? null,
+        actionParams: input.actionParams,
+        slackTemplateType: input.templates.slackTemplateType ?? null,
+        slackTemplate: input.templates.slackTemplate ?? null,
+        emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+        emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+      };
+
+      let trigger;
+      if (input.triggerId) {
+        const cadenceUpdate = resolveCadenceForUpdate(
+          input.action,
+          input.notificationCadence,
+        );
+        trigger = await ctx.prisma.trigger.update({
+          where: { id: input.triggerId, projectId: input.projectId },
+          data: {
+            ...data,
+            ...(cadenceUpdate !== undefined
+              ? { notificationCadence: cadenceUpdate }
+              : {}),
+            ...(input.traceDebounceMs !== undefined
+              ? { traceDebounceMs: input.traceDebounceMs }
+              : {}),
+          },
+        });
+      } else {
+        await enforceLicenseLimit(ctx, input.projectId, "automations");
+        trigger = await ctx.prisma.trigger.create({
+          data: {
+            id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+            projectId: input.projectId,
+            lastRunAt: new Date().getTime(),
+            notificationCadence: resolveCadenceForCreate(
+              input.action,
+              input.notificationCadence,
+            ),
+            traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            ...data,
+          },
+        });
+      }
+
+      await getApp().triggers.invalidate(input.projectId);
       return trigger;
     }),
 });

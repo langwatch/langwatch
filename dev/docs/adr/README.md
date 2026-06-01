@@ -19,6 +19,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [023](./023-per-trigger-dispatch-timing.md) | Per-trigger dispatch timing — cadence and trace-readiness debounce | Accepted |
 | [024](./024-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
 | [025](./025-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
+| [026](./026-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
 
 ## When to Write an ADR
 
