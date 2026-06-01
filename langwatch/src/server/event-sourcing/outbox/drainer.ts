@@ -125,6 +125,12 @@ export class OutboxDrainer {
 
     let dispatched = 0;
     while (dispatched < this.maxRowsPerWakeup) {
+      // leaseNext filters by (projectId, reactorName) and orders by
+      // nextAttemptAt — so a wakeup for trigger A may dispatch rows
+      // belonging to trigger B if B's row is the earlier-claimable
+      // one. Per-trigger ordering holds only across wakeup boundaries
+      // (the GroupQueue serialises wakeups per groupKey), not within
+      // a single drain pass.
       const row = await this.outboxService.leaseNext({
         projectId,
         reactorName: wakeup.reactorName,
@@ -137,7 +143,11 @@ export class OutboxDrainer {
     }
 
     // Drain cap hit: yield with an immediate follow-up wakeup so
-    // other groups get a turn but this one keeps draining.
+    // other groups get a turn. We re-post the original wakeup's
+    // groupKey, but the resumed drain still leases globally for
+    // (projectId, reactorName) — so "this one keeps draining" really
+    // means "the (project, reactor) backlog keeps draining," not
+    // "this trigger's rows keep draining."
     await this.scheduleWakeup({ wakeup });
   }
 

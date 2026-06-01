@@ -31,7 +31,10 @@ export interface OutboxEnqueueRequest {
    * Convention for trigger reactors:
    *   `${projectId}/${reactorName}:${triggerId}`
    *
-   * Per-trigger FIFO falls out of this shape.
+   * Wakeups for the same groupKey are serialised by the GroupQueue,
+   * so only one drainer at a time runs the dispatch loop for a given
+   * trigger. NOTE this is wakeup-level serialisation, not row-level
+   * ordering — see the longer note on `OutboxWakeup.groupKey`.
    */
   groupKey: string;
   /**
