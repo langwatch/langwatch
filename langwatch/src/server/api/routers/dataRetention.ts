@@ -6,6 +6,7 @@ import type { Session } from "~/server/auth";
 import {
   assertCanWriteRetentionScope,
   assertRetentionPlan,
+  assertRetentionPlanForScope,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
@@ -82,7 +83,12 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
-      await assertRetentionPlanForProject(ctx, input.projectId);
+      // Plan-gate against the scope's owning org, not the caller-supplied
+      // projectId. The two can belong to different organizations.
+      await assertRetentionPlanForScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
       try {
         return await getApp().dataRetention.policy.setForScope({
           scope: input.scope,
@@ -112,7 +118,10 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
-      await assertRetentionPlanForProject(ctx, input.projectId);
+      await assertRetentionPlanForScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
       await getApp().dataRetention.policy.removeForScope({
         scope: input.scope,
         category: input.category as RetentionCategory,
@@ -124,16 +133,30 @@ export const dataRetentionRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         category: retentionCategorySchema,
-        newRetentionDays: retentionDaysSchema,
       }),
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       await assertRetentionPlanForProject(ctx, input.projectId);
+      // Resolve the retention value server-side. Trusting a client-supplied
+      // newRetentionDays would let a project:update caller rewrite existing
+      // rows to any value, irreversibly contracting data without a matching
+      // saved rule. The effective policy is the only legitimate target.
+      const effective = await getApp().dataRetention.policy.getResolvedForProject(
+        input.projectId,
+      );
+      const category = input.category as RetentionCategory;
+      const newRetentionDays = effective[category];
+      if (newRetentionDays === undefined) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `No effective retention is resolvable for category ${category}.`,
+        });
+      }
       return getApp().dataRetention.retroactive.triggerUpdate({
         projectId: input.projectId,
-        category: input.category as RetentionCategory,
-        newRetentionDays: input.newRetentionDays,
+        category,
+        newRetentionDays,
       });
     }),
 

@@ -9,8 +9,19 @@ const rbacMocks = vi.hoisted(() => ({
 
 vi.mock("~/server/api/rbac", () => rbacMocks);
 
+const planMocks = vi.hoisted(() => ({
+  getActivePlan: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    planProvider: { getActivePlan: planMocks.getActivePlan },
+  }),
+}));
+
 import {
   assertCanWriteRetentionScope,
+  assertRetentionPlanForScope,
   requiredRetentionWritePermission,
 } from "../dataRetentionPolicy.authz";
 
@@ -127,6 +138,106 @@ describe("assertCanWriteRetentionScope", () => {
       ).rejects.toBeInstanceOf(TRPCError);
 
       expect(rbacMocks.hasProjectPermission).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("assertRetentionPlanForScope", () => {
+  const prismaScopeMock = {
+    organization: { findUnique: vi.fn() },
+    team: { findUnique: vi.fn() },
+    project: { findUnique: vi.fn() },
+  } as any;
+  const ctxScope = { prisma: prismaScopeMock, session };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaScopeMock.organization.findUnique.mockReset();
+    prismaScopeMock.team.findUnique.mockReset();
+    prismaScopeMock.project.findUnique.mockReset();
+  });
+
+  describe("regression: free-plan owning org rejects the mutation even when a paid projectId is supplied", () => {
+    /**
+     * Before the fix, `setForScope` and `removeForScope` plan-gated against
+     * the caller-supplied `input.projectId`, not `input.scope`. A caller who
+     * could write a scope in a free org and also had a paid project elsewhere
+     * could thread the paid project's id alongside the free-org scope and
+     * silently bypass the paid-tier gate. The gate now ties to the scope's
+     * owning org.
+     */
+    it("throws FORBIDDEN when the scope's owning organization is on a free plan", async () => {
+      // Scope target: an organization that is on the free plan.
+      prismaScopeMock.organization.findUnique.mockResolvedValue({
+        id: "org_free",
+      });
+      planMocks.getActivePlan.mockResolvedValue({ free: true });
+
+      await expect(
+        assertRetentionPlanForScope(ctxScope, {
+          scopeType: "ORGANIZATION",
+          scopeId: "org_free",
+        }),
+      ).rejects.toMatchObject({
+        name: "TRPCError",
+        code: "FORBIDDEN",
+      });
+
+      expect(planMocks.getActivePlan).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_free" }),
+      );
+    });
+  });
+
+  describe("given a TEAM scope", () => {
+    it("resolves the team's organization and gates against that org's plan", async () => {
+      prismaScopeMock.team.findUnique.mockResolvedValue({
+        organizationId: "org_paid",
+      });
+      planMocks.getActivePlan.mockResolvedValue({ free: false });
+
+      await expect(
+        assertRetentionPlanForScope(ctxScope, {
+          scopeType: "TEAM",
+          scopeId: "team_a",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(planMocks.getActivePlan).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_paid" }),
+      );
+    });
+  });
+
+  describe("given a PROJECT scope", () => {
+    it("resolves the project's team's organization and gates that org's plan", async () => {
+      prismaScopeMock.project.findUnique.mockResolvedValue({
+        team: { organizationId: "org_paid" },
+      });
+      planMocks.getActivePlan.mockResolvedValue({ free: false });
+
+      await expect(
+        assertRetentionPlanForScope(ctxScope, {
+          scopeType: "PROJECT",
+          scopeId: "project_a",
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the scope target does not exist", () => {
+    it("throws NOT_FOUND", async () => {
+      prismaScopeMock.organization.findUnique.mockResolvedValue(null);
+
+      await expect(
+        assertRetentionPlanForScope(ctxScope, {
+          scopeType: "ORGANIZATION",
+          scopeId: "org_missing",
+        }),
+      ).rejects.toMatchObject({
+        name: "TRPCError",
+        code: "NOT_FOUND",
+      });
     });
   });
 });

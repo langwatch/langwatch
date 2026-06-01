@@ -112,3 +112,56 @@ export async function assertRetentionPlan(
       "All projects use the platform default until the organization upgrades.",
   });
 }
+
+/**
+ * Resolves the organization that owns a scope target (org/team/project).
+ * Returns null if the scope does not exist or doesn't resolve to an org —
+ * callers should treat that as NOT_FOUND.
+ */
+export async function resolveScopeOrganizationId(
+  ctx: RBACContext,
+  scope: RetentionScope,
+): Promise<string | null> {
+  if (scope.scopeType === "ORGANIZATION") {
+    const org = await ctx.prisma.organization.findUnique({
+      where: { id: scope.scopeId },
+      select: { id: true },
+    });
+    return org?.id ?? null;
+  }
+  if (scope.scopeType === "TEAM") {
+    const team = await ctx.prisma.team.findUnique({
+      where: { id: scope.scopeId },
+      select: { organizationId: true },
+    });
+    return team?.organizationId ?? null;
+  }
+  const project = await ctx.prisma.project.findUnique({
+    where: { id: scope.scopeId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  return project?.team?.organizationId ?? null;
+}
+
+/**
+ * Plan-gate a scope-targeted retention mutation against the organization
+ * that owns the scope — NOT against the caller-supplied projectId.
+ *
+ * Without this, a caller who manages a scope in a free org and also has a
+ * paid project elsewhere could pass that paid project id alongside the
+ * free-org scope and bypass the paid-tier gate. Tie the plan check to the
+ * scope's owning org so the gate matches the mutation target.
+ */
+export async function assertRetentionPlanForScope(
+  ctx: RBACContext,
+  scope: RetentionScope,
+): Promise<void> {
+  const organizationId = await resolveScopeOrganizationId(ctx, scope);
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
+    });
+  }
+  await assertRetentionPlan(ctx, organizationId);
+}

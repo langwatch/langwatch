@@ -281,6 +281,11 @@ function DataRetentionPage({
   // irreversible if it contracts.
   const [pendingConfirm, setPendingConfirm] = useState<{
     retentionDays: number;
+    /** True when the user saved at least one scope beyond the current project
+     *  (org/team or a different project). Retroactive apply only ever runs on
+     *  the current project; surfacing this in the dialog prevents a user from
+     *  expecting an org-wide save to retro-stamp every child project. */
+    savedScopeWiderThanCurrentProject: boolean;
     onConfirm: () => void | Promise<void>;
   } | null>(null);
 
@@ -633,8 +638,13 @@ function DataRetentionPage({
                 return;
               }
 
+              const savedScopeWiderThanCurrentProject = scopes.some(
+                (s) =>
+                  !(s.scopeType === "PROJECT" && s.scopeId === projectId),
+              );
               setPendingConfirm({
                 retentionDays,
+                savedScopeWiderThanCurrentProject,
                 onConfirm: async () => {
                   const result = await saveOverrides();
                   const status = reportSaveResults(result);
@@ -647,13 +657,15 @@ function DataRetentionPage({
                     ),
                   );
                   if (succeededCategories.length > 0) {
+                    // The server derives newRetentionDays from the project's
+                    // resolved effective policy (the rule we just saved), so
+                    // the UI only sends the target identity here.
                     const triggerResults = await Promise.all(
                       succeededCategories.map((category) =>
                         triggerUpdate
                           .mutateAsync({
                             projectId,
                             category,
-                            newRetentionDays: retentionDays,
                           })
                           .then(
                             () => ({ ok: true as const }),
@@ -770,7 +782,10 @@ function ApplyToExistingConfirmDialog({
   onCancel,
   onConfirm,
 }: {
-  pending: { retentionDays: number } | null;
+  pending: {
+    retentionDays: number;
+    savedScopeWiderThanCurrentProject: boolean;
+  } | null;
   isApplying: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
@@ -788,13 +803,29 @@ function ApplyToExistingConfirmDialog({
         </Dialog.Header>
         <Dialog.Body>
           {pending && (
-            <Text>
-              We will rewrite existing data to use {pending.retentionDays} days
-              of retention. If any rows are currently older than{" "}
-              {pending.retentionDays} days, they become eligible for deletion
-              on the next background merge. After deletion, this cannot be
-              undone.
-            </Text>
+            <VStack align="stretch" gap={3}>
+              <Text>
+                We will rewrite <strong>this project's</strong> existing data
+                to use {pending.retentionDays} days of retention. If any rows
+                are currently older than {pending.retentionDays} days, they
+                become eligible for deletion on the next background merge.
+                After deletion, this cannot be undone.
+              </Text>
+              {pending.savedScopeWiderThanCurrentProject && (
+                <Alert.Root status="warning">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>
+                      You also saved an organization or team policy. New rows
+                      across those scopes will use the new retention, but
+                      existing rows in other projects keep their current
+                      retention until each project is visited and applied
+                      individually.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+            </VStack>
           )}
         </Dialog.Body>
         <Dialog.Footer>
