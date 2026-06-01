@@ -229,11 +229,18 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         makeEventRow("evt-span-2", [
           { ts: t(5), name: "process.tick", attrs: { iter: "1" } },
         ]),
-        // Stale earlier version of evt-span-1 — dedup must drop it.
+        // Stale earlier version of evt-span-1 — dedup must drop it. Override
+        // StartTime as well as UpdatedAt: stored_spans is
+        // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
+        // collapse the live row at insert time (rows in one INSERT land in a
+        // single part, and the engine resolves ties unpredictably). A strictly
+        // older StartTime makes the stale row deterministically lose the merge.
         makeEventRow(
           "evt-span-1",
           [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }],
           {
+            StartTime: new Date(base - 60_000),
+            EndTime: new Date(base - 60_000 + 50),
             UpdatedAt: new Date(base - 60_000),
             CreatedAt: new Date(base - 60_000),
           },
