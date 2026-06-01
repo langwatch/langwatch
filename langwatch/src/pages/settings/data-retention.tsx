@@ -23,6 +23,13 @@ import {
   type ScopeChipPickerEntry,
   type ScopeChipPickerScopeType,
 } from "~/components/settings/ScopeChipPicker";
+import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { useAvailableScopes } from "~/hooks/useAvailableScopes";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
+import {
+  isScopeInFilter,
+  resolveScopeFilter,
+} from "~/utils/filterProvidersByScope";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
@@ -170,12 +177,24 @@ function groupRulesByScope(rules: RetentionRuleRow[]): RetentionRuleGroup[] {
 
 function DataRetentionSettings() {
   const { project, organization, team } = useOrganizationTeamProject();
+  // Available scopes + URL-driven filter must be hooks (run unconditionally)
+  // so we compute them before the early return. Both gracefully accept
+  // null/undefined inputs.
+  const filterAvailable = useAvailableScopes(organization);
+  const [scopeFilter, setScopeFilter] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: team?.id,
+    projectId: project?.id,
+  });
   if (!project) return null;
   return (
     <DataRetentionPage
       projectId={project.id}
       organizationId={organization?.id}
       teamId={team?.id}
+      filterAvailable={filterAvailable}
+      scopeFilter={scopeFilter}
+      onScopeFilterChange={setScopeFilter}
     />
   );
 }
@@ -188,10 +207,16 @@ function DataRetentionPage({
   projectId,
   organizationId,
   teamId,
+  filterAvailable,
+  scopeFilter,
+  onScopeFilterChange,
 }: {
   projectId: string;
   organizationId: string | undefined;
   teamId: string | undefined;
+  filterAvailable: ReturnType<typeof useAvailableScopes>;
+  scopeFilter: ReturnType<typeof useUrlScopeFilter>[0];
+  onScopeFilterChange: ReturnType<typeof useUrlScopeFilter>[1];
 }) {
   const utils = api.useUtils();
   const rulesQuery = api.dataRetention.getRules.useQuery({ projectId });
@@ -376,19 +401,48 @@ function DataRetentionPage({
                     days); minimum {MIN_RETENTION_DAYS} days.
                   </Text>
                 </VStack>
-                {canWrite && (
-                  <Button
-                    colorPalette="blue"
-                    onClick={() => setDrawerOpen(true)}
-                    flexShrink={0}
-                  >
-                    Add override
-                  </Button>
-                )}
+                <HStack gap={2} flexShrink={0}>
+                  <ScopeFilterComponent
+                    value={scopeFilter}
+                    onChange={onScopeFilterChange}
+                    available={filterAvailable}
+                    currentTeamId={teamId}
+                    currentProjectId={projectId}
+                  />
+                  {canWrite && (
+                    <Button
+                      colorPalette="blue"
+                      onClick={() => setDrawerOpen(true)}
+                    >
+                      Add override
+                    </Button>
+                  )}
+                </HStack>
               </HStack>
             </Card.Header>
             <Card.Body>
-              {snapshot.rules.length > 0 ? (
+              {(() => {
+                const resolved = resolveScopeFilter(scopeFilter, {
+                  currentTeamId: teamId,
+                  currentProjectId: projectId,
+                });
+                const filteredRules = snapshot.rules.filter((r) =>
+                  isScopeInFilter(
+                    { scopeType: r.scopeType, scopeId: r.scopeId },
+                    resolved,
+                    filterAvailable.hierarchy,
+                  ),
+                );
+                if (filteredRules.length === 0) {
+                  return (
+                    <Text fontSize="sm" color="fg.muted">
+                      {snapshot.rules.length === 0
+                        ? "No overrides yet — the platform default applies."
+                        : "No overrides match the current scope filter."}
+                    </Text>
+                  );
+                }
+                return (
                 <Table.Root size="sm">
                   <Table.Header>
                     <Table.Row>
@@ -399,7 +453,7 @@ function DataRetentionPage({
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {groupRulesByScope(snapshot.rules).map((group) => {
+                    {groupRulesByScope(filteredRules).map((group) => {
                       const Icon = SCOPE_ICON[group.scopeType];
                       return group.rules.map((rule, idx) => (
                         <Table.Row
@@ -453,11 +507,8 @@ function DataRetentionPage({
                     })}
                   </Table.Body>
                 </Table.Root>
-              ) : (
-                <Text fontSize="sm" color="fg.muted">
-                  No overrides yet — the platform default applies.
-                </Text>
-              )}
+                );
+              })()}
             </Card.Body>
           </Card.Root>
         )}
