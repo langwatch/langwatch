@@ -50,6 +50,8 @@ import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
 import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
+import { startDataRetentionOrphanSweepWorker } from "./workers/dataRetentionOrphanSweepWorker";
+import { scheduleDataRetentionOrphanSweep } from "./queues/dataRetentionOrphanSweepQueue";
 import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
 import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
 
@@ -168,6 +170,9 @@ export const start = async (
     const usageStatsWorker = startUsageStatsWorker();
     const anomalyDetectionWorker = startAnomalyDetectionWorker();
     void scheduleAnomalyDetection();
+    const dataRetentionOrphanSweepWorker =
+      startDataRetentionOrphanSweepWorker();
+    void scheduleDataRetentionOrphanSweep();
     const ingestionPullerWorker = startIngestionPullerWorker();
     void scheduleIngestionPullers();
     const metricsServer = startMetricsServer();
@@ -178,6 +183,12 @@ export const start = async (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("anomalyDetection", anomalyDetectionWorker);
+    if (dataRetentionOrphanSweepWorker) {
+      registerCloseable(
+        "dataRetentionOrphanSweep",
+        dataRetentionOrphanSweepWorker,
+      );
+    }
     if (ingestionPullerWorker) {
       registerCloseable("ingestionPuller", ingestionPullerWorker);
     }

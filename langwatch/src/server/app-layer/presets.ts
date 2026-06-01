@@ -124,6 +124,10 @@ import { RetroactiveUpdateService } from "../data-retention/retroactive/retroact
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
 import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
+import {
+  InMemoryOrphanCursorStore,
+  RedisOrphanCursorStore,
+} from "../data-retention/orphan-sweep/orphanSweepCursor.store";
 import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
@@ -365,9 +369,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
   const orphanSweepRepo = new OrphanSweepRepository(prisma);
+  // Persist sweep cursors in Redis when available; fall back to the in-memory
+  // store otherwise. The cursor lets the sweep resume across runs instead of
+  // restarting at page 0 every hour and starving the tail.
+  const orphanCursorStore = redis
+    ? new RedisOrphanCursorStore(redis)
+    : new InMemoryOrphanCursorStore();
   const orphanSweepService = new OrphanSweepService(
     orphanSweepRepo,
     clickhouseEnabled ? resolveClickHouseClient : null,
+    orphanCursorStore,
   );
   const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
     orphanSweep: orphanSweepService,

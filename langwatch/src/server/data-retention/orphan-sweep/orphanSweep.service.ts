@@ -5,23 +5,32 @@ import type {
   OrphanCandidateCursor,
   OrphanSweepRepository,
 } from "./orphanSweep.repository";
+import {
+  InMemoryOrphanCursorStore,
+  type OrphanCursorStore,
+} from "./orphanSweepCursor.store";
 
 const logger = createLogger("langwatch:data-retention:orphan-sweep");
 
 const BATCH_SIZE = 1000;
 const CANDIDATE_LIMIT = 1000;
 
-// Safety bound on how many candidate pages one sweep walks. A project with
-// more referencing rows than this resumes from the start on the next sweep
-// (we don't persist the cursor across runs) — generous enough that real
-// projects drain in a single sweep, so this is a backstop, not the norm.
+// Safety bound on how many candidate pages one sweep walks. Cursoring is now
+// persisted across runs (see `cursorStore`), so a project with more
+// referencing rows than this resumes from where the previous sweep stopped
+// rather than restarting at the beginning and starving the tail.
 const MAX_SWEEP_PAGES = 100;
 
 export class OrphanSweepService {
+  private readonly cursorStore: OrphanCursorStore;
+
   constructor(
     private readonly repository: OrphanSweepRepository,
     private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
-  ) {}
+    cursorStore?: OrphanCursorStore,
+  ) {
+    this.cursorStore = cursorStore ?? new InMemoryOrphanCursorStore();
+  }
 
   async filterOrphanedTraceIds({
     projectId,
@@ -81,7 +90,12 @@ export class OrphanSweepService {
   }
 
   async sweepProject({ projectId }: { projectId: string }): Promise<void> {
-    let cursor: OrphanCandidateCursor | undefined;
+    // Resume from the previous sweep's cursor when one is saved. Without
+    // persistence, a project with > MAX_SWEEP_PAGES × CANDIDATE_LIMIT live
+    // referencing rows would restart at page 0 every hour and never reach
+    // any orphan past that prefix.
+    let cursor: OrphanCandidateCursor | undefined =
+      await this.cursorStore.load(projectId);
 
     for (let page = 0; page < MAX_SWEEP_PAGES; page++) {
       const { traceIds, nextCursor } =
@@ -100,14 +114,54 @@ export class OrphanSweepService {
       }
 
       // null cursor = every source drained; we've walked the whole project.
-      if (!nextCursor) return;
+      if (!nextCursor) {
+        await this.cursorStore.clear(projectId);
+        return;
+      }
       cursor = nextCursor;
     }
 
+    // Cap hit but more candidates exist. Persist the cursor so the next
+    // sweep advances from here instead of restarting.
+    if (cursor) {
+      await this.cursorStore.save(projectId, cursor);
+    }
     logger.warn(
       { projectId, maxPages: MAX_SWEEP_PAGES, pageSize: CANDIDATE_LIMIT },
-      "Orphan sweep hit the per-run page cap; remaining candidates will be revisited on the next sweep",
+      "Orphan sweep hit the per-run page cap; next sweep will resume from the saved cursor",
     );
+  }
+
+  /**
+   * Sweep a batch of projects in sequence. Used by the scheduled cron so
+   * tenants that have stopped ingesting still get their dangling PG rows
+   * cleaned — the reactor only fires on new TraceProcessingEvents, so
+   * without a scheduled pass an inactive tenant accrues stale annotations,
+   * shares and pins forever.
+   *
+   * Failures are isolated per-project so one stuck tenant doesn't block
+   * the rest of the batch.
+   */
+  async sweepProjects({
+    projectIds,
+  }: {
+    projectIds: string[];
+  }): Promise<{ swept: number; failed: number }> {
+    let swept = 0;
+    let failed = 0;
+    for (const projectId of projectIds) {
+      try {
+        await this.sweepProject({ projectId });
+        swept++;
+      } catch (error) {
+        failed++;
+        logger.error(
+          { projectId, error },
+          "Scheduled orphan sweep failed for project; continuing with remaining projects",
+        );
+      }
+    }
+    return { swept, failed };
   }
 
   private async cleanupBatch({

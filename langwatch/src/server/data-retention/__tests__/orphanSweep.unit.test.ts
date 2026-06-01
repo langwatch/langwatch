@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { OrphanSweepService } from "../orphan-sweep/orphanSweep.service";
+import { InMemoryOrphanCursorStore } from "../orphan-sweep/orphanSweepCursor.store";
 import { createRetentionOrphanSweepReactor } from "../orphan-sweep/retentionOrphanSweep.reactor";
 
 describe("OrphanSweepService", () => {
@@ -113,6 +114,89 @@ describe("OrphanSweepService", () => {
         projectId: "project-1",
         traceIds: ["missing"],
       });
+    });
+
+    /**
+     * Regression: the in-process cursor reset between sweep runs, so any
+     * project with more candidates than MAX_SWEEP_PAGES × CANDIDATE_LIMIT
+     * (100k) would restart at the beginning each run and starve the tail.
+     * The persistent cursor must survive across runs.
+     */
+    it("resumes from the persisted cursor on the next sweep when the page cap was hit", async () => {
+      // First sweep: every page returns a full page worth of trace ids AND
+      // a nextCursor. Effectively unbounded — sweep walks until the cap.
+      let callIndex = 0;
+      const repository = {
+        findCandidateTraceIds: vi.fn().mockImplementation(({ cursor }) => {
+          callIndex++;
+          return Promise.resolve({
+            traceIds: [`trace-${callIndex}`],
+            // Return a cursor that advances each call.
+            nextCursor: { annotationId: `cursor-${callIndex}` },
+            _receivedCursor: cursor,
+          });
+        }),
+        deleteAnnotations: vi.fn().mockResolvedValue(0),
+        deleteAnnotationQueueItems: vi.fn().mockResolvedValue(0),
+        deletePublicShares: vi.fn().mockResolvedValue(0),
+        nullifyTriggerSentTraceIds: vi.fn().mockResolvedValue(0),
+        deletePinnedTraces: vi.fn().mockResolvedValue(0),
+      };
+      const cursorStore = new InMemoryOrphanCursorStore();
+      const service = new OrphanSweepService(
+        repository as any,
+        async () =>
+          ({
+            query: vi.fn().mockResolvedValue({ json: async () => [] }),
+          }) as any,
+        cursorStore,
+      );
+
+      // Run 1 — page cap should trigger, cursor persisted.
+      await service.sweepProject({ projectId: "project-1" });
+      const persistedAfterFirst = await cursorStore.load("project-1");
+      expect(persistedAfterFirst).toBeDefined();
+      expect(persistedAfterFirst).toEqual(
+        expect.objectContaining({ annotationId: expect.any(String) }),
+      );
+
+      // Run 2 — sweep should resume from the persisted cursor, not start fresh.
+      const callsBeforeRun2 = repository.findCandidateTraceIds.mock.calls.length;
+      await service.sweepProject({ projectId: "project-1" });
+
+      const firstCallOfRun2 =
+        repository.findCandidateTraceIds.mock.calls[callsBeforeRun2]!;
+      expect(firstCallOfRun2[0].cursor).toEqual(persistedAfterFirst);
+    });
+
+    /** When the sweep drains every source (nextCursor=null) the persisted
+     *  cursor is cleared so the next sweep starts fresh. */
+    it("clears the persisted cursor once every source is drained", async () => {
+      const repository = {
+        findCandidateTraceIds: vi.fn().mockResolvedValue({
+          traceIds: ["missing"],
+          nextCursor: null,
+        }),
+        deleteAnnotations: vi.fn().mockResolvedValue(0),
+        deleteAnnotationQueueItems: vi.fn().mockResolvedValue(0),
+        deletePublicShares: vi.fn().mockResolvedValue(0),
+        nullifyTriggerSentTraceIds: vi.fn().mockResolvedValue(0),
+        deletePinnedTraces: vi.fn().mockResolvedValue(0),
+      };
+      const cursorStore = new InMemoryOrphanCursorStore();
+      await cursorStore.save("project-1", { annotationId: "stale" });
+      const service = new OrphanSweepService(
+        repository as any,
+        async () =>
+          ({
+            query: vi.fn().mockResolvedValue({ json: async () => [] }),
+          }) as any,
+        cursorStore,
+      );
+
+      await service.sweepProject({ projectId: "project-1" });
+
+      expect(await cursorStore.load("project-1")).toBeUndefined();
     });
   });
 });

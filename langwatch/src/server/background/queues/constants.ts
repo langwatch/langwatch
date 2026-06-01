@@ -56,3 +56,15 @@ export const PULLER_QUEUE = {
   JOB: "ingestion_puller",
 } as const;
 
+/**
+ * Data-retention orphan-sweep tick — sweeps dangling PG rows whose
+ * underlying CH trace rows have aged out via retention TTL. The
+ * ingestion reactor only fires for active tenants; this tick catches
+ * tenants that have stopped ingesting but whose CH rows are still
+ * being deleted by ClickHouse TTL.
+ */
+export const DATA_RETENTION_ORPHAN_SWEEP_QUEUE = {
+  NAME: makeQueueName("data_retention_orphan_sweep"),
+  JOB: "data_retention_orphan_sweep",
+} as const;
+

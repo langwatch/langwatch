@@ -100,6 +100,12 @@ export type AnomalyDetectionJob = {
   timestamp: number;
 };
 
+export type DataRetentionOrphanSweepJob = {
+  /** Wall-clock dispatch time (ms since epoch). Persisted on the job so
+   *  re-runs for the same scheduled tick are deterministic / dedup-able. */
+  timestamp: number;
+};
+
 export type IngestionPullerJob = {
   /** IngestionSource id this run targets. */
   ingestionSourceId: string;
