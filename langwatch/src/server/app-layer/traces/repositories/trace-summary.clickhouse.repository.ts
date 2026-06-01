@@ -27,7 +27,6 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
   _retention_days: number;
-  _size_bytes: number;
 }
 
 export class TraceSummaryClickHouseRepository
@@ -365,15 +364,6 @@ export class TraceSummaryClickHouseRepository
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
       _retention_days: retentionDays,
-      _size_bytes: estimateTraceSummarySizeBytes(data),
     };
   }
-}
-
-function estimateTraceSummarySizeBytes(data: TraceSummaryData): number {
-  let size = 128;
-  size += (data.computedInput?.length ?? 0) + (data.computedOutput?.length ?? 0);
-  size += (data.errorMessage?.length ?? 0);
-  size += JSON.stringify(data.attributes).length;
-  return size;
 }

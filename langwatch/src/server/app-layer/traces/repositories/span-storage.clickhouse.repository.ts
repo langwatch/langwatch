@@ -27,21 +27,6 @@ import {
 
 const TABLE_NAME = "stored_spans" as const;
 
-function estimateSpanSizeBytes(span: SpanInsertData): number {
-  let size = 64;
-  size += span.name.length;
-  size += JSON.stringify(span.resourceAttributes).length;
-  size += JSON.stringify(span.spanAttributes).length;
-  size += span.statusMessage?.length ?? 0;
-  for (const event of span.events) {
-    size += event.name.length + JSON.stringify(event.attributes).length;
-  }
-  for (const link of span.links) {
-    size += 64 + JSON.stringify(link.attributes).length;
-  }
-  return size;
-}
-
 /**
  * `stored_spans` is partitioned by `toYearWeek(StartTime)`. When the caller
  * passes an approximate trace timestamp we narrow the scan to a ±2-day
@@ -472,7 +457,6 @@ interface ClickHouseSpanRecord {
   CreatedAt: number;
   UpdatedAt: number;
   _retention_days: number;
-  _size_bytes: number;
 }
 
 interface FullSpanRow {
@@ -1495,7 +1479,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       CreatedAt: new Date(),
       UpdatedAt: new Date(),
       _retention_days: span.retentionDays ?? 0,
-      _size_bytes: estimateSpanSizeBytes(span),
     } satisfies ClickHouseSpanWriteRecord;
   }
 }

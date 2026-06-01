@@ -54,7 +54,6 @@ interface ClickHouseExperimentRunRecord {
   GradedCount: number;
   LastEventOccurredAt: number;
   _retention_days: number;
-  _size_bytes: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
@@ -136,7 +135,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       GradedCount: data.GradedCount,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
       _retention_days: 0,
-      _size_bytes: 64 + (data.Targets?.length ?? 0),
     };
   }
 

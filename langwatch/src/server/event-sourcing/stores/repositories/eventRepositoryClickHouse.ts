@@ -288,7 +288,6 @@ export class EventRepositoryClickHouse implements EventRepository {
       const stampedRecords = records.map((r) => ({
         ...r,
         _retention_days: r._retention_days ?? 0,
-        _size_bytes: r._size_bytes ?? JSON.stringify(r.EventPayload).length + 128,
       }));
       const client = await this.getClient(tenantId);
       await client.insert({

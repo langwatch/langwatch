@@ -42,7 +42,6 @@ interface ClickHouseEvaluationRunRecord {
   LastProcessedEventId: string;
   LastEventOccurredAt: number;
   _retention_days: number;
-  _size_bytes: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
@@ -474,7 +473,6 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = 0,
   ): ClickHouseEvaluationRunWriteRecord {
-    const inputsJson = data.inputs ? JSON.stringify(data.inputs) : null;
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -490,7 +488,7 @@ export class EvaluationRunClickHouseRepository
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
       Details: data.details,
-      Inputs: inputsJson,
+      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
       Error: data.error,
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
@@ -503,17 +501,6 @@ export class EvaluationRunClickHouseRepository
       CostId: data.costId ?? null,
       LastProcessedEventId: projectionId,
       _retention_days: retentionDays,
-      _size_bytes: estimateEvaluationRunSizeBytes(data, inputsJson),
     };
   }
-}
-
-function estimateEvaluationRunSizeBytes(
-  data: EvaluationRunData,
-  inputsJson: string | null,
-): number {
-  let size = 128;
-  size += (data.details?.length ?? 0) + (data.error?.length ?? 0) + (data.errorDetails?.length ?? 0);
-  size += inputsJson?.length ?? 0;
-  return size;
 }

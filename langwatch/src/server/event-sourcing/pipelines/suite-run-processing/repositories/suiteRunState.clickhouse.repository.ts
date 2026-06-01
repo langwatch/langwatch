@@ -48,7 +48,6 @@ interface ClickHouseSuiteRunRecord {
   FinishedAt: number | null;
   LastEventOccurredAt: number;
   _retention_days: number;
-  _size_bytes: number;
 }
 
 type ClickHouseSuiteRunWriteRecord = WithDateWrites<
@@ -116,7 +115,6 @@ export class SuiteRunStateRepositoryClickHouse<
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
       _retention_days: 0,
-      _size_bytes: 64,
     };
   }
 
