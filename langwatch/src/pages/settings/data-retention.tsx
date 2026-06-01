@@ -1,7 +1,9 @@
 import {
+  Alert,
   Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
   HStack,
@@ -21,6 +23,8 @@ import {
   type ScopeChipPickerScopeType,
 } from "~/components/settings/ScopeChipPicker";
 import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
+import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -42,11 +46,27 @@ const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   experiments: "Experiments",
 };
 
+// Each category covers several ClickHouse tables. Surface the coverage so the
+// page doesn't read as "only 3 things are retained" when the underlying
+// stamping reaches 11 tables.
+const CATEGORY_COVERAGE: Record<RetentionCategory, string> = {
+  traces: "Spans, logs, metrics, summaries, evaluations and DSPy steps.",
+  scenarios: "Simulation runs and suite runs.",
+  experiments: "Experiment runs and run items.",
+};
+
 const SCOPE_ICON: Record<ScopeChipPickerScopeType, typeof Building2> = {
   ORGANIZATION: Building2,
   TEAM: Users,
   PROJECT: Folder,
 };
+
+const categoryCollection = createListCollection({
+  items: RETENTION_CATEGORIES.map((c) => ({
+    value: c,
+    label: CATEGORY_LABELS[c],
+  })),
+});
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -61,16 +81,30 @@ function formatDays(days: number): string {
 }
 
 function DataRetentionSettings() {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization, team } = useOrganizationTeamProject();
   if (!project) return null;
-  return <DataRetentionPage projectId={project.id} />;
+  return (
+    <DataRetentionPage
+      projectId={project.id}
+      organizationId={organization?.id}
+      teamId={team?.id}
+    />
+  );
 }
 
 export default withPermissionGuard("project:view", {
   layoutComponent: SettingsLayout,
 })(DataRetentionSettings);
 
-function DataRetentionPage({ projectId }: { projectId: string }) {
+function DataRetentionPage({
+  projectId,
+  organizationId,
+  teamId,
+}: {
+  projectId: string;
+  organizationId: string | undefined;
+  teamId: string | undefined;
+}) {
   const utils = api.useUtils();
   const rulesQuery = api.dataRetention.getRules.useQuery({ projectId });
   const storageQuery = api.dataRetention.getStorageBreakdown.useQuery({
@@ -222,6 +256,16 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
       available.teams.length > 0 ||
       available.projects.length > 0);
 
+  // Show "Apply to existing data" only when the effective value diverges from
+  // the baseline this session opened with. Once applied, baseline catches up
+  // and the row goes quiet again — no perpetual call-to-action.
+  const hasPendingApply = (category: RetentionCategory): boolean => {
+    if (!snapshot || !baseline) return false;
+    const to = snapshot.effective[category];
+    if (to <= 0) return false;
+    return baseline[category] !== to;
+  };
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
@@ -229,193 +273,228 @@ function DataRetentionPage({ projectId }: { projectId: string }) {
           Data Retention
         </Heading>
 
-      {!canConfigureRetention && snapshot && (
-        <Card.Root width="full" borderColor="border.info" borderWidth="1px">
-          <Card.Body>
-            <Text fontSize="sm">
-              Your plan applies the platform default to every project. Upgrade
-              to configure per-organization, per-team, or per-project retention
-              overrides.
+        {!canConfigureRetention && snapshot && (
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>
+                Configurable retention is a paid-plan feature
+              </Alert.Title>
+              <Alert.Description>
+                Your plan applies the platform default to every project.
+                Upgrade to configure per-organization, per-team, or per-project
+                retention overrides.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        <Card.Root width="full">
+          <Card.Header>
+            <Heading as="h3" fontSize="lg">
+              Effective Retention
+            </Heading>
+            <Text fontSize="sm" color="fg.muted">
+              What applies to this project today, after the project → team →
+              organization cascade. No override anywhere means the platform
+              default applies.
             </Text>
+          </Card.Header>
+          <Card.Body>
+            <VStack gap={4} align="stretch">
+              {RETENTION_CATEGORIES.map((category) => {
+                const days = snapshot?.effective[category] ?? 0;
+                const showApply =
+                  canWrite && projectIsWritable && hasPendingApply(category);
+                return (
+                  <HStack
+                    key={category}
+                    justifyContent="space-between"
+                    align="start"
+                  >
+                    <VStack align="start" gap={0}>
+                      <Text>{CATEGORY_LABELS[category]}</Text>
+                      <Text fontSize="xs" color="fg.muted">
+                        {CATEGORY_COVERAGE[category]}
+                      </Text>
+                    </VStack>
+                    <HStack gap={3} flexShrink={0}>
+                      <Text fontWeight="medium">{formatDays(days)}</Text>
+                      {showApply && (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          loading={
+                            triggerUpdate.isLoading &&
+                            triggerUpdate.variables?.category === category
+                          }
+                          onClick={() => applyToExistingData(category)}
+                        >
+                          <History size={14} />
+                          Apply to existing data
+                        </Button>
+                      )}
+                    </HStack>
+                  </HStack>
+                );
+              })}
+            </VStack>
           </Card.Body>
         </Card.Root>
-      )}
 
-      <Card.Root width="full">
-        <Card.Header>
-          <Heading as="h3" fontSize="lg">
-            Effective Retention
-          </Heading>
-          <Text fontSize="sm" color="fg.muted">
-            What applies to this project today, after the project → team →
-            organization cascade. No override anywhere means the platform
-            default applies.
-          </Text>
-        </Card.Header>
-        <Card.Body>
-          <VStack gap={3} align="stretch">
-            {RETENTION_CATEGORIES.map((category) => {
-              const days = snapshot?.effective[category] ?? 0;
-              return (
-                <HStack key={category} justifyContent="space-between">
-                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                  <HStack gap={3}>
-                    <Text fontWeight="medium">{formatDays(days)}</Text>
-                    {canWrite && projectIsWritable && days > 0 && (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        loading={
-                          triggerUpdate.isLoading &&
-                          triggerUpdate.variables?.category === category
-                        }
-                        onClick={() => applyToExistingData(category)}
-                      >
-                        <History size={14} />
-                        Apply to existing data
-                      </Button>
-                    )}
-                  </HStack>
-                </HStack>
-              );
-            })}
-          </VStack>
-        </Card.Body>
-      </Card.Root>
-
-      <Card.Root width="full">
-        <Card.Header>
-          <HStack justifyContent="space-between" width="full">
-            <VStack align="start" gap={0}>
-              <Heading as="h3" fontSize="lg">
-                Overrides
-              </Heading>
-              <Text fontSize="sm" color="fg.muted">
-                Set a retention for a category at the organization, a team, or a
-                project. The most specific override wins. Retention is set in
-                whole weeks (multiples of {RETENTION_WEEK_DAYS} days); minimum{" "}
-                {MIN_RETENTION_DAYS} days.
-              </Text>
-            </VStack>
-            {canWrite && (
-              <Button
-                colorPalette="blue"
-                onClick={() => setDrawerOpen(true)}
-                flexShrink={0}
-              >
-                Add override
-              </Button>
-            )}
-          </HStack>
-        </Card.Header>
-        <Card.Body>
-          {snapshot && snapshot.rules.length > 0 ? (
-            <Table.Root size="sm">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                  <Table.ColumnHeader>Category</Table.ColumnHeader>
-                  <Table.ColumnHeader>Retention</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {snapshot.rules.map((rule) => {
-                  const Icon = SCOPE_ICON[rule.scopeType];
-                  return (
-                    <Table.Row
-                      key={`${rule.scopeType}:${rule.scopeId}:${rule.category}`}
-                    >
-                      <Table.Cell>
-                        <HStack gap={2}>
-                          <Icon size={14} />
-                          <Text>{rule.name}</Text>
-                          <Badge size="sm" colorPalette="gray">
-                            {rule.scopeType.toLowerCase()}
-                          </Badge>
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>{CATEGORY_LABELS[rule.category]}</Table.Cell>
-                      <Table.Cell>{formatDays(rule.retentionDays)}</Table.Cell>
-                      <Table.Cell textAlign="end">
-                        {canWrite && (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            colorPalette="red"
-                            loading={removeForScope.isLoading}
-                            onClick={() =>
-                              removeForScope.mutate({
-                                projectId,
-                                scope: {
-                                  scopeType: rule.scopeType,
-                                  scopeId: rule.scopeId,
-                                },
-                                category: rule.category,
-                              })
-                            }
-                            aria-label="Remove override"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        )}
-                      </Table.Cell>
+        {canConfigureRetention && snapshot && (
+          <Card.Root width="full">
+            <Card.Header>
+              <HStack justifyContent="space-between" width="full">
+                <VStack align="start" gap={0}>
+                  <Heading as="h3" fontSize="lg">
+                    Overrides
+                  </Heading>
+                  <Text fontSize="sm" color="fg.muted">
+                    Set a retention for a category at the organization, a team,
+                    or a project. The most specific override wins. Retention is
+                    set in whole weeks (multiples of {RETENTION_WEEK_DAYS}{" "}
+                    days); minimum {MIN_RETENTION_DAYS} days.
+                  </Text>
+                </VStack>
+                {canWrite && (
+                  <Button
+                    colorPalette="blue"
+                    onClick={() => setDrawerOpen(true)}
+                    flexShrink={0}
+                  >
+                    Add override
+                  </Button>
+                )}
+              </HStack>
+            </Card.Header>
+            <Card.Body>
+              {snapshot.rules.length > 0 ? (
+                <Table.Root size="sm">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                      <Table.ColumnHeader>Category</Table.ColumnHeader>
+                      <Table.ColumnHeader>Retention</Table.ColumnHeader>
+                      <Table.ColumnHeader />
                     </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          ) : (
-            <Text fontSize="sm" color="fg.muted">
-              No overrides yet — data is kept indefinitely.
-            </Text>
-          )}
-        </Card.Body>
-      </Card.Root>
+                  </Table.Header>
+                  <Table.Body>
+                    {snapshot.rules.map((rule) => {
+                      const Icon = SCOPE_ICON[rule.scopeType];
+                      return (
+                        <Table.Row
+                          key={`${rule.scopeType}:${rule.scopeId}:${rule.category}`}
+                        >
+                          <Table.Cell>
+                            <HStack gap={2}>
+                              <Icon size={14} />
+                              <Text>{rule.name}</Text>
+                              <Badge size="sm" colorPalette="gray">
+                                {rule.scopeType.toLowerCase()}
+                              </Badge>
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {CATEGORY_LABELS[rule.category]}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {formatDays(rule.retentionDays)}
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            {canWrite && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                colorPalette="red"
+                                loading={removeForScope.isLoading}
+                                onClick={() =>
+                                  removeForScope.mutate({
+                                    projectId,
+                                    scope: {
+                                      scopeType: rule.scopeType,
+                                      scopeId: rule.scopeId,
+                                    },
+                                    category: rule.category,
+                                  })
+                                }
+                                aria-label="Remove override"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
+                  </Table.Body>
+                </Table.Root>
+              ) : (
+                <Text fontSize="sm" color="fg.muted">
+                  No overrides yet — the platform default applies.
+                </Text>
+              )}
+            </Card.Body>
+          </Card.Root>
+        )}
 
-      <RetroactiveProgressCard
-        mutations={activeMutations}
-        onCancel={(mutationId) =>
-          killMutation.mutate({ projectId, mutationId })
-        }
-        isCancelling={killMutation.isLoading}
-      />
-
-      <StorageUsageCard
-        isLoading={storageQuery.isLoading}
-        data={storageQuery.data}
-      />
-
-      {available && (
-        <AddOverrideDrawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          projectId={projectId}
-          available={available}
-          isSaving={setForScope.isLoading}
-          onSave={(scope, category, retentionDays) =>
-            setForScope.mutate(
-              { projectId, scope, category, retentionDays },
-              { onSuccess: () => setDrawerOpen(false) },
-            )
+        <RetroactiveProgressCard
+          mutations={activeMutations}
+          onCancel={(mutationId) =>
+            killMutation.mutate({ projectId, mutationId })
           }
+          isCancelling={killMutation.isLoading}
         />
-      )}
 
-      <ContractionConfirmDialog
-        pending={confirmContraction}
-        isApplying={triggerUpdate.isLoading}
-        onCancel={() => setConfirmContraction(null)}
-        onConfirm={() => {
-          if (!confirmContraction) return;
-          triggerUpdate.mutate({
-            projectId,
-            category: confirmContraction.category,
-            newRetentionDays: confirmContraction.to,
-          });
-          setConfirmContraction(null);
-        }}
-      />
+        <StorageUsageCard
+          isLoading={storageQuery.isLoading}
+          data={storageQuery.data}
+        />
+
+        {available && (
+          <AddOverrideDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            available={available}
+            currentOrganizationId={organizationId}
+            currentTeamId={teamId}
+            currentProjectId={projectId}
+            isSaving={setForScope.isLoading}
+            onSave={async (scopes, category, retentionDays) => {
+              const results = await Promise.all(
+                scopes.map((scope) =>
+                  setForScope
+                    .mutateAsync({
+                      projectId,
+                      scope,
+                      category,
+                      retentionDays,
+                    })
+                    .then(
+                      () => ({ ok: true as const }),
+                      (error: Error) => ({ ok: false as const, error }),
+                    ),
+                ),
+              );
+              if (results.every((r) => r.ok)) setDrawerOpen(false);
+            }}
+          />
+        )}
+
+        <ContractionConfirmDialog
+          pending={confirmContraction}
+          isApplying={triggerUpdate.isLoading}
+          onCancel={() => setConfirmContraction(null)}
+          onConfirm={() => {
+            if (!confirmContraction) return;
+            triggerUpdate.mutate({
+              projectId,
+              category: confirmContraction.category,
+              newRetentionDays: confirmContraction.to,
+            });
+            setConfirmContraction(null);
+          }}
+        />
       </VStack>
     </SettingsLayout>
   );
@@ -571,20 +650,25 @@ function AddOverrideDrawer({
   open,
   onClose,
   available,
+  currentOrganizationId,
+  currentTeamId,
+  currentProjectId,
   isSaving,
   onSave,
 }: {
   open: boolean;
   onClose: () => void;
-  projectId: string;
   available: {
     organization: { id: string; name: string } | null;
     teams: { id: string; name: string }[];
     projects: { id: string; name: string; teamId: string }[];
   };
+  currentOrganizationId: string | undefined;
+  currentTeamId: string | undefined;
+  currentProjectId: string;
   isSaving: boolean;
   onSave: (
-    scope: ScopeChipPickerEntry,
+    scopes: ScopeChipPickerEntry[],
     category: RetentionCategory,
     retentionDays: number,
   ) => void;
@@ -593,54 +677,86 @@ function AddOverrideDrawer({
   const [category, setCategory] = useState<RetentionCategory>("traces");
   const [days, setDays] = useState<string>(String(DEFAULT_RETENTION_DAYS));
 
-  const organizationId = available.organization?.id;
-  const scope = scopes[scopes.length - 1];
+  useEffect(() => {
+    if (open) {
+      // Default to the current project so the picker opens on the user's
+      // working scope, mirroring the API-key drawer pattern.
+      setScopes(
+        available.projects.some((p) => p.id === currentProjectId)
+          ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
+          : [],
+      );
+      setCategory("traces");
+      setDays(String(DEFAULT_RETENTION_DAYS));
+    }
+  }, [open, currentProjectId, available.projects]);
+
   const daysNum = Number(days);
   const daysValid =
     Number.isInteger(daysNum) &&
     daysNum >= MIN_RETENTION_DAYS &&
     daysNum <= MAX_RETENTION_DAYS &&
     daysNum % RETENTION_WEEK_DAYS === 0;
-  const canSave = !!scope && daysValid;
+  const canSave = scopes.length > 0 && daysValid && !isSaving;
 
   return (
-    <Dialog.Root
+    <Drawer.Root
+      placement="end"
+      size="md"
       open={open}
       onOpenChange={({ open: isOpen }) => {
         if (!isOpen) onClose();
       }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Add retention override</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="stretch">
-            <ScopeChipPicker
-              value={scope ? [scope] : []}
-              onChange={(next) => setScopes(next.slice(-1))}
-              organizationId={organizationId}
-              organizationName={available.organization?.name}
-              availableTeams={available.teams}
-              availableProjects={available.projects}
-              showSummary
-            />
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <Heading size="md">Add retention override</Heading>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack gap={5} align="stretch">
+            <VStack gap={1.5} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Scope
+              </Text>
+              <ScopeChipPicker
+                value={scopes}
+                onChange={setScopes}
+                organizationId={available.organization?.id}
+                organizationName={available.organization?.name}
+                availableTeams={available.teams}
+                availableProjects={available.projects}
+                label=""
+                showQuickPicks
+                currentOrganizationId={
+                  available.organization ? currentOrganizationId : undefined
+                }
+                currentTeamId={currentTeamId}
+                currentProjectId={currentProjectId}
+              />
+            </VStack>
 
             <Field.Root>
               <Field.Label>Category</Field.Label>
-              <select
-                value={category}
-                onChange={(e) =>
-                  setCategory(e.target.value as RetentionCategory)
-                }
-                style={{ padding: "6px 8px", borderRadius: 6 }}
+              <Select.Root
+                collection={categoryCollection}
+                value={[category]}
+                onValueChange={(details) => {
+                  const v = details.value[0];
+                  if (v) setCategory(v as RetentionCategory);
+                }}
               >
-                {RETENTION_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+                <Select.Trigger background="bg">
+                  <Select.ValueText placeholder="Select category" />
+                </Select.Trigger>
+                <Select.Content>
+                  {categoryCollection.items.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
             </Field.Root>
 
             <Field.Root invalid={days !== "" && !daysValid}>
@@ -654,29 +770,29 @@ function AddOverrideDrawer({
                 onChange={(e) => setDays(e.target.value)}
                 width="200px"
               />
-              {days !== "" && !daysValid && (
-                <Field.ErrorText>
-                  Whole weeks only (multiples of {RETENTION_WEEK_DAYS} days),
-                  between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days
-                </Field.ErrorText>
-              )}
+              <Field.HelperText>
+                Whole weeks only (multiples of {RETENTION_WEEK_DAYS} days),
+                between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days.
+              </Field.HelperText>
             </Field.Root>
           </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="blue"
-            disabled={!canSave}
-            loading={isSaving}
-            onClick={() => scope && onSave(scope, category, daysNum)}
-          >
-            Save
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack width="full" justify="end" gap={2}>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="blue"
+              disabled={!canSave}
+              loading={isSaving}
+              onClick={() => onSave(scopes, category, daysNum)}
+            >
+              Save
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
