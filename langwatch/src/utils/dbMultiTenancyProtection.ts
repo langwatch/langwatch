@@ -470,23 +470,35 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
 };
 
+// Prisma actions that carry no model and no structured `where` clause
+// for this guard to inspect — for these, tenancy is the SQL author's
+// responsibility (e.g. the outbox lease query filters by projectId in
+// its SQL text). We allow them through explicitly, instead of a blanket
+// `!params.model` early return, so that any *other* actionless call
+// (an unexpected shape from a future Prisma upgrade, a mis-typed
+// middleware param) still flows into the projectId checks below and
+// fails closed rather than silently bypassing tenancy.
+const RAW_QUERY_ACTIONS: ReadonlySet<string> = new Set([
+  "queryRaw",
+  "executeRaw",
+  "runCommandRaw",
+]);
+
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  // Raw queries ($queryRaw / $executeRaw) carry no model and no
-  // structured `where` clause for this guard to inspect — tenancy is
-  // the SQL author's responsibility. The outbox lease query is the
-  // first in-tree use case (it filters by projectId in its SQL text),
-  // but the exemption applies to ALL raw queries: any future
-  // $queryRaw / $executeRaw call must include the tenancy predicate
-  // inline; this middleware will no longer catch a missing one.
-  //
-  // Mirrors `guardOrganizationId` (dbOrganizationIdProtection.ts),
-  // which also short-circuits when there is no model. The prior
-  // behaviour (fall through with `params.model === undefined`) was
-  // load-bearing only by accident — the create/findMany checks below
-  // throw on an undefined model, which would have surfaced as a
-  // confusing `The undefined action on the undefined model …` error
-  // rather than a real tenancy violation.
-  if (!params.model) return;
+  // Narrow, explicit allowlist for raw queries — see RAW_QUERY_ACTIONS
+  // comment above. Mirrors `guardOrganizationId`
+  // (dbOrganizationIdProtection.ts), which also short-circuits when
+  // there is no model, but tightened to known actions.
+  if (!params.model && RAW_QUERY_ACTIONS.has(params.action)) return;
+  if (!params.model) {
+    // Defence in depth: any non-raw actionless call is unexpected.
+    // Fail closed with a clear message rather than letting the
+    // create/findMany checks below throw a confusing "undefined
+    // action on undefined model" error.
+    throw new Error(
+      `_guardProjectId: refusing to run a tenancy-unscoped Prisma action "${params.action}" with no model — extend RAW_QUERY_ACTIONS if this is a legitimate raw query.`,
+    );
+  }
   if (EXEMPT_MODELS.includes(params.model)) return;
 
   const action = params.action;
