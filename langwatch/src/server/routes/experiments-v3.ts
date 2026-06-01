@@ -591,6 +591,20 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
     return c.json({ error: "Run not found" }, { status: 404 });
   }
 
+  // Same archive guard as /runs/:runId/results: a run whose owning
+  // experiment was archived must not keep serving status from the Redis
+  // cache for the rest of the 24h TTL. Without this, archive visibility
+  // silently depends on run age.
+  if (runState.experimentId) {
+    const stillLive = await ExperimentService.create(prisma).isActive({
+      projectId: project.id,
+      id: runState.experimentId,
+    });
+    if (!stillLive) {
+      return c.json({ error: "Run not found" }, { status: 404 });
+    }
+  }
+
   logger.debug({ runId, status: runState.status }, "Run status queried");
   markUsed();
 

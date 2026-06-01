@@ -140,3 +140,67 @@ describe("GET /api/experiments/runs/:runId/results archive visibility", () => {
     });
   });
 });
+
+describe("GET /api/experiments/runs/:runId archive visibility", () => {
+  beforeEach(() => {
+    getRunState.mockReset();
+    findFirst.mockReset();
+    getRun.mockReset();
+  });
+
+  describe("given a fresh Redis-cached run whose owning experiment was just archived", () => {
+    /** @scenario Archived experiments are hidden from the standard list query */
+    it("returns 404 instead of leaking the cached run status", async () => {
+      getRunState.mockResolvedValue({
+        runId: "run_status_x",
+        projectId: "project_MINE",
+        experimentId: "experiment_ARCHIVED",
+        experimentSlug: "x-archived-abc",
+        status: "completed",
+        progress: 10,
+        total: 10,
+        startedAt: 1,
+        finishedAt: 2,
+        summary: { ok: true },
+      });
+      findFirst.mockResolvedValue(null);
+
+      const res = await get("/api/experiments/runs/run_status_x");
+
+      expect(res.status).toBe(404);
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "experiment_ARCHIVED",
+          projectId: "project_MINE",
+          archivedAt: null,
+        },
+        select: { id: true },
+      });
+    });
+  });
+
+  describe("given a fresh Redis-cached run whose experiment is still live", () => {
+    it("returns the cached run status", async () => {
+      getRunState.mockResolvedValue({
+        runId: "run_status_y",
+        projectId: "project_MINE",
+        experimentId: "experiment_LIVE",
+        experimentSlug: "y-live",
+        status: "completed",
+        progress: 5,
+        total: 5,
+        startedAt: 1,
+        finishedAt: 2,
+        summary: { ok: true },
+      });
+      findFirst.mockResolvedValue({ id: "experiment_LIVE" });
+
+      const res = await get("/api/experiments/runs/run_status_y");
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.runId).toBe("run_status_y");
+      expect(body.status).toBe("completed");
+    });
+  });
+});

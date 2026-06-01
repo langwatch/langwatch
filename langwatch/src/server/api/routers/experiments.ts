@@ -240,13 +240,16 @@ export const experimentsRouter = createTRPCRouter({
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      // Check if experiment actually exists in DB to determine if this is a create or update.
-      // Archived rows are treated as non-existent for update purposes (slug was
-      // renamed on archive so there's no collision either way).
-      const existingSlug = await experiments.getExistingSlugForUpsert({
-        projectId: input.projectId,
-        id: experimentId,
-      });
+      // Check if experiment actually exists in DB to determine if this is a
+      // create or update. The service rejects archived rows with NOT_FOUND so
+      // a stale client autosaving an archived experiment cannot silently
+      // resurrect or mutate it through `prisma.upsert`.
+      const existingSlug = await experiments
+        .getExistingSlugForUpsert({
+          projectId: input.projectId,
+          id: experimentId,
+        })
+        .catch(mapExperimentError);
       const isNewExperiment = existingSlug === null;
 
       // Enforce experiment limit only when creating new experiments

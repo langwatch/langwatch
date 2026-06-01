@@ -209,6 +209,29 @@ export class ExperimentRepository {
     return await client.experiment.create({ data: input.data });
   }
 
+  /**
+   * Returns the row-existence status for `(id, projectId)` including
+   * archived rows. This is the only public helper that does not filter
+   * `archivedAt: null`, and it exists for one reason: the upsert path
+   * needs to refuse to mutate an archived row through `prisma.upsert`.
+   * Callers must not use this to surface archived rows to users.
+   */
+  async getRowStatusById(
+    input: { id: string; projectId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<
+    | { exists: false }
+    | { exists: true; archived: boolean; slug: string }
+  > {
+    const client = options?.tx ?? this.prisma;
+    const row = await client.experiment.findUnique({
+      where: { id: input.id, projectId: input.projectId },
+      select: { slug: true, archivedAt: true },
+    });
+    if (!row) return { exists: false };
+    return { exists: true, archived: row.archivedAt !== null, slug: row.slug };
+  }
+
   async updateById(
     input: {
       id: string;

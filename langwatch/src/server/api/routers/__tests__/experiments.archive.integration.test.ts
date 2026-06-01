@@ -462,4 +462,43 @@ describe("experiments.deleteExperiment", () => {
       });
     });
   });
+
+  describe("given an archived experiment", () => {
+    describe("when a stale client autosaves with the archived id", () => {
+      it("rejects with NOT_FOUND instead of mutating the archived row", async () => {
+        const slug = `${testNamespace}-stale-${nanoid(6)}`;
+        const { id } = await createExperiment({ slug });
+        await caller.experiments.deleteExperiment({
+          projectId: PROJECT_ID,
+          experimentId: id,
+        });
+
+        const archived = await prisma.experiment.findFirstOrThrow({
+          where: { id, projectId: PROJECT_ID },
+        });
+
+        await expectTRPCError(
+          caller.experiments.saveEvaluationsV3({
+            projectId: PROJECT_ID,
+            experimentId: id,
+            state: {
+              name: "Stale autosave",
+              datasets: [],
+              activeDatasetId: "dataset-1",
+              evaluators: [],
+              targets: [],
+            } as any,
+          }),
+          "NOT_FOUND",
+        );
+
+        const after = await prisma.experiment.findFirstOrThrow({
+          where: { id, projectId: PROJECT_ID },
+        });
+        expect(after.slug).toBe(archived.slug);
+        expect(after.archivedAt?.getTime()).toBe(archived.archivedAt?.getTime());
+        expect(after.workbenchState).toEqual(archived.workbenchState);
+      });
+    });
+  });
 });

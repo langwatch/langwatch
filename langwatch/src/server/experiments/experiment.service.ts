@@ -231,8 +231,13 @@ export class ExperimentService {
 
   /**
    * Returns the existing slug for an experiment that the caller is about to
-   * upsert, or null if there is no active row yet. Active rows mean the
-   * caller is doing an update; null means a create.
+   * upsert, or null if no row exists yet (active or archived).
+   *
+   * Throws `ExperimentNotFoundError` when an archived row matches the id:
+   * we cannot let `prisma.experiment.upsert` reach the `update` branch on
+   * an archived row, because that would silently resurrect or mutate an
+   * archived experiment. From the user's perspective the row is gone,
+   * which is exactly what `NOT_FOUND` means.
    */
   async getExistingSlugForUpsert({
     projectId,
@@ -241,11 +246,10 @@ export class ExperimentService {
     projectId: string;
     id: string;
   }): Promise<string | null> {
-    const row = await this.repository.findFirstActive({
-      where: { id, projectId },
-      select: { slug: true },
-    });
-    return row?.slug ?? null;
+    const status = await this.repository.getRowStatusById({ id, projectId });
+    if (!status.exists) return null;
+    if (status.archived) throw new ExperimentNotFoundError(id);
+    return status.slug;
   }
 
   /**
