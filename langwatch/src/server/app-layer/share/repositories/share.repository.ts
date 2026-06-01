@@ -33,5 +33,10 @@ export interface ShareRepository {
     resourceId: string;
   }): Promise<void>;
 
+  /** Returns the resourceIds (trace ids) of all TRACE-typed shares for the
+   *  project. Used by the service to enumerate which traces need an
+   *  auto-unpin pass before a bulk revocation. */
+  findAllTraceShareResourceIds(projectId: string): Promise<string[]>;
+
   deleteAllTraceShares(projectId: string): Promise<void>;
 }

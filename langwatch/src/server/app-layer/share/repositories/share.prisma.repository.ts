@@ -76,6 +76,14 @@ export class PrismaShareRepository implements ShareRepository {
     });
   }
 
+  async findAllTraceShareResourceIds(projectId: string): Promise<string[]> {
+    const rows = await this.prisma.publicShare.findMany({
+      where: { projectId, resourceType: "TRACE" },
+      select: { resourceId: true },
+    });
+    return rows.map((r) => r.resourceId);
+  }
+
   async deleteAllTraceShares(projectId: string): Promise<void> {
     await this.prisma.publicShare.deleteMany({
       where: { projectId, resourceType: "TRACE" },

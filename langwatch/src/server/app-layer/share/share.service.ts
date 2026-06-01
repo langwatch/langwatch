@@ -99,6 +99,21 @@ export class ShareService {
   }
 
   async revokeAllTraceShares(projectId: string): Promise<void> {
+    // Mirror single `unshare`: drive auto-unpin per trace before deletion so
+    // `source=share` pins disappear with their share. Manual pins survive
+    // because `autoUnpin` skips traces with a manual pin. Without this loop,
+    // disabling trace sharing left orphaned share-sourced pins behind.
+    const traceIds = await this.repo.findAllTraceShareResourceIds(projectId);
+    for (const traceId of traceIds) {
+      try {
+        await this.pinnedTraces.autoUnpin({ projectId, traceId });
+      } catch (error) {
+        logger.error(
+          { projectId, traceId, error },
+          "Failed to auto-unpin trace during bulk revoke; continuing with remaining traces",
+        );
+      }
+    }
     await this.repo.deleteAllTraceShares(projectId);
   }
 }
