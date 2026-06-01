@@ -86,4 +86,22 @@ describe("ExecuteEvaluationCommand", () => {
       });
     });
   });
+
+  describe("when it reads spans for the trace", () => {
+    /** @scenario the span read carries occurredAt so it can prune partitions */
+    it("passes the event occurredAt as the partition hint", async () => {
+      const deps = buildDeps();
+      const command = new ExecuteEvaluationCommand(deps);
+      const cmd = buildCommand();
+
+      await command.handle(cmd);
+
+      expect(deps.spanStorage.getSpansByTraceId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          traceId: cmd.data.traceId,
+          occurredAtMs: cmd.data.occurredAt,
+        }),
+      );
+    });
+  });
 });
