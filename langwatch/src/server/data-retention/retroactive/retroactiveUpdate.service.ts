@@ -47,8 +47,23 @@ export class RetroactiveMutationInProgressError extends Error {
 const TENANT_FILTER_SQL =
   "position(command, {tenantFilterNeedle:String}) > 0";
 
+/**
+ * Mirrors the way ClickHouse renders a string literal into
+ * `system.mutations.command`: backslash and single-quote escapes. Without
+ * this, project ids containing `'` or `\` would render escaped in CH's stored
+ * command text and the unescaped JS-side needle would never match — so the
+ * "do we already have a running mutation for this tenant?" check would
+ * silently return empty, letting a second concurrent ALTER through.
+ * CodeQL also flags the unescaped interpolation as incomplete encoding.
+ */
+function escapeClickHouseStringLiteral(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 function tenantFilterParams(projectId: string): Record<string, string> {
-  return { tenantFilterNeedle: `WHERE TenantId = '${projectId}'` };
+  return {
+    tenantFilterNeedle: `WHERE TenantId = '${escapeClickHouseStringLiteral(projectId)}'`,
+  };
 }
 
 export class RetroactiveUpdateService {

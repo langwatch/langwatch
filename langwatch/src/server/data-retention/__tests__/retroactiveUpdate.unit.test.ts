@@ -261,6 +261,34 @@ describe("RetroactiveUpdateService", () => {
     });
   });
 
+  describe("when the projectId contains a single quote or backslash", () => {
+    /**
+     * Regression: previously the tenant filter needle was built by raw
+     * interpolation `WHERE TenantId = '${projectId}'`. CH stores ALTER
+     * commands with the rendered SQL — single quotes/backslashes get
+     * escaped in the stored text. Without matching that escape on our
+     * side, the needle would never match and concurrent-mutation
+     * detection would silently return empty, letting a second ALTER
+     * through. Mirrors the CodeQL "incomplete escaping" finding too.
+     */
+    it("escapes single quotes and backslashes in the needle", async () => {
+      const query = vi.fn().mockResolvedValue({
+        json: async () => [],
+      });
+      const service = new RetroactiveUpdateService(
+        async () => ({ query }) as any,
+      );
+
+      await service.getMutationProgress({ projectId: "weird'\\id" });
+
+      const [request] = query.mock.calls[0]!;
+      // Backslash escaped first, then single quote — same order CH uses.
+      expect(request.query_params).toEqual({
+        tenantFilterNeedle: "WHERE TenantId = 'weird\\'\\\\id'",
+      });
+    });
+  });
+
   describe("killMutation()", () => {
     it("parametrizes mutation_id and tenant filter", async () => {
       const command = vi.fn().mockResolvedValue(undefined);
