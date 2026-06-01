@@ -421,12 +421,11 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async 
     };
   }
 
-  const experiment = await prisma.experiment.findUnique({
+  const experiment = await prisma.experiment.findFirst({
     where: {
-      projectId_slug: {
-        projectId: project.id,
-        slug: experimentSlug,
-      },
+      projectId: project.id,
+      slug: experimentSlug,
+      archivedAt: null,
     },
   });
   if (!experiment) {

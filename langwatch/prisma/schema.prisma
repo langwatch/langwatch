@@ -751,6 +751,7 @@ model Experiment {
   workflow         Workflow?         @relation(fields: [workflowId], references: [id])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @default(now()) @updatedAt
+  archivedAt       DateTime?
   batchEvaluations BatchEvaluation[]
   workbenchState   Json?
   monitor          Monitor?
@@ -758,6 +759,7 @@ model Experiment {
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
+  @@index([projectId, archivedAt])
 }
 
 model Annotation {

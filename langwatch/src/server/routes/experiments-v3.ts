@@ -345,6 +345,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
       projectId: project.id,
       slug,
       type: ExperimentType.EVALUATIONS_V3,
+      archivedAt: null,
     },
   });
 
@@ -678,7 +679,7 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
 
   if (!experimentId && experimentSlug) {
     const experiment = await prisma.experiment.findFirst({
-      where: { projectId: project.id, slug: experimentSlug },
+      where: { projectId: project.id, slug: experimentSlug, archivedAt: null },
       select: { id: true },
     });
     experimentId = experiment?.id;

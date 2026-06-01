@@ -35,12 +35,11 @@ export const batchRecordRouter = createTRPCRouter({
       const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;
 
-      const experiment = await prisma.experiment.findUnique({
+      const experiment = await prisma.experiment.findFirst({
         where: {
-          projectId_slug: {
-            projectId,
-            slug: experimentSlug,
-          },
+          projectId,
+          slug: experimentSlug,
+          archivedAt: null,
         },
       });
 

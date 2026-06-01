@@ -1,4 +1,3 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -25,13 +24,8 @@ import {
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
-import {
-  BATCH_EVALUATION_INDEX,
-  esClient,
-} from "../../elasticsearch";
 import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
@@ -103,10 +97,11 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       if (input.experimentId) {
-        const currentExperiment = await prisma.experiment.findUnique({
+        const currentExperiment = await prisma.experiment.findFirst({
           where: {
             id: input.experimentId,
             projectId: input.projectId,
+            archivedAt: null,
           },
         });
 
@@ -249,9 +244,15 @@ export const experimentsRouter = createTRPCRouter({
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      // Check if experiment actually exists in DB to determine if this is a create or update
-      const existing = await prisma.experiment.findUnique({
-        where: { id: experimentId, projectId: input.projectId },
+      // Check if experiment actually exists in DB to determine if this is a create or update.
+      // Archived rows are treated as non-existent for update purposes (slug was
+      // renamed on archive so there's no collision either way).
+      const existing = await prisma.experiment.findFirst({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
         select: { slug: true },
       });
       const isNewExperiment = !existing;
@@ -363,10 +364,11 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
-      const experiment = await prisma.experiment.findUnique({
+      const experiment = await prisma.experiment.findFirst({
         where: {
           id: input.experimentId,
           projectId: input.projectId,
+          archivedAt: null,
         },
         include: {
           workflow: {
@@ -526,6 +528,7 @@ export const experimentsRouter = createTRPCRouter({
 
       const baseWhereClause: Prisma.ExperimentWhereInput = {
         projectId: input.projectId,
+        archivedAt: null,
       };
 
       // Helper to check if an experiment is a real_time evaluation (old wizard)
@@ -803,6 +806,29 @@ export const experimentsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * Archives an experiment (and cascades archive to its workflow + monitor).
+   *
+   * Previously this procedure hard-deleted the Postgres rows AND issued
+   * DELETE FROM on `experiment_runs`, `experiment_run_items`, `dspy_steps`
+   * in ClickHouse plus a deleteByQuery against the Elasticsearch
+   * `batch_evaluation` index. Every such delete writes a lightweight-delete
+   * mask onto every cold-tier S3 part containing matching rows, then the
+   * background merges rewrite those parts to actually purge. At ~3-45 user
+   * deletes/day across prod, that workload was costing ~$200/mo in S3
+   * requests alone and tripping AWS Cost Anomaly Detection on heavy days
+   * (e.g. May 27 2026: 42 deletes -> 14,725 part rewrites).
+   *
+   * The Experiment model now matches the pattern used everywhere else in
+   * this schema (Workflow, Monitor, Dataset, Evaluator, Agent, Project,
+   * Team, etc.): archive via `archivedAt`, hide from list queries, leave
+   * the historical data in place. Once retention TTL ships, archived rows
+   * age out of ClickHouse naturally without a per-click S3 burst.
+   *
+   * The tRPC name remains `deleteExperiment` so the UI does not need to
+   * change; the user-visible behaviour is identical (item disappears from
+   * the list) but the platform cost drops to zero per click.
+   */
   deleteExperiment: protectedProcedure
     .input(
       z.object({
@@ -812,7 +838,6 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ input }) => {
-      // Verify the experiment exists and belongs to the project
       const experiment = await prisma.experiment.findUnique({
         where: {
           id: input.experimentId,
@@ -827,126 +852,49 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // Perform the Prisma deletion in a transaction to ensure consistency
+      // Idempotent: a duplicate click on an already-archived experiment is
+      // a no-op (we do not refresh the timestamp, to avoid spurious writes).
+      if (experiment.archivedAt) {
+        return { success: true };
+      }
+
+      const now = new Date();
+      // Rename the slug on archive so a future experiment can reuse the
+      // original slug; the unique [projectId, slug] index would otherwise
+      // collide. Mirrors the pattern in dataset.ts deleteById.
+      const archivedSlug = `${experiment.slug}-archived-${nanoid()}`;
+
       await prisma.$transaction(async (tx) => {
-        // Delete workflow versions if a workflow exists
+        await tx.experiment.update({
+          where: {
+            id: input.experimentId,
+            projectId: input.projectId,
+          },
+          data: { archivedAt: now, slug: archivedSlug },
+        });
+
         if (experiment.workflowId) {
-          // First, update the workflow to null out the reference fields
           await tx.workflow.update({
             where: {
               id: experiment.workflowId,
               projectId: input.projectId,
             },
-            data: {
-              currentVersionId: null,
-              latestVersionId: null,
-            },
-          });
-
-          // Then we update all workflow versions to null out the parent field
-          await tx.workflowVersion.updateMany({
-            where: {
-              workflowId: experiment.workflowId,
-              projectId: input.projectId,
-            },
-            data: {
-              parentId: null,
-            },
-          });
-
-          // Now we can safely delete the workflow versions
-          await tx.workflowVersion.deleteMany({
-            where: {
-              workflowId: experiment.workflowId,
-              projectId: input.projectId,
-            },
-          });
-
-          // Delete the workflow itself
-          await tx.workflow.delete({
-            where: {
-              id: experiment.workflowId,
-              projectId: input.projectId,
-            },
+            data: { archivedAt: now },
           });
         }
 
-        // Delete the monitor if it exists
-        const monitor = await tx.monitor.findFirst({
+        // Monitor is a small relational row with no ClickHouse / S3 footprint,
+        // and the Monitor model does not have an archivedAt column, so we
+        // keep the original hard-delete behaviour for it. The cost-driving
+        // path is the ClickHouse delete on experiment_runs / experiment_run_items
+        // / dspy_steps — that is what this PR removes.
+        await tx.monitor.deleteMany({
           where: {
             experimentId: input.experimentId,
             projectId: input.projectId,
           },
         });
-
-        if (monitor) {
-          await tx.monitor.delete({
-            where: {
-              experimentId: input.experimentId,
-              projectId: input.projectId,
-            },
-          });
-        }
-
-        // Finally, delete the experiment
-        await tx.experiment.delete({
-          where: {
-            id: input.experimentId,
-            projectId: input.projectId,
-          },
-        });
       });
-
-      // Best-effort cleanup of ES and CH data outside the transaction
-      // (these are not atomic with Prisma and should not cause rollback)
-      const esCleanup = esClient({ projectId: input.projectId }).then(async (client) => {
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { experiment_id: input.experimentId } },
-                  { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
-            },
-          },
-        });
-      }).catch((err) => {
-        console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-      });
-
-      const chCleanup = Promise.resolve().then(async () => {
-        const chClient = await getClickHouseClientForProject(input.projectId);
-        if (!chClient) return;
-        await Promise.all([
-          chClient.command({
-            query: `DELETE FROM experiment_runs WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-            },
-          }),
-          chClient.command({
-            query: `DELETE FROM experiment_run_items WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-            },
-          }),
-        ]);
-      }).catch((err) => {
-        console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-      });
-
-      const dspyCleanup = getApp().dspySteps.steps
-        .deleteByExperiment({ tenantId: input.projectId, experimentId: input.experimentId })
-        .catch((err) => {
-          console.error("Best-effort DSPy step cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-        });
-
-      await Promise.allSettled([esCleanup, chCleanup, dspyCleanup]);
 
       return { success: true };
     }),
@@ -980,10 +928,11 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const experiment = await ctx.prisma.experiment.findUnique({
+      const experiment = await ctx.prisma.experiment.findFirst({
         where: {
           id: input.experimentId,
           projectId: input.sourceProjectId,
+          archivedAt: null,
         },
         include: {
           workflow: {

@@ -131,6 +131,7 @@ export class ExperimentRunService {
           where: {
             projectId: params.projectId,
             slug: params.experimentSlug,
+            archivedAt: null,
           },
           select: { id: true, slug: true },
         });

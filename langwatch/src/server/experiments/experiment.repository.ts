@@ -13,7 +13,7 @@ export class ExperimentRepository {
   ): Promise<Experiment | null> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findFirst({
-      where: { id: input.id, projectId: input.projectId },
+      where: { id: input.id, projectId: input.projectId, archivedAt: null },
     });
   }
 
@@ -23,7 +23,7 @@ export class ExperimentRepository {
   ): Promise<Experiment | null> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findFirst({
-      where: { slug: input.slug, projectId: input.projectId },
+      where: { slug: input.slug, projectId: input.projectId, archivedAt: null },
     });
   }
 
@@ -33,7 +33,7 @@ export class ExperimentRepository {
   ): Promise<Experiment[]> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findMany({
-      where: { projectId: input.projectId },
+      where: { projectId: input.projectId, archivedAt: null },
     });
   }
 
@@ -43,7 +43,7 @@ export class ExperimentRepository {
   ): Promise<Experiment[]> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findMany({
-      where: { projectId: input.projectId },
+      where: { projectId: input.projectId, archivedAt: null },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       skip: input.skip,
       take: input.take,
@@ -56,7 +56,7 @@ export class ExperimentRepository {
   ): Promise<number> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.count({
-      where: { projectId: input.projectId },
+      where: { projectId: input.projectId, archivedAt: null },
     });
   }
 
@@ -81,6 +81,8 @@ export class ExperimentRepository {
 
   /**
    * Finds experiment names starting with "Draft" for draft name generation.
+   * Excludes archived rows so a freshly-archived "Draft 3" frees its number
+   * for the next draft.
    */
   async findDraftNames(input: {
     projectId: string;
@@ -90,6 +92,7 @@ export class ExperimentRepository {
       where: {
         projectId: input.projectId,
         name: { startsWith: "Draft" },
+        archivedAt: null,
       },
     });
   }
@@ -109,7 +112,7 @@ export class ExperimentRepository {
   ): Promise<Experiment | null> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findFirst({
-      where: { projectId: input.projectId },
+      where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },
     });
   }

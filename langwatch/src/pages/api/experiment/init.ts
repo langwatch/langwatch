@@ -167,8 +167,8 @@ export const findOrCreateExperiment = async ({
   let experiment: Experiment | null = null;
 
   if (experiment_id) {
-    experiment = await prisma.experiment.findUnique({
-      where: { projectId: project.id, id: experiment_id },
+    experiment = await prisma.experiment.findFirst({
+      where: { projectId: project.id, id: experiment_id, archivedAt: null },
     });
     if (!experiment) {
       throw new Error("Experiment not found");
@@ -178,6 +178,9 @@ export const findOrCreateExperiment = async ({
   let slug_ = null;
   if (experiment_slug) {
     slug_ = slugify(experiment_slug);
+    // The slug is renamed on archive (see deleteExperiment), so a findUnique
+    // by the user's intended slug will not match archived rows. No extra
+    // archivedAt filter needed here.
     experiment = await prisma.experiment.findUnique({
       where: { projectId_slug: { projectId: project.id, slug: slug_ } },
     });
