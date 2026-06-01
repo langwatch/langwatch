@@ -127,6 +127,15 @@ describe("OutboxDrainer.handleWakeup", () => {
         1,
         expect.objectContaining({ rowId: "a" }),
       );
+      // groupKey from the wakeup is forwarded to the lease query so a
+      // wakeup for trigger A can never lease trigger B's row.
+      expect(repo.leaseNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "proj1",
+          reactorName: "alertDispatch",
+          groupKey: baseWakeup.groupKey,
+        }),
+      );
       expect(scheduleWakeup).not.toHaveBeenCalled();
     });
   });

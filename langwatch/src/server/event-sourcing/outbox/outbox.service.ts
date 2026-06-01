@@ -76,14 +76,30 @@ export class OutboxService {
    * caller that mutates the payload shape and replays will still
    * dispatch the original payload, by design.
    *
-   * Validates that `groupKey` starts with `${projectId}/` so the
-   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-023). A
-   * misformatted key would silently land in the wrong tenant bucket
-   * for fair-scheduling purposes — failing here at enqueue is much
-   * cheaper to debug than a starvation bug in production.
+   * Validates that BOTH `groupKey` and `dedupKey` start with
+   * `${projectId}/`:
+   *   - `groupKey` so the wakeup parses cleanly under
+   *     `tenantIdFromGroupId` (ADR-023). A misformatted key would
+   *     silently land in the wrong tenant bucket for fair-scheduling
+   *     purposes.
+   *   - `dedupKey` because the unique index is global
+   *     `(reactorName, dedupKey)` and the row carries `projectId` as
+   *     a column, not part of the claim key. Without the prefix, a
+   *     producer in project A could suppress an enqueue for the same
+   *     unprefixed key in project B under the same reactor. The
+   *     convention is documented on `EnqueueOutboxParams.dedupKey`.
+   *
+   * Failing here at enqueue is much cheaper to debug than either a
+   * starvation bug (wrong tenant bucket) or a cross-tenant dedup
+   * suppression in production.
    */
   async enqueue(params: EnqueueOutboxParams): Promise<EnqueueOutboxResult> {
     const required = `${params.projectId}/`;
+    if (!params.dedupKey.startsWith(required)) {
+      throw new Error(
+        `OutboxService.enqueue: dedupKey must start with "${required}" (got "${params.dedupKey}"). See ADR-022 / ADR-023.`,
+      );
+    }
     if (!params.groupKey.startsWith(required)) {
       throw new Error(
         `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-023.`,
@@ -101,9 +117,10 @@ export class OutboxService {
   }
 
   /**
-   * Lease the next claimable row for (projectId, reactorName). Returns
-   * null when the queue for this group is empty or all rows are still
-   * backing off.
+   * Lease the next claimable row for (projectId, reactorName,
+   * groupKey). Returns null when this group's queue is empty or all
+   * its rows are still backing off. Scoping by groupKey keeps
+   * per-trigger FIFO at the row level — see ADR-023.
    */
   async leaseNext(params: LeaseOutboxParams): Promise<OutboxRow | null> {
     const now = this.now();
@@ -111,6 +128,7 @@ export class OutboxService {
     return this.repository.leaseNext({
       projectId: params.projectId,
       reactorName: params.reactorName,
+      groupKey: params.groupKey,
       leasedUntil,
       now,
     });

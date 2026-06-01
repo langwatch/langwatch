@@ -21,14 +21,12 @@ export interface OutboxWakeup extends Record<string, unknown> {
    * Convention for trigger reactors:
    *   `${projectId}/${reactorName}:${triggerId}`
    *
-   * Wakeups for the same groupKey are serialised by the GroupQueue, so
-   * only one drainer at a time runs the dispatch loop for a given
-   * trigger. NOTE this is wakeup-level serialisation, not row-level
-   * ordering: the drainer's `leaseNext` filters by `(projectId,
-   * reactorName)` and orders by `nextAttemptAt`, so within a single
-   * wakeup it may dispatch rows from sibling triggers if theirs is
-   * the earlier nextAttemptAt. Per-trigger FIFO holds only at the
-   * wakeup boundary, not across an entire (project, reactor) backlog.
+   * Per-trigger FIFO holds at BOTH levels:
+   *   - The GroupQueue serialises wakeups per groupKey, so only one
+   *     drainer at a time runs the dispatch loop for a given trigger.
+   *   - The drainer's `leaseNext` scopes its claim by `groupKey` too,
+   *     so a wakeup for trigger A can never lease trigger B's row
+   *     even if B's `nextAttemptAt` is earlier.
    */
   groupKey: string;
   /**
@@ -58,15 +56,15 @@ export function defineOutboxWakeupQueue({
     process,
     // groupKey IS already the full `${projectId}/${reactorName}:${triggerId}`
     // form (or equivalent) — see the field comment on OutboxWakeup. The
-    // queue's per-group serialisation uses it as-is; `tenantIdFromGroupId`
-    // parses the projectId out for fair scheduling.
+    // queue's per-group FIFO uses it as-is; `tenantIdFromGroupId` parses
+    // the projectId out for fair scheduling.
     groupKey: (payload) => payload.groupKey,
     score: (payload) => payload.scheduledAt,
     options: {
       // Drainer workload is IO-bound (PG lease + HTTP dispatch). The
-      // per-group serialisation means an individual group never goes
-      // parallel — we just want enough parallelism across groups to
-      // cover dispatcher latency.
+      // per-group FIFO means an individual group never goes parallel —
+      // we just want enough parallelism across groups to cover
+      // dispatcher latency.
       concurrency: 10,
       globalConcurrency: 300,
     },

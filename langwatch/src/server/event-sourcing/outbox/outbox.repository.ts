@@ -12,6 +12,13 @@ export interface OutboxInsertRow {
 export interface OutboxLeaseQuery {
   projectId: string;
   reactorName: string;
+  /**
+   * GroupQueue routing key of the wakeup that triggered this lease.
+   * The lease SQL filters on it so a wakeup for trigger A can never
+   * drain a row belonging to trigger B — per-group FIFO holds at the
+   * row level, not just at the wakeup boundary. See ADR-023.
+   */
+  groupKey: string;
   leasedUntil: Date;
   now: Date;
 }
@@ -58,10 +65,11 @@ export interface OutboxRepository {
 
   /**
    * Atomically lease the next claimable row for (projectId,
-   * reactorName) whose nextAttemptAt has elapsed. Updates status to
-   * "dispatching", sets leasedUntil, increments attempts. Returns
-   * null when no row is claimable. See ADR-023 for why the lease
-   * lives in PG (not Redis).
+   * reactorName, groupKey) whose nextAttemptAt has elapsed. Updates
+   * status to "dispatching", sets leasedUntil, increments attempts.
+   * Returns null when no row is claimable. Scoping by `groupKey`
+   * preserves per-trigger FIFO at the row level (see ADR-023). See
+   * ADR-023 for why the lease lives in PG (not Redis).
    */
   leaseNext(query: OutboxLeaseQuery): Promise<OutboxRow | null>;
 

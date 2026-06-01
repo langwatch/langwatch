@@ -2702,8 +2702,10 @@ model ReactorOutbox {
 
     @@unique([reactorName, dedupKey])
     // Drainer hot path: pick the next claimable row for a (project,
-    // reactor) whose backoff has elapsed.
-    @@index([projectId, reactorName, status, nextAttemptAt])
+    // reactor, group) whose backoff has elapsed. groupKey is part of
+    // the WHERE so per-trigger FIFO holds at the row level — see
+    // leaseNext in outbox.prisma.repository.ts.
+    @@index([projectId, reactorName, groupKey, status, nextAttemptAt])
     // Operator surface: list stuck/dead dispatches per project.
     @@index([projectId, status, updatedAt])
     // Crash recovery scan: find leased rows whose worker never came

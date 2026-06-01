@@ -19,6 +19,13 @@ export interface EnqueueOutboxParams {
    * are the claim primitive that makes pipeline replays safe — see
    * ADR-022.
    *
+   * MUST begin with `${projectId}/`. The unique index is global on
+   * `(reactorName, dedupKey)` and the row carries `projectId` as a
+   * column, not part of the claim key — without the prefix a producer
+   * in project A could suppress an enqueue for the same unprefixed key
+   * in project B under the same reactor. `OutboxService.enqueue`
+   * validates the prefix and throws before any row is written.
+   *
    * Convention (per-trigger subject scoping; the `${projectId}/` prefix
    * mirrors the `groupKey` shape so every dedup/group identifier in the
    * outbox layer is self-describing for an operator scanning rows; the
@@ -43,10 +50,10 @@ export interface EnqueueOutboxParams {
    * Convention for trigger reactors:
    *   `${projectId}/${reactorName}:${triggerId}`
    *
-   * Wakeups for the same groupKey are serialised by the GroupQueue,
-   * so only one drainer at a time runs the dispatch loop for a given
-   * trigger. NOTE this is wakeup-level serialisation, not row-level
-   * ordering — see the longer note on `OutboxWakeup.groupKey`.
+   * Per-trigger FIFO holds at both the wakeup boundary (the
+   * GroupQueue serialises wakeups per groupKey) and at the row
+   * level (the drainer's `leaseNext` scopes its claim by
+   * groupKey) — see the longer note on `OutboxWakeup.groupKey`.
    */
   groupKey: string;
   payload: OutboxPayload;
@@ -62,6 +69,13 @@ export interface EnqueueOutboxResult {
 export interface LeaseOutboxParams {
   projectId: string;
   reactorName: string;
+  /**
+   * GroupQueue routing key of the wakeup driving this lease. Scoping
+   * the claim by `groupKey` keeps per-trigger FIFO at the row level —
+   * a wakeup for trigger A can never drain trigger B's row, even when
+   * trigger B's `nextAttemptAt` is older. See ADR-023.
+   */
+  groupKey: string;
   /** How long the lease should hold before another worker can re-claim. */
   leaseDurationMs: number;
 }

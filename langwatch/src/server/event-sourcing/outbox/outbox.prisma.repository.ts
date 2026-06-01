@@ -42,9 +42,16 @@ export class PrismaOutboxRepository implements OutboxRepository {
   async leaseNext({
     projectId,
     reactorName,
+    groupKey,
     leasedUntil,
     now,
   }: OutboxLeaseQuery): Promise<OutboxRow | null> {
+    // Scope the claim by groupKey too: a wakeup for one trigger must
+    // never lease another trigger's row, otherwise per-group FIFO is
+    // lost and concurrent drainers across groups can interleave each
+    // other's dispatch order. The composite index
+    // (projectId, reactorName, groupKey, status, nextAttemptAt) on
+    // ReactorOutbox is shaped for this exact predicate.
     const rows = await this.prisma.$queryRaw<OutboxRow[]>`
       UPDATE "ReactorOutbox"
       SET
@@ -57,6 +64,7 @@ export class PrismaOutboxRepository implements OutboxRepository {
         FROM "ReactorOutbox"
         WHERE "projectId" = ${projectId}
           AND "reactorName" = ${reactorName}
+          AND "groupKey" = ${groupKey}
           AND "status" IN ('queued', 'failed_retryable')
           AND "nextAttemptAt" <= ${now}
         ORDER BY "nextAttemptAt" ASC, "createdAt" ASC

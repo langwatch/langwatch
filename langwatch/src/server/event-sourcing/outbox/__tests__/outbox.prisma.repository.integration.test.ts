@@ -90,11 +90,12 @@ describe("PrismaOutboxRepository", () => {
   describe("leaseNext", () => {
     describe("when two concurrent leasers race on a single queued row", () => {
       it("hands the row to exactly one of them", async () => {
+        const groupKey = `${projectId}/${reactorName}:trigger-A`;
         await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "only-one",
-          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          dedupKey: `${projectId}/only-one`,
+          groupKey,
           payload: {},
         });
 
@@ -102,8 +103,8 @@ describe("PrismaOutboxRepository", () => {
         const leasedUntil = new Date(now.getTime() + 60_000);
 
         const [a, b] = await Promise.all([
-          repo.leaseNext({ projectId, reactorName, leasedUntil, now }),
-          repo.leaseNext({ projectId, reactorName, leasedUntil, now }),
+          repo.leaseNext({ projectId, reactorName, groupKey, leasedUntil, now }),
+          repo.leaseNext({ projectId, reactorName, groupKey, leasedUntil, now }),
         ]);
 
         const winners = [a, b].filter((r) => r !== null);
@@ -114,12 +115,13 @@ describe("PrismaOutboxRepository", () => {
     describe("when a row's nextAttemptAt is in the future", () => {
       it("does not lease it", async () => {
         const future = new Date(Date.now() + 60_000);
+        const groupKey = `${projectId}/${reactorName}:trigger-A`;
         await prisma.reactorOutbox.create({
           data: {
             projectId,
             reactorName,
-            dedupKey: "backoff",
-            groupKey: `${projectId}/${reactorName}:trigger-A`,
+            dedupKey: `${projectId}/backoff`,
+            groupKey,
             payload: {},
             nextAttemptAt: future,
             status: "failed_retryable",
@@ -129,9 +131,69 @@ describe("PrismaOutboxRepository", () => {
         const leased = await repo.leaseNext({
           projectId,
           reactorName,
+          groupKey,
           leasedUntil: new Date(Date.now() + 30_000),
           now: new Date(),
         });
+        expect(leased).toBeNull();
+      });
+    });
+
+    describe("when two groupKeys share the same (projectId, reactorName)", () => {
+      it("does not let a wakeup for trigger-A lease trigger-B's row", async () => {
+        const groupA = `${projectId}/${reactorName}:trigger-A`;
+        const groupB = `${projectId}/${reactorName}:trigger-B`;
+        // Trigger-B's row is enqueued first so its nextAttemptAt is
+        // strictly earlier — without groupKey scoping, the lease for
+        // trigger-A would steal it.
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: `${projectId}/trigger-B:trace:1`,
+          groupKey: groupB,
+          payload: { trigger: "B" },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: `${projectId}/trigger-A:trace:1`,
+          groupKey: groupA,
+          payload: { trigger: "A" },
+        });
+
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          groupKey: groupA,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+
+        expect(leased).not.toBeNull();
+        expect(leased?.groupKey).toBe(groupA);
+        expect((leased?.payload as { trigger: string }).trigger).toBe("A");
+      });
+
+      it("returns null when nothing claimable exists for the requested group", async () => {
+        const groupA = `${projectId}/${reactorName}:trigger-A`;
+        const groupB = `${projectId}/${reactorName}:trigger-B`;
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: `${projectId}/only-b`,
+          groupKey: groupB,
+          payload: {},
+        });
+
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          groupKey: groupA,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+
         expect(leased).toBeNull();
       });
     });
@@ -145,7 +207,7 @@ describe("PrismaOutboxRepository", () => {
           data: {
             projectId,
             reactorName,
-            dedupKey: "expired",
+            dedupKey: `${projectId}/expired`,
             groupKey: `${projectId}/${reactorName}:trigger-A`,
             payload: {},
             status: "dispatching",
@@ -172,16 +234,18 @@ describe("PrismaOutboxRepository", () => {
   describe("markDispatched", () => {
     describe("when the row is still leased to this worker", () => {
       it("marks it dispatched (scoped by projectId)", async () => {
+        const groupKey = `${projectId}/${reactorName}:trigger-A`;
         await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "dispatch-me",
-          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          dedupKey: `${projectId}/dispatch-me`,
+          groupKey,
           payload: {},
         });
         const leased = await repo.leaseNext({
           projectId,
           reactorName,
+          groupKey,
           leasedUntil: new Date(Date.now() + 60_000),
           now: new Date(),
         });
@@ -204,16 +268,18 @@ describe("PrismaOutboxRepository", () => {
   describe("markRetry", () => {
     describe("when the attempts count no longer matches the leased row", () => {
       it("no-ops so a stale worker cannot clobber a re-leased row", async () => {
+        const groupKey = `${projectId}/${reactorName}:trigger-A`;
         await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "cas-guard",
-          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          dedupKey: `${projectId}/cas-guard`,
+          groupKey,
           payload: {},
         });
         const leased = await repo.leaseNext({
           projectId,
           reactorName,
+          groupKey,
           leasedUntil: new Date(Date.now() + 60_000),
           now: new Date(),
         });
@@ -242,17 +308,19 @@ describe("PrismaOutboxRepository", () => {
 
     describe("when promoting an exhausted row to dead", () => {
       it("clears nextAttemptAt to null", async () => {
+        const groupKey = `${projectId}/${reactorName}:trigger-A`;
         await repo.insertIfAbsent({
           projectId,
           reactorName,
-          dedupKey: "dead-row",
-          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          dedupKey: `${projectId}/dead-row`,
+          groupKey,
           payload: {},
           maxAttempts: 1,
         });
         const leased = await repo.leaseNext({
           projectId,
           reactorName,
+          groupKey,
           leasedUntil: new Date(Date.now() + 60_000),
           now: new Date(),
         });

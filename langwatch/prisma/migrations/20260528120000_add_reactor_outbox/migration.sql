@@ -40,9 +40,12 @@ CREATE TABLE "ReactorOutbox" (
 -- pipeline replays and retries safe.
 CREATE UNIQUE INDEX "ReactorOutbox_reactorName_dedupKey_key" ON "ReactorOutbox"("reactorName", "dedupKey");
 
--- Drainer hot path: pick the next claimable row for a (project, reactor)
--- whose backoff has elapsed.
-CREATE INDEX "ReactorOutbox_projectId_reactorName_status_nextAttemptAt_idx" ON "ReactorOutbox"("projectId", "reactorName", "status", "nextAttemptAt");
+-- Drainer hot path: pick the next claimable row for a (project,
+-- reactor, group) whose backoff has elapsed. groupKey is part of the
+-- WHERE so a wakeup for one trigger can never lease another trigger's
+-- row — per-group FIFO holds at the row level. See leaseNext in
+-- outbox.prisma.repository.ts.
+CREATE INDEX "ReactorOutbox_projectId_reactorName_groupKey_status_nextAttempt_idx" ON "ReactorOutbox"("projectId", "reactorName", "groupKey", "status", "nextAttemptAt");
 
 -- Operator surface: list stuck/dead dispatches per project.
 CREATE INDEX "ReactorOutbox_projectId_status_updatedAt_idx" ON "ReactorOutbox"("projectId", "status", "updatedAt");

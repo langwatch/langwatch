@@ -54,6 +54,7 @@ class InMemoryOutboxRepository implements OutboxRepository {
       (r) =>
         r.projectId === query.projectId &&
         r.reactorName === query.reactorName &&
+        r.groupKey === query.groupKey &&
         (r.status === "queued" || r.status === "failed_retryable") &&
         r.nextAttemptAt !== null &&
         r.nextAttemptAt <= query.now,
@@ -176,7 +177,7 @@ describe("OutboxService", () => {
         const result = await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: { triggerId: "trigger1" },
         });
@@ -192,14 +193,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const second = await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
@@ -215,11 +216,11 @@ describe("OutboxService", () => {
           service.enqueue({
             projectId: "proj1",
             reactorName: "alertDispatch",
-            dedupKey: "trigger1:trace1",
+            dedupKey: "proj1/trigger1:trace1",
             groupKey: "alertDispatch:trigger1",
             payload: {},
           }),
-        ).rejects.toThrow(/must start with "proj1\/"/);
+        ).rejects.toThrow(/groupKey must start with "proj1\/"/);
       });
 
       it("also rejects a groupKey for a different project", async () => {
@@ -228,11 +229,40 @@ describe("OutboxService", () => {
           service.enqueue({
             projectId: "proj1",
             reactorName: "alertDispatch",
-            dedupKey: "trigger1:trace1",
+            dedupKey: "proj1/trigger1:trace1",
             groupKey: "proj2/alertDispatch:trigger1",
             payload: {},
           }),
-        ).rejects.toThrow(/must start with "proj1\/"/);
+        ).rejects.toThrow(/groupKey must start with "proj1\/"/);
+      });
+    });
+
+    describe("when dedupKey does not start with `${projectId}/`", () => {
+      it("throws before any row is written (ADR-022 — claim key is global on (reactorName, dedupKey))", async () => {
+        const { repo, service } = buildService();
+        await expect(
+          service.enqueue({
+            projectId: "proj1",
+            reactorName: "alertDispatch",
+            dedupKey: "trigger1:trace1",
+            groupKey: "proj1/alertDispatch:trigger1",
+            payload: {},
+          }),
+        ).rejects.toThrow(/dedupKey must start with "proj1\/"/);
+        expect(repo.rows).toHaveLength(0);
+      });
+
+      it("also rejects a dedupKey for a different project", async () => {
+        const { service } = buildService();
+        await expect(
+          service.enqueue({
+            projectId: "proj1",
+            reactorName: "alertDispatch",
+            dedupKey: "proj2/trigger1:trace1",
+            groupKey: "proj1/alertDispatch:trigger1",
+            payload: {},
+          }),
+        ).rejects.toThrow(/dedupKey must start with "proj1\/"/);
       });
     });
   });
@@ -245,13 +275,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const row = await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 30_000,
         });
         expect(row?.status).toBe("dispatching");
@@ -268,6 +299,7 @@ describe("OutboxService", () => {
         const row = await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 30_000,
         });
         expect(row).toBeNull();
@@ -286,13 +318,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const leased = await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 30_000,
         });
         const result = await service.markFailedRetryable({
@@ -317,7 +350,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
           maxAttempts: 1,
@@ -325,6 +358,7 @@ describe("OutboxService", () => {
         const leased = await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 30_000,
         });
         const result = await service.markFailedRetryable({
@@ -345,13 +379,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const leased = await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 30_000,
         });
         await service.markDead({ row: leased!, error: "unrecoverable" });
@@ -371,13 +406,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         await service.leaseNext({
           projectId: "proj1",
           reactorName: "alertDispatch",
+          groupKey: "proj1/alertDispatch:trigger1",
           leaseDurationMs: 1_000,
         });
         now = future;
