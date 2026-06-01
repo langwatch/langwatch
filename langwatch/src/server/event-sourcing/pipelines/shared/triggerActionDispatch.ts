@@ -39,6 +39,20 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
   TriggerAction.ADD_TO_ANNOTATION_QUEUE,
 ]);
 
+/**
+ * How long a trace stays in the settle stage before its filters are
+ * re-evaluated. Sized to absorb the typical drip of late spans on an
+ * in-flight trace without making "immediate" cadence visibly delayed.
+ * The unified outbox queue uses Debounce Mode keyed on
+ * `(projectId, triggerId, traceId)` with this as the TTL — every new
+ * candidate event on the same trace extends + replaces the pending job.
+ *
+ * Per-trigger override lives on `Monitor.traceDebounceMs` (ADR-030),
+ * the application reads this as the floor / default when the trigger
+ * has no explicit value.
+ */
+export const DEFAULT_TRACE_DEBOUNCE_MS = 30_000;
+
 export const NOTIFICATION_CADENCES = [
   "immediate",
   "5min_digest",
