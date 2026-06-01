@@ -290,9 +290,13 @@ describe("ttlReconciler", () => {
     });
 
     describe("when CLICKHOUSE_URL is set but CLICKHOUSE_COLD_STORAGE_ENABLED is not set", () => {
-      it("skips reconciliation", async () => {
-        process.env.CLICKHOUSE_URL = "http://localhost:8123/langwatch";
-        await expect(reconcileTTL()).resolves.toBeUndefined();
+      it("still reconciles retention TTL — only the cold-storage MOVE clause is gated by the flag", async () => {
+        // CLICKHOUSE_URL=valid, no cold-storage flag → must NOT silently skip.
+        // The retention DELETE-by-_retention_days clause is platform-enforced
+        // and has to install on every deployment; only the cold-storage MOVE
+        // clause is operator-managed.
+        process.env.CLICKHOUSE_URL = "http://localhost:1/langwatch";
+        await expect(reconcileTTL()).rejects.toThrow();
       });
     });
 

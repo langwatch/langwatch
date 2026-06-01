@@ -253,19 +253,19 @@ export const TIERED_STORAGE_POLICY = "local_primary";
 export async function reconcileTTL(
   options: ReconcileOptions = {},
 ): Promise<void> {
-  // When called without an explicit connectionUrl (i.e. from production startup),
-  // respect the CLICKHOUSE_COLD_STORAGE_ENABLED gate.
-  // Direct callers (e.g. integration tests) pass connectionUrl explicitly to bypass.
-  if (!options.connectionUrl && process.env.CLICKHOUSE_COLD_STORAGE_ENABLED !== "true") {
-    logger.info("CLICKHOUSE_COLD_STORAGE_ENABLED is not set, skipping TTL reconciliation.");
-    return;
-  }
-
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrl) {
     logger.info("CLICKHOUSE_URL not configured, skipping TTL reconciliation.");
     return;
   }
+
+  // The cold-storage MOVE clause is operator-managed and only meaningful on
+  // tiered-storage tables. The DELETE-by-_retention_days clause is the
+  // platform's retention enforcement and must run on every deployment, or
+  // ingestion stamps `_retention_days` but nothing ever deletes. Gate the
+  // tiered-storage rewrite on the env flag; let retention TTL always reconcile.
+  const coldStorageEnabled =
+    process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
 
   const config = parseConnectionUrl(connectionUrl, options.database);
   const client = createClient({ url: config.databaseUrl });
@@ -299,8 +299,10 @@ export async function reconcileTTL(
 
       // TTL volume routing (`TO VOLUME 'cold'`) only works on tables using the
       // tiered storage policy. Tables on 'default' policy don't have a cold volume,
-      // but they CAN still have retention DELETE TTL.
-      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY) {
+      // but they CAN still have retention DELETE TTL. Likewise, when the operator
+      // disables cold-storage management we still need to install retention TTL,
+      // so collapse to the retention-only branch in both cases.
+      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
         if (
           retentionTTLExpr &&

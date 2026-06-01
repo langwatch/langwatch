@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const clickhouseMocks = vi.hoisted(() => {
   const client = {
@@ -19,8 +19,14 @@ vi.mock("@clickhouse/client", () => ({
 import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttlReconciler";
 
 describe("reconcileTTL()", () => {
+  const envBackup = { CLICKHOUSE_COLD_STORAGE_ENABLED: process.env.CLICKHOUSE_COLD_STORAGE_ENABLED };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // These regressions cover the tiered-storage path (cold + retention TTL),
+    // which only emits the cold MOVE clause when the operator has explicitly
+    // enabled it. Force the flag on so the assertions about cold TTL still hit.
+    process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = "true";
     clickhouseMocks.client.query.mockResolvedValue({
       json: async () => [
         {
@@ -33,6 +39,14 @@ describe("reconcileTTL()", () => {
     });
     clickhouseMocks.client.command.mockResolvedValue(undefined);
     clickhouseMocks.client.close.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    if (envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED === undefined) {
+      delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
+    } else {
+      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
+    }
   });
 
   describe("when a tiered table has current cold-storage TTL but no retention TTL", () => {
@@ -100,6 +114,47 @@ describe("reconcileTTL()", () => {
       // And MUST still contain the retention DELETE clause
       expect(query).toContain("_retention_days");
       expect(query).toContain("DELETE");
+    });
+  });
+
+  describe("when cold storage is disabled on the deployment", () => {
+    /**
+     * Regression: the reconciler used to early-return whenever
+     * CLICKHOUSE_COLD_STORAGE_ENABLED was unset, so self-hosted/default-storage
+     * installs stamped `_retention_days` but never installed the DELETE TTL,
+     * silently failing to enforce retention. Retention TTL must reconcile
+     * independently of the cold-storage flag.
+     */
+    it("still installs the retention DELETE TTL even without cold-storage MOVE", async () => {
+      delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
+
+      // Table currently has no retention TTL at all, even though it's on the
+      // tiered policy. Without cold-storage management we should still install
+      // retention.
+      clickhouseMocks.client.query.mockResolvedValueOnce({
+        json: async () => [
+          {
+            name: "stored_spans",
+            storage_policy: TIERED_STORAGE_POLICY,
+            engine_full:
+              "MergeTree ORDER BY (TenantId) TTL toDateTime(EndTime) + toIntervalDay(49) TO VOLUME 'cold'",
+          },
+        ],
+      });
+
+      await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
+        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      );
+      expect(modifyCalls.length).toBeGreaterThan(0);
+      const query = (modifyCalls[0]![0] as { query: string }).query;
+
+      // Retention DELETE clause IS issued
+      expect(query).toContain("_retention_days");
+      expect(query).toContain("DELETE");
+      // Cold MOVE clause is NOT issued — the operator hasn't opted in
+      expect(query).not.toContain("TO VOLUME 'cold'");
     });
   });
 });
