@@ -68,6 +68,11 @@ function makeS3Resolver(s3Client: { send: ReturnType<typeof vi.fn> }): S3ClientR
   return async () => ({ s3Client: s3Client as never, s3Bucket: "test-spool-bucket" });
 }
 
+/** Wraps a mock ClickHouseClient object as a ClickHouseClientResolver (resolver returns the same client for any tenantId). */
+function makeChResolver(client: ReturnType<typeof makeMockChClient>["client"]): (tenantId: string) => Promise<typeof client> {
+  return async (_tenantId) => client;
+}
+
 // ---------------------------------------------------------------------------
 // getFromEventLog — happy path
 // ---------------------------------------------------------------------------
@@ -91,7 +96,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), client as never);
+      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -123,7 +128,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), client as never);
+      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
 
       await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -148,7 +153,7 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), client as never);
+      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
 
       await expect(
         blobStore.getFromEventLog({
@@ -174,7 +179,7 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
         rows: [{ EventPayload: "not-valid-json{{{{" }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), client as never);
+      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
 
       await expect(
         blobStore.getFromEventLog({
@@ -203,7 +208,7 @@ describe("given a valid event_log row whose EventPayload does not contain the re
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), client as never);
+      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
 
       await expect(
         blobStore.getFromEventLog({
@@ -304,7 +309,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
         throw new Error("no object storage configured");
       };
 
-      const blobStore = new BlobStore(noStorageResolver, client as never);
+      const blobStore = new BlobStore(noStorageResolver, makeChResolver(client) as never);
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,

@@ -4,7 +4,8 @@ import {
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
-import type { ClickHouseClient } from "@clickhouse/client";
+import { z } from "zod";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 export interface S3ClientResolution {
   s3Client: S3Client;
@@ -45,13 +46,40 @@ export class BlobFieldNotFoundError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Zod schemas for parsing untyped external data (event_log EventPayload)
+// ---------------------------------------------------------------------------
+
+/** ClickHouse query response row from the event_log SELECT. */
+const eventLogRowSchema = z.object({ EventPayload: z.string() });
+
+/** Span attribute entry inside EventPayload. */
+const spanAttributeSchema = z.object({
+  key: z.string(),
+  value: z.object({ stringValue: z.string() }),
+});
+
+/** Parsed EventPayload structure (ADR-022: full event as stored by the command worker). */
+const eventPayloadSchema = z.object({
+  data: z
+    .object({
+      span: z
+        .object({
+          attributes: z.array(spanAttributeSchema),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
 /**
  * Provides transient S3 spool operations (ADR-022 write path) and event_log
  * read operations (ADR-022 read path).
  *
  * Spool: a per-span transient S3 object used to carry over-threshold command
  * payloads from the edge to the command worker. Eagerly deleted after the
- * event_log INSERT succeeds; 24h lifecycle policy as safety net for orphans.
+ * event_log INSERT succeeds; 3-day lifecycle policy as safety net for orphans
+ * (3 days covers weekend incidents that need catch-up time).
  *
  * Event log: the durable source of truth. `getFromEventLog` performs a
  * SELECT on `event_log` keyed by (TenantId, AggregateType, AggregateId,
@@ -61,13 +89,14 @@ export class BlobFieldNotFoundError extends Error {
 export class BlobStore {
   /**
    * @param resolveS3Client - Resolver for per-org S3 client + bucket.
-   * @param clickHouseClient - Optional ClickHouseClient for ADR-022 event_log reads.
-   *   When provided, `getFromEventLog` uses it to SELECT from event_log.
-   *   When absent, `getFromEventLog` throws "ClickHouseClient not configured".
+   * @param resolveClickHouseClient - Optional per-tenant ClickHouseClient resolver for ADR-022
+   *   event_log reads. When provided, `getFromEventLog` resolves the correct client for the
+   *   given tenantId (supporting multi-cluster tenants). When absent, `getFromEventLog` throws
+   *   "ClickHouseClient not configured".
    */
   constructor(
     private readonly resolveS3Client: S3ClientResolver,
-    private readonly clickHouseClient?: ClickHouseClient,
+    private readonly resolveClickHouseClient?: ClickHouseClientResolver,
   ) {}
 
   /**
@@ -95,14 +124,16 @@ export class BlobStore {
     aggregateType: string;
     aggregateId: string;
   }): Promise<string> {
-    if (!this.clickHouseClient) {
+    if (!this.resolveClickHouseClient) {
       throw new Error(
         "ClickHouseClient not configured — cannot read from event_log (ADR-022)",
       );
     }
 
+    const clickHouseClient = await this.resolveClickHouseClient(tenantId);
+
     // TenantId MUST be the first predicate in the WHERE clause (ADR-022 cross-tenant denial).
-    const result = await this.clickHouseClient.query({
+    const result = await clickHouseClient.query({
       query: `
         SELECT EventPayload
         FROM event_log
@@ -115,17 +146,21 @@ export class BlobStore {
       query_params: { tenantId, aggregateType, aggregateId, eventId },
     });
 
-    const response = await result.json<{ EventPayload: string }>();
-    const rows = response.data;
+    const response = await result.json<unknown>();
+    const rawRows = (response as { data?: unknown[] } | null)?.data;
 
-    if (!rows || rows.length === 0) {
+    if (!rawRows || rawRows.length === 0) {
       throw new BlobNotFoundError(eventId, field, tenantId);
     }
 
-    const row = rows[0]!;
-    let parsed: unknown;
+    const rowParse = eventLogRowSchema.safeParse(rawRows[0]);
+    if (!rowParse.success) {
+      throw new BlobNotFoundError(eventId, field, tenantId);
+    }
+
+    let parsedPayload: unknown;
     try {
-      parsed = JSON.parse(row.EventPayload);
+      parsedPayload = JSON.parse(rowParse.data.EventPayload);
     } catch (e) {
       throw new Error(
         `Failed to parse EventPayload for eventId=${eventId}: ${e instanceof Error ? e.message : String(e)}`,
@@ -134,27 +169,22 @@ export class BlobStore {
 
     // Extract span attribute by field name from the parsed EventPayload.
     // ADR-022: EventPayload contains the full event as stored by the command worker.
-    const spanAttributes = (
-      parsed as {
-        data?: {
-          span?: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
-        };
-      }
-    )?.data?.span?.attributes;
+    const payloadParse = eventPayloadSchema.safeParse(parsedPayload);
+    const spanAttributes = payloadParse.success
+      ? payloadParse.data.data?.span?.attributes
+      : undefined;
 
-    if (!Array.isArray(spanAttributes)) {
+    if (!spanAttributes || spanAttributes.length === 0) {
       throw new BlobFieldNotFoundError(eventId, field);
     }
 
-    const attr = spanAttributes.find(
-      (a: { key: string }) => a.key === field,
-    );
+    const attr = spanAttributes.find((a) => a.key === field);
 
-    if (!attr || typeof (attr as { value?: { stringValue?: string } }).value?.stringValue !== "string") {
+    if (!attr) {
       throw new BlobFieldNotFoundError(eventId, field);
     }
 
-    return (attr as { value: { stringValue: string } }).value.stringValue;
+    return attr.value.stringValue;
   }
 
   /**
@@ -186,8 +216,8 @@ export class BlobStore {
    * Returns the spool reference string (the S3 key) that the command will carry.
    *
    * Key shape: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient,
-   * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 24h
-   * lifecycle policy as a safety net for orphans.
+   * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 3-day
+   * lifecycle policy as a safety net for orphans (covers weekend incidents).
    */
   async putSpool({
     projectId,
@@ -215,7 +245,7 @@ export class BlobStore {
 
   /**
    * Best-effort deletion of a transient S3 spool object.
-   * Called after event_log INSERT succeeds. Errors are swallowed — the 24h lifecycle
+   * Called after event_log INSERT succeeds. Errors are swallowed — the 3-day lifecycle
    * policy is the safety net for orphans. Returns void in all cases.
    *
    * @param spoolRef - The spool reference string returned by `putSpool`.

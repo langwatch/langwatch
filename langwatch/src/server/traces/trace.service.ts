@@ -103,6 +103,41 @@ export interface BlobResolutionDeps {
 }
 
 /**
+ * Builds the per-trace resolver callback from BlobResolutionDeps.
+ *
+ * Encapsulates the ADR-022 read-path wiring: given a projectId and the
+ * NormalizedSpan array for a single trace, calls `resolveOffloadedTraces`
+ * and returns the resolved spans + recomputed IO.
+ *
+ * Returned as `undefined` when `deps` is absent so that ClickHouseTraceService
+ * falls back to the preview values from trace_summaries (pre-ADR-022 behavior).
+ */
+class OffloadedSpanResolver {
+  constructor(
+    private readonly deps: BlobResolutionDeps,
+    private readonly logger: ReturnType<typeof createLogger>,
+  ) {}
+
+  /**
+   * Returns an async callback compatible with ClickHouseTraceService's
+   * `resolveTraceSpansFn` parameter.
+   */
+  toResolverFn(): (
+    projectId: string,
+    normalizedSpans: NormalizedSpan[],
+  ) => ReturnType<typeof resolveOffloadedTraces> {
+    return (projectId, normalizedSpans) =>
+      resolveOffloadedTraces({
+        projectId,
+        normalizedSpans,
+        blobStore: this.deps.blobStore,
+        ioExtractionService: this.deps.ioExtractionService,
+        logger: this.logger,
+      });
+  }
+}
+
+/**
  * Unified service for fetching traces from ClickHouse.
  *
  * This service acts as a facade that routes all requests to the ClickHouse backend.
@@ -119,34 +154,17 @@ export class TraceService {
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
   private readonly evaluationService: EvaluationService;
-  /** Blob-offload resolution deps (optional — falls back to preview if absent). */
-  private readonly ioExtractionService: TraceIOExtractionService | undefined;
-  private readonly blobStore: BlobStore | undefined;
-
   constructor(
     readonly prisma: PrismaClient,
     blobResolutionDeps?: BlobResolutionDeps,
   ) {
-    this.blobStore = blobResolutionDeps?.blobStore;
-    this.ioExtractionService = blobResolutionDeps?.ioExtractionService;
-
     // Build the per-trace resolver callback when deps are present.
     // The callback is passed to ClickHouseTraceService so resolution happens
     // at the NormalizedSpan level (before mapping to legacy Span), which is
     // the only level where spanAttributes carry the eventref keys.
     const resolveTraceSpansFn =
       blobResolutionDeps !== undefined
-        ? async (
-            projectId: string,
-            normalizedSpans: NormalizedSpan[],
-          ) =>
-            resolveOffloadedTraces({
-              projectId,
-              normalizedSpans,
-              blobStore: blobResolutionDeps.blobStore,
-              ioExtractionService: blobResolutionDeps.ioExtractionService,
-              logger: this.logger,
-            })
+        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger).toResolverFn()
         : undefined;
 
     this.clickHouseService = ClickHouseTraceService.create(

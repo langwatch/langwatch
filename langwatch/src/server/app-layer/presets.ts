@@ -196,9 +196,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceListService",
   );
+  // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
+  // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
+  const blobStore = new BlobStore(createS3Client, clickhouseEnabled ? resolveClickHouseClient : undefined);
+  const ioExtractionService = new TraceIOExtractionService();
+
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
+      { blobStore, ioExtractionService },
     ),
     "SpanStorageService",
   );
@@ -226,10 +232,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  // ADR-022: Pass the shared ClickHouse client so BlobStore.getFromEventLog
-  // can SELECT from event_log (event_log read path for "show full" / eval).
-  const blobStore = new BlobStore(createS3Client, getSharedClickHouseClient() ?? undefined);
-  const ioExtractionService = new TraceIOExtractionService();
   const traceService = TraceService.create(prisma, {
     blobStore,
     ioExtractionService,

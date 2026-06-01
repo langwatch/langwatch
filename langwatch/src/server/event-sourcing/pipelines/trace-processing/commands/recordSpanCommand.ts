@@ -167,16 +167,15 @@ export class RecordSpanCommand implements CommandHandler<
         let resolvedCommandData = commandData;
         if (commandData.spoolRef && this.blobStore) {
           const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
-          const parsed = JSON.parse(spoolBody.toString("utf-8")) as {
-            span: OtlpSpan;
-            resource: OtlpResource | null;
-            instrumentationScope: unknown | null;
-          };
+          // ADR-022: spool body is the full serialized RecordSpanCommandData.
+          // Merge the spooled span/resource/instrumentationScope fields back into
+          // the in-flight command (the queue message carries only spoolRef + id fields).
+          const parsed = JSON.parse(spoolBody.toString("utf-8")) as RecordSpanCommandData;
           resolvedCommandData = {
             ...commandData,
             span: parsed.span,
             resource: parsed.resource,
-            instrumentationScope: parsed.instrumentationScope as typeof commandData.instrumentationScope,
+            instrumentationScope: parsed.instrumentationScope,
           };
         }
 

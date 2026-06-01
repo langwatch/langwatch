@@ -25,7 +25,7 @@ import type { Logger as PinoLogger } from "pino";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError, BlobFieldNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { TraceIOExtractionService, ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
@@ -41,12 +41,12 @@ export interface ResolvedTraceSpans {
    * Recomputed trace-level input from the resolved spans, or null when no
    * event refs were present / resolution failed.
    */
-  recomputedInput: import("~/server/app-layer/traces/trace-io-extraction.service").ExtractedIO | null;
+  recomputedInput: ExtractedIO | null;
   /**
    * Recomputed trace-level output from the resolved spans, or null when no
    * event refs were present / resolution failed.
    */
-  recomputedOutput: import("~/server/app-layer/traces/trace-io-extraction.service").ExtractedIO | null;
+  recomputedOutput: ExtractedIO | null;
   /**
    * True when at least one span had event refs successfully resolved. When false,
    * `recomputedInput`/`recomputedOutput` are null and the preview values
@@ -116,13 +116,13 @@ export async function resolveOffloadedTraces({
   }
 
   // Resolve each span individually so a failure on one span does not block
-  // the others. Track whether at least one span resolved successfully.
-  let anyResolved = false;
-  const resolvedSpans: NormalizedSpan[] = await Promise.all(
+  // the others. Promise.allSettled ensures successfully resolved spans are
+  // returned even when a span's resolver throws an unexpected uncaught error.
+  const spanSettlements = await Promise.allSettled(
     normalizedSpans.map(async (span) => {
       const attrs = span.spanAttributes as Record<string, string>;
       if (!hasEventRefs(attrs)) {
-        return span;
+        return { span, resolvedCount: 0 };
       }
 
       // Separate eventref keys from regular attributes
@@ -174,7 +174,7 @@ export async function resolveOffloadedTraces({
       if (eventrefEntries.length === 0) {
         // All ref keys were malformed JSON or missing eventId — strip
         // reserved keys anyway so the UI never sees the namespace.
-        return { ...span, spanAttributes: cleanedAttrs };
+        return { span: { ...span, spanAttributes: cleanedAttrs }, resolvedCount: 0 };
       }
 
       // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
@@ -182,68 +182,80 @@ export async function resolveOffloadedTraces({
       // event.id at lean time — see lean-for-projection.ts:120.
       const aggregateId = span.traceId;
 
-      try {
-        const resolvedAttrs = { ...cleanedAttrs };
-        let resolvedCount = 0;
+      const resolvedAttrs = { ...cleanedAttrs };
 
-        for (const { attrKey, field, eventId } of eventrefEntries) {
-          try {
-            const fullValue = await blobStore.getFromEventLog({
-              eventId,
-              field,
-              tenantId: projectId,
-              aggregateType,
-              aggregateId,
-            });
-            resolvedAttrs[attrKey] = fullValue;
-            resolvedCount++;
-          } catch (err) {
-            // Log and keep preview for this field; don't abort other fields.
-            if (err instanceof BlobNotFoundError || err instanceof BlobFieldNotFoundError) {
-              logger.warn(
-                {
-                  projectId,
-                  spanId: span.spanId,
-                  traceId: span.traceId,
-                  attrKey,
-                  error: err.message,
-                },
-                "event_log row not found for eventref — keeping preview value",
-              );
-            } else {
-              logger.warn(
-                {
-                  projectId,
-                  spanId: span.spanId,
-                  traceId: span.traceId,
-                  attrKey,
-                  error: err instanceof Error ? err.message : String(err),
-                },
-                "Failed to resolve eventref from event_log — keeping preview value",
-              );
-            }
-            // Keep the preview value from cleanedAttrs (already set)
+      // Parallelize independent event_log fetches for each eventref in this span.
+      const fieldResults = await Promise.allSettled(
+        eventrefEntries.map(async ({ attrKey, field, eventId }) => {
+          const fullValue = await blobStore.getFromEventLog({
+            eventId,
+            field,
+            tenantId: projectId,
+            aggregateType,
+            aggregateId,
+          });
+          return { attrKey, fullValue };
+        }),
+      );
+
+      let resolvedCount = 0;
+      for (const [idx, result] of fieldResults.entries()) {
+        if (result.status === "fulfilled") {
+          resolvedAttrs[result.value.attrKey] = result.value.fullValue;
+          resolvedCount++;
+        } else {
+          // Log and keep preview for this field; other fields are not affected.
+          const err = result.reason;
+          const attrKey = eventrefEntries[idx]?.attrKey ?? "unknown";
+          if (err instanceof BlobNotFoundError || err instanceof BlobFieldNotFoundError) {
+            logger.warn(
+              {
+                projectId,
+                spanId: span.spanId,
+                traceId: span.traceId,
+                attrKey,
+                error: (err as Error).message,
+              },
+              "event_log row not found for eventref — keeping preview value",
+            );
+          } else {
+            logger.warn(
+              {
+                projectId,
+                spanId: span.spanId,
+                traceId: span.traceId,
+                attrKey,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "Failed to resolve eventref from event_log — keeping preview value",
+            );
           }
         }
-
-        if (resolvedCount > 0) {
-          anyResolved = true;
-        }
-        return { ...span, spanAttributes: resolvedAttrs };
-      } catch (err) {
-        logger.warn(
-          {
-            projectId,
-            spanId: span.spanId,
-            traceId: span.traceId,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          "Failed to resolve offloaded event refs for span — keeping preview value",
-        );
-        return { ...span, spanAttributes: cleanedAttrs };
       }
+
+      return { span: { ...span, spanAttributes: resolvedAttrs }, resolvedCount };
     }),
   );
+
+  // Collect resolved spans; fall back to original span on unexpected rejection.
+  let anyResolved = false;
+  const resolvedSpans: NormalizedSpan[] = spanSettlements.map((settlement, i) => {
+    if (settlement.status === "fulfilled") {
+      if (settlement.value.resolvedCount > 0) anyResolved = true;
+      return settlement.value.span;
+    }
+    // Unexpected uncaught error from the span's async mapper — log and fall back.
+    logger.warn(
+      {
+        projectId,
+        spanId: normalizedSpans[i]?.spanId,
+        traceId: normalizedSpans[i]?.traceId,
+        error: settlement.reason instanceof Error ? settlement.reason.message : String(settlement.reason),
+      },
+      "Failed to resolve offloaded event refs for span — keeping preview value",
+    );
+    return normalizedSpans[i]!;
+  });
 
   if (!anyResolved) {
     return {

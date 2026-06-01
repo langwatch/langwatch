@@ -44,14 +44,13 @@ export async function maybeSpool({
     return data;
   }
 
-  // Payload exceeds threshold — attempt to spool to S3
+  // Payload exceeds threshold — attempt to spool to S3.
+  // Reuse `serialized` (already computed above) as the spool body — avoids
+  // a second JSON.stringify of the same data.
   const { tenantId: projectId, span } = data;
   const traceId = span.traceId as string;
   const spanId = span.spanId as string;
-  const spoolBody = Buffer.from(
-    JSON.stringify({ span, resource: data.resource, instrumentationScope: data.instrumentationScope }),
-    "utf-8",
-  );
+  const spoolBody = Buffer.from(serialized, "utf-8");
 
   try {
     const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body: spoolBody });
