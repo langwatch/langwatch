@@ -1,6 +1,13 @@
 import { hash } from "bcrypt";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+// Must be mocked before importing ../index — both create persistent handles
+// (Redis socket, Prisma connection pool) that prevent Vite from closing after
+// tests pass, causing shard 2 to hang until GitHub Actions cancels it.
+// Established pattern: see fallbackName.test.ts line 17-18.
+vi.mock("~/server/db", () => ({ prisma: {} }));
+vi.mock("~/server/redis", () => ({ connection: undefined }));
+
 describe("better-auth config", () => {
   describe("when imported", () => {
     /** @scenario BetterAuth is the live handler */
