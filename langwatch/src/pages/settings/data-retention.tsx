@@ -500,11 +500,13 @@ function DataRetentionPage({
           isCancelling={killMutation.isLoading}
         />
 
-        {snapshot && <DataRetentionCard effective={snapshot.effective} />}
-        <DataStorageCard
-          isLoading={storageQuery.isLoading}
-          data={storageQuery.data}
-        />
+        {snapshot && (
+          <RetentionAndUsageCard
+            effective={snapshot.effective}
+            isLoading={storageQuery.isLoading}
+            data={storageQuery.data}
+          />
+        )}
 
         {available && (
           <AddOverrideDrawer
@@ -772,10 +774,14 @@ function ApplyToExistingConfirmDialog({
   );
 }
 
-function DataRetentionCard({
+function RetentionAndUsageCard({
   effective,
+  isLoading,
+  data,
 }: {
   effective: Partial<Record<RetentionCategory, number>>;
+  isLoading: boolean;
+  data?: { totalBytes: number; byCategory: Record<RetentionCategory, number> };
 }) {
   const summary = renderPolicySummary(effective);
   return (
@@ -795,62 +801,47 @@ function DataRetentionCard({
           </Text>
         </HStack>
       </Card.Header>
-      {summary === "Mixed" && (
-        <Card.Body>
-          <VStack gap={2} align="stretch">
-            {RETENTION_CATEGORIES.map((category) => (
-              <HStack key={category} justifyContent="space-between">
-                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                <Text>
-                  {effective[category] !== undefined
-                    ? formatDays(effective[category]!)
-                    : "—"}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        </Card.Body>
-      )}
-    </Card.Root>
-  );
-}
-
-function DataStorageCard({
-  isLoading,
-  data,
-}: {
-  isLoading: boolean;
-  data?: { totalBytes: number; byCategory: Record<RetentionCategory, number> };
-}) {
-  return (
-    <Card.Root width="full">
-      <Card.Header>
-        <Heading as="h3" fontSize="lg">
-          Data storage
-        </Heading>
-        <Text fontSize="sm" color="fg.muted">
-          The storage that current project occupies today.
-        </Text>
-      </Card.Header>
       <Card.Body>
-        {isLoading ? (
-          <Spinner />
-        ) : data ? (
+        <VStack gap={5} align="stretch">
+          {summary === "Mixed" && (
+            <VStack gap={2} align="stretch">
+              {RETENTION_CATEGORIES.map((category) => (
+                <HStack key={category} justifyContent="space-between">
+                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                  <Text>
+                    {effective[category] !== undefined
+                      ? formatDays(effective[category]!)
+                      : "—"}
+                  </Text>
+                </HStack>
+              ))}
+            </VStack>
+          )}
           <VStack gap={2} align="stretch">
-            <HStack justifyContent="space-between">
-              <Text fontWeight="semibold">Total stored</Text>
-              <Text fontWeight="bold" fontSize="lg">
-                {formatBytes(data.totalBytes)}
+            <VStack align="start" gap={0}>
+              <Text fontWeight="semibold">Data storage</Text>
+              <Text fontSize="sm" color="fg.muted">
+                The storage that current project occupies today.
               </Text>
-            </HStack>
-            {RETENTION_CATEGORIES.map((category) => (
-              <HStack key={category} justifyContent="space-between">
-                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                <Text>{formatBytes(data.byCategory[category])}</Text>
-              </HStack>
-            ))}
+            </VStack>
+            {isLoading ? (
+              <Spinner />
+            ) : data ? (
+              <VStack gap={2} align="stretch" paddingTop={1}>
+                <HStack justifyContent="space-between">
+                  <Text fontWeight="semibold">Total stored</Text>
+                  <Text fontWeight="bold">{formatBytes(data.totalBytes)}</Text>
+                </HStack>
+                {RETENTION_CATEGORIES.map((category) => (
+                  <HStack key={category} justifyContent="space-between">
+                    <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                    <Text>{formatBytes(data.byCategory[category])}</Text>
+                  </HStack>
+                ))}
+              </VStack>
+            ) : null}
           </VStack>
-        ) : null}
+        </VStack>
       </Card.Body>
     </Card.Root>
   );
