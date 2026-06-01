@@ -22,6 +22,14 @@ import {
   type S3ClientResolver,
 } from "../blob-store.service";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock
@@ -272,6 +280,97 @@ describe("given a transient spool ref", () => {
 
       // Must not throw — errors are swallowed
       await expect(blobStore.deleteSpool(spoolRef)).resolves.toBeUndefined();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFromEventLog — read-vs-write contract regression (issue #4215)
+// ---------------------------------------------------------------------------
+
+/**
+ * CONTRACT REGRESSION: read path must match the real write path (eventToRecord).
+ *
+ * Bug: `getFromEventLog` was reading `EventPayload.data.span.attributes` but
+ * `eventToRecord` stores `EventPayload = event.data` — so the real path is
+ * `EventPayload.span.attributes` (no extra `.data` wrapper).
+ *
+ * This test derives the CH-mock EventPayload from the ACTUAL `eventToRecord`
+ * call rather than hand-writing the fixture, so ANY drift in either the write
+ * shape (`eventToRecord`) or the read shape (`getFromEventLog`) will cause this
+ * test to fail immediately.
+ *
+ * Failure mode: if `eventToRecord` is changed to add a `data` wrapper, the
+ * mock row will no longer match the schema `getFromEventLog` parses, and the
+ * test will throw `BlobFieldNotFoundError`. If `getFromEventLog` regresses to
+ * reading `.data.span.attributes`, `attr` will be undefined and the same error
+ * is thrown. Either side's drift is caught.
+ */
+describe("given a SpanReceivedEvent written through eventToRecord (real write path)", () => {
+  describe("when getFromEventLog is called with matching ids and the oversize field name", () => {
+    it("returns the field value — proving the read path matches the write path", async () => {
+      // Build a minimal but realistic SpanReceivedEvent whose data matches the
+      // real write shape used in recordSpanCommand.ts:281-290.
+      const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
+        aggregateType: "trace",
+        aggregateId: AGGREGATE_ID,
+        tenantId: createTenantId(TENANT_A),
+        type: SPAN_RECEIVED_EVENT_TYPE,
+        version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+        data: {
+          span: {
+            traceId: "abcd1234abcd1234abcd1234abcd1234",
+            spanId: "abcd1234abcd1234",
+            name: "test-span",
+            kind: 1, // SPAN_KIND_INTERNAL
+            startTimeUnixNano: "0",
+            endTimeUnixNano: "1000000",
+            attributes: [
+              // The oversize field under test — exact OTLP key-value shape
+              {
+                key: FIELD,
+                value: { stringValue: FULL_VALUE },
+              },
+            ],
+            events: [],
+            links: [],
+            status: { message: null, code: null },
+            droppedAttributesCount: 0,
+            droppedEventsCount: 0,
+            droppedLinksCount: 0,
+          },
+          resource: null,
+          instrumentationScope: null,
+          piiRedactionLevel: "DISABLED",
+        },
+      });
+
+      // Derive the EventPayload exactly as the write path does.
+      // eventToRecord sets `EventPayload = event.data ?? {}`, so
+      // record.EventPayload IS spanReceivedEvent.data — no extra wrapper.
+      const record = eventToRecord(spanReceivedEvent);
+
+      const { client, sqlCaptures } = makeMockChClient({
+        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      // read path must find the attribute at span.attributes, NOT data.span.attributes
+      const result = await blobStore.getFromEventLog({
+        eventId: spanReceivedEvent.id,
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(result).toBe(FULL_VALUE);
+      // Verify a CH query was actually issued (not short-circuited)
+      expect(sqlCaptures.length).toBeGreaterThan(0);
     });
   });
 });
