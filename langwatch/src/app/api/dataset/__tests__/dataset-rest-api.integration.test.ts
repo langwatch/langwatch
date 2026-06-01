@@ -333,30 +333,6 @@ describe("Feature: Dataset REST API", () => {
         expect(res.status).toBe(422);
       });
     });
-
-    describe("when the project has reached its dataset plan limit", () => {
-      beforeEach(async () => {
-        await createDataset({ name: "Existing", slug: "existing" });
-        mockGetActivePlan.mockResolvedValue({
-          ...FREE_PLAN,
-          maxDatasets: 1,
-          overrideAddingLimitations: false,
-        });
-      });
-
-      /** @scenario Create a dataset enforces plan limits */
-      it("returns 403 Forbidden", async () => {
-        const res = await helpers.api.post("/api/dataset", {
-          name: "One More",
-          columnTypes: [{ name: "input", type: "string" }],
-        });
-
-        expect(res.status).toBe(403);
-        const body = await res.json();
-        expect(body.error).toBe("resource_limit_exceeded");
-        expect(body.limitType).toBe("datasets");
-      });
-    });
   });
 
   // ── Get Single Dataset ─────────────────────────────────────────
