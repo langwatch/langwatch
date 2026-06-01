@@ -9,6 +9,7 @@ import {
   act,
   within,
   fireEvent,
+  cleanup,
 } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { AICreateModal } from "../AICreateModal";
@@ -50,6 +51,14 @@ function getDialogByState(state: "open" | "closed") {
 }
 
 describe("<AICreateModal/>", () => {
+  // Issue #4467: vitest runs without `globals: true`, so @testing-library/react's
+  // automatic per-test cleanup never registers. Without it every render() leaks its
+  // portaled Chakra Dialog into document.body; accumulated dialogs get aria-hidden by
+  // focus management, and role-based queries (getByRole) then intermittently fail to
+  // find the now-hidden dialog/close button — the CI-only flake. Unmounting after each
+  // test keeps exactly one live dialog.
+  afterEach(() => cleanup());
+
   describe("when open", () => {
     it("displays the provided title", () => {
       render(
