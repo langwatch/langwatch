@@ -658,9 +658,13 @@ function DataRetentionPage({
                     ),
                   );
                   if (succeededCategories.length > 0) {
-                    // The server derives newRetentionDays from the project's
-                    // resolved effective policy (the rule we just saved), so
-                    // the UI only sends the target identity here.
+                    // The server uses the cascade-aware resolver
+                    // (PROJECT > TEAM > ORGANIZATION > platform default), so
+                    // saving an org/team rule when the project already has a
+                    // closer override applies the project's value, NOT the
+                    // saved value. The server returns the value it actually
+                    // used; we surface that in the toast so the user sees the
+                    // truth (not the form value they typed).
                     const triggerResults = await Promise.all(
                       succeededCategories.map((category) =>
                         triggerUpdate
@@ -669,7 +673,7 @@ function DataRetentionPage({
                             category,
                           })
                           .then(
-                            () => ({ ok: true as const }),
+                            (res) => ({ ok: true as const, applied: res.appliedRetentionDays }),
                             (error: Error) => ({
                               ok: false as const,
                               error,
@@ -679,8 +683,26 @@ function DataRetentionPage({
                     );
                     const triggerFailed = triggerResults.filter((r) => !r.ok);
                     if (triggerFailed.length === 0) {
+                      const appliedValues = Array.from(
+                        new Set(
+                          triggerResults
+                            .filter(
+                              (
+                                r,
+                              ): r is { ok: true; applied: number } => r.ok,
+                            )
+                            .map((r) => r.applied),
+                        ),
+                      );
+                      const description =
+                        appliedValues.length === 1
+                          ? `Rewriting existing rows to ${formatDays(appliedValues[0]!)}.`
+                          : `Rewriting existing rows per category (${appliedValues
+                              .map(formatDays)
+                              .join(", ")}).`;
                       toaster.create({
                         title: "Applying retention to existing data…",
+                        description,
                         type: "info",
                       });
                     } else {
@@ -810,12 +832,19 @@ function ApplyToExistingConfirmDialog({
                   the retention limit from already-stored data.
                 </Text>
               ) : (
+                // We don't name a specific day count here because the server
+                // applies the project's RESOLVED effective retention
+                // (PROJECT > TEAM > ORGANIZATION > platform default), which
+                // may differ from the value the user just selected (e.g. when
+                // saving an org-wide rule but the project has a closer
+                // override). The toast that fires after the apply shows the
+                // value that was actually used.
                 <Text>
                   We will rewrite <strong>this project's</strong> existing data
-                  to use {pending.retentionDays} days of retention. If any rows
-                  are currently older than {pending.retentionDays} days, they
-                  become eligible for deletion on the next background merge.
-                  After deletion, this cannot be undone.
+                  to use its currently resolved retention policy. Rows older
+                  than the resolved retention become eligible for deletion on
+                  the next background merge. After deletion, this cannot be
+                  undone.
                 </Text>
               )}
               {pending.savedScopeWiderThanCurrentProject && (

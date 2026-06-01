@@ -150,7 +150,14 @@ export const dataRetentionRouter = createTRPCRouter({
       // Resolve the retention value server-side. Trusting a client-supplied
       // newRetentionDays would let a project:update caller rewrite existing
       // rows to any value, irreversibly contracting data without a matching
-      // saved rule. The effective policy is the only legitimate target.
+      // saved rule. The cascade-aware resolver is the only legitimate
+      // source: PROJECT > TEAM > ORGANIZATION > platform default. When the
+      // caller saves an org-wide override but a closer project override
+      // already wins, the resolved value REMAINS the project's existing
+      // value — so retroactive rewrite uses that, not the broader scope's
+      // value. We return `appliedRetentionDays` to the UI so it can show
+      // the truth (the dialog previously named the form value, which
+      // could differ silently from what got applied).
       const effective =
         await getApp().dataRetention.policy.getResolvedForProject(
           input.projectId,
@@ -163,11 +170,12 @@ export const dataRetentionRouter = createTRPCRouter({
           message: `No effective retention is resolvable for category ${category}.`,
         });
       }
-      return getApp().dataRetention.retroactive.triggerUpdate({
+      const result = await getApp().dataRetention.retroactive.triggerUpdate({
         projectId: input.projectId,
         category,
         newRetentionDays,
       });
+      return { ...result, appliedRetentionDays: newRetentionDays };
     }),
 
   getMutationProgress: protectedProcedure
