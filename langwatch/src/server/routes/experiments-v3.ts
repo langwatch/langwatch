@@ -39,6 +39,7 @@ import {
 } from "~/server/experiments-v3/execution/orchestrator";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   executionRequestSchema,
   type EvaluationV3Event,
@@ -340,13 +341,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   }
   const { project, markUsed } = authResult;
 
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: project.id,
-      slug,
-      type: ExperimentType.EVALUATIONS_V3,
-      archivedAt: null,
-    },
+  const experiment = await ExperimentService.create(prisma).findBySlugAndType({
+    projectId: project.id,
+    slug,
+    type: ExperimentType.EVALUATIONS_V3,
   });
 
   if (!experiment) {
@@ -676,11 +674,12 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
 
   const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
   let experimentId = experimentIdFromState;
+  const experiments = ExperimentService.create(prisma);
 
   if (!experimentId && experimentSlug) {
-    const experiment = await prisma.experiment.findFirst({
-      where: { projectId: project.id, slug: experimentSlug, archivedAt: null },
-      select: { id: true },
+    const experiment = await experiments.findIdBySlug({
+      projectId: project.id,
+      slug: experimentSlug,
     });
     experimentId = experiment?.id;
   } else if (experimentId) {
@@ -689,9 +688,9 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
     // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
     // after archive while the slug-based fallback already returns 404, so
     // archive visibility would silently depend on run age.
-    const stillLive = await prisma.experiment.findFirst({
-      where: { id: experimentId, projectId: project.id, archivedAt: null },
-      select: { id: true },
+    const stillLive = await experiments.isActive({
+      projectId: project.id,
+      id: experimentId,
     });
     if (!stillLive) experimentId = undefined;
   }

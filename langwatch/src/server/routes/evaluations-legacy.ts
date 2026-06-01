@@ -59,6 +59,7 @@ import type {
   ESBatchEvaluationTarget,
   ESBatchEvaluationTargetType,
 } from "~/server/experiments/types";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
@@ -421,12 +422,9 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async 
     };
   }
 
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: project.id,
-      slug: experimentSlug,
-      archivedAt: null,
-    },
+  const experiment = await ExperimentService.create(prisma).findBySlug({
+    projectId: project.id,
+    slug: experimentSlug,
   });
   if (!experiment) {
     throw new TRPCError({

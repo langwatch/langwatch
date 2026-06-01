@@ -1,4 +1,9 @@
-import type { Experiment, PrismaClient } from "@prisma/client";
+import type {
+  Experiment,
+  ExperimentType,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "../../utils/slugify";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
@@ -79,6 +84,213 @@ export class ExperimentService {
     projectId: string;
   }): Promise<Experiment | null> {
     return this.repository.findLatest({ projectId });
+  }
+
+  /**
+   * Returns the experiment with the given id if it is live, otherwise null.
+   * Use this for tolerant lookups (the caller decides how to react to null).
+   * For lookups that should throw on miss, use `getById`.
+   */
+  async findById({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<Experiment | null> {
+    return this.repository.findById({ id, projectId });
+  }
+
+  /**
+   * Returns the experiment with the given slug if it is live, otherwise null.
+   */
+  async findBySlug({
+    projectId,
+    slug,
+  }: {
+    projectId: string;
+    slug: string;
+  }): Promise<Experiment | null> {
+    return this.repository.findBySlug({ slug, projectId });
+  }
+
+  /**
+   * Returns the experiment with the given slug and type if it is live,
+   * otherwise null. The EVALUATIONS_V3 routes use this to refuse to operate
+   * on rows of the wrong type.
+   */
+  async findBySlugAndType({
+    projectId,
+    slug,
+    type,
+  }: {
+    projectId: string;
+    slug: string;
+    type: ExperimentType;
+  }): Promise<Experiment | null> {
+    return this.repository.findFirstActive({
+      where: { projectId, slug, type },
+    });
+  }
+
+  /**
+   * Returns `{ id, slug }` for an active experiment, or null. The execution
+   * service needs the bare id for ClickHouse keying without paying for the
+   * rest of the row.
+   */
+  async findIdBySlug({
+    projectId,
+    slug,
+  }: {
+    projectId: string;
+    slug: string;
+  }): Promise<{ id: string; slug: string } | null> {
+    return this.repository.findFirstActive({
+      where: { projectId, slug },
+      select: { id: true, slug: true },
+    });
+  }
+
+  /**
+   * Returns true when an active experiment exists for `(id, projectId)`.
+   * The routes use this to refuse to serve results once the owning
+   * experiment is archived, without paying for the full row.
+   */
+  async isActive({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<boolean> {
+    const row = await this.repository.findFirstActive({
+      where: { projectId, id },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
+  /**
+   * Returns the experiment by id with its Workflow joined (no version),
+   * or null. Use when the caller just needs to confirm a workflow link
+   * exists without paying for a version blob.
+   */
+  async findByIdWithWorkflow({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<Prisma.ExperimentGetPayload<{
+    include: { workflow: true };
+  }> | null> {
+    return this.repository.findFirstActive({
+      where: { id, projectId },
+      include: { workflow: true },
+    });
+  }
+
+  /**
+   * Returns the experiment by id with its Workflow + `currentVersion`
+   * joined, or null. Used by the saveAsMonitor flow.
+   */
+  async findByIdWithWorkflowCurrentVersion({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<Prisma.ExperimentGetPayload<{
+    include: { workflow: { include: { currentVersion: true } } };
+  }> | null> {
+    return this.repository.findFirstActive({
+      where: { id, projectId },
+      include: { workflow: { include: { currentVersion: true } } },
+    });
+  }
+
+  /**
+   * Returns the experiment by id with its Workflow + `latestVersion`
+   * joined, or null. Used by the copy-experiment flow (which needs the
+   * latest DSL to clone).
+   */
+  async findByIdWithWorkflowLatestVersion({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<Prisma.ExperimentGetPayload<{
+    include: { workflow: { include: { latestVersion: true } } };
+  }> | null> {
+    return this.repository.findFirstActive({
+      where: { id, projectId },
+      include: { workflow: { include: { latestVersion: true } } },
+    });
+  }
+
+  /**
+   * Returns the existing slug for an experiment that the caller is about to
+   * upsert, or null if there is no active row yet. Active rows mean the
+   * caller is doing an update; null means a create.
+   */
+  async getExistingSlugForUpsert({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<string | null> {
+    const row = await this.repository.findFirstActive({
+      where: { id, projectId },
+      select: { slug: true },
+    });
+    return row?.slug ?? null;
+  }
+
+  /**
+   * Returns the full project-wide list (with workflow+currentVersion
+   * joined) and the total count, used by the evaluations list UI. Real-time
+   * filtering is left to the caller because the discriminant lives in a
+   * JSON column.
+   */
+  async listForEvaluationsBoard({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<
+    Prisma.ExperimentGetPayload<{
+      include: { workflow: { include: { currentVersion: true } } };
+    }>[]
+  > {
+    return this.repository.findManyActive({
+      where: { projectId },
+      include: {
+        workflow: {
+          include: { currentVersion: true },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+  }
+
+  /**
+   * Archives an experiment by id. Throws ExperimentNotFoundError when no
+   * active or archived row matches. Returns `{ success: true }` for both
+   * a successful archive and an idempotent no-op (already archived).
+   */
+  async archive({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<{ success: true }> {
+    const result = await this.repository.archiveById({ id, projectId });
+    if (result.kind === "not-found") {
+      throw new ExperimentNotFoundError(id);
+    }
+    return { success: true };
   }
 
   /**

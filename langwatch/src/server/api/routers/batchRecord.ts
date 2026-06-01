@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { ExperimentService } from "../../experiments/experiment.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -35,12 +36,9 @@ export const batchRecordRouter = createTRPCRouter({
       const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;
 
-      const experiment = await prisma.experiment.findFirst({
-        where: {
-          projectId,
-          slug: experimentSlug,
-          archivedAt: null,
-        },
+      const experiment = await ExperimentService.create(prisma).findBySlug({
+        projectId,
+        slug: experimentSlug,
       });
 
       if (!experiment) {
