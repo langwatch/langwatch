@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TEST_FIRE_NOTICE } from "../banner";
+import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults";
 import { renderTriggerSlack } from "../renderSlack";
 import { makeContext } from "./fixtures";
 
@@ -39,6 +40,21 @@ describe("renderTriggerSlack", () => {
       });
       expect(asText(slack.payload)).toBe("Alert for Acme: High latency");
       expect(slack.usedDefault).toBe(false);
+    });
+  });
+
+  describe("when the framework default Block Kit template is rendered", () => {
+    it("produces a valid blocks payload (no JSON syntax errors)", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+        context: makeContext(),
+      });
+      const blocks = asBlocks(slack.payload);
+      expect(slack.usedDefault).toBe(false);
+      expect(slack.errors).toEqual([]);
+      expect(blocks.length).toBeGreaterThan(0);
+      expect(blocks[0]?.type).toBe("header");
     });
   });
 

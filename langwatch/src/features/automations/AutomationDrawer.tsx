@@ -1,4 +1,5 @@
-import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
+import { Box, Button, HStack, Heading, Spacer, Text } from "@chakra-ui/react";
+import { Mail } from "lucide-react";
 import type { TriggerAction } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/client";
@@ -69,8 +70,13 @@ function saveDisabledReason(
  */
 export function AutomationDrawer({
   automationId,
+  source,
 }: {
   automationId?: string;
+  /** Marker query param set by the email "Edit automation" footer link so the
+   *  drawer can surface a one-line landing banner. Any other value (or
+   *  undefined) renders the drawer normally. */
+  source?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -344,6 +350,7 @@ export function AutomationDrawer({
             </Heading>
           </Drawer.Header>
           <Drawer.Body>
+            {source === "email-link" ? <EmailLinkLandingBanner /> : null}
             <MainSectionList
               onTestFire={onTestFire}
               testFireLoading={testFire.isLoading}
@@ -398,5 +405,35 @@ export function AutomationDrawer({
         onDone={() => setSection(null)}
       />
     </>
+  );
+}
+
+/**
+ * One-line landing context for users who arrived here from the "Edit
+ * automation" link in a trigger email. Kept inline rather than as a toast
+ * because the user already changed page — a toast on a fresh load is easy
+ * to miss; a banner above the form gives them the orientation they need.
+ */
+function EmailLinkLandingBanner() {
+  return (
+    <Box
+      mb={3}
+      padding={3}
+      borderRadius="md"
+      border="1px solid"
+      borderColor="blue.200"
+      bg="blue.50"
+      _dark={{ borderColor: "blue.700", bg: "blue.950" }}
+    >
+      <HStack gap={2} align="start">
+        <Box color="blue.500" flexShrink={0} mt="2px">
+          <Mail size={16} />
+        </Box>
+        <Text textStyle="sm" color="fg">
+          Opened from an email notification. You're editing the automation
+          that produced that alert.
+        </Text>
+      </HStack>
+    </Box>
   );
 }

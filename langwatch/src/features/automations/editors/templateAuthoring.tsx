@@ -1,10 +1,12 @@
 import { Badge, Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef } from "react";
 import * as React from "react";
 import dynamic from "~/utils/compat/next-dynamic";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import { Link } from "~/components/ui/link";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   clearLiquidMarkers,
   LIQUID_JSON_LANGUAGE_ID,
@@ -246,9 +248,26 @@ export function CompactEmailPreview({
 
 type SlackBlock = Record<string, unknown>;
 
-/** Compact Slack preview — renders mrkdwn or Block Kit blocks inline,
- *  no border chrome. The "Open in Slack Block Kit Builder" link sits
- *  below as a thin row when blocks are present. */
+/** Name of the synced popup window. Reused across calls so a second click
+ *  re-points the existing popup instead of opening a new one. */
+const SYNCED_BUILDER_WINDOW_NAME = "lwBlockKitBuilder";
+
+/** Compact Slack preview — renders mrkdwn or Block Kit blocks inline, no
+ *  border chrome. For `block_kit` mode the inline render is honest about
+ *  being a rough approximation (our preview will never match Slack's actual
+ *  UI exactly); below it sit two ways to see the real thing:
+ *
+ *  - "Open in Block Kit Builder" — one-shot, fires `window.open` with the
+ *    current JSON. The popup is independent and won't update on further edits.
+ *  - "Open synced Block Kit Builder" — opens a named popup we keep a handle
+ *    to and re-navigate on every preview change. Slack's Block Kit Builder
+ *    reads the JSON from the URL fragment, so `popup.location.replace` with
+ *    the new fragment fires `hashchange` inside Slack's app and the rendered
+ *    blocks follow along. If the popup is closed, the next click reopens it.
+ *
+ *  An iframe would be ideal but Slack sets `X-Frame-Options: SAMEORIGIN`,
+ *  so cross-origin embedding is a non-starter. The popup is the closest
+ *  thing to a live preview we can actually have. */
 export function CompactSlackPreview({
   payload,
 }: {
@@ -259,6 +278,53 @@ export function CompactSlackPreview({
     const json = JSON.stringify({ blocks: payload.blocks });
     return `https://app.slack.com/block-kit-builder#${encodeURIComponent(json)}`;
   }, [payload]);
+
+  const syncedPopup = useRef<Window | null>(null);
+
+  // Keep the synced popup in step with the latest payload. If the user
+  // never opened it, this is a no-op. If they closed it, we drop the
+  // stale handle so the next click reopens a fresh window. Wrapped in
+  // try/catch because some browsers raise a SecurityError if the popup
+  // navigated to a page that briefly errored — we don't want a preview
+  // hiccup to crash the editor.
+  useEffect(() => {
+    if (!builderUrl) return;
+    const popup = syncedPopup.current;
+    if (!popup) return;
+    if (popup.closed) {
+      syncedPopup.current = null;
+      return;
+    }
+    try {
+      popup.location.replace(builderUrl);
+    } catch {
+      // Cross-origin navigation hiccup — user can click the button again.
+    }
+  }, [builderUrl]);
+
+  const openOnce = () => {
+    if (!builderUrl) return;
+    window.open(builderUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const openSynced = () => {
+    if (!builderUrl) return;
+    const existing = syncedPopup.current;
+    if (existing && !existing.closed) {
+      try {
+        existing.location.replace(builderUrl);
+      } catch {
+        // ignore — popup will be re-opened below if this throws repeatedly
+      }
+      existing.focus();
+      return;
+    }
+    syncedPopup.current = window.open(
+      builderUrl,
+      SYNCED_BUILDER_WINDOW_NAME,
+      "width=1200,height=900,noopener=no,noreferrer=no",
+    );
+  };
 
   return (
     <VStack align="stretch" gap={2}>
@@ -282,9 +348,27 @@ export function CompactSlackPreview({
         )}
       </Box>
       {builderUrl ? (
-        <Link href={builderUrl} isExternal color="orange.400" textStyle="xs">
-          Open in Slack Block Kit Builder
-        </Link>
+        <HStack gap={2} align="center" flexWrap="wrap">
+          <Tooltip
+            content="Opens Slack's Block Kit Builder in a new tab with this template's current JSON. Standalone — won't track further edits."
+            positioning={{ placement: "top" }}
+          >
+            <Button size="xs" variant="outline" onClick={openOnce}>
+              <ExternalLink size={12} /> Open in Block Kit Builder
+            </Button>
+          </Tooltip>
+          <Tooltip
+            content="Opens Slack's Block Kit Builder in a popup window that follows your edits. Slack reads the JSON from the URL fragment, so changes here re-point the popup live. Closing the popup is fine — the next click reopens it."
+            positioning={{ placement: "top" }}
+          >
+            <Button size="xs" variant="outline" onClick={openSynced}>
+              <Link2 size={12} /> Open synced Block Kit Builder
+            </Button>
+          </Tooltip>
+          <Text textStyle="xs" color="fg.muted">
+            Slack blocks iframes — popup is as close to live as we can get.
+          </Text>
+        </HStack>
       ) : null}
     </VStack>
   );

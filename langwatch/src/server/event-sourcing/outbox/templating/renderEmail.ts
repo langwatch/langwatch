@@ -67,6 +67,10 @@ export async function renderTriggerEmail({
   const html = wrapEmailHtml({
     bodyHtml: markdownToEmailHtml(bodyRender.output),
     prefixHtml: testFire ? testFireEmailCalloutHtml() : "",
+    footer: {
+      projectUrl: context.project.url,
+      editUrl: context.trigger.editUrl,
+    },
   });
 
   const errors = [subjectRender.error, bodyRender.error].filter(

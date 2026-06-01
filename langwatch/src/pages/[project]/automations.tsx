@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
 import { Bell, Edit2, Filter, MoreVertical, Plus, Trash } from "react-feather";
+import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
@@ -112,18 +113,10 @@ function Automations() {
     );
   };
 
-  const triggerActionName = (action: TriggerAction) => {
-    switch (action) {
-      case "SEND_SLACK_MESSAGE":
-        return "Slack";
-      case "SEND_EMAIL":
-        return "Email";
-      case "ADD_TO_DATASET":
-        return "Add to dataset";
-      case "ADD_TO_ANNOTATION_QUEUE":
-        return "Add to annotation queue";
-    }
-  };
+  // Pull from the provider registry so adding a new TriggerAction doesn't
+  // need a parallel switch here.
+  const triggerActionName = (action: TriggerAction) =>
+    CLIENT_PROVIDERS[action]?.shared.label ?? action;
 
   interface ActionParams {
     slackWebhook?: string;

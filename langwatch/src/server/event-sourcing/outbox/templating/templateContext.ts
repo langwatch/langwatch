@@ -29,9 +29,12 @@ export interface TemplateTriggerVars {
   message: string;
   alertType: AlertType | null;
   /** Deep link to the automation's edit page — `{{ project.url }}/automations`
-   *  with a query param the page expands to open the drawer in edit mode.
-   *  Used by the default email footer ("Click to edit this automation") so
-   *  authors don't have to remember the URL shape. */
+   *  with `drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`,
+   *  matching the query-param contract `useDrawer` consumes so navigation
+   *  lands on the Automations page with the edit drawer already open. The
+   *  `drawer.source=email-link` marker lets the drawer surface a small
+   *  "Opened from an email notification" banner so the operator has context
+   *  for why they're here. */
   editUrl: string;
 }
 
@@ -140,7 +143,7 @@ export function buildTemplateContext({
   return {
     trigger: {
       ...trigger,
-      editUrl: `${projectUrl}/automations?edit=${trigger.id}`,
+      editUrl: `${projectUrl}/automations?drawer.open=automation&drawer.automationId=${trigger.id}&drawer.source=email-link`,
     },
     project: {
       name: project.name,

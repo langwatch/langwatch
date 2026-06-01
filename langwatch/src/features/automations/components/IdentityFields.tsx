@@ -1,16 +1,30 @@
-import { Field, HStack, Input, NativeSelect } from "@chakra-ui/react";
+import { createListCollection, Field, HStack, Input } from "@chakra-ui/react";
 import { AlertType } from "@prisma/client";
-import { useDraft } from "../state/selectors";
+import { useMemo } from "react";
+import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
+import { useDraft } from "../state/selectors";
 
 /**
  * Shared identity fields (name, alert type). Subscribes to the draft via
  * the store so it doesn't need props beyond styling. Updates dispatch
  * straight back into the store.
  */
+const ALERT_TYPE_OPTIONS = [
+  { value: "", label: "—" },
+  { value: AlertType.INFO, label: "Info" },
+  { value: AlertType.WARNING, label: "Warning" },
+  { value: AlertType.CRITICAL, label: "Critical" },
+];
+
 export function IdentityFields() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
+
+  const alertTypeCollection = useMemo(
+    () => createListCollection({ items: ALERT_TYPE_OPTIONS }),
+    [],
+  );
 
   return (
     <HStack align="start" gap={3}>
@@ -35,23 +49,27 @@ export function IdentityFields() {
             }
           />
         </Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={draft.alertType ?? ""}
-            onChange={(e) =>
-              dispatch({
-                type: "SET_ALERT_TYPE",
-                value: (e.target.value || null) as AlertType | null,
-              })
-            }
-          >
-            <option value="">—</option>
-            <option value="INFO">Info</option>
-            <option value="WARNING">Warning</option>
-            <option value="CRITICAL">Critical</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
+        <Select.Root
+          collection={alertTypeCollection}
+          value={[draft.alertType ?? ""]}
+          onValueChange={({ value }) =>
+            dispatch({
+              type: "SET_ALERT_TYPE",
+              value: (value[0] || null) as AlertType | null,
+            })
+          }
+        >
+          <Select.Trigger>
+            <Select.ValueText placeholder="—" />
+          </Select.Trigger>
+          <Select.Content>
+            {ALERT_TYPE_OPTIONS.map((opt) => (
+              <Select.Item key={opt.value || "none"} item={opt}>
+                {opt.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
       </Field.Root>
     </HStack>
   );

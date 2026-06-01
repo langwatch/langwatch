@@ -103,24 +103,17 @@ export function notifyChannel(
   return isNotifyEntry(provider) ? provider.client.channel : null;
 }
 
+const EMPTY_TEMPLATES = {
+  emailSubjectTemplate: null,
+  emailBodyTemplate: null,
+  slackTemplate: null,
+  slackTemplateType: null,
+} as const;
+
 export function templatesFromDraft(draft: AutomationDraft) {
-  if (!draft.action) {
-    return {
-      emailSubjectTemplate: null,
-      emailBodyTemplate: null,
-      slackTemplate: null,
-      slackTemplateType: null,
-    };
-  }
+  if (!draft.action) return EMPTY_TEMPLATES;
   const provider = CLIENT_PROVIDERS[draft.action];
-  if (!isNotifyEntry(provider)) {
-    return {
-      emailSubjectTemplate: null,
-      emailBodyTemplate: null,
-      slackTemplate: null,
-      slackTemplateType: null,
-    };
-  }
+  if (!isNotifyEntry(provider)) return EMPTY_TEMPLATES;
   return provider.client.templatesFromSlice(draft.slices[draft.action]);
 }
 

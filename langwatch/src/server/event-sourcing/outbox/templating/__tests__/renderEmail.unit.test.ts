@@ -25,6 +25,29 @@ describe("renderTriggerEmail", () => {
         'href="https://app.langwatch.ai/acme/messages/trace_1"',
       );
     });
+
+    it("renders the chrome footer with the project + edit-automation links", async () => {
+      const email = await renderTriggerEmail({
+        subjectTemplate: null,
+        bodyTemplate: null,
+        context: makeContext(),
+      });
+      expect(email.html).toContain("Sent with");
+      expect(email.html).toContain("Edit automation");
+      expect(email.html).toContain('href="https://app.langwatch.ai/acme"');
+      expect(email.html).toContain(
+        'href="https://app.langwatch.ai/acme/automations?drawer.open=automation&drawer.automationId=trg_1&drawer.source=email-link"',
+      );
+    });
+
+    it("renders the chrome footer regardless of what the body template prints", async () => {
+      const email = await renderTriggerEmail({
+        subjectTemplate: null,
+        bodyTemplate: "Body content only.",
+        context: makeContext(),
+      });
+      expect(email.html).toContain("Edit automation");
+    });
   });
 
   describe("when a custom subject template is provided", () => {
