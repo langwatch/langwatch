@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Building2, Folder, History, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -61,11 +62,44 @@ const SCOPE_ICON: Record<ScopeChipPickerScopeType, typeof Building2> = {
   PROJECT: Folder,
 };
 
-const categoryCollection = createListCollection({
-  items: RETENTION_CATEGORIES.map((c) => ({
-    value: c,
-    label: CATEGORY_LABELS[c],
+// Retention is always stored in days, but the picker speaks human time. All
+// units round-trip through whole weeks so the resulting day count is always
+// a valid 7-multiple — 1 month = 4 weeks (28 days), 1 year = 52 weeks (364
+// days). This is the same calendar arithmetic ClickHouse partition pruning
+// expects.
+const DAYS_PER_UNIT = { weeks: 7, months: 28, years: 364 } as const;
+type RetentionUnit = keyof typeof DAYS_PER_UNIT;
+
+const RETENTION_UNIT_LABELS: Record<RetentionUnit, string> = {
+  weeks: "weeks",
+  months: "months",
+  years: "years",
+};
+
+const retentionUnitCollection = createListCollection({
+  items: (Object.keys(DAYS_PER_UNIT) as RetentionUnit[]).map((u) => ({
+    value: u,
+    label: RETENTION_UNIT_LABELS[u],
   })),
+});
+
+const RETENTION_PRESETS: Array<{ value: string; label: string; days: number }> =
+  [
+    { value: "49", label: "7 weeks", days: 49 },
+    { value: "91", label: "3 months", days: 91 },
+    { value: "182", label: "6 months", days: 182 },
+    { value: "364", label: "1 year", days: 364 },
+    { value: "728", label: "2 years", days: 728 },
+    { value: "1820", label: "5 years", days: 1820 },
+  ];
+
+const CUSTOM_PRESET_VALUE = "custom";
+
+const retentionPresetCollection = createListCollection({
+  items: [
+    ...RETENTION_PRESETS.map((p) => ({ value: p.value, label: p.label })),
+    { value: CUSTOM_PRESET_VALUE, label: "Custom…" },
+  ],
 });
 
 function formatBytes(bytes: number): string {
@@ -460,9 +494,12 @@ function DataRetentionPage({
             currentTeamId={teamId}
             currentProjectId={projectId}
             isSaving={setForScope.isLoading}
-            onSave={async (scopes, category, retentionDays) => {
+            onSave={async (scopes, categories, retentionDays) => {
+              const pairs = scopes.flatMap((scope) =>
+                categories.map((category) => ({ scope, category })),
+              );
               const results = await Promise.all(
-                scopes.map((scope) =>
+                pairs.map(({ scope, category }) =>
                   setForScope
                     .mutateAsync({
                       projectId,
@@ -669,13 +706,19 @@ function AddOverrideDrawer({
   isSaving: boolean;
   onSave: (
     scopes: ScopeChipPickerEntry[],
-    category: RetentionCategory,
+    categories: RetentionCategory[],
     retentionDays: number,
   ) => void;
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
-  const [category, setCategory] = useState<RetentionCategory>("traces");
-  const [days, setDays] = useState<string>(String(DEFAULT_RETENTION_DAYS));
+  const [categories, setCategories] = useState<RetentionCategory[]>([
+    ...RETENTION_CATEGORIES,
+  ]);
+  const [preset, setPreset] = useState<string>(
+    String(DEFAULT_RETENTION_DAYS),
+  );
+  const [customAmount, setCustomAmount] = useState<string>("");
+  const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
 
   useEffect(() => {
     if (open) {
@@ -686,18 +729,45 @@ function AddOverrideDrawer({
           ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
           : [],
       );
-      setCategory("traces");
-      setDays(String(DEFAULT_RETENTION_DAYS));
+      setCategories([...RETENTION_CATEGORIES]);
+      setPreset(String(DEFAULT_RETENTION_DAYS));
+      setCustomAmount("");
+      setCustomUnit("weeks");
     }
   }, [open, currentProjectId, available.projects]);
 
-  const daysNum = Number(days);
+  const resolvedDays = (() => {
+    if (preset === CUSTOM_PRESET_VALUE) {
+      const n = Number(customAmount);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return NaN;
+      return n * DAYS_PER_UNIT[customUnit];
+    }
+    return Number(preset);
+  })();
+
   const daysValid =
-    Number.isInteger(daysNum) &&
-    daysNum >= MIN_RETENTION_DAYS &&
-    daysNum <= MAX_RETENTION_DAYS &&
-    daysNum % RETENTION_WEEK_DAYS === 0;
-  const canSave = scopes.length > 0 && daysValid && !isSaving;
+    Number.isFinite(resolvedDays) &&
+    Number.isInteger(resolvedDays) &&
+    resolvedDays >= MIN_RETENTION_DAYS &&
+    resolvedDays <= MAX_RETENTION_DAYS &&
+    resolvedDays % RETENTION_WEEK_DAYS === 0;
+
+  const allCategoriesPicked = categories.length === RETENTION_CATEGORIES.length;
+
+  const toggleCategory = (cat: RetentionCategory, checked: boolean) => {
+    setCategories((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(cat);
+      else next.delete(cat);
+      return RETENTION_CATEGORIES.filter((c) => next.has(c));
+    });
+  };
+
+  const canSave =
+    scopes.length > 0 &&
+    categories.length > 0 &&
+    daysValid &&
+    !isSaving;
 
   return (
     <Drawer.Root
@@ -737,42 +807,89 @@ function AddOverrideDrawer({
             </VStack>
 
             <Field.Root>
-              <Field.Label>Category</Field.Label>
+              <Field.Label>Categories</Field.Label>
+              <VStack align="start" gap={2}>
+                <Checkbox
+                  checked={allCategoriesPicked}
+                  onCheckedChange={({ checked }) => {
+                    if (checked) setCategories([...RETENTION_CATEGORIES]);
+                    else setCategories([]);
+                  }}
+                >
+                  <Text fontWeight="600">All categories</Text>
+                </Checkbox>
+                {RETENTION_CATEGORIES.map((c) => (
+                  <Checkbox
+                    key={c}
+                    checked={categories.includes(c)}
+                    onCheckedChange={({ checked }) =>
+                      toggleCategory(c, checked === true)
+                    }
+                  >
+                    {CATEGORY_LABELS[c]}
+                  </Checkbox>
+                ))}
+              </VStack>
+            </Field.Root>
+
+            <Field.Root>
+              <Field.Label>Retention</Field.Label>
               <Select.Root
-                collection={categoryCollection}
-                value={[category]}
+                collection={retentionPresetCollection}
+                value={[preset]}
                 onValueChange={(details) => {
                   const v = details.value[0];
-                  if (v) setCategory(v as RetentionCategory);
+                  if (v) setPreset(v);
                 }}
               >
                 <Select.Trigger background="bg">
-                  <Select.ValueText placeholder="Select category" />
+                  <Select.ValueText placeholder="Pick a retention" />
                 </Select.Trigger>
                 <Select.Content>
-                  {categoryCollection.items.map((item) => (
+                  {retentionPresetCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
                   ))}
                 </Select.Content>
               </Select.Root>
-            </Field.Root>
-
-            <Field.Root invalid={days !== "" && !daysValid}>
-              <Field.Label>Retention (days)</Field.Label>
-              <Input
-                type="number"
-                min={MIN_RETENTION_DAYS}
-                max={MAX_RETENTION_DAYS}
-                step={RETENTION_WEEK_DAYS}
-                value={days}
-                onChange={(e) => setDays(e.target.value)}
-                width="200px"
-              />
+              {preset === CUSTOM_PRESET_VALUE && (
+                <HStack gap={2} marginTop={2} align="start">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    width="120px"
+                    placeholder="e.g. 8"
+                  />
+                  <Select.Root
+                    collection={retentionUnitCollection}
+                    value={[customUnit]}
+                    onValueChange={(details) => {
+                      const v = details.value[0] as RetentionUnit | undefined;
+                      if (v) setCustomUnit(v);
+                    }}
+                  >
+                    <Select.Trigger background="bg" width="140px">
+                      <Select.ValueText />
+                    </Select.Trigger>
+                    <Select.Content>
+                      {retentionUnitCollection.items.map((item) => (
+                        <Select.Item key={item.value} item={item}>
+                          {item.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </HStack>
+              )}
               <Field.HelperText>
-                Whole weeks only (multiples of {RETENTION_WEEK_DAYS} days),
-                between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS} days.
+                {preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
+                  ? `Stored as ${resolvedDays} days.`
+                  : preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid
+                    ? `Must be between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days.`
+                    : `Minimum ${MIN_RETENTION_DAYS} days (7 weeks). Retention is partition-aligned and rounded to whole weeks under the hood.`}
               </Field.HelperText>
             </Field.Root>
           </VStack>
@@ -786,7 +903,7 @@ function AddOverrideDrawer({
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
-              onClick={() => onSave(scopes, category, daysNum)}
+              onClick={() => onSave(scopes, categories, resolvedDays)}
             >
               Save
             </Button>
