@@ -1,7 +1,9 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { checkProjectPermission } from "../rbac";
 import { getApp } from "~/server/app-layer/app";
+import { PinnedToActiveShareError } from "~/server/data-retention/pinning/pinnedTrace.service";
 
 export const pinnedTraceRouter = createTRPCRouter({
   pin: protectedProcedure
@@ -31,10 +33,20 @@ export const pinnedTraceRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
-      await getApp().dataRetention.pinning.unpin({
-        projectId: input.projectId,
-        traceId: input.traceId,
-      });
+      try {
+        await getApp().dataRetention.pinning.unpin({
+          projectId: input.projectId,
+          traceId: input.traceId,
+        });
+      } catch (error) {
+        // Surfaces as a non-toast inline error in the UI (the PinButton also
+        // disables itself when source=share + share active, but we never
+        // trust the client; the route is the authoritative gate).
+        if (error instanceof PinnedToActiveShareError) {
+          throw new TRPCError({ code: "CONFLICT", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   getPin: protectedProcedure

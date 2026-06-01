@@ -362,7 +362,22 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     retentionPolicyCache,
   );
   const pinnedTraceRepo = new PinnedTraceRepository(prisma);
-  const pinnedTraceService = new PinnedTraceService(pinnedTraceRepo);
+  // Construct the share repo here (not inside ShareService) so the pinning
+  // service can ask "is this trace still shared?" without depending on
+  // ShareService — that would close the cycle: ShareService already depends
+  // on PinnedTraceService for auto(un)pin.
+  const shareRepo = new PrismaShareRepository(prisma);
+  const pinnedTraceService = new PinnedTraceService(
+    pinnedTraceRepo,
+    async ({ projectId, traceId }) => {
+      const share = await shareRepo.findByResource({
+        projectId,
+        resourceType: "TRACE",
+        resourceId: traceId,
+      });
+      return share !== null;
+    },
+  );
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
@@ -395,7 +410,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   };
 
   const share = traced(
-    new ShareService(new PrismaShareRepository(prisma), pinnedTraceService),
+    new ShareService(shareRepo, pinnedTraceService),
     "ShareService",
   );
 
