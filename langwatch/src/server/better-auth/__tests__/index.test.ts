@@ -47,6 +47,7 @@ describe("better-auth config", () => {
 
     /** @scenario Credentials-only on-prem mode */
     /** @scenario The BetterAuth admin plugin is intentionally omitted */
+    // Verifies that impersonation stays in Session.impersonating, not the admin() plugin.
     it("does not register the BetterAuth admin plugin", async () => {
       const { auth } = await import("../index");
       const options = (auth as any).options;
