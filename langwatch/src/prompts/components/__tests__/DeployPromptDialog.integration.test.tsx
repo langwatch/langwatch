@@ -105,7 +105,9 @@ vi.mock("~/components/ui/select", () => {
     "aria-label"?: string;
     [key: string]: unknown;
   }) => (
-    <div data-testid="select-root">
+    <div
+      data-testid="select-root"
+    >
       <select
         aria-label={rest["aria-label"] as string}
         value={value[0] ?? ""}
