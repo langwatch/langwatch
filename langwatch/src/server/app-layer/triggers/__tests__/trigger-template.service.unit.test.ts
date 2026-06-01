@@ -1,9 +1,14 @@
-import { AlertType } from "@prisma/client";
+import { AlertType, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
 } from "~/server/event-sourcing/outbox/templating/banner";
+import {
+  InvalidEmailRecipientError,
+  MissingAnnotatorError,
+  MissingSlackWebhookError,
+} from "../errors";
 import {
   type DraftIdentity,
   type DraftProject,
@@ -11,7 +16,9 @@ import {
   TestFireUnavailableError,
   type TriggerNotifier,
   TriggerTemplateService,
+  validateRecipientFormats,
   validateTemplateDraft,
+  validateUpsertActionParams,
 } from "../trigger-template.service";
 
 const BASE_HOST = "https://app.langwatch.ai";
@@ -66,6 +73,70 @@ describe("validateTemplateDraft", () => {
           emailBodyTemplate: "# {{ trigger.name }}",
           slackTemplateType: "string",
           slackTemplate: "Hi {{ project.name }}",
+        }),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("validateRecipientFormats", () => {
+  describe("when an address fails RFC shape", () => {
+    it("throws an invalid-recipient error carrying the offending address", () => {
+      expect(() =>
+        validateRecipientFormats(["ok@acme.test", "no-at-sign"]),
+      ).toThrowError(InvalidEmailRecipientError);
+    });
+  });
+
+  describe("when every address passes RFC shape", () => {
+    it("passes silently", () => {
+      expect(() =>
+        validateRecipientFormats(["a@acme.test", "b@acme.test"]),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("validateUpsertActionParams", () => {
+  describe("when SEND_EMAIL has an invalid recipient", () => {
+    it("throws an invalid-recipient error", () => {
+      expect(() =>
+        validateUpsertActionParams({
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: { members: ["broken"] },
+        }),
+      ).toThrowError(InvalidEmailRecipientError);
+    });
+  });
+
+  describe("when SEND_SLACK_MESSAGE has no webhook", () => {
+    it("throws a missing-webhook error", () => {
+      expect(() =>
+        validateUpsertActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: {},
+        }),
+      ).toThrowError(MissingSlackWebhookError);
+    });
+  });
+
+  describe("when ADD_TO_ANNOTATION_QUEUE has no annotators", () => {
+    it("throws a missing-annotator error", () => {
+      expect(() =>
+        validateUpsertActionParams({
+          action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+          actionParams: { annotators: [] },
+        }),
+      ).toThrowError(MissingAnnotatorError);
+    });
+  });
+
+  describe("when the action's required params are present", () => {
+    it("passes silently", () => {
+      expect(() =>
+        validateUpsertActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: { slackWebhook: "https://hooks.slack.com/T/B/X" },
         }),
       ).not.toThrow();
     });
@@ -249,6 +320,25 @@ describe("TriggerTemplateService", () => {
           }),
         ).rejects.toBeInstanceOf(TestFireUnavailableError);
         expect(sentSlack).toHaveLength(0);
+      });
+    });
+
+    describe("when the channel is email and a recipient is malformed", () => {
+      it("rejects before dispatching to the notifier", async () => {
+        const { notifier, sentEmails } = makeNotifier();
+        const service = makeService(notifier);
+
+        await expect(
+          service.testFire({
+            channel: "email",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: ["a@acme.test", "not-an-email"],
+            webhook: null,
+          }),
+        ).rejects.toBeInstanceOf(InvalidEmailRecipientError);
+        expect(sentEmails).toHaveLength(0);
       });
     });
   });

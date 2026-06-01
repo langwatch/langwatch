@@ -1,7 +1,11 @@
+import { generate as ksuid } from "@langwatch/ksuid";
+import type { Trigger } from "@prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { TtlCache } from "~/server/utils/ttlCache";
 import type {
   TriggerRepository,
   TriggerSummary,
+  TriggerUpsertInput,
 } from "./repositories/trigger.repository";
 
 export class TriggerService {
@@ -47,6 +51,35 @@ export class TriggerService {
     projectId: string,
   ): Promise<void> {
     return this.repo.updateLastRunAt(triggerId, projectId);
+  }
+
+  /**
+   * Authoring counterpart to the runtime methods above. Validation guards
+   * (template syntax, action params, license enforcement) belong upstream —
+   * this method assumes the payload has already cleared them and is
+   * responsible only for the persistence shape + cache invalidation. A
+   * KSUID is minted here on create so callers don't reach for an id
+   * generator of their own.
+   */
+  async upsertTrigger(params: {
+    projectId: string;
+    triggerId: string | null;
+    data: TriggerUpsertInput;
+  }): Promise<Trigger> {
+    const trigger = params.triggerId
+      ? await this.repo.update({
+          triggerId: params.triggerId,
+          projectId: params.projectId,
+          data: params.data,
+        })
+      : await this.repo.create({
+          id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+          projectId: params.projectId,
+          data: params.data,
+        });
+
+    await this.invalidate(params.projectId);
+    return trigger;
   }
 
   async invalidate(projectId: string): Promise<void> {

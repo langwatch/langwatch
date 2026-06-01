@@ -1,4 +1,5 @@
-import type { AlertType } from "@prisma/client";
+import { TriggerAction, type AlertType } from "@prisma/client";
+import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import {
   DEFAULT_EMAIL_BODY_TEMPLATE,
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
@@ -22,6 +23,9 @@ import {
 } from "~/server/event-sourcing/outbox/templating/templateContext";
 import { validateLiquid } from "~/server/event-sourcing/outbox/templating/validate";
 import {
+  InvalidEmailRecipientError,
+  MissingAnnotatorError,
+  MissingSlackWebhookError,
   TemplateValidationError,
   TestFireUnavailableError,
 } from "./errors";
@@ -124,6 +128,55 @@ function normalizeSlackType(raw: string | null | undefined): SlackTemplateType |
   if (raw === "block_kit") return "block_kit";
   if (raw === "string") return "string";
   return null;
+}
+
+/**
+ * Validates email recipient addresses by RFC shape. Used by both the upsert
+ * (action-param) path and the test-fire path so the rules are guaranteed
+ * identical regardless of which transport calls the service.
+ */
+export function validateRecipientFormats(recipients: string[]): void {
+  for (const email of recipients) {
+    if (!EMAIL_RX.test(email)) {
+      throw new InvalidEmailRecipientError(email);
+    }
+  }
+}
+
+/**
+ * Per-action guards applied at upsert time. Each branch enforces the
+ * minimum contract the action's runtime dispatch requires (recipients,
+ * webhook, annotators). Lives next to the template-validation guard so
+ * a single service call covers every shape check the save path needs.
+ */
+export function validateUpsertActionParams(params: {
+  action: TriggerAction;
+  actionParams: {
+    members?: string[];
+    slackWebhook?: string;
+    annotators?: { id: string; name: string }[];
+  };
+}): void {
+  const { action, actionParams } = params;
+  if (
+    action === TriggerAction.SEND_EMAIL &&
+    actionParams.members &&
+    actionParams.members.length > 0
+  ) {
+    validateRecipientFormats(actionParams.members);
+  }
+  if (
+    action === TriggerAction.SEND_SLACK_MESSAGE &&
+    !actionParams.slackWebhook
+  ) {
+    throw new MissingSlackWebhookError();
+  }
+  if (
+    action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+    (!actionParams.annotators || actionParams.annotators.length === 0)
+  ) {
+    throw new MissingAnnotatorError();
+  }
 }
 
 /**
@@ -253,6 +306,7 @@ export class TriggerTemplateService {
           "This automation has no email recipients to test-fire to.",
         );
       }
+      validateRecipientFormats(recipients);
       const rendered = await renderTriggerEmail({
         subjectTemplate: draft.emailSubjectTemplate ?? null,
         bodyTemplate: draft.emailBodyTemplate ?? null,

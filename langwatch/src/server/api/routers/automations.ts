@@ -6,16 +6,12 @@ import { z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import {
-  InvalidEmailRecipientError,
-  MissingAnnotatorError,
-  MissingSlackWebhookError,
-  ProjectNotFoundError,
-} from "~/server/app-layer/triggers/errors";
-import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
+import { ProjectNotFoundError } from "~/server/app-layer/triggers/errors";
+import { slackWebhookUrlSchema } from "~/automations/providers/definitions/slack/shared";
 import {
   type DraftProject,
   validateTemplateDraft,
+  validateUpsertActionParams,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
@@ -23,7 +19,7 @@ import {
   triggerFiltersSchema,
   triggerFiltersPermissiveSchema,
 } from "../../filters/types";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, resolveProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
@@ -103,23 +99,6 @@ async function resolveProjectIdentity(projectId: string): Promise<DraftProject> 
   const project = await getApp().projects.getById(projectId);
   if (!project) throw new ProjectNotFoundError(projectId);
   return { name: project.name, slug: project.slug };
-}
-
-/**
- * Mirrors the team-membership check the create procedure already does: every
- * Recipients are validated by RFC shape only — external addresses are
- * intentionally allowed (Slack's "email to a channel" pattern). The UI
- * surfaces an "External" warning badge for non-team addresses.
- *
- * A future per-project "strict mode" flag will re-enable team-membership
- * enforcement via `RecipientNotInTeamError`; that gate is not in this PR.
- */
-function validateEmailRecipientFormats(recipients: string[]): void {
-  for (const email of recipients) {
-    if (!EMAIL_RX.test(email)) {
-      throw new InvalidEmailRecipientError(email);
-    }
-  }
 }
 
 export const automationRouter = createTRPCRouter({
@@ -413,7 +392,7 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("triggers:view"))
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       try {
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.renderPreview({
@@ -434,15 +413,15 @@ export const automationRouter = createTRPCRouter({
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
         recipients: z.string().array().default([]),
-        webhook: z.string().nullable().default(null),
+        // SSRF guard: only accept Slack-hosted webhook URLs (or null for the
+        // email channel). Anything else is rejected before it reaches
+        // `IncomingWebhook(...).send(...)`.
+        webhook: slackWebhookUrlSchema.nullable().default(null),
       }),
     )
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       try {
-        if (input.channel === "email") {
-          validateEmailRecipientFormats(input.recipients);
-        }
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
           channel: input.channel,
@@ -471,67 +450,56 @@ export const automationRouter = createTRPCRouter({
         templates: templateDraftSchema,
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    // Permission depends on whether this is a create or an update — pick the
+    // right scope by inspecting the input. `triggers:update` is *not* a
+    // create grant (e.g. a contributor who can tune an existing automation
+    // but isn't allowed to introduce new ones).
+    .use(async ({ ctx, input, next }) => {
+      const required = input.triggerId ? "triggers:update" : "triggers:create";
+      const { permitted } = await resolveProjectPermission(
+        ctx,
+        input.projectId,
+        required,
+      );
+      if (!permitted) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to access this project resource",
+        });
+      }
+      return next();
+    })
     .mutation(async ({ ctx, input }) => {
       try {
         validateTemplateDraft(input.templates);
-        if (
-          input.action === TriggerAction.SEND_EMAIL &&
-          input.actionParams.members &&
-          input.actionParams.members.length > 0
-        ) {
-          validateEmailRecipientFormats(input.actionParams.members);
-        }
-        if (
-          input.action === TriggerAction.SEND_SLACK_MESSAGE &&
-          !input.actionParams.slackWebhook
-        ) {
-          throw new MissingSlackWebhookError();
-        }
-        if (
-          input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
-          (!input.actionParams.annotators ||
-            input.actionParams.annotators.length === 0)
-        ) {
-          throw new MissingAnnotatorError();
-        }
+        validateUpsertActionParams({
+          action: input.action,
+          actionParams: input.actionParams,
+        });
       } catch (err) {
         throw toTemplateTRPCError(err);
       }
 
-      const data = {
-        name: input.name,
-        action: input.action,
-        alertType: input.alertType ?? null,
-        message: input.message ?? null,
-        filters: JSON.stringify(input.filters),
-        customGraphId: input.customGraphId ?? null,
-        actionParams: input.actionParams,
-        slackTemplateType: input.templates.slackTemplateType ?? null,
-        slackTemplate: input.templates.slackTemplate ?? null,
-        emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-        emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-      };
-
-      let trigger;
-      if (input.triggerId) {
-        trigger = await ctx.prisma.trigger.update({
-          where: { id: input.triggerId, projectId: input.projectId },
-          data,
-        });
-      } else {
+      if (!input.triggerId) {
         await enforceLicenseLimit(ctx, input.projectId, "automations");
-        trigger = await ctx.prisma.trigger.create({
-          data: {
-            id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-            projectId: input.projectId,
-            lastRunAt: new Date().getTime(),
-            ...data,
-          },
-        });
       }
 
-      await getApp().triggers.invalidate(input.projectId);
-      return trigger;
+      return getApp().triggers.upsertTrigger({
+        projectId: input.projectId,
+        triggerId: input.triggerId ?? null,
+        data: {
+          name: input.name,
+          action: input.action,
+          alertType: input.alertType ?? null,
+          message: input.message ?? null,
+          filters: JSON.stringify(input.filters),
+          customGraphId: input.customGraphId ?? null,
+          actionParams: input.actionParams,
+          slackTemplateType: input.templates.slackTemplateType ?? null,
+          slackTemplate: input.templates.slackTemplate ?? null,
+          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+        },
+      });
     }),
 });

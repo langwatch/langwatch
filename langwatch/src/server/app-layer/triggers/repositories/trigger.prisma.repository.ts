@@ -1,8 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Trigger } from "@prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 import type {
   TriggerRepository,
   TriggerSummary,
+  TriggerUpsertInput,
 } from "./trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
@@ -57,6 +58,40 @@ export class PrismaTriggerRepository implements TriggerRepository {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },
+    });
+  }
+
+  async create({
+    id,
+    projectId,
+    data,
+  }: {
+    id: string;
+    projectId: string;
+    data: TriggerUpsertInput;
+  }): Promise<Trigger> {
+    return this.prisma.trigger.create({
+      data: {
+        id,
+        projectId,
+        lastRunAt: Date.now(),
+        ...data,
+      },
+    });
+  }
+
+  async update({
+    triggerId,
+    projectId,
+    data,
+  }: {
+    triggerId: string;
+    projectId: string;
+    data: TriggerUpsertInput;
+  }): Promise<Trigger> {
+    return this.prisma.trigger.update({
+      where: { id: triggerId, projectId },
+      data,
     });
   }
 }

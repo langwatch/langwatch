@@ -1,6 +1,6 @@
 import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { TriggerAction, AlertType } from "@prisma/client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/client";
 import { type ConfigFormCtx, isNotifyEntry } from "~/automations/providers/types";
 import { Drawer } from "~/components/ui/drawer";
@@ -156,13 +156,25 @@ export function AutomationDrawer({
     [project?.name, project?.slug],
   );
 
-  // Live preview for the active notify channel.
+  // Live preview for the active notify channel. The transport is a query so
+  // the read-only nature is honest, but the inputs change on every keystroke
+  // — we debounce by snapshotting `previewInput` after the user pauses, and
+  // useQuery does the rest (cached per-key, no-op when key is null).
   const channel = notifyChannel(draft);
-  const preview = api.automation.previewTemplate.useMutation();
+  type PreviewInput = {
+    projectId: string;
+    channel: "email" | "slack";
+    trigger: { name: string; alertType: AlertType | null; message: string | null };
+    draft: ReturnType<typeof templatesFromDraft>;
+  };
+  const [previewInput, setPreviewInput] = useState<PreviewInput | null>(null);
   useEffect(() => {
-    if (!channel || !projectId || section !== "configuration") return;
+    if (!channel || !projectId || section !== "configuration") {
+      setPreviewInput(null);
+      return;
+    }
     const timer = setTimeout(() => {
-      preview.mutate({
+      setPreviewInput({
         projectId,
         channel,
         trigger: {
@@ -184,6 +196,19 @@ export function AutomationDrawer({
     draft.action,
     draft.slices,
   ]);
+  const preview = api.automation.previewTemplate.useQuery(
+    previewInput ?? {
+      projectId: "",
+      channel: "email" as const,
+      trigger: { name: "", alertType: null, message: null },
+      draft: {},
+    },
+    {
+      enabled: previewInput !== null,
+      refetchOnWindowFocus: false,
+      keepPreviousData: true,
+    },
+  );
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -313,7 +338,7 @@ export function AutomationDrawer({
       variables: scaffold.variables,
       example: scaffold.example,
       preview: preview.data as NotifyPreview | undefined,
-      previewLoading: preview.isLoading,
+      previewLoading: preview.isFetching,
     }),
     [
       projectId,
@@ -322,7 +347,7 @@ export function AutomationDrawer({
       scaffold.variables,
       scaffold.example,
       preview.data,
-      preview.isLoading,
+      preview.isFetching,
     ],
   );
 

@@ -4,13 +4,19 @@ import type { PreviewEnvelope, SharedDef } from "../../types";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 
+/** Reusable zod schema for an incoming Slack webhook URL. The host prefix
+ *  is the only thing standing between an authenticated tRPC mutation and
+ *  an SSRF — anywhere we accept a webhook URL from input must validate
+ *  with this. */
+export const slackWebhookUrlSchema = z
+  .string()
+  .url({ message: "Slack webhooks must be valid URLs." })
+  .startsWith("https://hooks.slack.com/", {
+    message: "Expected a Slack incoming webhook URL.",
+  });
+
 export const slackActionParamsSchema = z.object({
-  slackWebhook: z
-    .string()
-    .url({ message: "Slack webhooks must be valid URLs." })
-    .startsWith("https://hooks.slack.com/", {
-      message: "Expected a Slack incoming webhook URL.",
-    }),
+  slackWebhook: slackWebhookUrlSchema,
 });
 
 export type SlackActionParams = z.infer<typeof slackActionParamsSchema>;
