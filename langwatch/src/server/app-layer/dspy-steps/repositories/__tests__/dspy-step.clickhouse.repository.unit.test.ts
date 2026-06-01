@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import type { DspyStepData } from "../../types";
 import { DspyStepClickHouseRepository } from "../dspy-step.clickhouse.repository";
@@ -67,22 +68,22 @@ describe("DspyStepClickHouseRepository retention stamping", () => {
   });
 
   describe("given the project has no retention policy", () => {
-    it("stamps 0 (indefinite) on upsertStep", async () => {
+    it("stamps the platform default on upsertStep", async () => {
       const { repo, insertedRetentionDays } = setup(resolverReturning(null));
 
       await repo.upsertStep(makeStep());
 
-      expect(insertedRetentionDays()).toBe(0);
+      expect(insertedRetentionDays()).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 
   describe("given no retention resolver is wired", () => {
-    it("falls back to 0 (indefinite)", async () => {
+    it("falls back to the platform default", async () => {
       const { repo, insertedRetentionDays } = setup(null);
 
       await repo.upsertStep(makeStep());
 
-      expect(insertedRetentionDays()).toBe(0);
+      expect(insertedRetentionDays()).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveScopeChain } from "../../scopes/resolveScopeChain";
 import { type RetentionRow, resolveRetention } from "../resolveRetentionDays";
-import { DEFAULT_RETENTION_DAYS } from "../retentionPolicy.schema";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../retentionPolicy.schema";
 
 const CHAIN = resolveScopeChain({
   organizationId: "org-1",
@@ -84,8 +84,8 @@ describe("resolveRetention", () => {
         rows: [row("PROJECT", "proj-1", "traces", 91)],
         chain: CHAIN,
       });
-      expect(resolved.scenarios).toBe(DEFAULT_RETENTION_DAYS);
-      expect(resolved.experiments).toBe(DEFAULT_RETENTION_DAYS);
+      expect(resolved.scenarios).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
+      expect(resolved.experiments).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 
@@ -95,7 +95,7 @@ describe("resolveRetention", () => {
         rows: [row("PROJECT", "other-project", "traces", 91)],
         chain: CHAIN,
       });
-      expect(resolved.traces).toBe(DEFAULT_RETENTION_DAYS);
+      expect(resolved.traces).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 });

@@ -1,13 +1,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
 import { createTenantId } from "../../domain/tenantId";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickHouse";
-import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
 
 /**
  * @scenario Trace pipeline stamps _retention_days from traces category
- * @scenario No retention policy defaults to indefinite
+ * @scenario No retention policy defaults to the platform default
  * @see specs/data-retention/ingestion-stamping.feature
  *
  * event_log is the source of truth for trace-pipeline events. If the retention
@@ -75,7 +76,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   });
 
   describe("when no resolver is wired (e.g. tests)", () => {
-    it("falls back to _retention_days = 0 (indefinite)", async () => {
+    it("falls back to the platform default", async () => {
       const store = new EventStoreClickHouse(
         new EventRepositoryClickHouse(async () => mockClient),
       );
@@ -85,12 +86,12 @@ describe("EventStoreClickHouse retention stamping", () => {
       const values = insertSpy.mock.calls[0]![0]!.values as Array<{
         _retention_days: number;
       }>;
-      expect(values[0]!._retention_days).toBe(0);
+      expect(values[0]!._retention_days).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 
   describe("when the tenant has no policy configured", () => {
-    it("falls back to _retention_days = 0", async () => {
+    it("falls back to the platform default", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue(null),
       };
@@ -104,7 +105,7 @@ describe("EventStoreClickHouse retention stamping", () => {
       const values = insertSpy.mock.calls[0]![0]!.values as Array<{
         _retention_days: number;
       }>;
-      expect(values[0]!._retention_days).toBe(0);
+      expect(values[0]!._retention_days).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
     });
   });
 });

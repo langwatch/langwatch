@@ -7,6 +7,12 @@ import {
 import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 
 describe("buildRetentionTTLExpression", () => {
+  // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
+  // every row carries a finite retention (308 migration default for pre-column
+  // rows, 49+ for new inserts), so 0 should never occur. But the guard MUST
+  // stay — without it a stray 0 evaluates to anchor + toIntervalDay(0) = the
+  // anchor date (in the past) and the row is deleted on the next merge. The
+  // guard maps 0 to the far-future 2106-01-01 sentinel instead.
   describe("when retentionTTLColumn is set", () => {
     it("builds correct IF expression for DateTime columns", () => {
       const config = TABLE_TTL_CONFIG.find((c) => c.table === "stored_spans")!;

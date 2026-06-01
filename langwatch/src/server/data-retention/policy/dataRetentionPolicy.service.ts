@@ -1,8 +1,9 @@
 import type { RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
-import type {
-  ResolvedRetention,
-  RetentionCategory,
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  type ResolvedRetention,
+  type RetentionCategory,
 } from "../retentionPolicy.schema";
 import type { RetentionPolicyCache } from "../retentionPolicyCache";
 import type { DataRetentionPolicyRepository } from "./dataRetentionPolicy.repository";
@@ -18,13 +19,22 @@ export class DataRetentionPolicyService {
   ) {}
 
   /**
-   * The effective per-category retention a project resolves to today (0 =
-   * indefinite). Walks PROJECT → TEAM → ORGANIZATION, most-specific-wins.
+   * The effective per-category retention a project resolves to today. Walks
+   * PROJECT → TEAM → ORGANIZATION, most-specific-wins. When the project has no
+   * resolvable scope context the cache returns null; we fall back to the
+   * platform default rather than 0, because retention is default-on (absence of
+   * an override means "use the platform default", not "keep indefinitely").
    * Delegates to the cache so the resolution path has a single definition.
    */
   async getResolvedForProject(projectId: string): Promise<ResolvedRetention> {
     const resolved = await this.retentionPolicyCache.resolve(projectId);
-    return resolved ?? { traces: 0, scenarios: 0, experiments: 0 };
+    return (
+      resolved ?? {
+        traces: PLATFORM_DEFAULT_RETENTION_DAYS,
+        scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
+        experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
+      }
+    );
   }
 
   /** Every retention override row in the organization (unfiltered). */

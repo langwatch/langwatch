@@ -1,24 +1,25 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
 	classifyClickHouseError,
 	SecurityError,
 	StoreError,
 	ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
 import type {
 	Projection,
 	ProjectionStoreReadContext,
 	ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
-import { createLogger } from "../../../../../utils/logger";
 import type {
 	ExperimentRunState,
 	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
-import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
+import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -134,7 +135,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
-      _retention_days: 0,
+      // Placeholder; storeProjection / storeProjectionBatch overwrite this with
+      // the resolved retention (platform default when the tenant has none).
+      _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
@@ -265,7 +268,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       );
 
       const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
-      projectionRecord._retention_days = retentionPolicy?.experiments ?? 0;
+      projectionRecord._retention_days =
+        retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 
       await client.insert({
         table: TABLE_NAME,
@@ -318,7 +322,8 @@ export class ExperimentRunStateRepositoryClickHouse<
 
     try {
       const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
-      const retentionDays = retentionPolicy?.experiments ?? 0;
+      const retentionDays =
+        retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
         const record = this.mapProjectionDataToClickHouseRecord(

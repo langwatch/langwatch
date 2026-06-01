@@ -2,9 +2,10 @@ import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import { TtlCache } from "../utils/ttlCache";
 import type { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repository";
 import { type RetentionRow, resolveRetention } from "./resolveRetentionDays";
-import type {
-  ResolvedRetention,
-  RetentionCategory,
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  type ResolvedRetention,
+  type RetentionCategory,
 } from "./retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "./retentionPolicyResolver";
 
@@ -39,7 +40,9 @@ export class RetentionPolicyCache implements RetentionPolicyResolver {
     category: RetentionCategory,
   ): Promise<number> {
     const resolved = await this.resolve(projectId);
-    return resolved?.[category] ?? 0;
+    // null = no resolvable scope context; retention is default-on, so fall back
+    // to the platform default rather than 0 (indefinite).
+    return resolved?.[category] ?? PLATFORM_DEFAULT_RETENTION_DAYS;
   }
 
   invalidate(projectId: string): void {

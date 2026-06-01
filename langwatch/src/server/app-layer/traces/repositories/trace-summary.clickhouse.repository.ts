@@ -1,5 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -34,7 +35,7 @@ export class TraceSummaryClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = 0): Promise<void> {
+  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.upsert",
@@ -309,7 +310,7 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     projectionId: string,
     version: string,
-    retentionDays = 0,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,

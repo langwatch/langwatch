@@ -1,12 +1,13 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
 import type {
-  DspyStepData,
-  DspyStepSummaryData,
   DspyExampleData,
   DspyLlmCallData,
+  DspyStepData,
+  DspyStepSummaryData,
 } from "../types";
 import type { DspyStepRepository } from "./dspy-step.repository";
 
@@ -92,18 +93,19 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   constructor(
     private readonly resolveClient: ClickHouseClientResolver,
     // dspy_steps is a traces-category retention table. Without a resolver the
-    // tenant's policy can't be read, so rows fall back to indefinite (0).
+    // tenant's policy can't be read, so rows fall back to the platform default.
     private readonly retentionResolver: RetentionPolicyResolver | null = null,
   ) {}
 
   /**
    * The tenant's resolved traces retention, stamped on every write so DSPy
-   * rows age out under the same policy as the rest of the trace family. 0
-   * (indefinite) when no resolver is wired or the project has no policy.
+   * rows age out under the same policy as the rest of the trace family.
+   * Retention is default-on, so a missing resolver or an unresolvable project
+   * falls back to the platform default rather than 0 (indefinite).
    */
   private async resolveTracesRetentionDays(tenantId: string): Promise<number> {
     const resolved = await this.retentionResolver?.resolve(tenantId);
-    return resolved?.traces ?? 0;
+    return resolved?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
   }
 
   /**

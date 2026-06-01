@@ -9,9 +9,11 @@ Feature: Data retention policy configuration
   # category at one scope (organization, team, or project), and a project
   # resolves the most-specific override that applies to it, walking
   # PROJECT -> TEAM -> ORGANIZATION. With no override anywhere in that chain,
-  # data is kept indefinitely. Categories resolve independently, so a project
-  # can keep traces for 91 days while scenarios inherit the team rule and
-  # experiments inherit the organization rule.
+  # data is kept for the platform default (49 days / 7 weeks) — retention is
+  # default-on, so absence of an override is NOT indefinite retention.
+  # Categories resolve independently, so a project can keep traces for 91 days
+  # while scenarios inherit the team rule and experiments inherit the
+  # organization rule.
   #
   # Retention is set in whole weeks (multiples of 7 days), because every
   # retention-managed table is partitioned weekly (toYearWeek).
@@ -19,10 +21,10 @@ Feature: Data retention policy configuration
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app" under that team
 
-  Scenario: A project with no override keeps data indefinitely
+  Scenario: A project with no override resolves to the platform default
     Given no retention override exists for the organization, the team, or the project
     When retention is resolved for project "web-app"
-    Then every category is kept indefinitely
+    Then every category resolves to the platform default of 49 days
 
   Scenario: An organization override applies to every project in the org
     Given an organization-level traces retention of 49 days for "acme"

@@ -1,14 +1,15 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event } from "../domain/types";
-import type { EventStoreReadContext } from "./eventStore.types";
 import { createLogger } from "../../../utils/logger/server";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import type { Event } from "../domain/types";
 import { AbstractEventStore } from "./abstractEventStore";
+import type { EventStoreReadContext } from "./eventStore.types";
 import type {
   EventRecord,
   EventRepository,
 } from "./repositories/eventRepository.types";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.
@@ -69,8 +70,11 @@ export class EventStoreClickHouse<
   }
 
   // event_log carries the trace category retention. Resolved once per batch
-  // from the tenant policy and stamped on every record; the repo's `?? 0`
-  // fallback then only applies when the resolver is missing (e.g. tests).
+  // from the tenant policy and stamped on every record. Retention is
+  // default-on: a tenant with no override resolves to the platform default, so
+  // we always stamp a concrete value rather than leaving the column to its
+  // migration default. When no resolver is wired (e.g. tests) we leave the
+  // field off and the repo's fallback stamps the platform default.
   protected override async enrichRecordsForStorage(
     records: EventRecord[],
     context: EventStoreReadContext<EventType>,
@@ -79,8 +83,7 @@ export class EventStoreClickHouse<
     const policy = await this.retentionPolicyResolver.resolve(
       String(context.tenantId),
     );
-    const retentionDays = policy?.traces ?? 0;
-    if (retentionDays === 0) return records;
+    const retentionDays = policy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     return records.map((r) => ({ ...r, _retention_days: retentionDays }));
   }
 }

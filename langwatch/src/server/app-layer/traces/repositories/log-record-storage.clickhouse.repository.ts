@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
@@ -15,7 +16,7 @@ export class LogRecordStorageClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertLogRecord(record: NormalizedLogRecord, retentionDays = 0): Promise<void> {
+  async insertLogRecord(record: NormalizedLogRecord, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: record.tenantId },
       "LogRecordStorageClickHouseRepository.insertLogRecord",

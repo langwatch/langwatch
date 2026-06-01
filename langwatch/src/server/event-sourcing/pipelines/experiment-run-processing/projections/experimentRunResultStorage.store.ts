@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createLogger } from "../../../../../utils/logger";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
@@ -32,7 +33,8 @@ export function createExperimentRunItemAppendStore(
         return;
       }
 
-      const retentionDays = context.retentionPolicy?.experiments ?? 0;
+      const retentionDays =
+        context.retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const recordWithRetention = {
         ...record,
         _retention_days: retentionDays,

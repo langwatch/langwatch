@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
+  PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
   retentionDaysSchema,
 } from "../retentionPolicy.schema";
@@ -63,5 +64,26 @@ describe("retentionDaysSchema", () => {
     it("rejects it", () => {
       expect(retentionDaysSchema.safeParse(49.5).success).toBe(false);
     });
+  });
+});
+
+describe("PLATFORM_DEFAULT_RETENTION_DAYS", () => {
+  // Stamped on every new row when a tenant has no override, and written into
+  // the UInt16 `_retention_days` column / weekly-partition TTL, so it has to
+  // obey the same bounds the schema enforces on a user-set override.
+  it("is a whole number of weeks", () => {
+    expect(PLATFORM_DEFAULT_RETENTION_DAYS % RETENTION_WEEK_DAYS).toBe(0);
+  });
+
+  it("sits within the allowed override range", () => {
+    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeGreaterThanOrEqual(
+      MIN_RETENTION_DAYS,
+    );
+    expect(PLATFORM_DEFAULT_RETENTION_DAYS).toBeLessThanOrEqual(
+      MAX_RETENTION_DAYS,
+    );
+    expect(
+      retentionDaysSchema.safeParse(PLATFORM_DEFAULT_RETENTION_DAYS).success,
+    ).toBe(true);
   });
 });

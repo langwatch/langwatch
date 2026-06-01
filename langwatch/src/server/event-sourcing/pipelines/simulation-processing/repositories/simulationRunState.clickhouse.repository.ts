@@ -1,18 +1,19 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
   classifyClickHouseError,
   SecurityError,
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
 import type {
   Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
-import { createLogger } from "../../../../../utils/logger";
 import type {
   SimulationRunState,
   SimulationRunStateData,
@@ -164,7 +165,9 @@ export class SimulationRunStateRepositoryClickHouse<
       CancellationRequestedAt: data.CancellationRequestedAt != null ? new Date(data.CancellationRequestedAt) : null,
       LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
-      _retention_days: 0,
+      // Placeholder; storeProjection / storeProjectionBatch overwrite this with
+      // the resolved retention (platform default when the tenant has none).
+      _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
@@ -301,7 +304,8 @@ export class SimulationRunStateRepositoryClickHouse<
       );
 
       const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
-      projectionRecord._retention_days = retentionPolicy?.scenarios ?? 0;
+      projectionRecord._retention_days =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 
       const client = await this.resolveClient(context.tenantId);
       await client.insert({
@@ -358,7 +362,8 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
-      const retentionDays = retentionPolicy?.scenarios ?? 0;
+      const retentionDays =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
         const record = this.mapProjectionDataToClickHouseRecord(

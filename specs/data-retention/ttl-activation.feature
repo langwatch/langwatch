@@ -11,11 +11,6 @@ Feature: ClickHouse TTL activation for data retention
     When ClickHouse evaluates the TTL expression during a background merge
     Then the row is deleted because StartTime + 49 days is in the past
 
-  Scenario: TTL expression preserves indefinite rows
-    Given a stored_spans row with _retention_days = 0
-    When ClickHouse evaluates the TTL expression during a background merge
-    Then the row is NOT deleted because the sentinel date is 2106-01-01
-
   Scenario: Retention TTL coexists with cold-storage tiering
     Given stored_spans has a cold-storage TTL of 49 days on EndTime
     When retention TTL is activated for stored_spans

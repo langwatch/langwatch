@@ -37,11 +37,25 @@ export const MAX_RETENTION_DAYS = 65534;
 export const DEFAULT_RETENTION_DAYS = MIN_RETENTION_DAYS;
 
 /**
- * The retention a data migration stamps onto pre-existing rows / seeds as the
- * org default when retention is first rolled out: ~10 months (44 weeks). It's
- * deliberately generous so the rollout never deletes data a customer didn't
- * opt into shrinking — distinct from the UI default, which starts at the
- * minimum.
+ * The retention actually stamped on a tenant's data when no override exists
+ * anywhere in its scope cascade: 7 weeks. Retention is default-on — absence of
+ * an override does NOT mean indefinite, it means "use the platform default".
+ * This is the value `resolveRetention` returns for an unconfigured category and
+ * the fallback every ingestion write path stamps when a resolved value is
+ * unavailable, so new rows are never silently left to the migration column
+ * default. Distinct from MIGRATION_DEFAULT_RETENTION_DAYS, which only
+ * grandfathers data that predates the column. Must stay a whole number of weeks
+ * (weekly partition key).
+ */
+export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+
+/**
+ * The ClickHouse `_retention_days` column DEFAULT (migration 00032): the value
+ * pre-existing rows read lazily because they were written before the column
+ * existed. ~10 months (44 weeks), deliberately generous so first rollout never
+ * shrinks data a customer didn't opt into shrinking. Distinct from
+ * PLATFORM_DEFAULT_RETENTION_DAYS (what new inserts are stamped) and from
+ * DEFAULT_RETENTION_DAYS (the UI's suggested starting value for a new override).
  */
 export const MIGRATION_DEFAULT_RETENTION_DAYS = 308;
 
