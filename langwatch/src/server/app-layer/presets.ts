@@ -351,7 +351,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const dataRetentionPolicyService = new DataRetentionPolicyService(
     dataRetentionPolicyRepo,
     retentionPolicyCache,
-    prisma,
   );
   const pinnedTraceRepo = new PinnedTraceRepository(prisma);
   const pinnedTraceService = new PinnedTraceService(pinnedTraceRepo);
@@ -746,7 +745,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
-      policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache, testPrisma),
+      policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache),
       pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),

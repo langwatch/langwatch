@@ -1,5 +1,6 @@
 import type { PrismaClient, RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
+import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
 import type { RetentionCategory } from "../retentionPolicy.schema";
 
@@ -116,6 +117,17 @@ export class DataRetentionPolicyRepository {
 
   async findById(id: string): Promise<RetentionPolicy | null> {
     return this.prisma.retentionPolicy.findUnique({ where: { id } });
+  }
+
+  /**
+   * Resolve the organization a (scopeType, scopeId) target belongs to.
+   * Wraps the generic scope resolver so the service can stay free of
+   * raw Prisma access.
+   */
+  async findOrganizationForScope(
+    scope: ScopeAssignment,
+  ): Promise<string | null> {
+    return resolveOrganizationForScope(this.prisma, scope);
   }
 
   /**

@@ -1,6 +1,5 @@
-import type { PrismaClient, RetentionPolicy } from "@prisma/client";
+import type { RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
-import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import type { RetentionPolicyCache } from "../retentionPolicyCache";
 import type {
   RetentionCategory,
@@ -16,7 +15,6 @@ export class DataRetentionPolicyService {
   constructor(
     private readonly repository: DataRetentionPolicyRepository,
     private readonly retentionPolicyCache: RetentionPolicyCache,
-    private readonly prisma: PrismaClient,
   ) {}
 
   /**
@@ -55,8 +53,7 @@ export class DataRetentionPolicyService {
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
-    const organizationId = await resolveOrganizationForScope(
-      this.prisma,
+    const organizationId = await this.repository.findOrganizationForScope(
       scope,
     );
     if (!organizationId) {
