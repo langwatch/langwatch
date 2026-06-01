@@ -74,7 +74,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts();
     // Only delete tags created by this test run to avoid interference with parallel runs
     await Promise.all(
       [...createdTagNames].map((name) =>

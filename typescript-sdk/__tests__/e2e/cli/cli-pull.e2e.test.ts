@@ -40,6 +40,7 @@ describe("CLI E2E", () => {
   let materializedPromptFileManagement: PromptFileManager;
   let lockFileManager: LockFileManager;
   let cli: CliRunner;
+  const createdHandles = new Set<string>();
 
   beforeAll(() => {
     if (fs.existsSync(TMP_BASE_DIR)) {
@@ -70,7 +71,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts([...createdHandles]);
   });
 
   describe("pull", () => {
@@ -85,6 +86,7 @@ describe("CLI E2E", () => {
           temperature: 0.9,
           prompt: "You are a helpful assistant.",
         });
+        createdHandles.add(promptHandle);
 
         const initResult = cli.run("prompt init");
         expectCliResultSuccess(initResult);
@@ -141,6 +143,7 @@ describe("CLI E2E", () => {
         temperature: 0.7,
         prompt: "Test prompt.",
       });
+      createdHandles.add(promptHandle);
 
       const initResult = cli.run("prompt init");
       expectCliResultSuccess(initResult);
