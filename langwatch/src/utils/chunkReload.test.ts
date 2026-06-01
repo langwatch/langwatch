@@ -130,4 +130,18 @@ describe("registerChunkReloadListener", () => {
       expect(reloaded()).toBe(true);
     });
   });
+
+  describe("when a second vite:preloadError fires within the cooldown", () => {
+    it("does not suppress the error so it can reach the error boundary", () => {
+      // Simulate a reload already having happened in this session.
+      sessionStorage.setItem(RELOAD_AT, "9999999999999");
+      registerChunkReloadListener();
+
+      const event = new Event("vite:preloadError", { cancelable: true });
+      window.dispatchEvent(event);
+
+      // No reload scheduled → Vite's error must NOT be preventDefault()'d.
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
 });

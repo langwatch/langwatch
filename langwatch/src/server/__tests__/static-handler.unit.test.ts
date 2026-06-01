@@ -132,6 +132,24 @@ describe("serveStaticOrFallback", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("text/html");
     });
+
+    it("serves the SPA shell with a revalidate Cache-Control so reloads pick up new chunks", async () => {
+      const res = await fetch(`${baseUrl}/projects/foo/traces`);
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
+  });
+
+  describe("when index.html is requested directly", () => {
+    it("serves it with a revalidate Cache-Control, not immutable", async () => {
+      const res = await fetch(`${baseUrl}/index.html`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html");
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
   });
 
   describe("when an asset path attempts traversal", () => {

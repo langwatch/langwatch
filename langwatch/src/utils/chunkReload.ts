@@ -70,8 +70,10 @@ export function reloadOnChunkError(err: unknown): boolean {
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
   window.addEventListener("vite:preloadError", (event) => {
-    // Stop Vite from rethrowing the error to the page; we recover by reloading.
-    event.preventDefault();
-    forceReloadOnce();
+    // Only suppress Vite's error when we actually scheduled a reload. If we're
+    // inside the cooldown (forceReloadOnce returns false), let the error
+    // propagate to the error boundary instead of swallowing it — otherwise the
+    // lazy import gets neither recovery nor the normal failure path.
+    if (forceReloadOnce()) event.preventDefault();
   });
 }
