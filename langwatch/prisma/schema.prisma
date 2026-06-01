@@ -705,6 +705,9 @@ model Trigger {
   slackTemplate        String?
   emailSubjectTemplate String?
   emailBodyTemplate    String?
+  // Per-trigger digest cadence; see ADR-025. Ignored for persist actions.
+  // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
+  notificationCadence  String        @default("immediate")
   TriggerSent   TriggerSent[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)

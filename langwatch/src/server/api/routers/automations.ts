@@ -7,6 +7,11 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import {
+  NOTIFICATION_CADENCES,
+  NOTIFY_TRIGGER_ACTIONS,
+  type NotificationCadence,
+} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   MissingSlackWebhookError,
@@ -33,6 +38,29 @@ const templateDraftSchema = z.object({
   emailSubjectTemplate: z.string().nullable().optional(),
   emailBodyTemplate: z.string().nullable().optional(),
 });
+
+const notificationCadenceSchema = z.enum(NOTIFICATION_CADENCES);
+
+// ADR-025: cadence applies to notify actions only. New notify triggers default
+// to a 5-minute digest (operator-friendly storm protection); persist actions
+// are pinned to immediate at the storage boundary so a stale value can't leak
+// into the dispatch path.
+function resolveCadenceForCreate(
+  action: TriggerAction,
+  requested: NotificationCadence | undefined,
+): NotificationCadence {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  return requested ?? "5min_digest";
+}
+
+function resolveCadenceForUpdate(
+  action: TriggerAction,
+  requested: NotificationCadence | undefined,
+): NotificationCadence | undefined {
+  if (requested === undefined) return undefined;
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  return requested;
+}
 
 const triggerIdentitySchema = z.object({
   name: z.string(),
@@ -129,6 +157,7 @@ export const automationRouter = createTRPCRouter({
         name: z.string(),
         action: z.nativeEnum(TriggerAction),
         filters: triggerFiltersSchema,
+        notificationCadence: notificationCadenceSchema.optional(),
         actionParams: z.object({
           createdByUserId: z.string().optional(),
           members: z.string().array().optional(),
@@ -218,6 +247,10 @@ export const automationRouter = createTRPCRouter({
           filters: JSON.stringify(input.filters),
           projectId: input.projectId,
           lastRunAt: new Date().getTime(),
+          notificationCadence: resolveCadenceForCreate(
+            input.action,
+            input.notificationCadence,
+          ),
         },
       });
 
@@ -409,6 +442,7 @@ export const automationRouter = createTRPCRouter({
         customGraphId: z.string().nullable().optional(),
         actionParams: actionParamsSchema,
         templates: templateDraftSchema,
+        notificationCadence: notificationCadenceSchema.optional(),
       }),
     )
     .use(checkProjectPermission("triggers:update"))
@@ -454,9 +488,18 @@ export const automationRouter = createTRPCRouter({
 
       let trigger;
       if (input.triggerId) {
+        const cadenceUpdate = resolveCadenceForUpdate(
+          input.action,
+          input.notificationCadence,
+        );
         trigger = await ctx.prisma.trigger.update({
           where: { id: input.triggerId, projectId: input.projectId },
-          data,
+          data: {
+            ...data,
+            ...(cadenceUpdate !== undefined
+              ? { notificationCadence: cadenceUpdate }
+              : {}),
+          },
         });
       } else {
         await enforceLicenseLimit(ctx, input.projectId, "automations");
@@ -465,6 +508,10 @@ export const automationRouter = createTRPCRouter({
             id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
             projectId: input.projectId,
             lastRunAt: new Date().getTime(),
+            notificationCadence: resolveCadenceForCreate(
+              input.action,
+              input.notificationCadence,
+            ),
             ...data,
           },
         });

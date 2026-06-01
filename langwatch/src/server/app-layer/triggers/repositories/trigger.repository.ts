@@ -1,4 +1,5 @@
 import type { AlertType, TriggerAction } from "@prisma/client";
+import type { NotificationCadence } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {
@@ -11,6 +12,7 @@ export interface TriggerSummary {
   alertType: AlertType | null;
   message: string | null;
   customGraphId: string | null;
+  notificationCadence: NotificationCadence;
 }
 
 export interface TriggerRepository {

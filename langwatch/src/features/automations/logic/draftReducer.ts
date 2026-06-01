@@ -7,6 +7,7 @@ import {
 } from "~/automations/providers/client";
 import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterField, FilterParam } from "~/hooks/useFilterParams";
+import type { NotificationCadence } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-028). Lives
@@ -32,6 +33,10 @@ export interface AutomationDraft {
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
+  /** Per-trigger digest cadence (ADR-025). Ignored at storage and dispatch
+   *  time for persist actions, so the draft value can sit dormant while the
+   *  user is type-switching. */
+  notificationCadence: NotificationCadence;
   /** Per-provider slice — all present, so type-switching never loses the
    *  slice the user was on. */
   slices: AllSlices;
@@ -44,6 +49,7 @@ export type DraftAction =
   | { type: "SET_SOURCE"; value: ConditionSource }
   | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
+  | { type: "SET_CADENCE"; value: NotificationCadence }
   | {
       type: "SET_SLICE";
       action: TriggerAction;
@@ -58,6 +64,10 @@ export const INITIAL_DRAFT: AutomationDraft = {
   source: "trace",
   filters: {},
   customGraphId: null,
+  // Matches the app-layer create-default for notify triggers (ADR-025).
+  // Persist actions ignore this at the router boundary, so leaving it set
+  // here while the user is picking an action is safe.
+  notificationCadence: "5min_digest",
   slices: initialSlices(),
 };
 
@@ -85,6 +95,8 @@ export function reducer(
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
       return { ...state, filters: action.value };
+    case "SET_CADENCE":
+      return { ...state, notificationCadence: action.value };
     case "SET_SLICE":
       return {
         ...state,

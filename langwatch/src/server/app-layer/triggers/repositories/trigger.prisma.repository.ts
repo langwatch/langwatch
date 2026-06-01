@@ -1,4 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
+import {
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import type { TriggerFilters } from "~/server/filters/types";
 import type {
   TriggerRepository,
@@ -21,6 +25,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
         alertType: true,
         message: true,
         customGraphId: true,
+        notificationCadence: true,
       },
     });
 
@@ -28,6 +33,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
       ...t,
       actionParams: t.actionParams ?? {},
       filters: parseFilters(t.filters),
+      notificationCadence: parseCadence(t.notificationCadence),
     }));
   }
 
@@ -73,4 +79,13 @@ function parseFilters(raw: unknown): TriggerFilters {
     return raw as TriggerFilters;
   }
   return {};
+}
+
+// Defensive narrow: column is a free-form TEXT so an upstream write of an
+// unknown value (e.g. a future cadence not yet shipped) must not throw —
+// fall back to "immediate" so the trigger keeps firing.
+function parseCadence(raw: string): NotificationCadence {
+  return (NOTIFICATION_CADENCES as readonly string[]).includes(raw)
+    ? (raw as NotificationCadence)
+    : "immediate";
 }

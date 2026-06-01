@@ -28,6 +28,10 @@ import {
 } from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import {
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
 import { FiltersSecondaryDrawer } from "./components/secondaries/FiltersSecondaryDrawer";
@@ -140,6 +144,12 @@ export function AutomationDrawer({
       source: row.customGraphId ? "customGraph" : "trace",
       customGraphId: row.customGraphId,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
+      // Defensive narrow: column is a free-form TEXT (see the repo parser).
+      notificationCadence: (NOTIFICATION_CADENCES as readonly string[]).includes(
+        row.notificationCadence,
+      )
+        ? (row.notificationCadence as NotificationCadence)
+        : "immediate",
       slices: {
         ...INITIAL_DRAFT.slices,
         [action]: provider.client.fromTriggerRow({
@@ -341,6 +351,7 @@ export function AutomationDrawer({
           draft.source === "customGraph" ? draft.customGraphId : null,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
+        notificationCadence: draft.notificationCadence,
       },
       {
         onSuccess: () => {

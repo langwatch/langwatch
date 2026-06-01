@@ -138,6 +138,7 @@ function createTrigger(
     alertType: "WARNING",
     message: "Evaluation passed",
     customGraphId: null,
+    notificationCadence: "immediate",
     ...overrides,
   };
 }

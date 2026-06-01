@@ -8,6 +8,7 @@ import {
   useDraft,
   useSummariseConditions,
 } from "../state/selectors";
+import { CadenceField } from "./CadenceField";
 import { IdentityFields } from "./IdentityFields";
 import { SectionRow } from "./SectionRow";
 import { TestFireSection } from "./TestFireSection";
@@ -77,6 +78,7 @@ export function MainSectionList({
         disabled={!draft.action}
         onClick={() => setSection("configuration")}
       />
+      <CadenceField />
       <TestFireSection loading={testFireLoading} onFire={onTestFire} />
     </VStack>
   );
