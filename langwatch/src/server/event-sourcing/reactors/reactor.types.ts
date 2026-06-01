@@ -20,6 +20,13 @@ export interface ReactorContext<FoldState = unknown> {
    * reactors can ignore it. Optional today so existing handlers and
    * test mocks don't need updating; framework call sites always pass
    * a defined value (live events get `false`).
+   *
+   * Phase 0 only: every call site in `ProjectionRouter` currently
+   * passes `false`. The replay-detection wiring (an `isReplay` flag
+   * on the event envelope or the projection runner) lands in Phase
+   * 1 alongside the `.withOutbox` reactor wrappers — see the
+   * "Replay short-circuits .withOutbox match after row retention has
+   * elapsed" scenario in specs/event-sourcing/reactor-outbox.feature.
    */
   isReplay?: boolean;
 }
