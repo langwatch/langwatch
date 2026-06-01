@@ -1,8 +1,8 @@
 # ADR-024: `.withOutbox` as a pipeline-builder primitive
 
-**Date:** 2026-05-28
+**Date:** 2026-05-28 (revised 2026-06-01 alongside [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md))
 
-**Status:** Accepted
+**Status:** Accepted (revised)
 
 ## Context
 
@@ -67,11 +67,14 @@ src/server/event-sourcing/
 The framework wrapper invoked by `.withOutbox` is responsible for:
 
 1. Wrapping `match` in `_originGuardedReactor` guards.
-2. Gating outbox row insertion on `TriggerSent.claimSend` (or equivalent reactor-defined claim).
-3. Writing rows via `createMany skipDuplicates`.
-4. Enqueueing a `GroupQueue` wakeup with the cadence-window delay and `extend: false` dedup.
+2. Gating queue enqueue on `TriggerSent.claimSend` (or equivalent reactor-defined claim).
+3. Calling `outboxDispatchQueue.send(payload, { delay: cadenceWindowMs, deduplication: { makeId: dedupKey, extend: false, replace: false } })`.
+
+   The queue's `PgOutboxAuditAdapter` writes the `ReactorOutbox` row via its `onEnqueue` hook ([ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) revision). There is **no** separate `createMany skipDuplicates` step in the wrapper — the queue's dedup config is the replay-safety mechanism, and the adapter mirrors the resulting transition to PG.
 
 The reactor author writes `match` and `dispatch`; everything else is provided.
+
+The wrapper itself is unchanged at the call-site level (reactor authors don't care which side of the queue/PG boundary writes the audit row), but the implementation behind it is queue-driven post-revision rather than PG-polled.
 
 ## Rationale
 

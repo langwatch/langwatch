@@ -1,8 +1,8 @@
-# ADR-022: Two-tier dedup — `TriggerSent` as match-claim, `ReactorOutbox` as dispatch state
+# ADR-022: Two-tier dedup — `TriggerSent` as match-claim, `ReactorOutbox` as dispatch audit
 
-**Date:** 2026-05-28
+**Date:** 2026-05-28 (revised 2026-06-01 alongside [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md))
 
-**Status:** Accepted
+**Status:** Accepted (revised)
 
 ## Context
 
@@ -14,7 +14,7 @@ The trigger dispatch path needs to answer two distinct questions:
 [ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) introduces `ReactorOutbox` for question 2. There's an obvious temptation to merge them — keep one table for "this trigger has fired" — but the two semantics behave differently:
 
 - `TriggerSent` is **domain** state, scoped to triggers, with the cross-pipeline race winner property baked in via the unique constraint.
-- `ReactorOutbox` is **framework** state, scoped per-reactor (the table will hold rows for `customerIoTraceSync`, future auditable reactors etc. in Phase 7), with dispatch lifecycle columns (status, attemptCount, leasedUntil, lastError).
+- `ReactorOutbox` is **framework** audit state, scoped per-reactor (the table will hold rows for `customerIoTraceSync`, future auditable reactors etc. in Phase 7), with the dispatch lifecycle columns operators query against (status, attemptCount, lastError, scheduledAt, dispatchedAt). Rows are maintained by the outbox queue's audit adapter ([ADR-021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) revision), not by application code — `leaseGroup` / `markDispatched` etc. are gone, the queue mirrors transitions through the adapter.
 
 A separate decision is how `ReactorOutbox` rows relate to matches and to digest windows. Two competing shapes:
 
@@ -28,15 +28,15 @@ Row-per-window seems compact but means 1000 simultaneous matches `UPDATE` the sa
 Keep **two separate tables** with distinct roles:
 
 - `TriggerSent` remains the **match-claim ledger**. Unchanged. Continues to serve as the cross-reactor race winner via its unique constraint.
-- `ReactorOutbox` is the **dispatch-state table**. Row-per-match (one row per match-subject for trigger outbox reactors). Unique constraint is `(reactorName, dedupKey)` where:
+- `ReactorOutbox` is the **dispatch audit table** — written exclusively by the queue's `PgOutboxAuditAdapter` on every lifecycle transition, read by operator surfaces. Row-per-match (one row per match-subject for trigger outbox reactors). Unique constraint is `(reactorName, dedupKey)` where:
   - Trace/evaluation triggers: `dedupKey = ${projectId}/${triggerId}:trace:${traceId}`.
   - Custom-graph alerts: `dedupKey = ${projectId}/${triggerId}:graph:${customGraphId}` (the subject is the graph, not a trace — alerts can re-fire across resolution cycles, so the dedupKey is scoped per claim, not lifetime).
 
   The `${projectId}/` prefix mirrors the `groupKey` convention from [ADR-023](./023-groupqueue-wakeup-pattern-for-outbox.md) and makes tenant scoping structural in the key itself — `triggerId` is a globally-unique cuid so the prefix isn't load-bearing for uniqueness, but it keeps every dedup/group identifier in the outbox layer self-describing for an operator scanning rows. The `:trace:` / `:graph:` discriminator keeps the two subject types in separate namespaces so a future trigger type cannot collide.
 
-Outbox row insertion is **gated on `TriggerSent` claim succeeding**: the reactor's match phase first calls `TriggerSent.claimSend`; only on a successful claim does it write the corresponding `ReactorOutbox` row.
+Outbox **queue enqueue** is **gated on `TriggerSent` claim succeeding**: the reactor's match phase first calls `TriggerSent.claimSend`; only on a successful claim does it call `outboxQueue.send(...)`, which then writes the corresponding `ReactorOutbox` audit row via the adapter's `onEnqueue` hook.
 
-Digest grouping is a **read-time concern**, not a write-time concern: when the outbox worker fires for a given trigger, it `SELECT … WHERE reactorName=X AND groupKey=Y AND status='queued' AND scheduledFor <= now()` (the indexed key defined in [ADR-023](./023-groupqueue-wakeup-pattern-for-outbox.md), with `groupKey = ${projectId}/${reactorName}:${triggerId}`) and batches whatever rows are returned into one dispatch call.
+Digest grouping is owned by the **queue**, not by an application-level `SELECT … FOR UPDATE`: the outbox dispatch queue uses `processBatch` + `coalesceMaxBatch` to fold same-`groupKey` jobs that are ready at the same time into a single dispatch invocation ([ADR-023](./023-groupqueue-wakeup-pattern-for-outbox.md) revision). The audit adapter then mirrors the batch's outcome to each individual row in PG.
 
 ## Rationale
 
