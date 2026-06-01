@@ -379,7 +379,7 @@ function DataRetentionPage({
       <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
         <HStack width="full" marginTop={2}>
           <Heading as="h2" fontSize="xl">
-            Data Retention
+            Data Retention Policies
           </Heading>
           <Spacer />
           <ScopeFilterComponent
@@ -412,7 +412,7 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
-        {snapshot && (snapshot.rules.length > 0 && scopeGroups.length === 0) ? (
+        {snapshot && snapshot.rules.length > 0 && scopeGroups.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
               <Text fontSize="sm" color="fg.muted" textAlign="center">
@@ -420,7 +420,7 @@ function DataRetentionPage({
               </Text>
             </Card.Body>
           </Card.Root>
-        ) : snapshot && (
+        ) : snapshot && scopeGroups.length > 0 && (
           <Card.Root width="full" overflow="hidden">
             <Card.Body paddingY={0} paddingX={0}>
               <Table.Root variant="line" size="md" width="full">
@@ -467,30 +467,6 @@ function DataRetentionPage({
                       </Table.Row>
                     );
                   })}
-                  <Table.Row
-                    bg="bg.subtle"
-                    fontWeight="medium"
-                  >
-                    <Table.Cell>
-                      <VStack align="start" gap={0}>
-                        <Text>
-                          {scopeGroups.length === 0
-                            ? "Platform default"
-                            : "Effective for this project"}
-                        </Text>
-                        {scopeGroups.length === 0 && (
-                          <Text fontSize="xs" color="fg.muted" fontWeight="normal">
-                            No overrides — applies to every category in this
-                            project.
-                          </Text>
-                        )}
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {renderPolicyValue(snapshot.effective)}
-                    </Table.Cell>
-                    <Table.Cell />
-                  </Table.Row>
                 </Table.Body>
               </Table.Root>
             </Card.Body>
@@ -505,10 +481,13 @@ function DataRetentionPage({
           isCancelling={killMutation.isLoading}
         />
 
-        <StorageUsageCard
-          isLoading={storageQuery.isLoading}
-          data={storageQuery.data}
-        />
+        {snapshot && (
+          <RetentionAndUsageCard
+            isLoading={storageQuery.isLoading}
+            data={storageQuery.data}
+            effective={snapshot.effective}
+          />
+        )}
 
         {available && (
           <AddOverrideDrawer
@@ -776,42 +755,53 @@ function ApplyToExistingConfirmDialog({
   );
 }
 
-function StorageUsageCard({
+function RetentionAndUsageCard({
   isLoading,
   data,
+  effective,
 }: {
   isLoading: boolean;
   data?: { totalBytes: number; byCategory: Record<RetentionCategory, number> };
+  effective: Partial<Record<RetentionCategory, number>>;
 }) {
   return (
     <Card.Root width="full">
       <Card.Header>
         <Heading as="h3" fontSize="lg">
-          Storage Usage
+          Data retention and usage
         </Heading>
         <Text fontSize="sm" color="fg.muted">
-          Current stored data size for this project.
+          The retention currently applied to this project, and the storage it
+          occupies today.
         </Text>
       </Card.Header>
       <Card.Body>
-        {isLoading ? (
-          <Spinner />
-        ) : data ? (
-          <VStack gap={3} align="stretch">
-            <HStack justifyContent="space-between">
-              <Text fontWeight="semibold">Total</Text>
-              <Text fontWeight="bold" fontSize="lg">
-                {formatBytes(data.totalBytes)}
-              </Text>
-            </HStack>
-            {RETENTION_CATEGORIES.map((category) => (
-              <HStack key={category} justifyContent="space-between">
-                <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                <Text>{formatBytes(data.byCategory[category])}</Text>
+        <VStack gap={3} align="stretch">
+          <HStack justifyContent="space-between">
+            <Text fontWeight="semibold">Data policy for this project</Text>
+            <Text fontWeight="bold" fontSize="lg">
+              {renderPolicyValue(effective)}
+            </Text>
+          </HStack>
+          {isLoading ? (
+            <Spinner />
+          ) : data ? (
+            <>
+              <HStack justifyContent="space-between">
+                <Text fontWeight="semibold">Total stored</Text>
+                <Text fontWeight="bold" fontSize="lg">
+                  {formatBytes(data.totalBytes)}
+                </Text>
               </HStack>
-            ))}
-          </VStack>
-        ) : null}
+              {RETENTION_CATEGORIES.map((category) => (
+                <HStack key={category} justifyContent="space-between">
+                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
+                  <Text>{formatBytes(data.byCategory[category])}</Text>
+                </HStack>
+              ))}
+            </>
+          ) : null}
+        </VStack>
       </Card.Body>
     </Card.Root>
   );
