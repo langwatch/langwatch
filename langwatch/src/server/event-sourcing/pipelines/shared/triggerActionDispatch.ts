@@ -25,19 +25,28 @@ const logger = createLogger("langwatch:trigger-action-dispatch");
  * - Persist actions write durable data the customer asked for; batching them
  *   would defeat the intent, so they always dispatch immediately.
  *
- * The two sets must together cover every TriggerAction value, with no overlap
- * (enforced by the unit test). A new action type must be classified here at the
- * point it is introduced.
+ * `satisfies Record<TriggerAction, …>` makes adding a TriggerAction without
+ * classifying it a build break — the runtime exhaustiveness test is defense
+ * in depth.
  */
-export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
-  TriggerAction.SEND_EMAIL,
-  TriggerAction.SEND_SLACK_MESSAGE,
-]);
+export type TriggerActionClass = "notify" | "persist";
 
-export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
-  TriggerAction.ADD_TO_DATASET,
-  TriggerAction.ADD_TO_ANNOTATION_QUEUE,
-]);
+export const TRIGGER_ACTION_CLASS = {
+  [TriggerAction.SEND_EMAIL]: "notify",
+  [TriggerAction.SEND_SLACK_MESSAGE]: "notify",
+  [TriggerAction.ADD_TO_DATASET]: "persist",
+  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: "persist",
+} as const satisfies Record<TriggerAction, TriggerActionClass>;
+
+const actionsInClass = (cls: TriggerActionClass): ReadonlySet<TriggerAction> =>
+  new Set(
+    (Object.entries(TRIGGER_ACTION_CLASS) as [TriggerAction, TriggerActionClass][])
+      .filter(([, c]) => c === cls)
+      .map(([action]) => action),
+  );
+
+export const NOTIFY_TRIGGER_ACTIONS = actionsInClass("notify");
+export const PERSIST_TRIGGER_ACTIONS = actionsInClass("persist");
 
 export const NOTIFICATION_CADENCES = [
   "immediate",

@@ -198,10 +198,12 @@ describe("alertTrigger reactor", () => {
   describe("when one of several matching triggers fails to dispatch", () => {
     it("still dispatches the remaining triggers", async () => {
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        createTrigger({ id: "trigger-before" }),
         createTrigger({ id: "trigger-failing" }),
-        createTrigger({ id: "trigger-ok" }),
+        createTrigger({ id: "trigger-after" }),
       ]);
       vi.mocked(sendTriggerEmail)
+        .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(
           new DispatchError({ message: "revoked", retryable: false }),
         )
@@ -210,10 +212,18 @@ describe("alertTrigger reactor", () => {
       const reactor = createAlertTriggerReactor(deps);
       await reactor.handle(createEvent(), createContext(createFoldState()));
 
-      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(2);
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(1);
+      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(3);
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(2);
       expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
-        "trigger-ok",
+        "trigger-before",
+        "tenant-1",
+      );
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
+        "trigger-after",
+        "tenant-1",
+      );
+      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalledWith(
+        "trigger-failing",
         "tenant-1",
       );
     });
