@@ -60,11 +60,10 @@ def _make_api_response_200(
 
 def _mock_sync_detailed_response(parsed, status_code=200):
     """Create a mock Response object wrapping a parsed model."""
-    from http import HTTPStatus
-    from langwatch.generated.langwatch_rest_api_client.types import Response
+    from langwatch.generated.langwatch_rest_api_client.types import Response, safe_http_status
 
     return Response(
-        status_code=HTTPStatus(status_code),
+        status_code=safe_http_status(status_code),
         content=json.dumps({}).encode() if parsed else b"",
         headers={},
         parsed=parsed,

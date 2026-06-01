@@ -13,6 +13,7 @@ from http import HTTPStatus
 import httpx
 import pytest
 
+from langwatch.generated.langwatch_rest_api_client import errors
 from langwatch.generated.langwatch_rest_api_client.api.default import (
     get_api_prompts_by_id,
 )
@@ -65,3 +66,13 @@ class TestBuildResponseWithNonStandardStatus:
 
         assert built.status_code is HTTPStatus.IM_A_TEAPOT
         assert built.parsed is None
+
+    def test_raises_unexpected_status_on_520_when_enabled(self) -> None:
+        """raise_on_unexpected_status=True must surface UnexpectedStatus(520), not ValueError."""
+        client = Client(base_url="https://example.com", raise_on_unexpected_status=True)
+        response = self._make_httpx_response(520)
+
+        with pytest.raises(errors.UnexpectedStatus) as exc_info:
+            get_api_prompts_by_id._build_response(client=client, response=response)
+
+        assert exc_info.value.status_code == 520
