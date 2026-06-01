@@ -66,6 +66,11 @@ interface SpanReceivedEventRow {
   EventVersion: string;
   EventPayload: string;
   IdempotencyKey?: string;
+  /** Test fixtures use deliberately backdated timestamps to verify long-term
+   *  durability of event_log. Stamp `_retention_days = 0` (the never-expire
+   *  sentinel) so the platform retention TTL doesn't immediately delete the
+   *  fixture rows on the next merge. */
+  _retention_days: number;
 }
 
 function buildSpanReceivedEventRow({
@@ -118,6 +123,7 @@ function buildSpanReceivedEventRow({
     EventVersion: "2025-01-01",
     EventPayload: JSON.stringify(payload),
     IdempotencyKey: eventId,
+    _retention_days: 0,
   };
 }
 
