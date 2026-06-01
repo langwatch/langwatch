@@ -683,6 +683,17 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
       select: { id: true },
     });
     experimentId = experiment?.id;
+  } else if (experimentId) {
+    // Independent of how we resolved the id, refuse to return results once
+    // the owning experiment is archived. Without this check the Redis-state
+    // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
+    // after archive while the slug-based fallback already returns 404, so
+    // archive visibility would silently depend on run age.
+    const stillLive = await prisma.experiment.findFirst({
+      where: { id: experimentId, projectId: project.id, archivedAt: null },
+      select: { id: true },
+    });
+    if (!stillLive) experimentId = undefined;
   }
 
   if (!experimentId) {
