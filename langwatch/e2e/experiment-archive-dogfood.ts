@@ -17,7 +17,7 @@
  * Run via:
  *   DATABASE_URL=postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_db?schema=public \
  *     BASE_URL=http://localhost:5571 \
- *     pnpm exec tsx e2e/auth-regression/experiment-archive-qa.ts
+ *     pnpm exec tsx e2e/experiment-archive-dogfood.ts
  */
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
