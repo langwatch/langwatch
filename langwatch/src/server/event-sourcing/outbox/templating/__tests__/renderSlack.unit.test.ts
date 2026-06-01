@@ -26,7 +26,7 @@ describe("renderTriggerSlack", () => {
       });
       const text = asText(slack.payload);
       expect(text).toContain("High latency");
-      expect(text).toContain("https://app.langwatch.ai/acme/messages/trace_1");
+      expect(text).toContain("what is the weather");
       expect(slack.usedDefault).toBe(true);
     });
   });

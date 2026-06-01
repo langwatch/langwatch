@@ -1,4 +1,4 @@
-import { Badge, Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ExternalLink, Link2 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef } from "react";
@@ -252,22 +252,25 @@ type SlackBlock = Record<string, unknown>;
  *  re-points the existing popup instead of opening a new one. */
 const SYNCED_BUILDER_WINDOW_NAME = "lwBlockKitBuilder";
 
-/** Compact Slack preview — renders mrkdwn or Block Kit blocks inline, no
- *  border chrome. For `block_kit` mode the inline render is honest about
- *  being a rough approximation (our preview will never match Slack's actual
- *  UI exactly); below it sit two ways to see the real thing:
+/** Compact Slack preview.
  *
- *  - "Open in Block Kit Builder" — one-shot, fires `window.open` with the
- *    current JSON. The popup is independent and won't update on further edits.
- *  - "Open synced Block Kit Builder" — opens a named popup we keep a handle
- *    to and re-navigate on every preview change. Slack's Block Kit Builder
- *    reads the JSON from the URL fragment, so `popup.location.replace` with
- *    the new fragment fires `hashchange` inside Slack's app and the rendered
- *    blocks follow along. If the popup is closed, the next click reopens it.
+ *  - Plain-text mode renders the mrkdwn inline — Slack's mrkdwn rendering
+ *    is well-understood and the in-editor preview reads close enough that
+ *    it's a useful proof the template parsed correctly.
+ *  - Block Kit mode does NOT render the blocks inline. Slack's Block Kit
+ *    UI is too distinct to approximate honestly, and a wrong-looking
+ *    "preview" is worse than no preview — it gives the author false
+ *    confidence in something that won't match Slack. Instead, the surface
+ *    confirms how many blocks the JSON produced and offers two ways into
+ *    Slack's actual Block Kit Builder:
  *
- *  An iframe would be ideal but Slack sets `X-Frame-Options: SAMEORIGIN`,
- *  so cross-origin embedding is a non-starter. The popup is the closest
- *  thing to a live preview we can actually have. */
+ *    • Open in Block Kit Builder — one-shot, new tab.
+ *    • Open synced Block Kit Builder — named popup we keep a handle to
+ *      and re-navigate on every edit so the rendered blocks follow along.
+ *      An iframe would be ideal but Slack ships `X-Frame-Options:
+ *      SAMEORIGIN`, so popup-sync is the closest live preview we can
+ *      offer.
+ */
 export function CompactSlackPreview({
   payload,
 }: {
@@ -326,10 +329,8 @@ export function CompactSlackPreview({
     );
   };
 
-  return (
-    <VStack align="stretch" gap={2}>
-      {/* Vertically resizable so a long Block Kit preview can be pulled up
-          to fit instead of pushing the editor off-screen. */}
+  if ("text" in payload) {
+    return (
       <Box
         bg="bg.subtle"
         borderRadius="md"
@@ -339,92 +340,66 @@ export function CompactSlackPreview({
         overflowY="auto"
         css={{ resize: "vertical" }}
       >
-        {"text" in payload ? (
-          <Text whiteSpace="pre-wrap" textStyle="sm">
-            {renderSlackMrkdwn(payload.text)}
-          </Text>
-        ) : (
-          <BlockKitBlocks blocks={payload.blocks} />
-        )}
+        <Text whiteSpace="pre-wrap" textStyle="sm">
+          {renderSlackMrkdwn(payload.text)}
+        </Text>
       </Box>
-      {builderUrl ? (
+    );
+  }
+
+  const blockCount = payload.blocks.length;
+  return (
+    <Box
+      bg="bg.subtle"
+      borderRadius="md"
+      padding={4}
+      border="1px solid"
+      borderColor="border"
+    >
+      <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={1}>
+          <Text textStyle="sm" fontWeight="semibold">
+            Preview in Slack's Block Kit Builder
+          </Text>
+          <Text textStyle="xs" color="fg.muted">
+            {blockCount === 1
+              ? "1 block ready to preview."
+              : `${blockCount} blocks ready to preview.`}{" "}
+            Block Kit renders differently than plain text, so preview where it
+            will run.
+          </Text>
+        </VStack>
         <HStack gap={2} align="center" flexWrap="wrap">
           <Tooltip
             content="Preview your blocks in Slack's Block Kit Builder. Opens once in a new tab."
             positioning={{ placement: "top" }}
           >
-            <Button size="xs" variant="outline" onClick={openOnce}>
-              <ExternalLink size={12} /> Open in Block Kit Builder
+            <Button
+              size="sm"
+              colorPalette="orange"
+              variant="outline"
+              onClick={openOnce}
+            >
+              <ExternalLink size={14} /> Open in Block Kit Builder
             </Button>
           </Tooltip>
           <Tooltip
             content="Live preview in Slack's Block Kit Builder. Updates as you edit."
             positioning={{ placement: "top" }}
           >
-            <Button size="xs" variant="outline" onClick={openSynced}>
-              <Link2 size={12} /> Open synced Block Kit Builder
+            <Button
+              size="sm"
+              colorPalette="orange"
+              variant="solid"
+              onClick={openSynced}
+            >
+              <Link2 size={14} /> Open synced Block Kit Builder
             </Button>
           </Tooltip>
         </HStack>
-      ) : null}
-    </VStack>
+      </VStack>
+    </Box>
   );
-}
-
-function BlockKitBlocks({ blocks }: { blocks: SlackBlock[] }) {
-  return (
-    <VStack align="stretch" gap={2}>
-      {blocks.map((block, i) => (
-        <BlockKitBlock key={i} block={block} />
-      ))}
-    </VStack>
-  );
-}
-
-function blockText(block: SlackBlock): string {
-  const text = block.text;
-  if (typeof text === "string") return text;
-  if (text && typeof text === "object" && "text" in text) {
-    const inner = (text as { text?: unknown }).text;
-    return typeof inner === "string" ? inner : "";
-  }
-  return "";
-}
-
-function BlockKitBlock({ block }: { block: SlackBlock }) {
-  switch (block.type) {
-    case "header":
-      return (
-        <Text fontWeight="bold" textStyle="sm">
-          {blockText(block)}
-        </Text>
-      );
-    case "section":
-      return (
-        <Text whiteSpace="pre-wrap" textStyle="sm">
-          {renderSlackMrkdwn(blockText(block))}
-        </Text>
-      );
-    case "context": {
-      const elements = Array.isArray(block.elements) ? block.elements : [];
-      const text = elements
-        .map((el) =>
-          el && typeof el === "object" && "text" in el
-            ? String((el as { text?: unknown }).text ?? "")
-            : "",
-        )
-        .join("  ");
-      return (
-        <Text textStyle="xs" color="fg.muted" whiteSpace="pre-wrap">
-          {renderSlackMrkdwn(text)}
-        </Text>
-      );
-    }
-    case "divider":
-      return <Separator />;
-    default:
-      return null;
-  }
 }
 
 function renderSlackMrkdwn(text: string): React.ReactNode[] {

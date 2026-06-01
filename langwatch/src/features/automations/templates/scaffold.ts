@@ -42,8 +42,7 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
 {% endif %}
 *Input:* {{ match.trace.input | truncate: 200 }}
 *Output:* {{ match.trace.output | truncate: 200 }}{% if match.evaluation and match.evaluation.evaluatorName %}
-*{{ match.evaluation.evaluatorName }}:*{% if match.evaluation.score != null %} {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% endif %}
-<{{ match.trace.url }}|View trace> · <{{ trigger.editUrl }}|Edit automation>`;
+*{{ match.evaluation.evaluatorName }}:*{% if match.evaluation.score != null %} {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% endif %}`;
 
 export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
