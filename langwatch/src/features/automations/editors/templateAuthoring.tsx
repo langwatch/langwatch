@@ -358,16 +358,13 @@ export function CompactSlackPreview({
             </Button>
           </Tooltip>
           <Tooltip
-            content="Opens Slack's Block Kit Builder in a popup window that follows your edits. Slack reads the JSON from the URL fragment, so changes here re-point the popup live. Closing the popup is fine — the next click reopens it."
+            content="Opens Slack's Block Kit Builder in a popup window that follows your edits live."
             positioning={{ placement: "top" }}
           >
             <Button size="xs" variant="outline" onClick={openSynced}>
               <Link2 size={12} /> Open synced Block Kit Builder
             </Button>
           </Tooltip>
-          <Text textStyle="xs" color="fg.muted">
-            Slack blocks iframes — popup is as close to live as we can get.
-          </Text>
         </HStack>
       ) : null}
     </VStack>
