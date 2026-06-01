@@ -57,3 +57,12 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
     Given the organization is on the free plan
     Then creation limits are still enforced for "projects", "teams", "members", and "membersLite"
     But creation limits are not enforced for any experimentation resource
+
+  @unit
+  Scenario: A pre-existing signed license that still encodes experimentation limits stays valid
+    Given a self-hosted license signed before the experimentation limits were removed
+    And its signed payload still carries maxPrompts, maxWorkflows, maxScenarios, and similar caps
+    When the upgraded platform validates that license
+    Then the license is accepted with no re-issuance because the signature still verifies
+    And the experimentation caps are dropped from the active plan rather than enforced
+    And the license's seat limits and Enterprise tier still apply
