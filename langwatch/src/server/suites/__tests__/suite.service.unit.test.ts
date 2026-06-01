@@ -244,6 +244,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Deleted scenarios still cause validation errors */
         /** @scenario "Suite run fails when a scenario does not exist" */
         it("throws InvalidScenarioReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
