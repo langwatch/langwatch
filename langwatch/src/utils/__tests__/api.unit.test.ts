@@ -57,7 +57,7 @@ describe("Global mutation error handler", () => {
               code: "FORBIDDEN",
               httpStatus: 403,
               cause: {
-                limitType: "prompts",
+                limitType: "projects",
                 current: 10,
                 max: 10,
               },
@@ -66,13 +66,13 @@ describe("Global mutation error handler", () => {
         },
       });
       expect(extractLimitExceededInfo(error)).toEqual({
-        limitType: "prompts",
+        limitType: "projects",
         current: 10,
         max: 10,
       });
     });
 
-    it("extracts limit info for scenarios", () => {
+    it("extracts limit info for teams", () => {
       const error = new TRPCClientError("Limit exceeded", {
         result: {
           error: {
@@ -80,7 +80,7 @@ describe("Global mutation error handler", () => {
               code: "FORBIDDEN",
               httpStatus: 403,
               cause: {
-                limitType: "scenarios",
+                limitType: "teams",
                 current: 5,
                 max: 5,
               },
@@ -89,13 +89,13 @@ describe("Global mutation error handler", () => {
         },
       });
       expect(extractLimitExceededInfo(error)).toEqual({
-        limitType: "scenarios",
+        limitType: "teams",
         current: 5,
         max: 5,
       });
     });
 
-    it("extracts limit info for evaluators", () => {
+    it("extracts limit info for members", () => {
       const error = new TRPCClientError("Limit exceeded", {
         result: {
           error: {
@@ -103,7 +103,7 @@ describe("Global mutation error handler", () => {
               code: "FORBIDDEN",
               httpStatus: 403,
               cause: {
-                limitType: "evaluators",
+                limitType: "members",
                 current: 3,
                 max: 3,
               },
@@ -112,7 +112,7 @@ describe("Global mutation error handler", () => {
         },
       });
       expect(extractLimitExceededInfo(error)).toEqual({
-        limitType: "evaluators",
+        limitType: "members",
         current: 3,
         max: 3,
       });
@@ -126,14 +126,14 @@ describe("Global mutation error handler", () => {
               code: "FORBIDDEN",
               httpStatus: 403,
               cause: {
-                limitType: "workflows",
+                limitType: "membersLite",
               },
             },
           },
         },
       });
       expect(extractLimitExceededInfo(error)).toEqual({
-        limitType: "workflows",
+        limitType: "membersLite",
         current: 0,
         max: 0,
       });
@@ -145,18 +145,18 @@ describe("Global mutation error handler", () => {
       const store = useUpgradeModalStore.getState();
       expect(store.isOpen).toBe(false);
 
-      store.open("prompts", 10, 10);
+      store.open("projects", 10, 10);
 
       const updatedState = useUpgradeModalStore.getState();
       expect(updatedState.isOpen).toBe(true);
-      expect(updatedState.limitType).toBe("prompts");
+      expect(updatedState.limitType).toBe("projects");
       expect(updatedState.current).toBe(10);
       expect(updatedState.max).toBe(10);
     });
 
     it("closes modal and resets state", () => {
       const store = useUpgradeModalStore.getState();
-      store.open("scenarios", 5, 5);
+      store.open("teams", 5, 5);
       store.close();
 
       const updatedState = useUpgradeModalStore.getState();
@@ -170,7 +170,7 @@ describe("Global mutation error handler", () => {
   describe("Global mutation cache integration", () => {
     it("opens upgrade modal when limit error is detected", () => {
       const limitInfo = {
-        limitType: "prompts" as const,
+        limitType: "projects" as const,
         current: 10,
         max: 10,
       };
@@ -182,7 +182,7 @@ describe("Global mutation error handler", () => {
 
       const state = useUpgradeModalStore.getState();
       expect(state.isOpen).toBe(true);
-      expect(state.limitType).toBe("prompts");
+      expect(state.limitType).toBe("projects");
     });
 
     it("does not open modal for non-limit errors", () => {

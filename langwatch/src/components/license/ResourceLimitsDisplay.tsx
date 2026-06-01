@@ -9,12 +9,6 @@ export type ResourceKey =
   | "membersLite"
   | "teams"
   | "projects"
-  | "prompts"
-  | "workflows"
-  | "scenarios"
-  | "evaluators"
-  | "agents"
-  | "experiments"
   | "messagesPerMonth"
   | "eventsPerMonth"
   | "tracesPerMonth"
@@ -49,12 +43,6 @@ export interface ResourceLimits {
   membersLite: { current: number; max: number };
   teams: { current: number; max: number };
   projects: { current: number; max: number };
-  prompts: { current: number; max: number };
-  workflows: { current: number; max: number };
-  scenarios: { current: number; max: number };
-  evaluators: { current: number; max: number };
-  agents: { current: number; max: number };
-  experiments: { current: number; max: number };
   messagesPerMonth: { current: number; max: number };
 }
 
@@ -68,18 +56,6 @@ interface LicenseStatusWithPlan {
   maxTeams: number;
   currentProjects: number;
   maxProjects: number;
-  currentPrompts: number;
-  maxPrompts: number;
-  currentWorkflows: number;
-  maxWorkflows: number;
-  currentScenarios: number;
-  maxScenarios: number;
-  currentEvaluators: number;
-  maxEvaluators: number;
-  currentAgents: number;
-  maxAgents: number;
-  currentExperiments: number;
-  maxExperiments: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
 }
@@ -90,12 +66,6 @@ interface UsageData {
   membersLiteCount: number;
   teamsCount: number;
   projectsCount: number;
-  promptsCount: number;
-  workflowsCount: number;
-  scenariosCount: number;
-  evaluatorsCount: number;
-  agentsCount: number;
-  experimentsCount: number;
   currentMonthMessagesCount: number | null;
 }
 
@@ -111,12 +81,6 @@ export function mapLicenseStatusToLimits(
     membersLite: { current: licenseData.currentMembersLite, max: licenseData.maxMembersLite },
     teams: { current: licenseData.currentTeams, max: licenseData.maxTeams },
     projects: { current: licenseData.currentProjects, max: licenseData.maxProjects },
-    prompts: { current: licenseData.currentPrompts, max: licenseData.maxPrompts },
-    workflows: { current: licenseData.currentWorkflows, max: licenseData.maxWorkflows },
-    scenarios: { current: licenseData.currentScenarios, max: licenseData.maxScenarios },
-    evaluators: { current: licenseData.currentEvaluators, max: licenseData.maxEvaluators },
-    agents: { current: licenseData.currentAgents, max: licenseData.maxAgents },
-    experiments: { current: licenseData.currentExperiments, max: licenseData.maxExperiments },
     messagesPerMonth: { current: licenseData.currentMessagesPerMonth, max: licenseData.maxMessagesPerMonth },
   };
 }
@@ -134,12 +98,6 @@ export function mapUsageToLimits(
     membersLite: { current: usage.membersLiteCount, max: plan.maxMembersLite },
     teams: { current: usage.teamsCount, max: plan.maxTeams },
     projects: { current: usage.projectsCount, max: plan.maxProjects },
-    prompts: { current: usage.promptsCount, max: plan.maxPrompts },
-    workflows: { current: usage.workflowsCount, max: plan.maxWorkflows },
-    scenarios: { current: usage.scenariosCount, max: plan.maxScenarios },
-    evaluators: { current: usage.evaluatorsCount, max: plan.maxEvaluators },
-    agents: { current: usage.agentsCount, max: plan.maxAgents },
-    experiments: { current: usage.experimentsCount, max: plan.maxExperiments },
     messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0, max: plan.maxMessagesPerMonth },
   };
 }

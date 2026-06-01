@@ -21,7 +21,6 @@ import {
 } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-import { checkScenarioSetLimitForRunStarted } from "./scenario-set-limit";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -95,10 +94,6 @@ secured.access(requires("scenarios:manage")).post(
       );
     }
 
-    // Enforce scenario set limit on RUN_STARTED events.
-    // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
-    // propagates to handleError which returns 403 + meta fields.
-    await checkScenarioSetLimitForRunStarted({ project, event });
     await dispatchSimulationEvent(project.id, event);
 
     // Streaming events: broadcast only, no persistence

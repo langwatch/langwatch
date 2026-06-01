@@ -195,14 +195,14 @@ describe("createSaaSPlanProvider", () => {
       });
     });
 
-    describe("when maxWorkflows override is set", () => {
+    describe("when maxMembers override is set", () => {
       it("applies the override (bug fix)", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
-          maxWorkflows: 25,
+          maxMembers: 25,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map(
               (f) => [f, null],
             ),
           ),
@@ -212,7 +212,7 @@ describe("createSaaSPlanProvider", () => {
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
-        expect(plan.maxWorkflows).toBe(25);
+        expect(plan.maxMembers).toBe(25);
       });
     });
 
@@ -220,16 +220,6 @@ describe("createSaaSPlanProvider", () => {
       it.each([
         ["maxMembersLite", 15],
         ["maxTeams", 10],
-        ["maxPrompts", 30],
-        ["maxEvaluators", 40],
-        ["maxScenarios", 20],
-        ["maxAgents", 12],
-        ["maxExperiments", 50],
-        ["maxOnlineEvaluations", 18],
-        ["maxDatasets", 25],
-        ["maxDashboards", 8],
-        ["maxCustomGraphs", 15],
-        ["maxAutomations", 22],
       ] as const)("applies %s override when set to %d", async (field, value) => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
@@ -300,8 +290,8 @@ describe("createSaaSPlanProvider", () => {
       it("applies each override and leaves remaining fields at plan defaults", async () => {
         const overrides = {
           maxMembers: 20,
-          maxWorkflows: 50,
-          maxPrompts: 30,
+          maxTeams: 50,
+          maxMembersLite: 30,
           maxMessagesPerMonth: 200_000,
         };
         const subscription = {
@@ -320,8 +310,8 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan.maxMembers).toBe(20);
-        expect(plan.maxWorkflows).toBe(50);
-        expect(plan.maxPrompts).toBe(30);
+        expect(plan.maxTeams).toBe(50);
+        expect(plan.maxMembersLite).toBe(30);
         expect(plan.maxMessagesPerMonth).toBe(200_000);
 
         const basePlan = PLAN_LIMITS[PlanTypes.LAUNCH];
@@ -379,9 +369,9 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
           status: SubscriptionStatus.ACTIVE,
-          maxWorkflows: 50,
+          maxTeams: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxTeams").map(
               (f) => [f, null],
             ),
           ),
@@ -392,7 +382,7 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan.type).toBe(PlanTypes.FREE);
-        expect(plan.maxWorkflows).toBe(50);
+        expect(plan.maxTeams).toBe(50);
       });
 
       describe("when SEAT_EVENT org has unknown plan key", () => {

@@ -111,12 +111,6 @@ export interface UsageStats {
   membersCount: number;
   membersLiteCount: number;
   teamsCount: number;
-  promptsCount: number;
-  workflowsCount: number;
-  scenariosCount: number;
-  evaluatorsCount: number;
-  agentsCount: number;
-  experimentsCount: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -171,12 +165,6 @@ export class UsageStatsService {
       membersCount,
       membersLiteCount,
       teamsCount,
-      promptsCount,
-      workflowsCount,
-      scenariosCount,
-      evaluatorsCount,
-      agentsCount,
-      experimentsCount,
       usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
@@ -187,12 +175,6 @@ export class UsageStatsService {
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
       this.repository.getTeamCount(organizationId),
-      this.repository.getPromptCount(organizationId),
-      this.repository.getWorkflowCount(organizationId),
-      this.repository.getActiveScenarioCount(organizationId),
-      this.repository.getEvaluatorCount(organizationId),
-      this.repository.getAgentCount(organizationId),
-      this.repository.getExperimentCount(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -214,12 +196,6 @@ export class UsageStatsService {
       membersCount,
       membersLiteCount,
       teamsCount,
-      promptsCount,
-      workflowsCount,
-      scenariosCount,
-      evaluatorsCount,
-      agentsCount,
-      experimentsCount,
       messageLimitInfo,
       usageUnit,
     };

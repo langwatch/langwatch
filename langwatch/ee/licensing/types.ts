@@ -2,7 +2,18 @@ import { z } from "zod";
 import type { PlanInfo } from "./planInfo";
 import type { LicenseError } from "./constants";
 
-/** Plan limits embedded within a license */
+/**
+ * Plan limits embedded within a license (the signed payload).
+ *
+ * IMPORTANT: The experimentation fields below (maxWorkflows, maxPrompts,
+ * maxEvaluators, maxScenarios, maxAgents, maxExperiments, maxOnlineEvaluations,
+ * maxDatasets, maxDashboards, maxCustomGraphs) are NO LONGER ENFORCED — those
+ * resources are OSS/Apache-2.0 and uncapped. They are retained in this schema
+ * purely for backward compatibility: `verifySignature` re-serializes the
+ * Zod-parsed `data`, and `z.object` strips unknown keys, so dropping a field
+ * here would change the JSON for already-issued licenses and break their
+ * signature verification. Keep them; they are simply ignored downstream.
+ */
 export const LicensePlanLimitsSchema = z.object({
   type: z.string(),
   name: z.string(),
@@ -91,28 +102,6 @@ type LicenseResourceLimits = {
   maxTeams: number;
   currentProjects: number;
   maxProjects: number;
-  currentPrompts: number;
-  maxPrompts: number;
-  currentWorkflows: number;
-  maxWorkflows: number;
-  currentScenarios: number;
-  maxScenarios: number;
-  currentEvaluators: number;
-  maxEvaluators: number;
-  currentAgents: number;
-  maxAgents: number;
-  currentExperiments: number;
-  maxExperiments: number;
-  currentOnlineEvaluations: number;
-  maxOnlineEvaluations: number;
-  currentDatasets: number;
-  maxDatasets: number;
-  currentDashboards: number;
-  maxDashboards: number;
-  currentCustomGraphs: number;
-  maxCustomGraphs: number;
-  currentAutomations: number;
-  maxAutomations: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
 };

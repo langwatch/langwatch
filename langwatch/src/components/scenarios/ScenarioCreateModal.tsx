@@ -4,7 +4,6 @@ import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
@@ -60,7 +59,6 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
   const { hasEnabledProviders, providers } = useModelProvidersSettings({
@@ -125,7 +123,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       <ModelProviderRequiredModal
         open={open}
         onClose={onClose}
-        onProceedAnyway={() => checkAndProceed(handleSkip)}
+        onProceedAnyway={handleSkip}
       />
     );
   }
@@ -137,8 +135,8 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       title={MODAL_TITLE}
       placeholder={MODAL_PLACEHOLDER}
       exampleTemplates={EXAMPLE_TEMPLATES}
-      onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
-      onSkip={() => checkAndProceed(handleSkip)}
+      onGenerate={(desc) => handleGenerate(desc)}
+      onSkip={handleSkip}
       generatingText={GENERATING_TEXT}
     />
   );

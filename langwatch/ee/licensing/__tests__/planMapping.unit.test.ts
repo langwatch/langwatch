@@ -59,10 +59,6 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembers).toBe(5);
     expect(result.maxProjects).toBe(10);
     expect(result.maxMessagesPerMonth).toBe(50000);
-    expect(result.maxWorkflows).toBe(25);
-    expect(result.maxPrompts).toBe(30);
-    expect(result.maxEvaluators).toBe(35);
-    expect(result.maxScenarios).toBe(40);
   });
 
   /** @scenario Maps canPublish flag correctly when true */
@@ -127,7 +123,7 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
   });
 
-  it("uses DEFAULT_LIMIT for optional fields not in older licenses", () => {
+  it("defaults maxMembersLite for older licenses without the field", () => {
     // Simulate an older license that doesn't have the new optional fields
     const oldLicenseData: LicenseData = {
       licenseId: "lic-old-001",
@@ -145,16 +141,12 @@ describe("mapToPlanInfo", () => {
         evaluationsCredit: 100,
         maxWorkflows: 50,
         canPublish: true,
-        // Note: maxPrompts, maxEvaluators, maxScenarios, maxMembersLite are NOT provided
+        // Note: maxMembersLite is NOT provided
       },
     };
 
     const result = mapToPlanInfo(oldLicenseData);
 
-    // Should use DEFAULT_LIMIT for missing optional fields
-    expect(result.maxPrompts).toBe(DEFAULT_LIMIT);
-    expect(result.maxEvaluators).toBe(DEFAULT_LIMIT);
-    expect(result.maxScenarios).toBe(DEFAULT_LIMIT);
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
   });
 

@@ -10,9 +10,6 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
@@ -101,44 +98,13 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  let experiment: Experiment;
-  try {
-    experiment = await findOrCreateExperiment({
-      project,
-      experiment_slug: params.experiment_slug,
-      experiment_type: params.experiment_type,
-      experiment_name: params.experiment_name,
-      workflowId: params.workflowId,
-    });
-  } catch (error) {
-    if (error instanceof LimitExceededError) {
-      let message = error.message;
-      try {
-        const organizationId = await resolveOrganizationId(project.teamId);
-        if (organizationId) {
-          message = await buildResourceLimitMessage({
-            organizationId,
-            limitType: error.limitType,
-            max: error.max,
-          });
-        }
-      } catch {
-        logger.warn(
-          { projectId: project.id },
-          "Failed to build resource limit message",
-        );
-      }
-
-      return res.status(403).json({
-        error: error.kind,
-        message,
-        limitType: error.limitType,
-        current: error.current,
-        max: error.max,
-      });
-    }
-    throw error;
-  }
+  const experiment = await findOrCreateExperiment({
+    project,
+    experiment_slug: params.experiment_slug,
+    experiment_type: params.experiment_type,
+    experiment_name: params.experiment_name,
+    workflowId: params.workflowId,
+  });
 
   // Late markUsed: response has been fully built, the API key was genuinely used
   // for a successful request. Fire-and-forget; a DB hiccup must not mask the
@@ -199,12 +165,6 @@ export const findOrCreateExperiment = async ({
   }
 
   if (!experiment && slug_) {
-    const organizationId = await resolveOrganizationId(project.teamId);
-    if (organizationId) {
-      const enforcement = createLicenseEnforcementService(prisma);
-      await enforcement.enforceLimit(organizationId, "experiments");
-    }
-
     experiment = await prisma.experiment.create({
       data: {
         id: `experiment_${nanoid()}`,
@@ -228,15 +188,3 @@ export const findOrCreateExperiment = async ({
   return experiment;
 };
 
-/**
- * Resolves the organizationId from a teamId.
- * Returns null if the team or organization is not found.
- */
-async function resolveOrganizationId(teamId: string): Promise<string | null> {
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
-    select: { organizationId: true },
-  });
-
-  return team?.organizationId ?? null;
-}

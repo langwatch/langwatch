@@ -18,8 +18,6 @@ import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -67,12 +65,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // License enforcement for agent AND workflow creation
-  // Creating a workflow agent requires creating both a workflow AND an agent,
-  // so we need to check both limits before proceeding
-  const agentEnforcement = useLicenseEnforcement("agents");
-  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -278,11 +270,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               <Button
                 colorPalette="blue"
                 onClick={() => {
-                  // Check both workflows and agents limits before proceeding
-                  checkCompoundLimits(
-                    [workflowEnforcement, agentEnforcement],
-                    () => void handleSubmit(onSubmit)()
-                  );
+                  void handleSubmit(onSubmit)();
                 }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}

@@ -4,23 +4,18 @@ import { z } from "zod";
  * Single source of truth for limit types.
  * Adding a new type here will cause compile errors in all switch statements
  * that use `assertNever`, ensuring exhaustive handling.
+ *
+ * Only the structural/seat levers remain enforced: projects, teams, members,
+ * and lite members. Experimentation resources (workflows, prompts, evaluators,
+ * scenarios, agents, experiments, online evaluations, datasets, dashboards,
+ * custom graphs, automations) are OSS (Apache 2.0) and have no creation cap on
+ * any plan — cloud monetizes via traces/seats, not by counting these.
  */
 export const limitTypes = [
-  "workflows",
-  "prompts",
-  "evaluators",
-  "scenarios",
   "projects",
   "teams",
   "members",
   "membersLite",
-  "agents",
-  "experiments",
-  "onlineEvaluations",
-  "datasets",
-  "dashboards",
-  "customGraphs",
-  "automations",
 ] as const;
 
 export type LimitType = (typeof limitTypes)[number];

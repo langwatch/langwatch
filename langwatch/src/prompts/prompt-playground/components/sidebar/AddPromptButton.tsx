@@ -2,7 +2,6 @@ import { LuPlus } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useCreateDraftPrompt } from "../../hooks/useCreateDraftPrompt";
 
@@ -13,13 +12,11 @@ interface AddPromptButtonProps {
 /**
  * AddPromptButton
  * Single Responsibility: Renders a button to create a new draft prompt.
- * Uses click-then-modal pattern: checks RBAC permissions first,
- * then license limits. If either check fails, shows the appropriate modal
- * instead of creating the draft.
+ * Checks RBAC permissions first; if the check fails, shows the
+ * restriction modal instead of creating the draft.
  */
 export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();
-  const { checkAndProceed } = useLicenseEnforcement("prompts");
   const { hasPermission } = useOrganizationTeamProject();
   const openLiteMemberRestriction = useUpgradeModalStore(
     (state) => state.openLiteMemberRestriction,
@@ -30,9 +27,7 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
       openLiteMemberRestriction({ resource: "prompts" });
       return;
     }
-    checkAndProceed(() => {
-      void createDraftPrompt();
-    });
+    void createDraftPrompt();
   };
 
   return (
