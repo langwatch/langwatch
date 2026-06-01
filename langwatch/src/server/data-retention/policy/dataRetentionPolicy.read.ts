@@ -152,14 +152,15 @@ export async function getRetentionPolicySnapshot(
 
   // A caller can read a rule's scope only if they have the corresponding
   // manage/update permission on it. Map.has() on the name maps only proves
-  // org membership, which would leak unrelated team/project rule names to
-  // any user who can view a single project in the org.
+  // org membership, which would leak unrelated team/project rule names —
+  // AND the org-default retention number — to any user with project:view
+  // in the same org.
   //
-  // Org rules remain visible to anyone who reached this snapshot (they hold
-  // project:view on some project in the same org); the chip picker still
-  // gates write access via `canManageOrg` for `available.organization`.
+  // ORG-scope rules expose the org-default retention, which a project-only
+  // viewer must not see (could be a negotiated SLA bound). Gate on
+  // organization:manage, the same permission required to edit it.
   const canReadScope = (scopeType: ScopeTier, scopeId: string): boolean => {
-    if (scopeType === "ORGANIZATION") return true;
+    if (scopeType === "ORGANIZATION") return canManageOrg;
     if (scopeType === "TEAM") return teamManage.teams.get(scopeId) === true;
     return projectUpdate.projects.get(scopeId) === true;
   };

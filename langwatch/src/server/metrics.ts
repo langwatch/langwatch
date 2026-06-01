@@ -544,20 +544,15 @@ export async function withMetrics<T>({
 }
 
 // --- Data Retention Metrics ---
-
-register.removeSingleMetric("data_retention_lag_seconds");
-export const dataRetentionLagSeconds = new Gauge({
-  name: "data_retention_lag_seconds",
-  help: "Seconds between expected cutoff and actual oldest data for tenants with active retention",
-  labelNames: ["tenant_id", "table"] as const,
-});
-
-register.removeSingleMetric("data_retention_mutation_progress_ratio");
-export const dataRetentionMutationProgressRatio = new Gauge({
-  name: "data_retention_mutation_progress_ratio",
-  help: "Ratio of parts_done / total_parts for active retention mutations",
-  labelNames: ["tenant_id", "table"] as const,
-});
+//
+// We deliberately do NOT expose tenant-cardinality gauges for retention
+// lag or per-mutation progress on the Prometheus side. Following the same
+// rule as evaluatorLoopBlockedCounter above (post-2026-05-11 incident):
+// per-tenant attribution lives in structured logs, not as Prometheus
+// labels — one series per tenant per table would balloon cardinality on
+// a multi-thousand-tenant fleet. If/when an operator dashboard needs
+// fleet-wide retention health, add it as a label-free aggregate counter
+// here and log the tenant alongside each emission.
 
 register.removeSingleMetric("data_retention_orphans_swept_total");
 export const dataRetentionOrphansSweptTotal = new Counter({
@@ -565,14 +560,6 @@ export const dataRetentionOrphansSweptTotal = new Counter({
   help: "Count of PG orphan records cleaned up by retention sweep",
   labelNames: ["model"] as const,
 });
-
-export function setRetentionLag(tenantId: string, table: string, lagSeconds: number): void {
-  dataRetentionLagSeconds.set({ tenant_id: tenantId, table }, lagSeconds);
-}
-
-export function setMutationProgress(tenantId: string, table: string, ratio: number): void {
-  dataRetentionMutationProgressRatio.set({ tenant_id: tenantId, table }, ratio);
-}
 
 export function incrementOrphansSwept(model: string, count: number): void {
   dataRetentionOrphansSweptTotal.inc({ model }, count);

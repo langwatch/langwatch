@@ -102,7 +102,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
   });
 
   describe("when caller has project:update on one project only", () => {
-    it("omits team and other-project rules from the snapshot", async () => {
+    it("omits team, other-project, AND org rules from the snapshot", async () => {
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },
         { projectId: "project_a" },
@@ -112,13 +112,34 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
         (r) => `${r.scopeType}:${r.scopeId}`,
       );
 
-      // Caller-readable: org rule + their own project rule
-      expect(scopeKeys).toContain("ORGANIZATION:org_1");
+      // Caller-readable: only their own project rule.
       expect(scopeKeys).toContain("PROJECT:project_a");
 
-      // Leaked previously — must be absent now
+      // Leaked previously — must be absent now. ORG rule is gated on
+      // organization:manage (which this caller lacks) so the org-default
+      // retention number doesn't leak to project-only viewers.
+      expect(scopeKeys).not.toContain("ORGANIZATION:org_1");
       expect(scopeKeys).not.toContain("PROJECT:project_b");
       expect(scopeKeys).not.toContain("PROJECT:project_c");
+      expect(scopeKeys).not.toContain("TEAM:team_b");
+    });
+
+    it("exposes the org rule once caller also holds organization:manage", async () => {
+      rbacMocks.hasOrganizationPermission.mockResolvedValue(true);
+
+      const snapshot = await getRetentionPolicySnapshot(
+        { prisma, session },
+        { projectId: "project_a" },
+      );
+
+      const scopeKeys = snapshot.rules.map(
+        (r) => `${r.scopeType}:${r.scopeId}`,
+      );
+
+      expect(scopeKeys).toContain("ORGANIZATION:org_1");
+      expect(scopeKeys).toContain("PROJECT:project_a");
+      // Project/team gates still apply
+      expect(scopeKeys).not.toContain("PROJECT:project_b");
       expect(scopeKeys).not.toContain("TEAM:team_b");
     });
 
