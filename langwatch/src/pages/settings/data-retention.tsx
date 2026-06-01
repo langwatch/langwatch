@@ -14,7 +14,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, Folder, History, Trash2, Users } from "lucide-react";
+import { Building2, Folder, Trash2, Users } from "lucide-react";
+import { Checkbox } from "~/components/ui/checkbox";
 import { useEffect, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
@@ -26,7 +27,6 @@ import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -228,9 +228,15 @@ function DataRetentionPage({
   // without an extra query (they could still be the migration default), so we
   // always route through the confirm dialog before mutating CH — the action is
   // irreversible if it contracts.
-  const [pendingApply, setPendingApply] = useState<{
-    category: RetentionCategory;
-    to: number;
+  //
+  // The dialog is shared between two flows: the per-row icon button (triggers
+  // a single retroactive update) and the drawer save with "apply to existing
+  // data" checked (saves overrides AND triggers retroactive updates). Both
+  // hand the dialog an opaque onConfirm so the dialog stays a thin
+  // confirmation surface.
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    retentionDays: number;
+    onConfirm: () => void | Promise<void>;
   } | null>(null);
 
   // Poll system.mutations while a retroactive apply is in flight, then idle.
@@ -247,21 +253,14 @@ function DataRetentionPage({
     setPollMs(activeMutations.length > 0 ? 3000 : false);
   }, [activeMutations.length]);
 
+  // Per-call toasts intentionally omitted — the drawer flow fans this out one
+  // call per category and the per-row icon flow batches it via the same
+  // confirm dialog. Call sites emit a single aggregated toast.
   const triggerUpdate = api.dataRetention.triggerRetroactiveUpdate.useMutation({
     onSuccess: () => {
       setPollMs(3000);
       void progressQuery.refetch();
-      toaster.create({
-        title: "Applying retention to existing data…",
-        type: "info",
-      });
     },
-    onError: (error) =>
-      toaster.create({
-        title: "Failed to apply retention to existing data",
-        description: error.message,
-        type: "error",
-      }),
   });
 
   const killMutation = api.dataRetention.killMutation.useMutation({
@@ -279,12 +278,6 @@ function DataRetentionPage({
         type: "error",
       }),
   });
-
-  const applyToExistingData = (category: RetentionCategory) => {
-    const to = rulesQuery.data?.effective[category] ?? 0;
-    if (to <= 0) return; // indefinite — nothing finite to propagate
-    setPendingApply({ category, to });
-  };
 
   if (rulesQuery.isLoading) {
     return (
@@ -346,8 +339,6 @@ function DataRetentionPage({
             <VStack gap={4} align="stretch">
               {RETENTION_CATEGORIES.map((category) => {
                 const days = snapshot?.effective[category] ?? 0;
-                const showApply =
-                  canWrite && projectIsWritable && days > 0;
                 return (
                   <HStack
                     key={category}
@@ -360,25 +351,9 @@ function DataRetentionPage({
                         {CATEGORY_COVERAGE[category]}
                       </Text>
                     </VStack>
-                    <HStack gap={2} flexShrink={0}>
-                      <Text fontWeight="medium">{formatDays(days)}</Text>
-                      {showApply && (
-                        <Tooltip content="Apply this retention to existing data">
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            aria-label={`Apply ${CATEGORY_LABELS[category]} retention to existing data`}
-                            loading={
-                              triggerUpdate.isLoading &&
-                              triggerUpdate.variables?.category === category
-                            }
-                            onClick={() => applyToExistingData(category)}
-                          >
-                            <History size={14} />
-                          </Button>
-                        </Tooltip>
-                      )}
-                    </HStack>
+                    <Text fontWeight="medium" flexShrink={0}>
+                      {formatDays(days)}
+                    </Text>
                   </HStack>
                 );
               })}
@@ -509,65 +484,143 @@ function DataRetentionPage({
             currentTeamId={teamId}
             currentProjectId={projectId}
             isSaving={setForScope.isLoading}
-            onSave={async (scopes, categories, retentionDays) => {
-              const pairs = scopes.flatMap((scope) =>
-                categories.map((category) => ({ scope, category })),
-              );
-              const results = await Promise.all(
-                pairs.map(({ scope, category }) =>
-                  setForScope
-                    .mutateAsync({
-                      projectId,
-                      scope,
-                      category,
-                      retentionDays,
-                    })
-                    .then(
-                      () => ({ ok: true as const }),
-                      (error: Error) => ({ ok: false as const, error }),
-                    ),
-                ),
-              );
-              void invalidate();
-              const failed = results.filter((r) => !r.ok);
-              if (failed.length === 0) {
+            onSave={async (
+              scopes,
+              categories,
+              retentionDays,
+              applyToExisting,
+            ) => {
+              const saveOverrides = async () => {
+                const pairs = scopes.flatMap((scope) =>
+                  categories.map((category) => ({ scope, category })),
+                );
+                const results = await Promise.all(
+                  pairs.map(({ scope, category }) =>
+                    setForScope
+                      .mutateAsync({
+                        projectId,
+                        scope,
+                        category,
+                        retentionDays,
+                      })
+                      .then(
+                        () => ({ ok: true as const, category }),
+                        (error: Error) => ({
+                          ok: false as const,
+                          category,
+                          error,
+                        }),
+                      ),
+                  ),
+                );
+                void invalidate();
+                return { pairs, results };
+              };
+
+              const reportSaveResults = ({
+                pairs,
+                results,
+              }: Awaited<ReturnType<typeof saveOverrides>>) => {
+                const failed = results.filter((r) => !r.ok);
+                if (failed.length === 0) {
+                  toaster.create({
+                    title:
+                      pairs.length === 1
+                        ? "Retention override saved"
+                        : `${pairs.length} retention overrides saved`,
+                    type: "success",
+                  });
+                  return { success: true, failed: [] };
+                }
+                const firstError = failed.find(
+                  (r): r is { ok: false; category: RetentionCategory; error: Error } =>
+                    !r.ok,
+                );
                 toaster.create({
                   title:
-                    pairs.length === 1
-                      ? "Retention override saved"
-                      : `${pairs.length} retention overrides saved`,
-                  type: "success",
+                    failed.length === pairs.length
+                      ? "Failed to save overrides"
+                      : `Saved ${pairs.length - failed.length} of ${pairs.length} overrides`,
+                  description: firstError?.error.message,
+                  type: "error",
                 });
-                setDrawerOpen(false);
+                return {
+                  success: failed.length === 0,
+                  failed: failed.map((f) => f.category),
+                };
+              };
+
+              if (!applyToExisting) {
+                const result = await saveOverrides();
+                const status = reportSaveResults(result);
+                if (status.success) setDrawerOpen(false);
                 return;
               }
-              const firstError = failed.find(
-                (r): r is { ok: false; error: Error } => !r.ok,
-              );
-              toaster.create({
-                title:
-                  failed.length === pairs.length
-                    ? "Failed to save overrides"
-                    : `Saved ${pairs.length - failed.length} of ${pairs.length} overrides`,
-                description: firstError?.error.message,
-                type: "error",
+
+              setPendingConfirm({
+                retentionDays,
+                onConfirm: async () => {
+                  const result = await saveOverrides();
+                  const status = reportSaveResults(result);
+
+                  const succeededCategories = Array.from(
+                    new Set(
+                      result.results
+                        .filter((r) => r.ok)
+                        .map((r) => r.category),
+                    ),
+                  );
+                  if (succeededCategories.length > 0) {
+                    const triggerResults = await Promise.all(
+                      succeededCategories.map((category) =>
+                        triggerUpdate
+                          .mutateAsync({
+                            projectId,
+                            category,
+                            newRetentionDays: retentionDays,
+                          })
+                          .then(
+                            () => ({ ok: true as const }),
+                            (error: Error) => ({
+                              ok: false as const,
+                              error,
+                            }),
+                          ),
+                      ),
+                    );
+                    const triggerFailed = triggerResults.filter((r) => !r.ok);
+                    if (triggerFailed.length === 0) {
+                      toaster.create({
+                        title: "Applying retention to existing data…",
+                        type: "info",
+                      });
+                    } else {
+                      const firstError = triggerFailed.find(
+                        (r): r is { ok: false; error: Error } => !r.ok,
+                      );
+                      toaster.create({
+                        title: "Some retroactive updates failed",
+                        description: firstError?.error.message,
+                        type: "error",
+                      });
+                    }
+                  }
+                  if (status.success) setDrawerOpen(false);
+                },
               });
             }}
           />
         )}
 
         <ApplyToExistingConfirmDialog
-          pending={pendingApply}
-          isApplying={triggerUpdate.isLoading}
-          onCancel={() => setPendingApply(null)}
-          onConfirm={() => {
-            if (!pendingApply) return;
-            triggerUpdate.mutate({
-              projectId,
-              category: pendingApply.category,
-              newRetentionDays: pendingApply.to,
-            });
-            setPendingApply(null);
+          pending={pendingConfirm}
+          isApplying={triggerUpdate.isLoading || setForScope.isLoading}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={async () => {
+            if (!pendingConfirm) return;
+            const fn = pendingConfirm.onConfirm;
+            setPendingConfirm(null);
+            await fn();
           }}
         />
       </VStack>
@@ -639,10 +692,10 @@ function ApplyToExistingConfirmDialog({
   onCancel,
   onConfirm,
 }: {
-  pending: { category: RetentionCategory; to: number } | null;
+  pending: { retentionDays: number } | null;
   isApplying: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }) {
   return (
     <Dialog.Root
@@ -658,10 +711,11 @@ function ApplyToExistingConfirmDialog({
         <Dialog.Body>
           {pending && (
             <Text>
-              ClickHouse will rewrite existing {CATEGORY_LABELS[pending.category]} rows
-              to use {pending.to} days of retention. If any rows are currently
-              older than {pending.to} days, they become eligible for deletion
-              on the next background merge. This cannot be undone.
+              We will rewrite existing data to use {pending.retentionDays} days
+              of retention. If any rows are currently older than{" "}
+              {pending.retentionDays} days, they become eligible for deletion
+              on the next background merge. After deletion, this cannot be
+              undone.
             </Text>
           )}
         </Dialog.Body>
@@ -669,7 +723,11 @@ function ApplyToExistingConfirmDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button colorPalette="red" loading={isApplying} onClick={onConfirm}>
+          <Button
+            colorPalette="red"
+            loading={isApplying}
+            onClick={() => void onConfirm()}
+          >
             Apply to existing data
           </Button>
         </Dialog.Footer>
@@ -744,6 +802,7 @@ function AddOverrideDrawer({
     scopes: ScopeChipPickerEntry[],
     categories: RetentionCategory[],
     retentionDays: number,
+    applyToExisting: boolean,
   ) => void;
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
@@ -755,6 +814,7 @@ function AddOverrideDrawer({
   );
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
+  const [applyToExisting, setApplyToExisting] = useState<boolean>(true);
 
   useEffect(() => {
     if (open) {
@@ -769,6 +829,7 @@ function AddOverrideDrawer({
       setPreset(String(DEFAULT_RETENTION_DAYS));
       setCustomAmount("");
       setCustomUnit("weeks");
+      setApplyToExisting(true);
     }
   }, [open, currentProjectId, available.projects]);
 
@@ -933,6 +994,23 @@ function AddOverrideDrawer({
                     : `Minimum ${MIN_RETENTION_DAYS} days (7 weeks). Retention is partition-aligned and rounded to whole weeks under the hood.`}
               </Field.HelperText>
             </Field.Root>
+
+            <Checkbox
+              checked={applyToExisting}
+              onCheckedChange={({ checked }) =>
+                setApplyToExisting(checked === true)
+              }
+            >
+              <VStack align="start" gap={0}>
+                <Text fontWeight="600" fontSize="sm">
+                  Apply this change to existing data
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Rewrites this project's existing rows so the new retention
+                  takes effect immediately, not just for new ingestion.
+                </Text>
+              </VStack>
+            </Checkbox>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -944,7 +1022,9 @@ function AddOverrideDrawer({
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
-              onClick={() => onSave(scopes, categories, resolvedDays)}
+              onClick={() =>
+                onSave(scopes, categories, resolvedDays, applyToExisting)
+              }
             >
               Save
             </Button>
