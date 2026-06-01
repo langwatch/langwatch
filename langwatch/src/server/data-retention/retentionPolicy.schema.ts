@@ -31,9 +31,12 @@ export type ResolvedRetention = Record<RetentionCategory, number>;
 
 /**
  * Which ClickHouse table belongs to which retention category. Drives both the
- * TTL reconciler and the per-category storage breakdown.
+ * TTL reconciler and the per-category storage breakdown. `as const satisfies`
+ * keeps the keys as a string-literal union so consumers like
+ * `RETENTION_TABLE_CATEGORY_MAP[someTable]` get narrow typing (typos fail at
+ * the call site instead of silently returning undefined).
  */
-export const RETENTION_TABLE_CATEGORY_MAP: Record<string, RetentionCategory> = {
+export const RETENTION_TABLE_CATEGORY_MAP = {
   event_log: "traces",
   stored_spans: "traces",
   stored_log_records: "traces",
@@ -45,8 +48,10 @@ export const RETENTION_TABLE_CATEGORY_MAP: Record<string, RetentionCategory> = {
   suite_runs: "scenarios",
   experiment_runs: "experiments",
   experiment_run_items: "experiments",
-};
+} as const satisfies Record<string, RetentionCategory>;
+
+export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
 
 export const RETENTION_MANAGED_TABLES = Object.keys(
   RETENTION_TABLE_CATEGORY_MAP,
-);
+) as RetentionManagedTable[];

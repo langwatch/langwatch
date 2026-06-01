@@ -616,6 +616,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testRetentionPolicyCache = new RetentionPolicyCache(
     testRetentionPolicyRepo,
   );
+  // Single PinnedTraceService instance shared between dataRetention.pinning
+  // and share, mirroring the production wiring (presets.ts above). Without
+  // this, tests that auto-pin via share would see a different repo state
+  // than tests that pin directly through dataRetention.pinning.
+  const testPinnedTraceService = new PinnedTraceService(
+    new PinnedTraceRepository(testPrisma),
+  );
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -746,14 +753,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
       policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache),
-      pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
+      pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
       orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),
-      new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
+      testPinnedTraceService,
     ),
     ...overrides,
   });

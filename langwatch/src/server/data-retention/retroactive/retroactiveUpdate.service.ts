@@ -3,6 +3,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
+  type RetentionManagedTable,
 } from "../retentionPolicy.schema";
 
 export interface MutationProgress {
@@ -197,6 +198,7 @@ export class RetroactiveUpdateService {
     isDone: r.isDone === 1,
     partsToDo: r.partsToDo,
     createTime: r.createTime,
-    category: RETENTION_TABLE_CATEGORY_MAP[r.table] ?? null,
+    category:
+      RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
   });
 }

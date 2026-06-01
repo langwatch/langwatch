@@ -304,7 +304,7 @@ export async function reconcileTTL(
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
         if (
           retentionTTLExpr &&
-          RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
+          (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table) &&
           !hasRetentionTTL(tableInfo.engine_full)
         ) {
           const onCluster = config.clusterName
@@ -337,7 +337,7 @@ export async function reconcileTTL(
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const isManaged = RETENTION_MANAGED_TABLES.includes(tableConfig.table);
+      const isManaged = (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table);
       // Whether the cold TTL alone is enough to skip this run — i.e. nothing
       // has changed in the cold-TTL space. For managed tables we must still
       // run when retention TTL is missing from the table (first-time apply).

@@ -320,12 +320,7 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
-            const retentionPolicy = await this.resolveRetention(event.tenantId);
-            const context: ProjectionStoreContext = {
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              retentionPolicy,
-            };
+            const context = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
               onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
@@ -563,12 +558,7 @@ export class ProjectionRouter<
           }
 
           try {
-            const retentionPolicy = await this.resolveRetention(event.tenantId);
-            const storeContext: ProjectionStoreContext = {
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              retentionPolicy,
-            };
+            const storeContext = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
               onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
@@ -641,13 +631,7 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const retentionPolicy = await this.resolveRetention(event.tenantId);
-        const storeContext: ProjectionStoreContext = {
-          aggregateId: String(event.aggregateId),
-          tenantId: event.tenantId,
-          key,
-          retentionPolicy,
-        };
+        const storeContext = await this.buildStoreContext(event, key);
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -729,13 +713,7 @@ export class ProjectionRouter<
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
-        const retentionPolicy = await this.resolveRetention(first.tenantId);
-        const storeContext: ProjectionStoreContext = {
-          aggregateId: String(first.aggregateId),
-          tenantId: first.tenantId,
-          key,
-          retentionPolicy,
-        };
+        const storeContext = await this.buildStoreContext(first, key);
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
@@ -942,5 +920,24 @@ export class ProjectionRouter<
   private async resolveRetention(tenantId: unknown): Promise<ResolvedRetention | null> {
     if (!this.retentionPolicyResolver) return null;
     return this.retentionPolicyResolver.resolve(String(tenantId));
+  }
+
+  /**
+   * Build the per-event ProjectionStoreContext shared by all projection
+   * executors (map handler, fold processFoldProjectionEvent, fold batch).
+   * Centralising it ensures every store sees the same shape — and any new
+   * context field (e.g. process role, trace correlation) lands in one place.
+   */
+  private async buildStoreContext(
+    event: EventType,
+    key?: string,
+  ): Promise<ProjectionStoreContext> {
+    const retentionPolicy = await this.resolveRetention(event.tenantId);
+    return {
+      aggregateId: String(event.aggregateId),
+      tenantId: event.tenantId,
+      ...(key !== undefined ? { key } : {}),
+      retentionPolicy,
+    };
   }
 }
