@@ -914,6 +914,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
           // the heavy span attribute/link payload. Includes exception events
           // for parity with the trace-level list the fold used to carry.
+          //
+          // Dedup at row level inside the subquery so ARRAY JOIN only expands
+          // surviving spans — applying dedup post-expansion would multiply the
+          // tuple lookup by `events_per_span`.
           const result = await client.query({
             query: `
               SELECT
@@ -921,15 +925,22 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 toUnixTimestamp64Milli(event_timestamp) AS timestamp,
                 event_name AS name,
                 event_attrs AS attributes
-              FROM ${TABLE_NAME}
+              FROM (
+                SELECT
+                  SpanId,
+                  "Events.Timestamp" AS Events_Timestamp,
+                  "Events.Name" AS Events_Name,
+                  "Events.Attributes" AS Events_Attributes
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId = {traceId:String}
+                  ${partition.sqlAnd}
+                  AND ${dedupInTuple(partition.sqlAndInner)}
+              )
               ARRAY JOIN
-                "Events.Timestamp" AS event_timestamp,
-                "Events.Name" AS event_name,
-                "Events.Attributes" AS event_attrs
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
+                Events_Timestamp AS event_timestamp,
+                Events_Name AS event_name,
+                Events_Attributes AS event_attrs
               ORDER BY event_timestamp ASC
             `,
             query_params: { tenantId, traceId, ...partition.params },
@@ -981,6 +992,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
+          // Same shape as `getTraceEventsByTraceId`: dedup at row level inside
+          // the subquery, then ARRAY JOIN the Events.* arrays of the survivors,
+          // and finally drop exception events (which is a per-event filter).
           const result = await client.query({
             query: `
               SELECT
@@ -990,16 +1004,23 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 toUnixTimestamp64Milli(event_timestamp) AS started_at,
                 event_name AS event_type,
                 event_attrs AS attributes
-              FROM ${TABLE_NAME}
+              FROM (
+                SELECT
+                  TenantId, TraceId, SpanId,
+                  "Events.Timestamp" AS Events_Timestamp,
+                  "Events.Name" AS Events_Name,
+                  "Events.Attributes" AS Events_Attributes
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId = {traceId:String}
+                  ${partition.sqlAnd}
+                  AND ${dedupInTuple(partition.sqlAndInner)}
+              )
               ARRAY JOIN
-                "Events.Timestamp" AS event_timestamp,
-                "Events.Name" AS event_name,
-                "Events.Attributes" AS event_attrs
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-                AND event_name != 'exception'
+                Events_Timestamp AS event_timestamp,
+                Events_Name AS event_name,
+                Events_Attributes AS event_attrs
+              WHERE event_name != 'exception'
               ORDER BY event_timestamp DESC
             `,
             query_params: { tenantId, traceId, ...partition.params },
