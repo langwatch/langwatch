@@ -89,6 +89,17 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 
 If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
+For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart will not materialise this Secret itself — the deployment composes `CLICKHOUSE_URL` at runtime from the password key:
+
+```bash
+kubectl create secret generic langwatch-clickhouse-creds \
+  --namespace langwatch \
+  --from-literal=password="$(openssl rand -hex 32)" \
+  --from-literal=clusterSecret="$(openssl rand -hex 24)"
+```
+
+The `clusterSecret` key is only used when `clickhouse.replicas > 1` (Keeper inter-node auth), but creating it upfront keeps a future `--set clickhouse.replicas=3` a one-line change. If you run external ClickHouse (`clickhouse.chartManaged: false`), skip this Secret entirely.
+
 For external databases, create additional secrets:
 
 ```bash
@@ -160,6 +171,12 @@ clickhouse:
   memory: "8Gi"
   storage:
     size: 100Gi
+  auth:
+    # Operator-owned Secret (created above). With autogen.enabled=false the
+    # chart will not materialise a ClickHouse Secret; point at the one you
+    # created and the deployment composes CLICKHOUSE_URL at runtime from
+    # its password key.
+    existingSecret: langwatch-clickhouse-creds
 
 # Ingress with TLS
 ingress:
