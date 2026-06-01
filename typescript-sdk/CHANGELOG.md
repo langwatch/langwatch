@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.31.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.30.0...typescript-sdk@v0.31.0) (2026-06-01)
+
+
+### Features
+
+* **cli:** make experiment results/status slug-first, defaulting to latest run ([#4411](https://github.com/langwatch/langwatch/issues/4411)) ([791ddc7](https://github.com/langwatch/langwatch/commit/791ddc7f53ba817cffc6673c5c8a86ffe7b99976))
+
+
+### Bug Fixes
+
+* **deps:** bump uuid to &gt;=11.1.1 across the monorepo (closes 7 alerts) ([#4470](https://github.com/langwatch/langwatch/issues/4470)) ([f22706b](https://github.com/langwatch/langwatch/commit/f22706b523526875ecd639d54c1e392d27cbcfae))
+* **typescript-sdk:** re-enable cli-sync.e2e.test.ts ([#4000](https://github.com/langwatch/langwatch/issues/4000)) ([40dd49d](https://github.com/langwatch/langwatch/commit/40dd49d5787df4c0eb524813863bc5fe3282a700))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump typescript from 5.9.2 to 5.9.3 in /typescript-sdk ([#4341](https://github.com/langwatch/langwatch/issues/4341)) ([e71df89](https://github.com/langwatch/langwatch/commit/e71df894883a53a4aa5dda628c44c34fb0277c54))
+* **deps:** bump @opentelemetry/instrumentation from 0.212.0 to 0.218.0 in /typescript-sdk ([#4345](https://github.com/langwatch/langwatch/issues/4345)) ([fdf519c](https://github.com/langwatch/langwatch/commit/fdf519c58e57de8f2272407532c99c5dfc2b6c23))
+* **deps:** bump @opentelemetry/instrumentation in /typescript-sdk ([fdf519c](https://github.com/langwatch/langwatch/commit/fdf519c58e57de8f2272407532c99c5dfc2b6c23))
+
 ## [0.30.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.1...typescript-sdk@v0.30.0) (2026-05-29)
 
 
