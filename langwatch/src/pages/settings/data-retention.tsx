@@ -165,18 +165,11 @@ function DataRetentionPage({
   const invalidate = () =>
     utils.dataRetention.getRules.invalidate({ projectId });
 
-  const setForScope = api.dataRetention.setForScope.useMutation({
-    onSuccess: () => {
-      void invalidate();
-      toaster.create({ title: "Retention override saved", type: "success" });
-    },
-    onError: (error) =>
-      toaster.create({
-        title: "Failed to save override",
-        description: error.message,
-        type: "error",
-      }),
-  });
+  // Per-call toasts are intentionally omitted — the Add-override drawer
+  // fans out one setForScope per (scope × category) pair and stacks the
+  // toaster column with identical "saved" messages. The drawer's onSave
+  // emits a single aggregated toast after the batch resolves.
+  const setForScope = api.dataRetention.setForScope.useMutation();
 
   const removeForScope = api.dataRetention.removeForScope.useMutation({
     onSuccess: () => {
@@ -528,7 +521,30 @@ function DataRetentionPage({
                     ),
                 ),
               );
-              if (results.every((r) => r.ok)) setDrawerOpen(false);
+              void invalidate();
+              const failed = results.filter((r) => !r.ok);
+              if (failed.length === 0) {
+                toaster.create({
+                  title:
+                    pairs.length === 1
+                      ? "Retention override saved"
+                      : `${pairs.length} retention overrides saved`,
+                  type: "success",
+                });
+                setDrawerOpen(false);
+                return;
+              }
+              const firstError = failed.find(
+                (r): r is { ok: false; error: Error } => !r.ok,
+              );
+              toaster.create({
+                title:
+                  failed.length === pairs.length
+                    ? "Failed to save overrides"
+                    : `Saved ${pairs.length - failed.length} of ${pairs.length} overrides`,
+                description: firstError?.error.message,
+                type: "error",
+              });
             }}
           />
         )}
