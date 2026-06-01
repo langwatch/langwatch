@@ -4,7 +4,7 @@ Feature: Experiments are archived, not hard-deleted
   I want the experiment to disappear from my list immediately
   But I also want the platform to NOT churn the ClickHouse cold tier
   Because every hard delete forces a lightweight-delete mask onto every
-  matching part on S3 and triggers a multi-day merge tail — a recurring
+  matching part on S3 and triggers a multi-day merge tail, a recurring
   ~$200/mo S3 cost on a 3-45-deletes/day workload, growing with usage.
 
   # Background: every other major entity in the schema (Workflow, Monitor,
@@ -39,7 +39,7 @@ Feature: Experiments are archived, not hard-deleted
     # The Monitor model has no archivedAt column and is a small relational row
     # with no ClickHouse / S3 footprint, so hard-delete remains correct for it.
     # The cost-driving path was the ClickHouse mass-delete on experiment_runs
-    # / experiment_run_items / dspy_steps — that is what this feature removes.
+    # / experiment_run_items / dspy_steps, which is what this feature removes.
 
   Scenario: Archiving without a workflow or monitor still succeeds
     Given an experiment "exp_no_wf" with workflowId = null and no monitor
@@ -95,13 +95,13 @@ Feature: Experiments are archived, not hard-deleted
     Then deleteByExperiment is never called
 
   # ============================================================================
-  # Permission + tenancy
+  # Tenancy
   # ============================================================================
 
-  Scenario: A user without workflows:delete cannot archive experiments
-    Given a user "u_viewer" who does NOT have the "workflows:delete" permission on project "p1"
-    When "u_viewer" calls `experiments.deleteExperiment` for an experiment in "p1"
-    Then the call returns FORBIDDEN
+  # The workflows:delete permission is enforced via the shared
+  # checkProjectPermission middleware and is exercised by every protected
+  # mutation; re-asserting it for the archive endpoint specifically would
+  # duplicate that coverage and is intentionally left out of this feature.
 
   Scenario: An experiment from another project cannot be archived
     Given two projects "p1" and "p2"

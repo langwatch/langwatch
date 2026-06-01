@@ -134,6 +134,7 @@ describe("Experiment archive (formerly delete)", () => {
     return { id, workflowId };
   }
 
+  /** @scenario Archiving an experiment sets archivedAt and preserves the row */
   it("archives the experiment row instead of deleting it", async () => {
     const { id } = await createExperiment({
       slug: `${testNamespace}-basic-${nanoid(6)}`,
@@ -149,6 +150,7 @@ describe("Experiment archive (formerly delete)", () => {
     expect(row?.slug).toMatch(/-archived-/);
   });
 
+  /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
   it("cascade-archives the linked workflow and hard-deletes the monitor", async () => {
     const { id, workflowId } = await createExperiment({
       slug: `${testNamespace}-cascade-${nanoid(6)}`,
@@ -171,6 +173,7 @@ describe("Experiment archive (formerly delete)", () => {
     expect(mon).toBeNull();
   });
 
+  /** @scenario Archiving without a workflow or monitor still succeeds */
   it("handles an experiment with no workflow or monitor without erroring", async () => {
     const { id } = await createExperiment({
       slug: `${testNamespace}-nowf-${nanoid(6)}`,
@@ -181,7 +184,8 @@ describe("Experiment archive (formerly delete)", () => {
     ).resolves.toEqual({ success: true });
   });
 
-  it("is idempotent — a second click does not overwrite archivedAt", async () => {
+  /** @scenario A second click on the same already-archived experiment is a no-op */
+  it("is idempotent - a second click does not overwrite archivedAt", async () => {
     const { id } = await createExperiment({
       slug: `${testNamespace}-idem-${nanoid(6)}`,
     });
@@ -202,6 +206,7 @@ describe("Experiment archive (formerly delete)", () => {
     expect(firstArchive).toEqual(secondArchive);
   });
 
+  /** @scenario Archived experiments are hidden from the standard list query */
   it("hides archived experiments from the project-wide list (Postgres path)", async () => {
     const liveSlug = `${testNamespace}-live-${nanoid(6)}`;
     const archivedSlug = `${testNamespace}-arch-${nanoid(6)}`;
@@ -214,7 +219,7 @@ describe("Experiment archive (formerly delete)", () => {
     });
 
     // getAllByProjectId goes through the repository's findAll, which is
-    // pure Postgres — no ClickHouse enrichment. That is the layer we need
+    // pure Postgres, no ClickHouse enrichment. That is the layer we need
     // to verify here (the run-count enrichment in getAllForEvaluationsList
     // happens after this list filter and is tested elsewhere).
     const list = await caller.experiments.getAllByProjectId({ projectId });
@@ -224,6 +229,7 @@ describe("Experiment archive (formerly delete)", () => {
     expect(ids).not.toContain(archivedId);
   });
 
+  /** @scenario A single getExperiment by id returns archived experiments as not-found */
   it("returns NOT_FOUND when fetching an archived experiment by slug", async () => {
     const slug = `${testNamespace}-notfound-${nanoid(6)}`;
     const { id } = await createExperiment({ slug });
@@ -248,12 +254,87 @@ describe("Experiment archive (formerly delete)", () => {
       experimentId: firstId,
     });
 
-    // Now create a new experiment with the same slug — should succeed.
     const { id: secondId } = await createExperiment({ slug });
     const row = await prisma.experiment.findFirst({
       where: { id: secondId, projectId },
     });
     expect(row?.slug).toBe(slug);
     expect(row?.archivedAt).toBeNull();
+  });
+
+  // The archive path used to issue three side-effect calls that the feature
+  // file forbids: a ClickHouse mass-delete (lightweight-delete masks on
+  // cold-tier S3 parts), an Elasticsearch deleteByQuery on the
+  // batch_evaluation index, and an in-process DSpy step cleanup. We
+  // removed all three by deleting the imports from the router. The most
+  // reliable proof is a source-level check: with the imports gone there
+  // is no path by which the archive procedure can reach those services.
+  // Runtime fail-on-call mocks were considered but rejected because
+  // getClickHouseClientForProject is still used by sibling list and
+  // enrichment procedures in the same router and globally mocking it
+  // would break unrelated tests.
+  /** @scenario The delete-experiment code path does NOT contact ClickHouse */
+  /** @scenario The delete-experiment code path does NOT contact Elasticsearch */
+  /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */
+  it("does not import ClickHouse, Elasticsearch, or DSpy cleanup in the router", async () => {
+    const routerSrc = await import("node:fs/promises").then((fs) =>
+      fs.readFile(
+        require.resolve("../experiments.ts"),
+        "utf8",
+      ),
+    );
+    expect(routerSrc).not.toMatch(/getClickHouseClientForProject/);
+    expect(routerSrc).not.toMatch(/from\s+["'][^"']*server\/elasticsearch["']/);
+    expect(routerSrc).not.toMatch(/BATCH_EVALUATION_INDEX/);
+    expect(routerSrc).not.toMatch(/dspySteps\.steps\.deleteByExperiment/);
+  });
+
+  /** @scenario An experiment from another project cannot be archived */
+  it("returns NOT_FOUND when archiving an experiment that belongs to a different project", async () => {
+    const otherProjectId = `${projectId}-other-${nanoid(6)}`;
+    await prisma.project.create({
+      data: {
+        id: otherProjectId,
+        name: `Other Project ${otherProjectId}`,
+        slug: otherProjectId,
+        teamId: (await prisma.project.findFirstOrThrow({
+          where: { id: projectId },
+          select: { teamId: true },
+        })).teamId,
+        language: "python",
+        framework: "openai",
+        apiKey: `qa-key-${otherProjectId}`,
+      },
+    });
+
+    const foreignId = `experiment_${nanoid()}`;
+    await prisma.experiment.create({
+      data: {
+        id: foreignId,
+        name: "Foreign experiment",
+        slug: `foreign-${nanoid(6)}`,
+        projectId: otherProjectId,
+        type: ExperimentType.BATCH_EVALUATION_V2,
+      },
+    });
+
+    try {
+      await expect(
+        caller.experiments.deleteExperiment({
+          projectId,
+          experimentId: foreignId,
+        }),
+      ).rejects.toThrow(/not found|forbidden|access/i);
+
+      const stillThere = await prisma.experiment.findFirst({
+        where: { id: foreignId, projectId: otherProjectId },
+      });
+      expect(stillThere?.archivedAt).toBeNull();
+    } finally {
+      await prisma.experiment
+        .delete({ where: { id: foreignId, projectId: otherProjectId } })
+        .catch(() => {});
+      await prisma.project.delete({ where: { id: otherProjectId } }).catch(() => {});
+    }
   });
 });
