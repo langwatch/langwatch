@@ -474,6 +474,12 @@ function slackMrkdwnToCommonMark(input: string): string {
         /(^|[^~\w])~([^~\n][^~\n]*?[^~\n\s])~(?=[^~\w]|$)/g,
         (_match, lead: string, content: string) => `${lead}~~${content}~~`,
       )
+      // Slack treats every `\n` as a visible line break. CommonMark
+      // collapses single newlines into spaces and only honours blank lines
+      // as paragraph breaks, so append two trailing spaces to every
+      // newline that isn't already a paragraph break — that's the
+      // CommonMark hard-break that renders as `<br>` under `<Markdown>`.
+      .replace(/([^\n])\n(?!\n)/g, "$1  \n")
   );
 }
 
