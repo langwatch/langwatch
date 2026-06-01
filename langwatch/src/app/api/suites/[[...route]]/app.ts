@@ -1,22 +1,15 @@
 import type { SimulationSuite } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { handleError } from "../../middleware";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
@@ -25,8 +18,6 @@ import { getApp } from "~/server/app-layer/app";
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:suites");
-
-type Variables = AuthMiddlewareVariables;
 
 const suiteTargetSchema = z.object({
   type: z.enum(["prompt", "http", "code", "workflow"]),
@@ -117,17 +108,11 @@ function createService() {
   });
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/suites")
-  .use(tracerMiddleware({ name: "suites" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/suites" });
 
-  // ── List Suites ────────────────────────────────────────────
-  .get(
+// ── List Suites ────────────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
     "/",
-    requirePermission("scenarios:view"),
     describeRoute({
       description: "List all non-archived suites (run plans) for the project",
       responses: {
@@ -157,12 +142,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       })));
     },
-  )
+  );
 
-  // ── Get Suite ──────────────────────────────────────────────
-  .get(
+// ── Get Suite ──────────────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
     "/:id",
-    requirePermission("scenarios:view"),
     describeRoute({
       description: "Get a suite (run plan) by its ID",
       responses: {
@@ -203,12 +187,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+  );
 
-  // ── Create Suite ───────────────────────────────────────────
-  .post(
+// ── Create Suite ───────────────────────────────────────────
+secured.access(requires("scenarios:manage")).post(
     "/",
-    requirePermission("scenarios:manage"),
     resourceLimitMiddleware("experiments"),
     describeRoute({
       description: "Create a new suite (run plan)",
@@ -250,12 +233,11 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Update Suite ───────────────────────────────────────────
-  .patch(
+// ── Update Suite ───────────────────────────────────────────
+secured.access(requires("scenarios:manage")).patch(
     "/:id",
-    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Update a suite (run plan)",
       responses: {
@@ -304,12 +286,11 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Duplicate Suite ────────────────────────────────────────
-  .post(
+// ── Duplicate Suite ────────────────────────────────────────
+secured.access(requires("scenarios:manage")).post(
     "/:id/duplicate",
-    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Duplicate a suite (run plan)",
       responses: {
@@ -352,12 +333,11 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Run Suite ──────────────────────────────────────────────
-  .post(
+// ── Run Suite ──────────────────────────────────────────────
+secured.access(requires("scenarios:manage")).post(
     "/:id/run",
-    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
       responses: {
@@ -420,12 +400,11 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
-  // ── Delete (Archive) Suite ─────────────────────────────────
-  .delete(
+// ── Delete (Archive) Suite ─────────────────────────────────
+secured.access(requires("scenarios:manage")).delete(
     "/:id",
-    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Archive (soft-delete) a suite (run plan)",
       responses: {
@@ -461,3 +440,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ id, archived: true });
     },
   );
+
+export const app = secured.hono;

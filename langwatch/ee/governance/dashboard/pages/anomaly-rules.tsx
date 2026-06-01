@@ -17,15 +17,13 @@ import { Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { docsUrl } from "~/utils/docsUrl";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -191,16 +189,10 @@ const blankComposer = (): ComposerState => ({
 });
 
 function AnomalyRulesPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
 
   const rulesQuery = api.anomalyRules.list.useQuery(
     { organizationId: orgId },
@@ -333,13 +325,6 @@ function AnomalyRulesPage() {
       });
     }
   };
-
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -901,6 +886,10 @@ function ThresholdPreview({
   );
 }
 
-export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-  AnomalyRulesPage,
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
+    AnomalyRulesPage,
+  ),
 );

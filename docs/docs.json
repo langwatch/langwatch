@@ -680,7 +680,8 @@
           {
             "group": "Dashboards",
             "pages": [
-              "ai-governance/governance-dashboard"
+              "ai-governance/governance-dashboard",
+              "ai-governance/cost-centers"
             ]
           },
           {
@@ -761,7 +762,8 @@
               "self-hosting/deployment/docker-compose",
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
-              "self-hosting/deployment/kubernetes-local"
+              "self-hosting/deployment/kubernetes-local",
+              "self-hosting/deployment/argocd"
             ]
           },
           {
@@ -1207,7 +1209,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1780001877",
+      "source": "/ci/cache/busted/1780257651",
       "destination": "/"
     },
     {

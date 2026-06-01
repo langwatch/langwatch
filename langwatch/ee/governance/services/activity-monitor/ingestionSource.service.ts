@@ -31,14 +31,7 @@ import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
-
-/**
- * Non-enterprise plans can create up to this many active IngestionSources
- * per org. Composer separately restricts source TYPE to otel_generic, so
- * a non-enterprise org gets 3 generic OTel sources to try the pillar
- * before needing to upgrade. Spec: specs/ai-gateway/license-gate-governance.feature.
- */
-export const NON_ENTERPRISE_INGESTION_SOURCE_CAP = 3;
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
 
 export type SourceType =
   | "otel_generic"

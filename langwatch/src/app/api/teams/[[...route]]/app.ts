@@ -1,5 +1,4 @@
 import type { Organization } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -8,18 +7,13 @@ import {
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
+import { createOrgApp, requires } from "~/server/api/security";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { NotFoundError } from "../../shared/errors";
 import { handleTeamError } from "./error-handler";
 
 patchZodOpenapi();
-
-type Variables = OrgAuthMiddlewareVariables & TeamServiceMiddlewareVariables;
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -70,20 +64,20 @@ function teamResponse(team: {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/teams")
-  .use(tracerMiddleware({ name: "teams" }))
-  .use(loggerMiddleware())
-  .use(orgAuthMiddleware)
-  .use(teamServiceMiddleware)
-  .onError(handleTeamError)
+const secured = createOrgApp<TeamServiceMiddlewareVariables>({
+  basePath: "/api/teams",
+});
 
+secured.hono.onError(handleTeamError);
+
+secured
+  .access(requires("team:view"))
   .get(
     "/",
+    teamServiceMiddleware,
     describeRoute({
       description: "List all non-archived teams for the organization (paginated)",
     }),
-    requireOrgPermission("team:view"),
     zValidator("query", paginationQuerySchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -101,14 +95,16 @@ export const app = new Hono<{ Variables: Variables }>()
         pagination: result.pagination,
       });
     },
-  )
+  );
 
+secured
+  .access(requires("team:create"))
   .post(
     "/",
+    teamServiceMiddleware,
     describeRoute({
       description: "Create a new team",
     }),
-    requireOrgPermission("team:create"),
     zValidator("json", createTeamSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -122,14 +118,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(teamResponse(team), 201);
     },
-  )
+  );
 
+secured
+  .access(requires("team:view"))
   .get(
     "/:id",
+    teamServiceMiddleware,
     describeRoute({
       description: "Get a team by its id",
     }),
-    requireOrgPermission("team:view"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -145,14 +143,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(teamResponse(team));
     },
-  )
+  );
 
+secured
+  .access(requires("team:update"))
   .patch(
     "/:id",
+    teamServiceMiddleware,
     describeRoute({
       description: "Update a team by its id",
     }),
-    requireOrgPermission("team:update"),
     zValidator("json", updateTeamSchema, validationHook),
     async (c) => {
       const { id } = c.req.param();
@@ -178,14 +178,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(teamResponse(team));
     },
-  )
+  );
 
+secured
+  .access(requires("team:delete"))
   .delete(
     "/:id",
+    teamServiceMiddleware,
     describeRoute({
       description: "Archive a team (soft-delete)",
     }),
-    requireOrgPermission("team:delete"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -211,3 +213,5 @@ export const app = new Hono<{ Variables: Variables }>()
       });
     },
   );
+
+export const app = secured.hono;

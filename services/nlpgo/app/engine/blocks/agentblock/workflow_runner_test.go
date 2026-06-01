@@ -131,7 +131,7 @@ func TestWorkflowRunner_NonTwoXxReturnsHTTPError(t *testing.T) {
 	if !errors.As(err, &httpErr) {
 		t.Fatalf("Execute: error = %v, want *HTTPError", err)
 	}
-	if httpErr.StatusCode != 502 {
+	if httpErr.StatusCode != http.StatusBadGateway {
 		t.Errorf("StatusCode = %d, want 502", httpErr.StatusCode)
 	}
 	if !strings.Contains(httpErr.Body, "upstream gone") {

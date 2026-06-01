@@ -63,6 +63,77 @@ Feature: AI Gateway — Provider settings cohesion
     And a span event "provider_disabled_for_vk" fires on each affected VK
 
   # ============================================================================
+  # Advanced (Gateway) section — single Save, collapsed by default, FF-gated
+  # ============================================================================
+
+  @integration
+  Scenario: Advanced (Gateway) is hidden when the AI gateway feature flag is off
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is disabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    Then the "Advanced (Gateway)" accordion is not rendered
+    And the drawer's basic fields and Save button remain interactive
+
+  @integration
+  Scenario: Advanced (Gateway) renders as a collapsed accordion when the flag is on
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is enabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    Then the "Advanced (Gateway)" accordion is rendered collapsed
+    And the rate-limit, fallback priority, and provider config inputs are hidden
+      until I expand the accordion
+
+  @integration
+  Scenario: Single Save persists basic credentials and advanced gateway fields together
+    Given a ModelProvider "openai" exists scoped to ORGANIZATION "acme"
+    And the "release_ui_ai_gateway_menu_enabled" flag is enabled for "acme"
+    When I open the ModelProvider drawer for "openai"
+    And I expand the "Advanced (Gateway)" accordion
+    And I set rateLimitRpm=600 and providerConfig={"region":"us-east-1"}
+    And I click the drawer's "Save" button
+    Then the drawer closes after a single save round-trip
+    And the row's rate limit AND credentials reflect the new values
+    And no separate "Save Advanced" button is rendered
+
+  # ============================================================================
+  # Advanced (Gateway) writes inherit the row's scope-manage requirement
+  # ============================================================================
+
+  @integration
+  Scenario: Advanced gateway writes require manage on every existing-row scope
+    Given a ModelProvider "cerebras" exists scoped to ORGANIZATION "acme"
+    And I am a team admin in "acme" without organization:manage
+    When I send `updateModelProvider({ id, rateLimitRpm: 600 })` with no
+      `scopes` array
+    Then the service rejects with FORBIDDEN and does not mutate
+      `rateLimitRpm`
+    And the same check holds for `rateLimitTpm`, `rateLimitRpd`,
+      `fallbackPriorityGlobal`, and `providerConfig`
+
+  @integration
+  Scenario: Update of a vanished id surfaces NOT_FOUND instead of silently creating
+    Given I am an organization admin in "acme"
+    When I send `updateModelProvider({ id: "vanished-id", projectId, provider: "groq", enabled: true, customKeys: {...} })`
+      for a row that was concurrently deleted or is not visible from the
+      project
+    Then the service rejects with NOT_FOUND
+    And no new ModelProvider row is created in the caller's project
+
+  # ============================================================================
+  # Dispatch-side stripping of unsupported sampling params
+  # ============================================================================
+
+  @integration
+  Scenario: Stale top_p is stripped when the model does not support it
+    Given a custom Bedrock model "us.anthropic.claude-haiku-4-5" with
+      supportedParameters=["temperature"]
+    And a saved prompt-config blob whose llm carries a stale top_p=1.0
+    When the workflow dispatches through studioBackendPostEvent
+    Then the request that reaches nlpgo carries temperature but NOT top_p
+    And Bedrock no longer returns "temperature and top_p cannot both be
+      specified for this model"
+
+  # ============================================================================
   # Advanced (Gateway) tab — fields formerly on GatewayProviderCredential
   # ============================================================================
 

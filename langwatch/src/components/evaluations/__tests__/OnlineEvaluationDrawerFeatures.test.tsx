@@ -53,7 +53,7 @@ vi.mock("~/hooks/useLicenseEnforcement", async () =>
 // Mock scrollIntoView which jsdom doesn't support
 Element.prototype.scrollIntoView = vi.fn();
 
-// TODO(#3240): re-enable after react-admin 5.13.1 provider wrapper fix
+// TODO(#3240): re-enable once the drawer test provider wrapper is fixed.
 describe.skip("OnlineEvaluationDrawer - Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();

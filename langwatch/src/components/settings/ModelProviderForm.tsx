@@ -1,6 +1,6 @@
 import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
 import { SmallLabel } from "../SmallLabel";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
@@ -23,8 +23,15 @@ import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 // section on the model-providers settings page (DefaultModelsSection). See
 // specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
-import { ModelProviderAdvancedSection } from "./ModelProviderAdvancedSection";
+import {
+  draftFromProvider,
+  EMPTY_ADVANCED_DRAFT,
+  type ModelProviderAdvancedDraft,
+  ModelProviderAdvancedSection,
+  parseAdvancedDraft,
+} from "./ModelProviderAdvancedSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -63,6 +70,24 @@ export const EditModelProviderForm = ({
   }, [providers, providerKey]);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Advanced (Gateway) draft lives at the form root so the single Save
+  // sends basic + advanced in one update mutation. Gated on the AI
+  // Gateway feature flag — orgs without the gateway never see the
+  // accordion AND the form never spreads advanced fields into the
+  // payload, so toggling the flag has no payload-shape side effects.
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    "release_ui_ai_gateway_menu_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const [advancedDraft, setAdvancedDraft] =
+    useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
+  const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(
+    null,
+  );
 
   // Find the row this form is editing. Three inputs to the lookup:
   //   - `modelProviderId === "new"` → always blank, never pre-fill from
@@ -104,6 +129,64 @@ export const EditModelProviderForm = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
+  // Reset advanced draft when the *drawer subject* changes — i.e. the
+  // user opened the drawer on a different provider row. We intentionally
+  // do NOT re-seed on every underlying-value change: a background
+  // refetch (window focus, invalidation, concurrent edit in another
+  // tab) re-runs this effect and would overwrite the user's in-progress
+  // draft + clear their JSON error with no warning. Keying on the row
+  // id + the flag preserves typed values across silent refetches.
+  const providerId = (provider as { id?: string }).id;
+  useEffect(() => {
+    if (!gatewayMenuEnabled) {
+      setAdvancedDraft(EMPTY_ADVANCED_DRAFT);
+      setAdvancedJsonError(null);
+      return;
+    }
+    setAdvancedDraft(
+      draftFromProvider({
+        rateLimitRpm:
+          (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+        rateLimitTpm:
+          (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+        rateLimitRpd:
+          (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+        fallbackPriorityGlobal:
+          (provider as { fallbackPriorityGlobal?: number | null })
+            .fallbackPriorityGlobal ?? null,
+        providerConfig: (provider as { providerConfig?: unknown })
+          .providerConfig,
+      }),
+    );
+    setAdvancedJsonError(null);
+    setAdvancedAccordionValue([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatewayMenuEnabled, providerId]);
+
+  // Controlled accordion state: collapsed by default, but expands
+  // automatically when the user clicks Save with malformed JSON so the
+  // inline error is actually visible.
+  const [advancedAccordionValue, setAdvancedAccordionValue] = useState<
+    string[]
+  >([]);
+
+  const getAdvancedPayload = useCallback(() => {
+    if (!gatewayMenuEnabled) return null;
+    try {
+      const parsed = parseAdvancedDraft(advancedDraft);
+      setAdvancedJsonError(null);
+      return parsed;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Invalid JSON";
+      setAdvancedJsonError(message);
+      // Auto-expand the accordion so the inline error is visible. Save
+      // would otherwise stop spinning + the drawer stay open with no
+      // visible feedback if the user collapsed the section before save.
+      setAdvancedAccordionValue(["advanced-gateway"]);
+      throw e;
+    }
+  }, [gatewayMenuEnabled, advancedDraft]);
+
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
   // Effective defaults (project values with fallbacks) are computed inside the hook
   const [state, actions] = useModelProviderForm({
@@ -115,6 +198,7 @@ export const EditModelProviderForm = ({
     organizationId: organization?.id,
     canManageOrganization,
     canManageTeam,
+    getAdvancedPayload,
     onSuccess: () => {
       closeDrawer();
     },
@@ -297,35 +381,31 @@ export const EditModelProviderForm = ({
           />
         )}
 
-        <ModelProviderAdvancedSection
-          modelProviderId={(provider as { id?: string }).id}
-          initial={{
-            rateLimitRpm:
-              (provider as { rateLimitRpm?: number | null }).rateLimitRpm ??
-              null,
-            rateLimitTpm:
-              (provider as { rateLimitTpm?: number | null }).rateLimitTpm ??
-              null,
-            rateLimitRpd:
-              (provider as { rateLimitRpd?: number | null }).rateLimitRpd ??
-              null,
-            fallbackPriorityGlobal:
-              (provider as { fallbackPriorityGlobal?: number | null })
-                .fallbackPriorityGlobal ?? null,
-            providerConfig: (provider as { providerConfig?: unknown })
-              .providerConfig,
-            healthStatus: (provider as { healthStatus?: string | null })
-              .healthStatus,
-            circuitOpenedAt: (provider as {
-              circuitOpenedAt?: Date | string | null;
-            }).circuitOpenedAt,
-            lastHealthCheckAt: (provider as {
-              lastHealthCheckAt?: Date | string | null;
-            }).lastHealthCheckAt,
-            disabledAt: (provider as { disabledAt?: Date | string | null })
-              .disabledAt,
-          }}
-        />
+        {gatewayMenuEnabled && (
+          <ModelProviderAdvancedSection
+            modelProviderId={(provider as { id?: string }).id}
+            draft={advancedDraft}
+            onDraftChange={(next) => {
+              setAdvancedDraft(next);
+              setAdvancedJsonError(null);
+            }}
+            jsonError={advancedJsonError}
+            accordionValue={advancedAccordionValue}
+            onAccordionValueChange={setAdvancedAccordionValue}
+            initial={{
+              healthStatus: (provider as { healthStatus?: string | null })
+                .healthStatus,
+              circuitOpenedAt: (provider as {
+                circuitOpenedAt?: Date | string | null;
+              }).circuitOpenedAt,
+              lastHealthCheckAt: (provider as {
+                lastHealthCheckAt?: Date | string | null;
+              }).lastHealthCheckAt,
+              disabledAt: (provider as { disabledAt?: Date | string | null })
+                .disabledAt,
+            }}
+          />
+        )}
 
         <HStack width="full" justify="end">
           <Button

@@ -45,15 +45,15 @@ import (
 // configId), a saved-version node (configId + handle + versionMetadata),
 // or a draft node (saved + promptDraft=true).
 type signatureNodeOpts struct {
-	NodeID         string
-	NodeName       string
-	ConfigID       string
-	Handle         string
-	VersionID      string
-	VersionNumber  int
-	Draft          bool
-	Instructions   string
-	TemplateMsgs   []map[string]any
+	NodeID        string
+	NodeName      string
+	ConfigID      string
+	Handle        string
+	VersionID     string
+	VersionNumber int
+	Draft         bool
+	Instructions  string
+	TemplateMsgs  []map[string]any
 }
 
 // signatureWorkflowBody builds an execute_component envelope shaped
@@ -242,4 +242,3 @@ func (f *promptSpansFixture) FindPromptSpan(t *testing.T, name string) sdktrace.
 	}
 	return s
 }
-

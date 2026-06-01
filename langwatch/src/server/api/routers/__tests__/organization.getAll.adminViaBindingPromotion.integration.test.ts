@@ -8,7 +8,7 @@
  * `organization.members[0].role`, so the stale legacy column shadows
  * the fresh binding and `withPermissionGuard("organization:manage")`
  * denies access — even though backend RBAC paths
- * (`resolveOrganizationPermission`, `requirePatPermission`) already
+ * (`resolveOrganizationPermission`, `requireApiKeyPermission`) already
  * honor the binding correctly.
  *
  * The narrow fix in `organization.getAll` promotes the exposed
@@ -121,7 +121,7 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     const safeDelete = async (fn: () => Promise<unknown>) => {
       try {
         await fn();

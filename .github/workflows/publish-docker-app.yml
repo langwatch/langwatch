@@ -200,6 +200,12 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pin to cosign 2.x. cosign 3.x defaults to the new bundle format (OCI 1.1
+          # referrers), which Docker Hub does not reliably serve, so cosign verify
+          # reports "no signatures found" immediately after a successful cosign sign.
+          # The 2.x line writes the tag-based signature format Docker Hub supports.
+          cosign-release: v2.6.3
 
       - name: Install syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
@@ -220,78 +226,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sboms
+          # Release tags (VERSION + optionally latest) and the HASH tag should all point
+          # at the same multi-arch manifest digest; sign-image.sh asserts this and signs
+          # any tag whose digest drifted rather than leaving it unsigned.
+          EXTRA_TAGS=""
+          if [ "${IS_RELEASE}" = "true" ]; then
+            EXTRA_TAGS="${VERSION}"
+            if ! echo "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-.+'; then
+              EXTRA_TAGS="${EXTRA_TAGS} latest"
+            fi
+          fi
           for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
-            REF="langwatch/${IMAGE}:${HASH}"
-            INSPECT=$(docker buildx imagetools inspect "${REF}" --format '{{ json . }}')
-
-            INDEX_DIGEST=$(echo "${INSPECT}" | jq -r '.manifest.digest')
-            if [ -z "${INDEX_DIGEST}" ] || [ "${INDEX_DIGEST}" = "null" ]; then
-              echo "::error::Could not resolve index digest for ${REF}"
-              exit 1
-            fi
-            echo "Signing multi-arch index langwatch/${IMAGE}@${INDEX_DIGEST}"
-            cosign sign "langwatch/${IMAGE}@${INDEX_DIGEST}"
-
-            echo "Verifying index signature for langwatch/${IMAGE}@${INDEX_DIGEST}"
-            cosign verify "langwatch/${IMAGE}@${INDEX_DIGEST}" \
-              --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
-              --certificate-oidc-issuer "${CERT_OIDC_ISSUER}" > /dev/null
-
-            # Release tags (VERSION + optionally latest) and the HASH tag should all point
-            # at the same multi-arch manifest digest, but assert it explicitly so that any
-            # future registry-side normalization that produces a different digest is signed
-            # rather than silently leaving an unsigned tag.
-            EXTRA_TAGS=""
-            if [ "${IS_RELEASE}" = "true" ]; then
-              EXTRA_TAGS="${VERSION}"
-              if ! echo "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-.+'; then
-                EXTRA_TAGS="${EXTRA_TAGS} latest"
-              fi
-            fi
-            for TAG in ${EXTRA_TAGS}; do
-              TAG_DIGEST=$(docker buildx imagetools inspect "langwatch/${IMAGE}:${TAG}" --format '{{ json . }}' | jq -r '.manifest.digest')
-              if [ "${TAG_DIGEST}" != "${INDEX_DIGEST}" ]; then
-                echo "::warning::langwatch/${IMAGE}:${TAG} digest ${TAG_DIGEST} differs from :${HASH} digest ${INDEX_DIGEST}; signing separately"
-                cosign sign "langwatch/${IMAGE}@${TAG_DIGEST}"
-                cosign verify "langwatch/${IMAGE}@${TAG_DIGEST}" \
-                  --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
-                  --certificate-oidc-issuer "${CERT_OIDC_ISSUER}" > /dev/null
-              fi
-            done
-
-            PLATFORMS_JSON=$(echo "${INSPECT}" | jq -c '[.manifest.manifests[] | select(.platform.os != "unknown") | {digest: .digest, os: .platform.os, arch: .platform.architecture}]')
-            COUNT=$(echo "${PLATFORMS_JSON}" | jq 'length')
-            if [ "${COUNT}" -eq 0 ]; then
-              echo "::error::No platform manifests found in index for ${REF}"
-              exit 1
-            fi
-
-            for i in $(seq 0 $((COUNT - 1))); do
-              ENTRY=$(echo "${PLATFORMS_JSON}" | jq -c ".[$i]")
-              PDIGEST=$(echo "${ENTRY}" | jq -r '.digest')
-              POS=$(echo "${ENTRY}" | jq -r '.os')
-              PARCH=$(echo "${ENTRY}" | jq -r '.arch')
-              PDREF="langwatch/${IMAGE}@${PDIGEST}"
-              SBOM_FILE="sboms/${IMAGE}-${POS}-${PARCH}.cdx.json"
-
-              echo "Generating CycloneDX SBOM for ${PDREF} (${POS}/${PARCH})"
-              syft "registry:${PDREF}" -o cyclonedx-json="${SBOM_FILE}"
-
-              echo "Signing platform manifest ${PDREF}"
-              cosign sign "${PDREF}"
-
-              echo "Attesting SBOM for ${PDREF}"
-              cosign attest --predicate "${SBOM_FILE}" --type cyclonedx "${PDREF}"
-
-              echo "Verifying signature and SBOM attestation for ${PDREF}"
-              cosign verify "${PDREF}" \
-                --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
-                --certificate-oidc-issuer "${CERT_OIDC_ISSUER}" > /dev/null
-              cosign verify-attestation "${PDREF}" \
-                --type cyclonedx \
-                --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
-                --certificate-oidc-issuer "${CERT_OIDC_ISSUER}" > /dev/null
-            done
+            REPO="langwatch/${IMAGE}" \
+            IMAGE_NAME="${IMAGE}" \
+            INSPECT_TAG="${HASH}" \
+            SBOM_DIR="sboms" \
+            EXTRA_TAGS="${EXTRA_TAGS}" \
+            CERT_IDENTITY_REGEX="${CERT_IDENTITY_REGEX}" \
+            CERT_OIDC_ISSUER="${CERT_OIDC_ISSUER}" \
+            bash .github/scripts/sign-image.sh
           done
 
       - name: Upload SBOMs as workflow artifact

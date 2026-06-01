@@ -1,26 +1,19 @@
 import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
-import { Hono } from "hono";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  requirePermission,
-  resourceLimitMiddleware,
-} from "../../middleware";
+import type { AuthMiddlewareVariables } from "../../middleware";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");
-
-type Variables = AuthMiddlewareVariables;
-
-export const app = new Hono<{ Variables: Variables }>().basePath("/");
 
 const getService = () => ScenarioService.create(prisma);
 
@@ -60,9 +53,11 @@ function toScenarioResponse(scenario: Scenario) {
   };
 }
 
-app.get(
+export function registerScenarioRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
   "/",
-  requirePermission("scenarios:view"),
   describeRoute({
     description: "Get all scenarios for a project",
     responses: {
@@ -94,9 +89,8 @@ app.get(
   },
 );
 
-app.get(
+  secured.access(requires("scenarios:view")).get(
   "/:id",
-  requirePermission("scenarios:view"),
   describeRoute({
     description: "Get a specific scenario by ID",
     responses: {
@@ -139,9 +133,8 @@ app.get(
   },
 );
 
-app.post(
+  secured.access(requires("scenarios:manage")).post(
   "/",
-  requirePermission("scenarios:manage"),
   resourceLimitMiddleware("scenarios"),
   describeRoute({
     description: "Create a new scenario",
@@ -183,9 +176,8 @@ app.post(
   },
 );
 
-app.put(
+  secured.access(requires("scenarios:manage")).put(
   "/:id",
-  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Update an existing scenario",
     responses: {
@@ -240,9 +232,8 @@ app.put(
   },
 );
 
-app.delete(
+  secured.access(requires("scenarios:manage")).delete(
   "/:id",
-  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Archive (soft-delete) a scenario",
     responses: {
@@ -286,3 +277,4 @@ app.delete(
     }
   },
 );
+}

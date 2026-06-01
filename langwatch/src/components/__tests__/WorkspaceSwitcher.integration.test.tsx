@@ -3,7 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import {
@@ -144,6 +144,173 @@ describe("WorkspaceSwitcher", () => {
       });
 
       expect(screen.getByText("Foo Project")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a team the user can create projects in", () => {
+    /** @scenario The dropdown shows a per-team "Create project" button (admin-only) */
+    it("renders a + button that opens the create-project drawer scoped to that team", async () => {
+      const user = userEvent.setup();
+      const onCreateProjectForTeam = vi.fn();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      await user.click(addButton);
+
+      expect(onCreateProjectForTeam).toHaveBeenCalledWith({
+        teamId: "team_a",
+        orgId: "org_acme",
+      });
+    });
+
+    /** @scenario The "Create project" button is suppressed for non-admin members */
+    it("hides the + button when the user cannot create projects in the team", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: false }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /create project in/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The "Create project" tooltip never auto-opens on switcher mount */
+    it("does not show a visible 'Create project' tooltip when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The IconButton itself must still be reachable (aria-label).
+      expect(
+        await screen.findByRole("button", {
+          name: /create project in acme engineering/i,
+        }),
+      ).toBeInTheDocument();
+      // The tooltip is controlled; Ark Menu's focus rove must not flip it
+      // open. (Pre-fix the Tooltip auto-opened because Zag opens on focus
+      // and has no openOnFocus={false} knob — see WorkspaceSwitcher.tsx.)
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The "+" button is not auto-focused on dropdown open */
+    it("does not auto-focus the + button when the dropdown opens", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      // tabIndex=-1 takes it out of the menu's initial focus. Ark Menu's
+      // auto-focus would otherwise land here because the "+" sits next
+      // to (not inside) a Menu.Item, competing for first focus and
+      // showing a visible ring on every menu open.
+      expect(addButton).toHaveAttribute("tabindex", "-1");
+      expect(addButton).not.toHaveFocus();
+    });
+
+    /** @scenario The "Create project" tooltip still appears on actual pointer hover */
+    it("shows the tooltip on pointer hover and hides it on leave", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+
+      await user.hover(addButton);
+      expect(
+        await screen.findByText("Create project"),
+      ).toBeInTheDocument();
+
+      await user.unhover(addButton);
+      await waitFor(() => {
+        expect(screen.queryByText("Create project")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("personal entry governance gate", () => {
+    /** @scenario The personal entry is hidden when no organization enables governance */
+    it("does not render the My Workspace entry when personal is omitted", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "team", teamId: "team_a" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // "Foo Project" is unique to the open dropdown (the trigger shows the
+      // current team), so finding it confirms the menu opened.
+      expect(await screen.findByText("Foo Project")).toBeInTheDocument();
+      expect(screen.queryByText("My Workspace")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The personal entry shows when any organization enables governance */
+    it("renders the My Workspace entry when personal is provided", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "team", teamId: "team_a" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      expect(
+        (await screen.findAllByText("My Workspace")).length,
+      ).toBeGreaterThan(0);
     });
   });
 

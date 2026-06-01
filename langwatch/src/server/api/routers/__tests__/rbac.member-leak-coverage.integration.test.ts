@@ -277,7 +277,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       where: { id: { in: [ADMIN_USER_ID, MEMBER_USER_ID] } },
     });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
-    resetApp();
+    await resetApp();
   });
 
   // ── 1. Admin-surface procedures deny MEMBER ───────────────────────

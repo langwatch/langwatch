@@ -1,5 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  DEFAULT_SET_ID,
+  expandSetIdFilter,
+  INTERNAL_SET_PREFIX,
+} from "~/server/scenarios/internal-set-id";
 import type {
   BatchHistoryItem,
   ExternalSetSummary,
@@ -8,11 +13,10 @@ import type {
 } from "~/server/scenarios/scenario-event.types";
 import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
+  type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
   mapStatus,
-  type ClickHouseSimulationRunRow,
 } from "~/server/simulations/simulation-run.mappers";
-import { DEFAULT_SET_ID, INTERNAL_SET_PREFIX, expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
@@ -59,7 +63,11 @@ function buildDateFilter({
 }: {
   startDate?: number;
   endDate?: number;
-}): { havingClause: string | null; whereClause: string; params: Record<string, string> } {
+}): {
+  havingClause: string | null;
+  whereClause: string;
+  params: Record<string, string>;
+} {
   const havingParts: string[] = [];
   const whereParts: string[] = [];
   const params: Record<string, string> = {};
@@ -331,19 +339,30 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
+          : {}),
         fetchLimit: String(validatedLimit + 1),
       },
     );
 
-    const [totalCountRows, batchRows] = await Promise.all([totalCountPromise, batchRowsPromise]);
+    const [totalCountRows, batchRows] = await Promise.all([
+      totalCountPromise,
+      batchRowsPromise,
+    ]);
     const totalCount = parseInt(totalCountRows[0]?.TotalBatchCount ?? "0", 10);
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
 
     if (pageRows.length === 0) {
-      return { batches: [], nextCursor: undefined, hasMore: false, lastUpdatedAt: 0, totalCount };
+      return {
+        batches: [],
+        nextCursor: undefined,
+        hasMore: false,
+        lastUpdatedAt: 0,
+        totalCount,
+      };
     }
 
     const lastRow = pageRows[pageRows.length - 1]!;
@@ -374,7 +393,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ArchivedAt IS NULL
          ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId), batchRunIds },
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        batchRunIds,
+      },
     );
 
     // Group items by batchRunId
@@ -390,11 +413,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
       const lastUpdatedAt = Number(b.LastUpdatedAt);
-      if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
+      if (lastUpdatedAt > globalLastUpdatedAt)
+        globalLastUpdatedAt = lastUpdatedAt;
 
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
         const baseStatus = mapStatus(r.Status);
-        const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
+        const durationMs =
+          r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
         const perRunUpdatedAt = Number(r.UpdatedAt);
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
         const resolvedStatus = resolveRunStatus({
@@ -436,7 +461,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       };
     });
 
-    return { batches, nextCursor, hasMore, lastUpdatedAt: globalLastUpdatedAt, totalCount };
+    return {
+      batches,
+      nextCursor,
+      hasMore,
+      lastUpdatedAt: globalLastUpdatedAt,
+      totalCount,
+    };
   }
 
   async getRunDataForBatchRun({
@@ -484,7 +515,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId), batchRunId },
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        batchRunId,
+      },
     );
 
     const now = Date.now();
@@ -589,7 +624,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
-  }): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }> {
+  }): Promise<{
+    runs: ScenarioRunData[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
@@ -601,7 +640,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       : "1 = 1";
 
     const dateFilter = buildDateFilter({ startDate, endDate });
-    
+
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     const batchRows = await this.queryRows<{
@@ -624,7 +663,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
+          : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
@@ -639,12 +680,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const lastRow = pageRows[pageRows.length - 1];
 
-    const nextCursor = lastRow && hasMore
-      ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
-      : undefined;
+    const nextCursor =
+      lastRow && hasMore
+        ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
+        : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, scenarioSetId });
+    const runs = await this.getRunsForBatchIds({
+      projectId,
+      batchRunIds,
+      scenarioSetId,
+    });
 
     return { runs, nextCursor, hasMore };
   }
@@ -700,7 +746,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       : "1 = 1";
 
     const dateFilter = buildDateFilter({ startDate, endDate });
-    
+
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     // NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
@@ -727,7 +773,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
+          : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
@@ -737,7 +785,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
 
     if (pageRows.length === 0) {
-      return { changed: true, lastUpdatedAt: 0, runs: [], scenarioSetIds: {}, nextCursor: undefined, hasMore: false };
+      return {
+        changed: true,
+        lastUpdatedAt: 0,
+        runs: [],
+        scenarioSetIds: {},
+        nextCursor: undefined,
+        hasMore: false,
+      };
     }
 
     const lastRow = pageRows[pageRows.length - 1]!;
@@ -757,7 +812,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       0,
     );
 
-    return { changed: true, lastUpdatedAt, runs, scenarioSetIds, nextCursor, hasMore };
+    return {
+      changed: true,
+      lastUpdatedAt,
+      runs,
+      scenarioSetIds,
+      nextCursor,
+      hasMore,
+    };
   }
 
   async getExternalSetSummaries(params: {
@@ -794,17 +856,21 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     filter: "external" | "internal-suites";
   }): Promise<ExternalSetSummary[]> {
     const dateFilter = buildDateFilter({ startDate, endDate });
-    
-    const havingClause = dateFilter.havingClause ? `HAVING ${dateFilter.havingClause}` : "";
 
-    const wherePredicate = filter === "external"
-      ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
-      : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
+    const havingClause = dateFilter.havingClause
+      ? `HAVING ${dateFilter.havingClause}`
+      : "";
+
+    const wherePredicate =
+      filter === "external"
+        ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+        : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
 
     // External sets normalize empty ScenarioSetId to 'default'
-    const selectId = filter === "external"
-      ? "IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId"
-      : "ScenarioSetId AS NormalizedSetId";
+    const selectId =
+      filter === "external"
+        ? "IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId"
+        : "ScenarioSetId AS NormalizedSetId";
 
     const rows = await this.queryRows<{
       ScenarioSetId: string;
@@ -855,15 +921,48 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }));
   }
 
-  async getAllRunIdsForProject({
+  async getRunIdsForScope({
     projectId,
+    batchRunId,
+    scenarioSetId,
   }: {
     projectId: string;
+    batchRunId?: string;
+    scenarioSetId?: string;
   }): Promise<string[]> {
+    // Guard: a scope is mandatory. Without a batch or set predicate this would
+    // select every run in the tenant — the bulk-archive footgun this method
+    // exists to prevent. The API layer rejects the request before reaching
+    // here; this is defence in depth at the data layer.
+    if (!batchRunId && !scenarioSetId) {
+      throw new Error(
+        "getRunIdsForScope requires a batchRunId or scenarioSetId; refusing to select all runs for the tenant",
+      );
+    }
+
+    const predicates = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
+    const query_params: Record<string, string | string[]> = {
+      tenantId: projectId,
+    };
+    if (batchRunId) {
+      predicates.push("BatchRunId = {batchRunId:String}");
+      query_params.batchRunId = batchRunId;
+    }
+    if (scenarioSetId) {
+      // The default set is stored as '' but addressed as 'default' (and
+      // vice-versa). Expand to both storage forms so archiving the default
+      // set matches its rows — the same normalization every other
+      // set-scoped query uses via expandSetIdFilter.
+      predicates.push("ScenarioSetId IN ({scenarioSetIds:Array(String)})");
+      query_params.scenarioSetIds = expandSetIdFilter(scenarioSetId);
+    }
+
     const client = await this.getClient(projectId);
     const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL LIMIT 10000`,
-      query_params: { tenantId: projectId },
+      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE ${predicates.join(
+        " AND ",
+      )} LIMIT 10000`,
+      query_params,
       format: "JSONEachRow",
     });
     const rows = await result.json<{ ScenarioRunId: string }>();
@@ -897,7 +996,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
 
     return new Set(
-      rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)),
+      rows.map((r) =>
+        r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId,
+      ),
     );
   }
 
@@ -912,7 +1013,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     try {
       const json = Buffer.from(cursor, "base64").toString("utf-8");
       const parsed = JSON.parse(json) as Record<string, unknown>;
-      if (typeof parsed.ts !== "string" || typeof parsed.batchRunId !== "string") {
+      if (
+        typeof parsed.ts !== "string" ||
+        typeof parsed.batchRunId !== "string"
+      ) {
         return null;
       }
       return { ts: parsed.ts, batchRunId: parsed.batchRunId };
@@ -958,7 +1062,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          )
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
-      { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}) },
+      {
+        tenantId: projectId,
+        batchRunIds,
+        ...(scenarioSetId
+          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
+          : {}),
+      },
       { expectedMaxDurationMs: 5000, expectedMaxReadBytes: 5_000_000 },
     );
 

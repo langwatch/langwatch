@@ -47,7 +47,7 @@ func TestProbeAddress_ResolvesSchemeDefaultPort(t *testing.T) {
 
 // TestProbeAddress_RejectsUnknownSchemeWithoutPort pins the surfaced
 // startup error for misconfigured URLs. A bare hostname under an
-// unrecognised scheme has no obvious default port to fill in, so we
+// unrecognized scheme has no obvious default port to fill in, so we
 // fail loud at New() rather than silently failing every probe at
 // runtime — the latter mode is exactly what hid the bug CR flagged.
 func TestProbeAddress_RejectsUnknownSchemeWithoutPort(t *testing.T) {

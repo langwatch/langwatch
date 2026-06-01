@@ -1,5 +1,5 @@
 # Onboarding Empty State — Gherkin Spec
-# Covers: empty state display, journey storytelling, PAT minting inside the Integrate drawer
+# Covers: empty state display, journey storytelling, API key minting inside the Integrate drawer
 #
 # AUDIT NOTE (2026-05-01): The previously-specced "four flat tabs of static
 # setup content" empty state was replaced by a stage-driven storytelling
@@ -9,7 +9,7 @@
 # table-overlaying preview of fixture traces (`useSamplePreview`) tied to
 # the journey itself — no client-side OTLP POST happens. Scenarios that
 # described the old layout have been deleted; the ones below match what
-# `TracesEmptyOnboarding`, `IntegrateDrawer`, `PatIntegrationInfoCard`,
+# `TracesEmptyOnboarding`, `IntegrateDrawer`, `ApiKeyIntegrationInfoCard`,
 # `SampleDataBanner`, and `CelebrationBanner` actually do.
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -134,11 +134,11 @@ Rule: Returning users see a chapter-jump hub on welcome
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# INTEGRATE DRAWER (PAT MINTING + SETUP TABS)
+# INTEGRATE DRAWER (API KEY MINTING + SETUP TABS)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Integrate drawer hosts PAT minting and setup paths
-  The "Integrate my code" CTA opens a side `Drawer` that mints a PAT
+Rule: Integrate drawer hosts API key minting and setup paths
+  The "Integrate my code" CTA opens a side `Drawer` that mints an API key
   at the top and then exposes four setup tabs ("Skills", "MCP",
   "Prompt", "Manually"). The freshly-minted token flows into every
   setup body via `ActiveProjectProvider` so each path renders snippets
@@ -148,9 +148,9 @@ Rule: Integrate drawer hosts PAT minting and setup paths
     Given the empty-state journey is visible
     And the user clicks "Integrate my code" (or presses "I")
 
-  Scenario: Drawer opens with title and PAT card at the top
+  Scenario: Drawer opens with title and API key card at the top
     Then the drawer titled "Send your own traces" is open
-    And the `PatIntegrationInfoCard` is rendered at the top of the body
+    And the `ApiKeyIntegrationInfoCard` is rendered at the top of the body
     And a tab strip is visible with: "Skills", "MCP", "Prompt", "Manually"
     And "Skills" is selected by default
 
@@ -166,11 +166,11 @@ Rule: Integrate drawer hosts PAT minting and setup paths
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PERSONAL ACCESS TOKEN GENERATION
+# API KEY GENERATION
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Generate access token inside the Integrate drawer
-  `PatIntegrationInfoCard` mints a project-scoped PAT and surfaces it
+  `ApiKeyIntegrationInfoCard` mints a project-scoped API key and surfaces it
   as a copyable env-var block. The token is lifted to the drawer so
   every setup tab can read it via `ActiveProjectProvider`.
 
@@ -181,10 +181,10 @@ Rule: Generate access token inside the Integrate drawer
     Then a card titled "Generate an access token" is visible
     And a "Generate access token" button is enabled
 
-  Scenario: Generating creates a project-scoped PAT
+  Scenario: Generating creates a project-scoped API key
     When the user clicks "Generate access token"
-    Then a PAT is created via `personalAccessToken.create`
-    And the PAT name is "Initial API key"
+    Then an API key is created via `apiKey.create`
+    And the API key name is "Initial API key"
     And the binding is `{ role: MEMBER, scopeType: PROJECT, scopeId: projectId }`
     # TODO(traces-v2): Switch to a tracing-only custom role once one ships;
     # MEMBER is the closest preset that grants traces + prompts read/write.

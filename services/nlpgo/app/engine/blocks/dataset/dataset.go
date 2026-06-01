@@ -98,7 +98,7 @@ func SplitRecords(rows Records, trainSize, testSize float64, seed int64) (*Split
 	for i := range indices {
 		indices[i] = i
 	}
-	src := rand.New(rand.NewPCG(uint64(seed), uint64(seed)))
+	src := rand.New(rand.NewPCG(uint64(seed), uint64(seed))) //nolint:gosec // dataset sampling RNG is reproducibility-keyed, not security-sensitive
 	src.Shuffle(n, func(i, j int) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
@@ -159,7 +159,7 @@ func SelectByEntry(rows Records, sel *dsl.EntrySelection, byString func(rows Rec
 			if len(rows) == 0 {
 				return nil, &EntrySelectionInvalidError{Reason: "entry_selection_empty_dataset"}
 			}
-			return rows[rand.IntN(len(rows))], nil
+			return rows[rand.IntN(len(rows))], nil //nolint:gosec // dataset sampling RNG is reproducibility-keyed, not security-sensitive
 		}
 		if byString == nil {
 			return nil, &EntrySelectionInvalidError{Reason: "string_selection_lookup_not_provided"}

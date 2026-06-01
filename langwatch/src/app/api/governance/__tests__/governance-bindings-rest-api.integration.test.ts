@@ -8,7 +8,7 @@
  *
  * Setup builds a real PAT row + RoleBindings via PatService so the
  * Bearer pat-lw-... + X-Project-Id auth path resolves end-to-end and
- * the PAT ceiling check (organization:view) passes.
+ * the API-key ceiling check (organization:view) passes.
  *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  *       specs/ai-gateway/governance/user-ingestion-binding-lifecycle.feature
@@ -66,7 +66,7 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as unknown as

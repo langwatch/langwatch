@@ -34,7 +34,7 @@ func TestExecuteStream_HeartbeatExitDoesNotRaceWithClose(t *testing.T) {
 	}
 
 	// Tight loop: many iterations × 1ms heartbeat × very-fast workflow
-	// completion maximises the chance of an emit() landing in the
+	// completion maximizes the chance of an emit() landing in the
 	// closed-channel window. 200 iterations is enough that a real race
 	// shows up in CI under -race even at low scheduler pressure.
 	const iterations = 200

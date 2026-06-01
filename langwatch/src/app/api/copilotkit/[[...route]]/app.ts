@@ -9,41 +9,21 @@ import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
 } from "@copilotkit/runtime";
-import type { Project } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 
-import type { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+import { createProjectApp, requires } from "~/server/api/security";
 import { createLogger } from "~/utils/logger/server";
-import {
-  authMiddleware,
-  handleError,
-  loggerMiddleware,
-  tracerMiddleware,
-} from "../../middleware";
 import { PromptStudioAdapter } from "./service-adapter";
 
 const logger = createLogger("langwatch:api:copilotkit");
 
-// Define types for our Hono context variables
-type Variables = {
-  project: Project;
-  llmConfigRepository: LlmConfigRepository;
-};
+const secured = createProjectApp({
+  basePath: "/api/copilotkit",
+});
 
-// Define the Hono app
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/api/copilotkit");
-
-// Middleware
-app.use(tracerMiddleware({ name: "copilotkit" }));
-app.use(loggerMiddleware());
-app.use("/*", authMiddleware);
-app.onError(handleError);
-
-// Get all prompts
-app.post(
+// The CopilotKit runtime adapts the project's prompt configs into the prompt
+// studio context, so a prompt read is the correct ceiling.
+secured.access(requires("prompts:view")).post(
   "/",
   describeRoute({
     description: "Get simulation thread",
@@ -65,3 +45,5 @@ app.post(
     return handler(c.req.raw);
   },
 );
+
+export const app = secured.hono;

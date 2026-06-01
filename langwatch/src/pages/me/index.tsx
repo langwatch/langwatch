@@ -10,8 +10,7 @@ import {
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
@@ -19,8 +18,6 @@ import { MyProjectsCard } from "~/components/me/MyProjectsCard";
 import MyLayout from "~/components/me/MyLayout";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
@@ -31,18 +28,7 @@ const fmtPctDelta = (pct: number | null) =>
     ? null
     : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;
 
-export default function MyUsagePage() {
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  // /me is the persona-1 (org-less CLI/IDE dev) home — must resolve the FF
-  // without project context. Project param remains as a hint for PostHog
-  // cohort targeting when present, but the query no longer gates on it.
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-    });
+function MyUsagePage() {
   const ctx = usePersonalContext();
   const {
     summary,
@@ -52,13 +38,6 @@ export default function MyUsagePage() {
     recentActivity,
     organizationName,
   } = ctx;
-
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
 
   const isOverBudget = budget.status === "exceeded";
 
@@ -361,3 +340,7 @@ function EmptyState({ message, hint }: { message: string; hint?: string }) {
     </VStack>
   );
 }
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(MyUsagePage);

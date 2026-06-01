@@ -9,6 +9,8 @@
  */
 import { Page, expect } from "@playwright/test";
 
+import { getProjectSlug } from "../helpers";
+
 // =============================================================================
 // Navigation Steps
 // =============================================================================
@@ -17,19 +19,7 @@ import { Page, expect } from "@playwright/test";
  * Given I am on the evaluations page
  */
 export async function givenIAmOnTheEvaluationsPage(page: Page) {
-  await page.goto("/");
-
-  // Wait for the sidebar Home link to appear (indicates app is loaded)
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 30000 });
-
-  const href = await homeLink.getAttribute("href");
-  const projectSlug = href?.replace(/^\//, "") || "";
-
-  if (!projectSlug) {
-    throw new Error("Could not extract project slug from Home link");
-  }
-
+  const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/evaluations`);
   await expect(page).toHaveURL(/evaluations/);
 }

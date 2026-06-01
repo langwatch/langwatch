@@ -235,7 +235,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
 
   @bdd @cli @login @token
   Scenario: `langwatch login --token <token>` non-interactively imports a pre-minted device session
-    Given the user has minted an access token in the dashboard "Personal Access Tokens" surface
+    Given the user has minted an access token in the dashboard "API Keys" surface
     When the user runs `langwatch login --token <opaque-token>`
     Then the token is written to `~/.langwatch/config.json:access_token`
     And no browser opens

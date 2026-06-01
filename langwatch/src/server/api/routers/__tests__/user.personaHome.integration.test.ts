@@ -164,7 +164,7 @@ describe("user.persona-home customization integration", () => {
     });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
-    resetApp();
+    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

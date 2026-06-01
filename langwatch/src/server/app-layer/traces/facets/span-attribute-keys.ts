@@ -19,8 +19,12 @@ import { baseParams, buildTimeWhere } from "./helpers";
  *   - `SpanAttributes.keys` is the keys subcolumn of the Map. Reading it
  *     directly skips loading the values column entirely — meaningful at
  *     scale because span attribute values can be large strings.
- *   - `length(SpanAttributes) > 0` short-circuits granules where every
- *     span has empty attrs, mirroring the events facet's prefilter.
+ *   - The empty-map short-circuit also probes `SpanAttributes.keys`, never
+ *     `SpanAttributes` itself: `length(SpanAttributes) > 0` makes ClickHouse
+ *     materialise the whole Map (keys *and* values) just to count entries,
+ *     which pulls the heavy values column into memory and tips busy tenants
+ *     into MEMORY_LIMIT_EXCEEDED. `length(SpanAttributes.keys)` reads only
+ *     the keys subcolumn, keeping the whole query on the keys side of the Map.
  *
  * The actual filter side (`span.attribute.<k>:value`) is already wired
  * through `filter-to-clickhouse/ast.ts` — this facet only feeds the
@@ -44,7 +48,7 @@ export function buildSpanAttributeKeysFacetQuery(
         SELECT arrayJoin(SpanAttributes.keys) AS key
         FROM stored_spans
         WHERE ${where}
-          AND length(SpanAttributes) > 0
+          AND length(SpanAttributes.keys) > 0
       )
       WHERE key != ''
         AND NOT startsWith(key, 'langwatch.reserved.')

@@ -14,8 +14,8 @@ export default defineConfig({
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
-      "**/*.integration.test.ts",
-      "**/*.stress.test.ts",
+      "**/*.integration.test.{ts,tsx}",
+      "**/*.stress.test.{ts,tsx}",
       "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",

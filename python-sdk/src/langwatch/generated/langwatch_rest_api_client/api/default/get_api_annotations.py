@@ -7,7 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.annotation import Annotation
 from ...models.error import Error
-from ...types import Response
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs() -> dict[str, Any]:
@@ -47,8 +47,11 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[Error | list[Annotation]]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
     return Response(
-        status_code=HTTPStatus(response.status_code),
+        status_code=safe_http_status(response.status_code),
         content=response.content,
         headers=response.headers,
         parsed=_parse_response(client=client, response=response),

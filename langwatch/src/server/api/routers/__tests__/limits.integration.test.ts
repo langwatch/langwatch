@@ -87,12 +87,12 @@ describe("Limits Router Integration", () => {
     caller = appRouter.createCaller(ctx);
   });
 
-  afterEach(() => {
-    resetApp();
+  afterEach(async () => {
+    await resetApp();
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -105,7 +105,7 @@ describe("Limits Router Integration", () => {
   });
 
   describe("getUsage", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       mockGetCurrentMonthCount.mockReset();
       mockGetActivePlan.mockResolvedValue({
         ...FREE_PLAN,
@@ -115,7 +115,7 @@ describe("Limits Router Integration", () => {
         free: false,
         maxMessagesPerMonth: 1000,
       });
-      resetApp();
+      await resetApp();
       globalForApp.__langwatch_app = createTestApp({
         usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
         planProvider: PlanProviderService.create({

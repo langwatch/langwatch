@@ -88,6 +88,42 @@ Feature: Persona-aware home resolver
     And the destination matches Persona 4 (super-admin governance)
 
   # ---------------------------------------------------------------------------
+  # Governance-UI gate — /me and /governance are flag-gated and 404 without it
+  # ---------------------------------------------------------------------------
+  # The /me and /governance surfaces are gated behind
+  # release_ui_ai_governance_enabled. A user whose org does not have the flag
+  # (for example a customer an admin is impersonating, or anyone signing in to
+  # a non-governance org) must never be auto-routed there — they land on the
+  # project home, the pre-governance LLMOps experience. An explicit user pin is
+  # the exception: it could only have been set while the surface was reachable.
+
+  Scenario: Personal-VK user in a non-governance org → project home, not /me
+    Given user "jane@acme.com" has a personal VirtualKey
+    And the user is a member of project "jane-team-prod"
+    But the org does not have the governance UI enabled
+    When the resolver runs for the user
+    Then the resolver returns "/<projectSlug>/messages"
+    And NOT "/me"
+
+  Scenario: Would-be governance admin in a non-governance org → project home, not /governance
+    Given user "carol@acme.com" has the "organization:manage" permission
+    And the user is on the Enterprise plan
+    And the org has governance ingest
+    But the org does not have the governance UI enabled
+    And the user is a member of project "carol-team-prod"
+    When the resolver runs for the user
+    Then the resolver returns "/<projectSlug>/messages"
+    And NOT "/governance"
+
+  Scenario: Non-governance org member with no projects → onboarding, not the gated /me
+    Given user "dave@acme.com" belongs to no projects (no ProjectMember rows)
+    But the org does not have the governance UI enabled
+    When the resolver runs for the user
+    Then the resolver returns "/onboarding/welcome"
+    And NOT "/me"
+    And the user lands on a recoverable bootstrap page rather than a 404
+
+  # ---------------------------------------------------------------------------
   # User override
   # ---------------------------------------------------------------------------
 

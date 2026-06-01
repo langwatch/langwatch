@@ -13,29 +13,20 @@
  * includes a run count and latest run timestamp without loading run history.
  */
 import type { Experiment } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:experiments");
-
-type Variables = AuthMiddlewareVariables;
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
@@ -97,85 +88,89 @@ const toExperimentSummary = ({
   lastRunAt: lastRunAt ? new Date(lastRunAt).toISOString() : null,
 });
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/experiments")
-  .use(tracerMiddleware({ name: "experiments" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({
+  basePath: "/api/experiments",
+});
 
-  .get(
-    "/",
-    describeRoute({
-      description:
-        "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(experimentsListResponseSchema),
-            },
+// Mirror the canonical experiments-list permission: the tRPC procedures that
+// return this same project-scoped experiment list (experimentRouter
+// getAllByProjectId / getAllForEvaluationsList) gate on experiments:view, the
+// dedicated permission experiments now use instead of inheriting workflows:view.
+secured.access(requires("experiments:view")).get(
+  "/",
+  describeRoute({
+    description:
+      "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(experimentsListResponseSchema),
           },
         },
       },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const page = parsePositiveInt({
-        value: c.req.query("page"),
-        fallback: 1,
-      });
-      const pageSize = parsePositiveInt({
-        value: c.req.query("pageSize"),
-        fallback: DEFAULT_PAGE_SIZE,
-        max: MAX_PAGE_SIZE,
-      });
-
-      logger.info(
-        { projectId: project.id, page, pageSize },
-        "Listing experiments",
-      );
-
-      const { experiments: paged, totalHits } =
-        await ExperimentService.create(prisma).getPage({
-          projectId: project.id,
-          page,
-          pageSize,
-        });
-
-      const runAggregates =
-        paged.length > 0
-          ? await ExperimentRunService.create(
-              prisma,
-            ).getRunAggregatesForExperimentIds({
-              projectId: project.id,
-              experimentIds: paged.map((e) => e.id),
-            })
-          : {};
-
-      const experiments = paged.map((experiment) => {
-        const aggregate = runAggregates[experiment.id] ?? {
-          runsCount: 0,
-          lastRunAt: null,
-        };
-        return toExperimentSummary({
-          experiment,
-          runsCount: aggregate.runsCount,
-          lastRunAt: aggregate.lastRunAt,
-        });
-      });
-
-      const offset = (page - 1) * pageSize;
-      return c.json({
-        experiments,
-        pagination: {
-          page,
-          pageSize,
-          totalHits,
-          hasMore: offset + paged.length < totalHits,
-        },
-      });
     },
-  );
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const page = parsePositiveInt({
+      value: c.req.query("page"),
+      fallback: 1,
+    });
+    const pageSize = parsePositiveInt({
+      value: c.req.query("pageSize"),
+      fallback: DEFAULT_PAGE_SIZE,
+      max: MAX_PAGE_SIZE,
+    });
+
+    logger.info(
+      { projectId: project.id, page, pageSize },
+      "Listing experiments",
+    );
+
+    const { experiments: paged, totalHits } = await ExperimentService.create(
+      prisma,
+    ).getPage({
+      projectId: project.id,
+      page,
+      pageSize,
+    });
+
+    const runAggregates =
+      paged.length > 0
+        ? await ExperimentRunService.create(
+            prisma,
+          ).getRunAggregatesForExperimentIds({
+            projectId: project.id,
+            experimentIds: paged.map((e) => e.id),
+          })
+        : {};
+
+    const experiments = paged.map((experiment) => {
+      const aggregate = runAggregates[experiment.id] ?? {
+        runsCount: 0,
+        lastRunAt: null,
+      };
+      return toExperimentSummary({
+        experiment,
+        runsCount: aggregate.runsCount,
+        lastRunAt: aggregate.lastRunAt,
+      });
+    });
+
+    const offset = (page - 1) * pageSize;
+    return c.json({
+      experiments,
+      pagination: {
+        page,
+        pageSize,
+        totalHits,
+        hasMore: offset + paged.length < totalHits,
+      },
+    });
+  },
+);
+
+export const app = secured.hono;

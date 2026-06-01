@@ -701,6 +701,7 @@ describe("aiToolsRouter integration", () => {
           name: `org-anthropic-${ns}`,
           provider: "anthropic",
           enabled: true,
+          organizationId,
           scopes: {
             create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
           },
@@ -711,6 +712,7 @@ describe("aiToolsRouter integration", () => {
           name: `pf-openai-${ns}`,
           provider: "openai",
           enabled: true,
+          organizationId,
           scopes: {
             create: [{ scopeType: "TEAM", scopeId: teamPlatformId }],
           },
@@ -721,6 +723,7 @@ describe("aiToolsRouter integration", () => {
           name: `ds-azure-${ns}`,
           provider: "azure",
           enabled: true,
+          organizationId,
           scopes: {
             create: [{ scopeType: "TEAM", scopeId: teamDataScienceId }],
           },

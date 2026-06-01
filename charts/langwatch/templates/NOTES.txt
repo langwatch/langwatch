@@ -93,3 +93,45 @@ on a `helm upgrade` or run the gateway out-of-band per
 docs/ai-gateway/self-hosting/helm.
 
 {{- end }}
+
+──────────────────────────────────────────────────────────────────────
+6. Required Secrets — check before upgrading
+──────────────────────────────────────────────────────────────────────
+Each chart bump may introduce new required keys on the umbrella's app
+Secret. When upgrading, verify these are present in the Secret the app
++ gateway pods mount, otherwise the pods crashloop at boot with a
+CreateContainerConfigError that hides the missing key behind a generic
+message.
+
+  {{ include "langwatch.appSecretName" . }} keys (always required):
+    - credentialsEncryptionKey
+    - cronApiKey
+    - nextAuthSecret
+    - virtualKeyPepper
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
+    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+{{- end }}
+
+  When autogen.enabled=true the chart materialises this Secret on
+  first install via per-key lookup-or-rand and heals missing keys
+  on subsequent renders. When autogen.enabled=false the operator
+  pre-creates the Secret out-of-band and the preflight Job validates
+  the required keys are present before pods roll. The
+  operator-provided path is the only one that works cleanly under
+  GitOps controllers whose render step has no cluster access (ArgoCD
+  repo-server, etc.) because the chart never renders the Secret for
+  the controller to reconcile against. See
+  docs/self-hosting/deployment/argocd.mdx for the full guide.
+
+  Pre-create command for the operator-provided path:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
+      --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+      --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+      --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+{{- end }}

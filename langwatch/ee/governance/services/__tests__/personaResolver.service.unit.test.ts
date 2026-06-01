@@ -26,6 +26,10 @@ const baseInput: PersonaResolverInput = {
   hasApplicationTraces: false,
   hasOrganizationManagePermission: false,
   isEnterprise: false,
+  // The persona 1/2/4 destinations (/me, /governance) only exist for orgs
+  // with the governance UI flag; default the fixture to enabled so those
+  // matrices read cleanly. The gate is exercised explicitly below.
+  hasGovernanceUi: true,
   firstProjectSlug: null,
 };
 
@@ -144,6 +148,61 @@ describe("resolvePersonaHome", () => {
     });
   });
 
+  describe("when the org does not have the governance UI flag", () => {
+    it("routes a personal-VK customer to the project home instead of /me", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      // Persona is still detected (mixed: personal VK + project), but /me is
+      // flag-gated and 404s, so the destination falls back to the project
+      // home — this is the impersonated-customer case.
+      expect(result.persona).toBe("mixed");
+      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.governanceUiEnabled).toBe(false);
+    });
+
+    it("does NOT route a would-be governance admin to /governance", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        hasOrganizationManagePermission: true,
+        isEnterprise: true,
+        setupState: { ...baseInput.setupState, hasIngestionSources: true },
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).not.toBe("/governance");
+    });
+
+    it("routes a member with no projects to onboarding, not the gated /me", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        firstProjectSlug: null,
+      });
+      // /me is flag-gated and 404s here, so there is no usable personal home;
+      // send the user to the recoverable onboarding bootstrap instead.
+      expect(result.destination).toBe("/onboarding/welcome");
+      expect(result.destination).not.toBe("/me");
+    });
+
+    it("still honors an explicit user pin even when the flag is off", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        hasGovernanceUi: false,
+        userLastHomePath: "/me",
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      // A pin can only have been set while the surface was reachable; keep it.
+      expect(result.destination).toBe("/me");
+      expect(result.isOverride).toBe(true);
+    });
+  });
+
   describe("project_only fallback when no project slug", () => {
     it("returns /me when persona is project_only but firstProjectSlug is null", () => {
       const result = resolvePersonaHome({
@@ -165,11 +224,21 @@ describe("resolvePersonaHomeSafe", () => {
     expect(result.destination).toBe("/team-prod/messages");
   });
 
-  it("falls back to /me when given partial input + no project slug", () => {
+  it("falls back to onboarding when partial input has no project slug and no governance UI", () => {
     const result = resolvePersonaHomeSafe({
       firstProjectSlug: null,
     });
+    // hasGovernanceUi defaults to false, so /me would 404 — route to the
+    // recoverable onboarding bootstrap instead.
     expect(result.persona).toBe("project_only");
+    expect(result.destination).toBe("/onboarding/welcome");
+  });
+
+  it("falls back to /me when no project slug but the governance UI is enabled", () => {
+    const result = resolvePersonaHomeSafe({
+      firstProjectSlug: null,
+      hasGovernanceUi: true,
+    });
     expect(result.destination).toBe("/me");
   });
 

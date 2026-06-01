@@ -166,7 +166,7 @@ func TestEvaluationWorkflow_PostsBatchResultsToLangWatch(t *testing.T) {
 	  }
 	}`
 
-	req, err := http.NewRequest("POST", url+"/go/studio/execute", bytes.NewBufferString(envelope))
+	req, err := http.NewRequest(http.MethodPost, url+"/go/studio/execute", bytes.NewBufferString(envelope))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-LangWatch-Origin", "evaluation")
@@ -265,7 +265,7 @@ func TestEvaluationWorkflow_NonInlineDatasetReturnsActionableError(t *testing.T)
 	  }
 	}`
 
-	req, err := http.NewRequest("POST", url+"/go/studio/execute", bytes.NewBufferString(envelope))
+	req, err := http.NewRequest(http.MethodPost, url+"/go/studio/execute", bytes.NewBufferString(envelope))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)

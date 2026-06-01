@@ -153,6 +153,7 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
         name: MODEL_PROVIDER_ID,
         provider: "openai",
         enabled: true,
+        organizationId: ORG_ID,
         scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
       },
     });

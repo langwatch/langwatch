@@ -7,19 +7,18 @@
  * Auth0 sends `sscim` (Successful SCIM Operation) events when a user
  * is created, updated, or deleted via SCIM on an enterprise connection.
  */
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { extractEmailDomain } from "~/server/better-auth/sso";
 import { ScimService } from "~/server/scim/scim.service";
+import {
+  createServiceApp,
+  internalSecret,
+} from "~/server/api/security";
 
-export const app = new Hono().basePath("/api/webhooks");
-app.use(tracerMiddleware({ name: "webhooks" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/webhooks" });
 
-app.post("/auth0-scim", async (c) => {
+secured.access(internalSecret("auth0 SCIM webhook shared secret compared against the Authorization header in-handler")).post("/auth0-scim", async (c) => {
   const secret = env.AUTH0_SCIM_WEBHOOK_SECRET;
   if (!secret) {
     return c.json({ error: "Webhook not configured" }, { status: 404 });
@@ -79,6 +78,8 @@ app.post("/auth0-scim", async (c) => {
 
   return c.json({ received: true });
 });
+
+export const app = secured.hono;
 
 // ── helpers ──────────────────────────────────────────────────────────
 

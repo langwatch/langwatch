@@ -30,8 +30,7 @@ import { useMemo, useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import {
   ScopeChipPicker,
@@ -42,7 +41,6 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
@@ -82,15 +80,6 @@ function RoutingPoliciesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  // Admin-in-empty-org (org but no project) is exempted from the no-org
-  // bouncer for this route — the FF query must resolve on org alone, not
-  // gate on project. Project remains a hint for PostHog cohort targeting.
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId: orgId },
@@ -338,13 +327,6 @@ function RoutingPoliciesPage() {
       });
     }
   };
-
-  if (ffLoading) {
-    return <LoadingScreen />;
-  }
-  if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
-  }
 
   const hasAnyPolicy =
     grouped.organization.length +
@@ -1537,6 +1519,6 @@ function RoutingPolicyDrawer({
   );
 }
 
-export default withPermissionGuard("organization:manage", {})(
-  RoutingPoliciesPage,
-);
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(withPermissionGuard("organization:manage", {})(RoutingPoliciesPage));

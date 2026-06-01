@@ -1,20 +1,13 @@
 import type { Prisma } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
+import { createProjectApp, requires } from "~/server/api/security";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware, requirePermission,
-  handleError,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
@@ -22,8 +15,6 @@ import { badRequestSchema } from "../../shared/schemas";
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:monitors");
-
-type Variables = AuthMiddlewareVariables;
 
 const executionModeEnum = z.enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"]);
 
@@ -112,18 +103,12 @@ function toMonitorResponse(monitor: {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/monitors")
-  .use(tracerMiddleware({ name: "monitors" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/monitors" });
 
-  // ── List Monitors ───────────────────────────────────────────
-  .get(
-    "/",
-    requirePermission("evaluations:view"),
-    describeRoute({
+// ── List Monitors ───────────────────────────────────────────
+secured.access(requires("evaluations:view")).get(
+  "/",
+  describeRoute({
       description:
         "List all online evaluation monitors for the project",
       responses: {
@@ -155,12 +140,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       })));
     }
-  )
+);
 
-  // ── Get Monitor ─────────────────────────────────────────────
-  .get(
+// ── Get Monitor ─────────────────────────────────────────────
+secured.access(requires("evaluations:view")).get(
     "/:id",
-    requirePermission("evaluations:view"),
     describeRoute({
       description: "Get a monitor by its ID",
       responses: {
@@ -205,12 +189,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     }
-  )
+);
 
-  // ── Create Monitor ──────────────────────────────────────────
-  .post(
+// ── Create Monitor ──────────────────────────────────────────
+secured.access(requires("evaluations:manage")).post(
     "/",
-    requirePermission("evaluations:manage"),
     resourceLimitMiddleware("onlineEvaluations"),
     describeRoute({
       description: "Create a new online evaluation monitor",
@@ -278,12 +261,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       }, 201);
     }
-  )
+);
 
-  // ── Update Monitor ──────────────────────────────────────────
-  .patch(
+// ── Update Monitor ──────────────────────────────────────────
+secured.access(requires("evaluations:manage")).patch(
     "/:id",
-    requirePermission("evaluations:manage"),
     describeRoute({
       description:
         "Update a monitor (name, enabled state, settings, etc.)",
@@ -368,12 +350,11 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     }
-  )
+);
 
-  // ── Toggle Monitor ──────────────────────────────────────────
-  .post(
+// ── Toggle Monitor ──────────────────────────────────────────
+secured.access(requires("evaluations:manage")).post(
     "/:id/toggle",
-    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Enable or disable a monitor",
       responses: {
@@ -421,12 +402,11 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json({ id, enabled });
     }
-  )
+);
 
-  // ── Delete Monitor ──────────────────────────────────────────
-  .delete(
+// ── Delete Monitor ──────────────────────────────────────────
+secured.access(requires("evaluations:manage")).delete(
     "/:id",
-    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Delete a monitor",
       responses: {
@@ -471,4 +451,6 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json({ id, deleted: true });
     }
-  );
+);
+
+export const app = secured.hono;

@@ -87,7 +87,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
       />
 
       {/*
-       * Mirror the rule used by the empty-state PAT card and
+       * Mirror the rule used by the empty-state API key card and
        * `buildMcpConfig`: only surface `LANGWATCH_ENDPOINT` when the
        * deployment differs from the public cloud default. Cloud users
        * never need this in their .env (it's the SDK's default), and

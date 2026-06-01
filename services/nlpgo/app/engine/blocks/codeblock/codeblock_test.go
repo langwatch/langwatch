@@ -39,7 +39,7 @@ func TestCodeBlock_HappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(5), res.Outputs["sum"])
+	assert.InDelta(t, 5.0, res.Outputs["sum"], 1e-9)
 }
 
 func TestCodeBlock_StdoutCaptured(t *testing.T) {
@@ -78,7 +78,7 @@ func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error)
-	assert.Equal(t, float64(5), res.Outputs["sum"])
+	assert.InDelta(t, 5.0, res.Outputs["sum"], 1e-9)
 	scratch, hasScratch := res.Outputs["scratch"]
 	assert.True(t, hasScratch, "undeclared output keys must be preserved (legacy parity)")
 	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, scratch)
@@ -155,7 +155,7 @@ class Code(dspy.Module):
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(15), res.Outputs["sum"])
+	assert.InDelta(t, 15.0, res.Outputs["sum"], 1e-9)
 }
 
 // TestCodeBlock_PlainClassWithForward covers the new default template:
@@ -174,7 +174,7 @@ func TestCodeBlock_PlainClassWithForward(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(42), res.Outputs["doubled"])
+	assert.InDelta(t, 42.0, res.Outputs["doubled"], 1e-9)
 }
 
 // TestCodeBlock_PlainClassWithCallable pins the idiomatic-Python
@@ -202,7 +202,7 @@ func TestCodeBlock_PlainClassWithCallable(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(42), res.Outputs["doubled"])
+	assert.InDelta(t, 42.0, res.Outputs["doubled"], 1e-9)
 }
 
 // TestCodeBlock_CallableTakesPriorityOverForward pins the resolution
@@ -253,7 +253,7 @@ class Code(dspy.Module):
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
 	assert.Equal(t, "42", res.Outputs["answer"])
-	assert.Equal(t, 0.9, res.Outputs["confidence"])
+	assert.InDelta(t, 0.9, res.Outputs["confidence"], 1e-9)
 }
 
 // TestCodeBlock_DspyMarkerImportsAreInert covers the marker-only
@@ -353,6 +353,6 @@ func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Nil(t, res.Error, "iter %d", i)
-		assert.Equal(t, float64(1), res.Outputs["x"], "no global state leak between invocations")
+		assert.InDelta(t, 1.0, res.Outputs["x"], 1e-9, "no global state leak between invocations")
 	}
 }

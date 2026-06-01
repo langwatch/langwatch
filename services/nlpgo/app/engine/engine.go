@@ -106,6 +106,13 @@ type ExecuteRequest struct {
 	// outputs and propagate via edges. Mirrors Python's
 	// `ExecuteComponentPayload.node_id` (langwatch_nlp/studio/app.py).
 	NodeID string
+	// UntilNodeID, when non-empty, scopes the run to the backward
+	// dependency path of the named node — the Studio "Run until here"
+	// flow (Nodes.tsx wires Play → startWorkflowExecution({untilNodeId})).
+	// Mirrors Python's `ExecuteFlowPayload.until_node_id` consumed by
+	// `find_path_until_node` in studio/parser.py. Disconnected siblings
+	// + everything downstream of the target are trimmed from the plan.
+	UntilNodeID string
 	// Type is the StudioClientEvent discriminator. Routes the engine
 	// between the parallel state-event families Studio's reducer
 	// expects (`execution_state_change` for execute_flow,
@@ -182,7 +189,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		// workflow execution.
 		req.TraceID = traceID
 	}
-	plan, err := planner.New(req.Workflow)
+	plan, err := planner.New(req.Workflow, planOptionsFor(req)...)
 	if err != nil {
 		return nil, err
 	}
@@ -596,13 +603,20 @@ func jsonSchemaForField(f dsl.Field) map[string]any {
 // non-JSON fallback.
 func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]any, []string) {
 	out := make(map[string]any, len(outputs))
-	var parsed map[string]any
-	if err := jsonUnmarshalRaw([]byte(content), &parsed); err != nil {
+
+	parsed, ok := recoverJSONObject(content)
+	if !ok {
+		// The completion wasn't a JSON object even after stripping a
+		// markdown ```json fence and extracting the first balanced {...}.
+		// Preserve the raw text in the first declared field so the
+		// response isn't lost, and warn so operators see the malformed
+		// structured response.
 		if len(outputs) > 0 {
 			out[outputs[0].Identifier] = content
 		}
-		return out, []string{fmt.Sprintf("signature: structured response did not parse as JSON object: %v", err)}
+		return out, []string{"signature: structured response did not parse as a JSON object"}
 	}
+
 	var warnings []string
 	for _, f := range outputs {
 		if v, ok := parsed[f.Identifier]; ok {
@@ -612,6 +626,32 @@ func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]an
 		}
 	}
 	return out, warnings
+}
+
+// recoverJSONObject parses an LLM completion into a JSON object, tolerating
+// the markdown ```json fence and surrounding prose that models (notably
+// Anthropic/Claude) emit even when a JSON response_format is requested.
+// Mirrors DSPy's JSONAdapter.parse, which strips the fence and extracts the
+// first balanced object before parsing. Tries, in order: the raw content,
+// the fence-stripped content, then the first balanced {...} object. Without
+// this, a fenced ```json{...}``` completion fails to parse and the whole
+// blob is dumped into the first output field instead of being split across
+// the declared fields.
+func recoverJSONObject(content string) (map[string]any, bool) {
+	candidates := []string{content}
+	if stripped := stripJSONFence(content); stripped != content {
+		candidates = append(candidates, stripped)
+	}
+	if obj, ok := extractFirstJSONObject(content); ok {
+		candidates = append(candidates, obj)
+	}
+	for _, c := range candidates {
+		var parsed map[string]any
+		if err := jsonUnmarshalRaw([]byte(c), &parsed); err == nil && parsed != nil {
+			return parsed, true
+		}
+	}
+	return nil, false
 }
 
 // runEvaluator dispatches an evaluator node to the LangWatch evaluator
@@ -665,8 +705,8 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	// final result panel. The Studio expects the same field names the
 	// Python EvaluationResultWithMetadata produces.
 	out := map[string]any{
-		"status":   res.Status,
-		"details":  res.Details,
+		"status":  res.Status,
+		"details": res.Details,
 	}
 	if res.Score != nil {
 		out["score"] = *res.Score
@@ -707,7 +747,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 //   - http     → reuse the HTTP-block executor with the agent's URL/method/etc.
 //   - code     → reuse the code-block executor with the agent's `code`.
 //   - workflow → call the LangWatch app's /api/workflows/<id>[/<version>]/run
-//                via the agentblock.WorkflowRunner.
+//     via the agentblock.WorkflowRunner.
 func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
@@ -860,6 +900,17 @@ func (e *Engine) runCustom(ctx context.Context, req ExecuteRequest, node *dsl.No
 	return map[string]any{"value": res.Result}, nil
 }
 
+// planOptionsFor translates ExecuteRequest's run-shaping fields into the
+// planner's functional options. Keeps engine.go and stream.go from
+// diverging on which knobs reach the planner.
+func planOptionsFor(req ExecuteRequest) []planner.Option {
+	var opts []planner.Option
+	if req.UntilNodeID != "" {
+		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
+	}
+	return opts
+}
+
 // applyManualInputs primes runState with the inbound execute_component
 // payload's `node_id` + `inputs` so resolveInputs can short-circuit for
 // the target node. Both Execute and ExecuteStream MUST call this — the
@@ -877,13 +928,13 @@ func applyManualInputs(state *runState, req ExecuteRequest) {
 // runState aggregates per-node outputs and tracks the first error
 // observed. It is the engine's equivalent of WorkflowState.execution.
 type runState struct {
-	mu          sync.Mutex
-	nodes       map[string]*dsl.Node
-	outputs     map[string]map[string]any
-	states      map[string]*NodeState
-	firstError  *NodeError
-	endNodeID   string
-	totalCost   float64
+	mu         sync.Mutex
+	nodes      map[string]*dsl.Node
+	outputs    map[string]map[string]any
+	states     map[string]*NodeState
+	firstError *NodeError
+	endNodeID  string
+	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
 	// per Studio's wire convention.
@@ -1020,7 +1071,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 	}
 	if ctxErr != nil {
 		res.Status = "error"
-		res.Error = &NodeError{Type: "context_cancelled", Message: ctxErr.Error()}
+		res.Error = &NodeError{Type: "context_canceled", Message: ctxErr.Error()}
 		return res
 	}
 	if state.firstError != nil {

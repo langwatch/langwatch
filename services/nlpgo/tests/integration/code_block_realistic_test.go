@@ -69,11 +69,11 @@ func TestSync_CodeBlock_StdlibHeavyComputation(t *testing.T) {
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
 	got, _ := res.Result["result"].(string)
 	// Sanity-check each stdlib feature reached the customer code.
-	assert.Contains(t, got, `"len": 18`)               // len("customer-data-2026")
-	assert.Contains(t, got, `"year": 2026`)            // datetime
+	assert.Contains(t, got, `"len": 18`)    // length of the 18-char input
+	assert.Contains(t, got, `"year": 2026`) // datetime imported
 	assert.Contains(t, got, `"raw": "customer-data-2026"`)
-	assert.Contains(t, got, `"sha256":`)               // hashlib produced something
-	// base64.b64encode("customer-data-2026") = "Y3VzdG9tZXItZGF0YS0yMDI2"
+	assert.Contains(t, got, `"sha256":`) // hashlib produced something
+	// "customer-data-2026" base64-encoded.
 	assert.Contains(t, got, `Y3VzdG9tZXItZGF0YS0yMDI2`)
 }
 

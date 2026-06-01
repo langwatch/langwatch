@@ -330,7 +330,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -443,7 +443,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
         return await experimentService()
@@ -475,7 +475,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -504,7 +504,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       return await experimentService().getAll({
         projectId: input.projectId,
@@ -519,7 +519,7 @@ export const experimentsRouter = createTRPCRouter({
         pageSize: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
@@ -637,7 +637,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -706,7 +706,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -760,7 +760,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -786,7 +786,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -1103,7 +1103,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       return await experimentService().getLatest({
         projectId: input.projectId,

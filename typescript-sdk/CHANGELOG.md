@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.30.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.1...typescript-sdk@v0.30.0) (2026-05-29)
+
+
+### Features
+
+* **governance:** post-merge follow-ups for the AI Governance Platform ([#4238](https://github.com/langwatch/langwatch/issues/4238)) ([e79f85f](https://github.com/langwatch/langwatch/commit/e79f85f5b00aee32f359720915c8dcb7996438c1))
+* **governance:** the LangWatch AI Governance Platform ([#3524](https://github.com/langwatch/langwatch/issues/3524)) ([7dcaa89](https://github.com/langwatch/langwatch/commit/7dcaa895e29f6f2cce8d1e9160ef857520af340a))
+
+
+### Bug Fixes
+
+* **mcp:** serve partial experiment results and fix status for SDK runs ([#4276](https://github.com/langwatch/langwatch/issues/4276)) ([d21997a](https://github.com/langwatch/langwatch/commit/d21997a3c65146b0f52026dccf0907e2abeb8bb9))
+
+
+### Miscellaneous
+
+* **deps:** bump liquidjs to &gt;=10.26.0 (RCE GHSA-gf2q-c269-pqgc) in typescript-sdk, skills, mcp-server ([#4340](https://github.com/langwatch/langwatch/issues/4340)) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump liquidjs to &gt;=10.26.0 in typescript-sdk, skills, mcp-server (GHSA-gf2q-c269-pqgc) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump the npm_and_yarn group across 2 directories with 4 updates ([#4279](https://github.com/langwatch/langwatch/issues/4279)) ([e84354c](https://github.com/langwatch/langwatch/commit/e84354cc9e8a5d8e096a5762dda31b3258a36062))
+
 ## [0.29.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.0...typescript-sdk@v0.29.1) (2026-05-27)
 
 

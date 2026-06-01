@@ -27,12 +27,10 @@ import {
   type GroupBy,
 } from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -79,16 +77,10 @@ const fmtRelative = (date: Date | string | null): string => {
 };
 
 function GovernanceOverviewPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      projectId: project?.id,
-      organizationId: orgId,
-      enabled: !!orgId,
-    });
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
@@ -131,9 +123,6 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-
-  if (ffLoading) return <LoadingScreen />;
-  if (!governancePreviewEnabled) return <NotFoundScene />;
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -1197,6 +1186,10 @@ function UserRow({ user }: { user: SpendByUser }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(GovernanceOverviewPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceOverviewPage),
+);

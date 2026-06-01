@@ -125,11 +125,12 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	tracer := otelapi.Tracer(tracerName)
 	attrs := studioRequestAttrs(req)
 	attrs = append(attrs, attribute.String("langwatch.span.type", spanType))
+	//nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
 	ctx, span := tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(attrs...),
 	)
-	return ctx, span
+	return ctx, span //nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
 }
 
 func studioRequestAttrs(req *app.WorkflowRequest) []attribute.KeyValue {
@@ -172,4 +173,3 @@ func parseTraceID(s string) (trace.TraceID, bool) {
 	}
 	return tid, true
 }
-

@@ -10,13 +10,10 @@
  */
 
 import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
 import type { NextRequest } from "~/types/next-stubs";
 import crypto from "crypto";
 
-import { handleError } from "../../../middleware/error-handler";
-import { loggerMiddleware } from "../../../middleware/logger";
-import { tracerMiddleware } from "../../../middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import { getServerAuthSession } from "~/server/auth";
@@ -28,11 +25,7 @@ import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:export-traces");
 
-export const app = new Hono().basePath("/api/export/traces");
-
-app.use(tracerMiddleware({ name: "export-traces" }));
-app.use(loggerMiddleware());
-app.onError(handleError);
+const secured = createServiceApp({ basePath: "/api/export/traces" });
 
 /**
  * POST /download — Stream trace data as a file download.
@@ -45,7 +38,7 @@ app.onError(handleError);
  * subscription can relay them to the client. The export ID is returned
  * in the X-Export-Id response header.
  */
-app.post("/download", zValidator("json", exportRequestSchema), async (c) => {
+secured.access(handlerManagedAuth("user session + traces:view enforced in-handler")).post("/download", zValidator("json", exportRequestSchema), async (c) => {
   const request = c.req.valid("json");
 
   // Authenticate
@@ -152,3 +145,5 @@ app.post("/download", zValidator("json", exportRequestSchema), async (c) => {
 
   return new Response(stream, { headers });
 });
+
+export const app = secured.hono;

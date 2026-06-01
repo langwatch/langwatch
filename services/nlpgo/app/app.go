@@ -61,6 +61,10 @@ type WorkflowRequest struct {
 	// execute_flow / execute_evaluation, where Inputs go to the Entry
 	// node and propagate via edges.
 	NodeID string
+	// UntilNodeID scopes a flow run to the backward dependency path of
+	// the named node — the Studio "Run until here" gesture. Empty for
+	// full runs. Mirrors Python's `ExecuteFlowPayload.until_node_id`.
+	UntilNodeID string
 	// APIKey is `workflow.api_key` from the inbound payload — peeked
 	// out of WorkflowJSON at decode time so the request handler can
 	// stash it on the request context before creating its top-level

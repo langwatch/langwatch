@@ -19,7 +19,11 @@ import { useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
-import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
+import {
+  type AdvancedGatewayPayload,
+  type FormSnapshot,
+  useProviderFormSubmit,
+} from "./useProviderFormSubmit";
 
 export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -48,6 +52,13 @@ export type UseModelProviderFormParams = {
    */
   canManageOrganization?: boolean;
   canManageTeam?: boolean;
+  /**
+   * Optional advanced-gateway payload callback used by the unified
+   * Save. The drawer wires this when the AI Gateway feature flag is
+   * on for the caller's org; throwing (malformed JSON) aborts submit
+   * so the parent can render the inline parse error.
+   */
+  getAdvancedPayload?: () => AdvancedGatewayPayload | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -123,6 +134,7 @@ export function useModelProviderForm(
     organizationId,
     canManageOrganization,
     canManageTeam,
+    getAdvancedPayload,
     onSuccess,
     onError,
   } = params;
@@ -248,6 +260,7 @@ export function useModelProviderForm(
 
   const formSubmitHook = useProviderFormSubmit({
     getFormSnapshot,
+    getAdvancedPayload,
     onSuccess,
     onError,
   });

@@ -5,6 +5,7 @@ import {
   type PrismaClient,
 } from "@prisma/client";
 import {
+  bindingScopeCanGrant,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
   teamRoleHasPermission,
@@ -196,6 +197,11 @@ export async function checkRoleBindingPermission({
   const bindings = await collectBindingsForScope({ prisma, principal: resolvedPrincipal, organizationId, scope });
 
   for (const binding of bindings) {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021). Stays in sync with
+    // checkPermissionFromBindings() in rbac.ts.
+    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+
     // Custom role — look up its permissions
     if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
       const customRole = await prisma.customRole.findUnique({

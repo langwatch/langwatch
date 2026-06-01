@@ -80,4 +80,75 @@ export const featureFlagRouter = createTRPCRouter({
 
       return { enabled };
     }),
+
+  /**
+   * Check if a feature flag is enabled for ANY of the given organizations.
+   *
+   * Org-targeted flags can only be evaluated one organization at a time, but
+   * some UI (the workspace switcher's personal entry) gates on whether the
+   * user has the flag in any organization they belong to. Returns true as
+   * soon as one organization has it enabled.
+   *
+   * The procedure first intersects `organizationIds` with the caller's
+   * actual `OrganizationUser` memberships and silently drops the rest —
+   * otherwise an authenticated user could probe the flag state of arbitrary
+   * organizations they have no business knowing about. Silent drop (rather
+   * than throwing on the first unknown id) keeps the response shape
+   * indistinguishable between "flag off" and "not a member", so the
+   * procedure cannot be used as a membership oracle either.
+   *
+   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
+   * @param organizationIds - Organizations to evaluate the flag against
+   * @returns { enabled: boolean }
+   */
+  isEnabledForAnyOrganization: protectedProcedure
+    .input(
+      z.object({
+        flag: frontendFeatureFlagSchema,
+        organizationIds: z.array(z.string()),
+      }),
+    )
+    // Membership filtering below is the real authorization check; the
+    // rbac middleware's sensitive-key guard does not cover plural
+    // targeting params and is not relevant here.
+    .use(skipPermissionCheck())
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      if (input.organizationIds.length === 0) {
+        return { enabled: false };
+      }
+
+      // OrganizationUser is org-scoped under the single-organization
+      // invariant of guardOrganizationId, so a single `in:` query would
+      // be rejected for spanning multiple orgs. Resolve memberships
+      // per-id; the user's org count is bounded by their workspace list.
+      const memberships = await Promise.all(
+        input.organizationIds.map((organizationId) =>
+          ctx.prisma.organizationUser.findUnique({
+            where: { userId_organizationId: { userId, organizationId } },
+            select: { organizationId: true },
+          }),
+        ),
+      );
+      const allowedOrganizationIds = memberships
+        .filter((m): m is { organizationId: string } => m !== null)
+        .map((m) => m.organizationId);
+
+      if (allowedOrganizationIds.length === 0) {
+        return { enabled: false };
+      }
+
+      const results = await Promise.all(
+        allowedOrganizationIds.map((organizationId) =>
+          featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
+            distinctId: userId,
+            defaultValue: false,
+            organizationId,
+          }),
+        ),
+      );
+
+      return { enabled: results.some(Boolean) };
+    }),
 });

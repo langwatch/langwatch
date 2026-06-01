@@ -68,15 +68,21 @@ const sampleResults = {
 
 describe("experimentResultsCommand()", () => {
   let mockGetRunResults: ReturnType<typeof vi.fn>;
+  let mockListRuns: ReturnType<typeof vi.fn>;
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRunResults = vi.fn();
+    // Default: one run exists, so the slug-first command resolves it as latest.
+    mockListRuns = vi.fn().mockResolvedValue({
+      runs: [{ runId: "run_1" }, { runId: "older_run" }],
+    });
     vi.mocked(ExperimentsApiService).mockImplementation(() => ({
       startRun: vi.fn(),
       getRunStatus: vi.fn(),
       getRunResults: mockGetRunResults,
+      listRuns: mockListRuns,
     }) as unknown as ExperimentsApiService);
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
@@ -87,12 +93,44 @@ describe("experimentResultsCommand()", () => {
     vi.restoreAllMocks();
   });
 
-  describe("given a completed run", () => {
-    describe("when invoked without filters", () => {
-      it("calls the service with the run id", async () => {
+  describe("given an experiment slug", () => {
+    describe("when no run id is given", () => {
+      it("resolves the latest run and fetches its results", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await experimentResultsCommand({ runId: "run_1" });
-        expect(mockGetRunResults).toHaveBeenCalledWith({ runId: "run_1" });
+        await experimentResultsCommand({ experimentSlug: "doc-qa" });
+        expect(mockListRuns).toHaveBeenCalledWith({
+          experimentSlug: "doc-qa",
+          pageSize: 1,
+        });
+        expect(mockGetRunResults).toHaveBeenCalledWith({
+          runId: "run_1",
+          experimentSlug: "doc-qa",
+        });
+      });
+    });
+
+    describe("when --run-id pins a specific run", () => {
+      it("uses that run id and does not look up the latest", async () => {
+        mockGetRunResults.mockResolvedValue(sampleResults);
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { runId: "pinned_run" },
+        });
+        expect(mockListRuns).not.toHaveBeenCalled();
+        expect(mockGetRunResults).toHaveBeenCalledWith({
+          runId: "pinned_run",
+          experimentSlug: "doc-qa",
+        });
+      });
+    });
+
+    describe("when no runs exist for the experiment", () => {
+      it("exits with code 1", async () => {
+        mockListRuns.mockResolvedValue({ runs: [] });
+        await expect(
+          experimentResultsCommand({ experimentSlug: "doc-qa" }),
+        ).rejects.toMatchObject({ code: 1 });
+        expect(mockGetRunResults).not.toHaveBeenCalled();
       });
     });
 
@@ -100,7 +138,7 @@ describe("experimentResultsCommand()", () => {
       it("applies filters and dumps the matching payload to stdout", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         await experimentResultsCommand({
-          runId: "run_1",
+          experimentSlug: "doc-qa",
           options: { format: "json", filter: "failed", limit: "1" },
         });
         const payload = JSON.parse(String(logSpy.mock.calls[0]![0]));
@@ -120,15 +158,12 @@ describe("experimentResultsCommand()", () => {
       it("prints only failing rows", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         await experimentResultsCommand({
-          runId: "run_1",
+          experimentSlug: "doc-qa",
           options: { filter: "failed" },
         });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
-        // Row 1 (errored) and row 2 (failed quality) should appear
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
-        // Row 0 (all-pass) should NOT appear in the data area
-        // Heuristic: "hello world" was the entry summary for row 0
         expect(printed).not.toContain("hello world");
       });
     });
@@ -137,12 +172,11 @@ describe("experimentResultsCommand()", () => {
       it("narrows the column set to that evaluator", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         await experimentResultsCommand({
-          runId: "run_1",
+          experimentSlug: "doc-qa",
           options: { evaluator: "quality" },
         });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
-        // safety column should not appear in the header
         const headerLine = logSpy.mock.calls
           .map((c) => String(c[0]))
           .find((line) => line.includes("Target")) ?? "";
@@ -162,7 +196,7 @@ describe("experimentResultsCommand()", () => {
         };
         mockGetRunResults.mockResolvedValue(big);
         await experimentResultsCommand({
-          runId: "run_1",
+          experimentSlug: "doc-qa",
           options: { limit: "5" },
         });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
@@ -171,14 +205,83 @@ describe("experimentResultsCommand()", () => {
     });
   });
 
-  describe("given the API call fails", () => {
+  describe("given a run still in progress", () => {
+    describe("when invoked in table mode", () => {
+      it("prints a partial-results banner", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({ experimentSlug: "doc-qa" });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).toContain("Run status: running");
+        expect(printed).toContain("partial results");
+      });
+    });
+
+    describe("when format is json", () => {
+      it("omits the banner so the payload stays machine-readable", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: {
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { format: "json" },
+        });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).not.toContain("Run status:");
+      });
+    });
+  });
+
+  describe("given a non-terminal run with zero rows", () => {
+    describe("when the run was interrupted", () => {
+      it("does not tell the user to wait for more rows", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          dataset: [],
+          evaluations: [],
+          timestamps: {
+            createdAt: Date.now() - 60 * 60 * 1000,
+            updatedAt: Date.now() - 30 * 60 * 1000,
+            finishedAt: null,
+            stoppedAt: null,
+          },
+        });
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { runId: "interrupted" },
+        });
+        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(printed).toContain("interrupted");
+        expect(printed).not.toContain("No rows matched the filter");
+        expect(printed).not.toContain("still in progress");
+      });
+    });
+  });
+
+  describe("given the results fetch fails", () => {
     describe("when the run is missing", () => {
       it("exits with code 1", async () => {
         mockGetRunResults.mockRejectedValue(
           new ExperimentsApiServiceError("Run not found", "get run results"),
         );
         await expect(
-          experimentResultsCommand({ runId: "missing" }),
+          experimentResultsCommand({
+            experimentSlug: "doc-qa",
+            options: { runId: "missing" },
+          }),
         ).rejects.toMatchObject({ code: 1 });
         expect(oraMocks.fail).toHaveBeenCalledWith(
           expect.stringContaining("Run not found"),

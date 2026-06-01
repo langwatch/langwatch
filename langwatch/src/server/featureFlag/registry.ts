@@ -123,9 +123,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_nlp_go_engine_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service instead of the legacy Python langwatch_nlp pipeline.",
+      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service. Default flipped to on: the legacy Python langwatch_nlp pipeline is now the opt-out path (set a PostHog rule or operator-store row to disable per project).",
   },
   {
     key: "release_ui_sdk_radar_banner_card_enabled",
@@ -136,8 +136,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
-    description: "Reveals the AI Gateway menu in the project sidebar.",
+    defaultValue: true,
+    description:
+      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
   // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
   // ingestion request (not per span) via the postgres-cached store, so the
@@ -157,13 +158,6 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
-  },
-  {
-    key: "release_ui_traces_v2_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Enables the traces v2 surface (new drawer, lens-based saved views, interactive error chip popover). Per-device opt-in is layered on top via langwatch:traces-v2:* localStorage keys.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 

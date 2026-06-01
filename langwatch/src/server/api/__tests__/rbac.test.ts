@@ -468,6 +468,9 @@ describe("RBAC Permission System", () => {
         expect(permissions).toContain("project:manage");
         expect(permissions).toContain("workflows:view");
         expect(permissions).toContain("workflows:manage");
+        // Experiments are their own permission, not inherited from workflows.
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).toContain("experiments:manage");
         expect(permissions).toContain("team:manage");
       });
 
@@ -480,6 +483,8 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("project:manage");
         expect(permissions).toContain("workflows:view");
         expect(permissions).toContain("workflows:manage");
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).toContain("experiments:manage");
         expect(permissions).not.toContain("team:manage");
       });
 
@@ -492,7 +497,28 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("project:manage");
         expect(permissions).toContain("workflows:view");
         expect(permissions).not.toContain("workflows:manage");
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).not.toContain("experiments:manage");
         expect(permissions).not.toContain("team:manage");
+      });
+
+      /** @scenario "Experiments use a dedicated permission decoupled from workflows" */
+      it("grants experiments:view wherever workflows:view exists, manage tracks workflows:manage", () => {
+        for (const role of [
+          TeamUserRole.ADMIN,
+          TeamUserRole.MEMBER,
+          TeamUserRole.VIEWER,
+          TeamUserRole.CUSTOM,
+        ]) {
+          const perms = getTeamRolePermissions(role);
+          if (perms.includes("workflows:view")) {
+            expect(perms).toContain("experiments:view");
+          }
+          // manage is reserved for roles that can also manage workflows.
+          expect(perms.includes("experiments:manage")).toBe(
+            perms.includes("workflows:manage"),
+          );
+        }
       });
     });
 
@@ -589,9 +615,9 @@ describe("RBAC Permission System", () => {
         expect(
           hasPermissionWithHierarchy(permissions, "ingestionSources:update"),
         ).toBe(true);
-        expect(hasPermissionWithHierarchy(permissions, "anomalyRules:delete")).toBe(
-          true,
-        );
+        expect(
+          hasPermissionWithHierarchy(permissions, "anomalyRules:delete"),
+        ).toBe(true);
       });
 
       it("custom-role assignment via CustomRolePermissions can grant security-analyst-style read-only access", () => {

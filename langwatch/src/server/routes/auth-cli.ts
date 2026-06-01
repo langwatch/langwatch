@@ -27,7 +27,6 @@
  * library out there (incl. the Go CLI's keyring-backed client).
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 
@@ -59,10 +58,18 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
+import {
+  createServiceApp,
+  handlerManagedAuth,
+} from "~/server/api/security";
 
 const logger = createLogger("langwatch:auth-cli");
 
-export const app = new Hono().basePath("/api/auth/cli");
+const secured = createServiceApp({ basePath: "/api/auth/cli" });
+
+const CLI_POLICY = handlerManagedAuth(
+  "CLI device-flow / user session validated in-handler",
+);
 
 // ---------------------------------------------------------------------------
 // Constants — tunable via env if a customer ever needs longer windows.
@@ -321,7 +328,7 @@ const deviceCodeRequestSchema = z.object({
     .default("device_session"),
 });
 
-app.post("/device-code", async (c: Context) => {
+secured.access(CLI_POLICY).post("/device-code", async (c: Context) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = deviceCodeRequestSchema.safeParse(body);
@@ -390,7 +397,7 @@ const exchangeRequestSchema = z.object({
   client_info: clientInfoSchema,
 });
 
-app.post("/exchange", async (c: Context) => {
+secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = exchangeRequestSchema.safeParse(body);
@@ -674,7 +681,7 @@ const refreshRequestSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
-app.post("/refresh", async (c: Context) => {
+secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = refreshRequestSchema.safeParse(body);
@@ -881,7 +888,7 @@ async function resolveOrgAdminEmail(
   return admin?.user.email ?? null;
 }
 
-app.get("/budget/status", async (c: Context) => {
+secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -965,7 +972,7 @@ app.get("/budget/status", async (c: Context) => {
 // formatLoginCeremony renders identically regardless of path.
 // ---------------------------------------------------------------------------
 
-app.get("/bootstrap", async (c: Context) => {
+secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1052,7 +1059,7 @@ async function ensureGovernancePermissionOr403(
   );
 }
 
-app.get("/governance/ingest/sources", async (c: Context) => {
+secured.access(CLI_POLICY).get("/governance/ingest/sources", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1096,7 +1103,7 @@ app.get("/governance/ingest/sources", async (c: Context) => {
   });
 });
 
-app.get("/governance/ingest/sources/:id/events", async (c: Context) => {
+secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/events", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1156,7 +1163,7 @@ app.get("/governance/ingest/sources/:id/events", async (c: Context) => {
   return c.json({ events });
 });
 
-app.get("/governance/ingest/sources/:id/health", async (c: Context) => {
+secured.access(CLI_POLICY).get("/governance/ingest/sources/:id/health", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1209,7 +1216,7 @@ app.get("/governance/ingest/sources/:id/health", async (c: Context) => {
   });
 });
 
-app.get("/governance/status", async (c: Context) => {
+secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1240,7 +1247,7 @@ app.get("/governance/status", async (c: Context) => {
 // approves. Session-protected so unauthenticated visitors can't probe
 // outstanding device codes.
 // ---------------------------------------------------------------------------
-app.get("/lookup", async (c: Context) => {
+secured.access(CLI_POLICY).get("/lookup", async (c: Context) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -1309,7 +1316,7 @@ const approveRequestSchema = z.object({
   project_id: z.string().optional(),
 });
 
-app.post("/approve", async (c: Context) => {
+secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -1579,7 +1586,7 @@ app.post("/approve", async (c: Context) => {
 // ---------------------------------------------------------------------------
 const denyRequestSchema = z.object({ user_code: z.string().min(1) });
 
-app.post("/deny", async (c: Context) => {
+secured.access(CLI_POLICY).post("/deny", async (c: Context) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -1618,7 +1625,7 @@ const logoutRequestSchema = z.object({
   access_token: z.string().optional(),
 });
 
-app.post("/logout", async (c: Context) => {
+secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = logoutRequestSchema.safeParse(body);
@@ -1637,6 +1644,8 @@ app.post("/logout", async (c: Context) => {
   await ops.exec();
   return c.json({ ok: true });
 });
+
+export const app = secured.hono;
 
 // ---------------------------------------------------------------------------
 // Helpers exported for use by the browser-side approval handler

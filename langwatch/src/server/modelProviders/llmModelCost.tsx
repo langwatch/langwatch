@@ -1,5 +1,7 @@
 import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
+import { resolveScopeChain } from "../scopes/resolveScopeChain";
+import type { ScopeTier } from "../scopes/scope.types";
 import { llmModels } from "./loadModelCatalog";
 
 const getImportedModelCosts = () => {
@@ -98,6 +100,8 @@ const getImportedModelCosts = () => {
 export type MaybeStoredLLMModelCost = {
   id?: string;
   projectId: string;
+  scopeType?: ScopeTier;
+  scopeId?: string;
   model: string;
   regex: string;
   inputCostPerToken?: number;
@@ -150,13 +154,48 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
   return cachedStaticModelCosts;
 };
 
+// Most-specific tier wins: a PROJECT override shadows a TEAM override, which
+// shadows an ORGANIZATION override, which shadows the static default. Within a
+// tier the newest row wins.
+const SCOPE_TIER_RANK: Record<ScopeTier, number> = {
+  PROJECT: 0,
+  TEAM: 1,
+  ORGANIZATION: 2,
+};
+
 export const getLLMModelCosts = async ({
   projectId,
 }: {
   projectId: string;
 }): Promise<MaybeStoredLLMModelCost[]> => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { organizationId: true } },
+    },
+  });
+
+  // No project context means no custom overrides apply; fall back to the
+  // static catalog rather than leaking another tenant's costs.
+  if (!project) return getStaticModelCosts();
+
+  const organizationId = project.team.organizationId;
+  const chain = resolveScopeChain({
+    organizationId,
+    teamId: project.teamId,
+    projectId,
+  });
+
   const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
-    where: { projectId },
+    where: {
+      organizationId,
+      OR: chain.map((scope) => ({
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      })),
+    },
   });
 
   const customCosts = llmModelCostsCustomData
@@ -165,6 +204,8 @@ export const getLLMModelCosts = async ({
         ({
           id: record.id,
           projectId,
+          scopeType: record.scopeType,
+          scopeId: record.scopeId,
           model: record.model,
           regex: record.regex,
           inputCostPerToken: record.inputCostPerToken ?? undefined,
@@ -176,7 +217,11 @@ export const getLLMModelCosts = async ({
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,
     )
-    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
+    .sort(
+      (a, b) =>
+        SCOPE_TIER_RANK[a.scopeType!] - SCOPE_TIER_RANK[b.scopeType!] ||
+        b.createdAt!.getTime() - a.createdAt!.getTime(),
+    );
 
   return [...customCosts, ...getStaticModelCosts()];
 };

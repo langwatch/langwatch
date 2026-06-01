@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestDecodeStudioClientEvent_DoNotTrace_FromEnvelope(t *testing.T) {
 			"do_not_trace": true
 		}
 	}`)
-	r := httptest.NewRequest("POST", "/", strings.NewReader(string(body)))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body)))
 	req, herrErr := decodeStudioClientEvent(r, body)
 	if herrErr != nil {
 		t.Fatalf("decode failed: %v", herrErr)
@@ -44,7 +45,7 @@ func TestDecodeStudioClientEvent_DoNotTrace_FromEnableTracingFalse(t *testing.T)
 			"workflow": {"workflow_id": "wf", "api_key": "k", "spec_version": "1.3", "enable_tracing": false}
 		}
 	}`)
-	r := httptest.NewRequest("POST", "/", strings.NewReader(string(body)))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body)))
 	req, herrErr := decodeStudioClientEvent(r, body)
 	if herrErr != nil {
 		t.Fatalf("decode failed: %v", herrErr)
@@ -67,7 +68,7 @@ func TestDecodeStudioClientEvent_DoNotTrace_DefaultsFalse(t *testing.T) {
 			"workflow": {"workflow_id": "wf", "api_key": "k", "spec_version": "1.3"}
 		}
 	}`)
-	r := httptest.NewRequest("POST", "/", strings.NewReader(string(body)))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body)))
 	req, herrErr := decodeStudioClientEvent(r, body)
 	if herrErr != nil {
 		t.Fatalf("decode failed: %v", herrErr)

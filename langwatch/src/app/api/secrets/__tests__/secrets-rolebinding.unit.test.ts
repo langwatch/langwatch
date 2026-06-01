@@ -65,6 +65,27 @@ vi.mock("../../middleware/tracer", () => ({
   },
 }));
 
+// The SecuredApp project strategy imports authMiddleware/requirePermission from
+// the auth module directly, so mock that path (not just the barrel) to inject a
+// project and bypass real auth in this unit test.
+vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  return {
+    ...actual,
+    authMiddleware: async (c: any, next: any) => {
+      c.set("project", {
+        id: "project-1",
+        teamId: "team-1",
+        name: "Test Project",
+      });
+      await next();
+    },
+    requirePermission: () => async (_c: any, next: any) => {
+      await next();
+    },
+  };
+});
+
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
 

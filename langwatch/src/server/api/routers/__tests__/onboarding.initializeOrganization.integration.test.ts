@@ -93,7 +93,7 @@ describe("onboarding.initializeOrganization integration", () => {
       overrideAddingLimitations: false,
     });
 
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       notifications: {
         sendSlackSignupEvent: mockSendSlackSignupEvent,
@@ -145,7 +145,7 @@ describe("onboarding.initializeOrganization integration", () => {
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
     await prisma.user.deleteMany({
       where: { id: userId },
     });

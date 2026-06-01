@@ -43,7 +43,7 @@ func TestEngineExecute_SuppressesEntryAndEndSpans(t *testing.T) {
 	require.Equal(t, "success", res.Status)
 
 	spans := rec.Ended()
-	require.Len(t, spans, 0,
+	require.Empty(t, spans,
 		"Entry + End are pass-throughs and must NOT emit per-node spans (Python parity)")
 }
 

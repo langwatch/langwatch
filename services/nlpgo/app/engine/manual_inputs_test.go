@@ -18,7 +18,9 @@ import (
 // req.Inputs was treated as Entry-node outputs. A fresh-dragged Code
 // node with no Entry→Code wiring received an empty input map → the
 // Python runner raised
-//   `Code.__call__() missing 1 required positional argument: 'input'`
+//
+//	`Code.__call__() missing 1 required positional argument: 'input'`
+//
 // and the Studio input field appeared to be silently dropped on
 // Execute click.
 //

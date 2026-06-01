@@ -41,14 +41,27 @@ class File:
 T = TypeVar("T")
 
 
+def safe_http_status(status_code: int) -> HTTPStatus | int:
+    """Coerce a status code to HTTPStatus when possible, otherwise return the raw int.
+
+    LangWatch override: upstream openapi-python-client blindly calls HTTPStatus(code),
+    which raises ValueError on non-IANA codes (Cloudflare 520-527, AWS WAF 561, etc).
+    Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
+    """
+    try:
+        return HTTPStatus(status_code)
+    except ValueError:
+        return status_code
+
+
 @define
 class Response(Generic[T]):
     """A response from an endpoint"""
 
-    status_code: HTTPStatus
+    status_code: HTTPStatus | int
     content: bytes
     headers: MutableMapping[str, str]
     parsed: T | None
 
 
-__all__ = ["UNSET", "File", "FileTypes", "RequestFiles", "Response", "Unset"]
+__all__ = ["UNSET", "File", "FileTypes", "RequestFiles", "Response", "Unset", "safe_http_status"]

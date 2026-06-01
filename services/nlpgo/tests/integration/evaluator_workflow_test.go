@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -30,7 +31,6 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/pkg/health"
 )
 
 // setupEvaluatorStack mirrors setupStack but wires the evaluator + agent

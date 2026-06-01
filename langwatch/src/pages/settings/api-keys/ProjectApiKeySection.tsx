@@ -7,7 +7,7 @@ import { formatEnvLines } from "./utils";
 
 /**
  * Project-scoped legacy API key (`sk-lw-...`). One per project.
- * Lives next to the PAT list on the Settings → API Key page so users can
+ * Lives next to the API key list on the Settings → API Key page so users can
  * manage both personal and project credentials in one spot.
  */
 export function ProjectApiKeySection() {

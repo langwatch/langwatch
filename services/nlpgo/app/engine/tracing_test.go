@@ -72,7 +72,7 @@ func TestStartNodeSpan_NameIsUserSetNodeName(t *testing.T) {
 	assert.Equal(t, "thread_qq", attrs["langwatch.thread_id"])
 	assert.Equal(t, "workflow", attrs["langwatch.origin"])
 	assert.Equal(t, int64(42), attrs["langwatch.duration_ms"])
-	assert.Equal(t, 0.001, attrs["langwatch.cost"])
+	assert.InDelta(t, 0.001, attrs["langwatch.cost"], 1e-9)
 	assert.Equal(t, codes.Ok, got.Status().Code)
 }
 

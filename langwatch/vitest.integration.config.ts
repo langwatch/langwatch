@@ -34,6 +34,13 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel
     fileParallelism: false,
+    // Use forked child processes. We briefly tried pool: "threads" to
+    // sidestep the post-test shard 4 wedge, but threads exposes a panic
+    // in @prisma/client/query-engine-node-api when the client gets
+    // constructed inside a worker-thread context (engine.rs:166 "Failed
+    // to deserialize constructor options"). The wedge in forks is
+    // handled by a hard-floor process.exit timer in globalSetup.ts.
+    pool: "forks",
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },

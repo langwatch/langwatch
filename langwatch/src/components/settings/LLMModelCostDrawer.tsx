@@ -1,4 +1,5 @@
 import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
@@ -10,6 +11,10 @@ import { api } from "../../utils/api";
 import { isSafeRegex } from "../../utils/safeRegex";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "./ScopeChipPicker";
 
 export function LLMModelCostDrawer({
   id,
@@ -61,7 +66,7 @@ function LLMModelCostForm({
   cloneModel?: string;
   llmModelCosts: MaybeStoredLLMModelCost[];
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { organization, team, project } = useOrganizationTeamProject();
 
   const { closeDrawer } = useDrawer();
   const createOrUpdate = api.llmModelCost.createOrUpdate.useMutation();
@@ -89,6 +94,24 @@ function LLMModelCostForm({
     regex: string;
   };
 
+  // Single-organization scope this cost applies to (ADR-021). Editing keeps
+  // the row's scope; new/cloned rows default to the current project. The
+  // org/team rows let an admin push one cost policy down the cascade
+  // (PROJECT -> TEAM -> ORGANIZATION) instead of every project re-entering it.
+  const [scope, setScope] = useState<ScopeChipPickerEntry[]>(() => {
+    if (currentLLMModelCost?.scopeType && currentLLMModelCost?.scopeId) {
+      return [
+        {
+          scopeType: currentLLMModelCost.scopeType,
+          scopeId: currentLLMModelCost.scopeId,
+        },
+      ];
+    }
+    return project?.id
+      ? [{ scopeType: "PROJECT", scopeId: project.id }]
+      : [];
+  });
+
   const {
     register,
     handleSubmit,
@@ -110,6 +133,8 @@ function LLMModelCostForm({
     const optionalRate = (value: number | undefined) =>
       value == null || isNaN(value) ? undefined : value;
 
+    const selectedScope = scope[0];
+
     createOrUpdate.mutate(
       {
         id,
@@ -120,6 +145,8 @@ function LLMModelCostForm({
         cacheReadCostPerToken: optionalRate(data.cacheReadCostPerToken),
         cacheCreationCostPerToken: optionalRate(data.cacheCreationCostPerToken),
         projectId: project.id,
+        scopeType: selectedScope?.scopeType,
+        scopeId: selectedScope?.scopeId,
       },
       {
         onSuccess: () => {
@@ -157,6 +184,26 @@ function LLMModelCostForm({
     <>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
+        <HorizontalFormControl
+          label="Applies to"
+          helper="Pick the scope this cost rule applies to. Project-level rules override team-level, which override organization-level."
+        >
+          <ScopeChipPicker
+            label=""
+            singleSelect
+            value={scope}
+            onChange={setScope}
+            organizationId={organization?.id}
+            organizationName={organization?.name}
+            teamId={team?.id}
+            teamName={team?.name}
+            projectId={project?.id}
+            projectName={project?.name}
+            currentOrganizationId={organization?.id}
+            currentTeamId={team?.id}
+            currentProjectId={project?.id}
+          />
+        </HorizontalFormControl>
         <HorizontalFormControl
           label="Model Name"
           helper="Identifier for your LLM model cost rule"

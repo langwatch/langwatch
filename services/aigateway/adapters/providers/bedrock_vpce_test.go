@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	brtypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -241,5 +243,136 @@ func TestBedrockVPCE_DispatchHonorsAWSStyleCredentialKeys(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestMapBedrockToolChoice pins the OpenAI/bifrost tool_choice -> Bedrock
+// Converse ToolChoice mapping. Pre-fix this branch did not exist and the
+// VPCE intercept silently dropped tool_choice from the outbound request.
+// Customer dogfood 2026-05-31: nlpgo's executor.go translates
+// response_format -> tools + forced tool_choice for bedrock+anthropic
+// structured outputs; without this mapper the model was free to ignore
+// the synthetic lw_so_* tool and replied with text, which the engine's
+// prose-fallback then dumped into the first declared output field.
+func TestMapBedrockToolChoice(t *testing.T) {
+	t.Run("nil input returns nil", func(t *testing.T) {
+		if got := mapBedrockToolChoice(nil); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("string form: any => ToolChoiceMemberAny", func(t *testing.T) {
+		s := "any"
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{ChatToolChoiceStr: &s})
+		if _, ok := got.(*brtypes.ToolChoiceMemberAny); !ok {
+			t.Fatalf("expected ToolChoiceMemberAny, got %T", got)
+		}
+	})
+
+	t.Run("string form: required => ToolChoiceMemberAny", func(t *testing.T) {
+		s := "required"
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{ChatToolChoiceStr: &s})
+		if _, ok := got.(*brtypes.ToolChoiceMemberAny); !ok {
+			t.Fatalf("expected ToolChoiceMemberAny, got %T", got)
+		}
+	})
+
+	t.Run("string form: auto => ToolChoiceMemberAuto", func(t *testing.T) {
+		s := "auto"
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{ChatToolChoiceStr: &s})
+		if _, ok := got.(*brtypes.ToolChoiceMemberAuto); !ok {
+			t.Fatalf("expected ToolChoiceMemberAuto, got %T", got)
+		}
+	})
+
+	t.Run("string form: none => nil (omit tools instead)", func(t *testing.T) {
+		s := "none"
+		if got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{ChatToolChoiceStr: &s}); got != nil {
+			t.Fatalf("expected nil for 'none', got %#v", got)
+		}
+	})
+
+	t.Run("struct form: function with name => ToolChoiceMemberTool (the customer-fix case)", func(t *testing.T) {
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{
+			ChatToolChoiceStruct: &bfschemas.ChatToolChoiceStruct{
+				Type:     bfschemas.ChatToolChoiceTypeFunction,
+				Function: &bfschemas.ChatToolChoiceFunction{Name: "lw_so_ClassifierRelevance"},
+			},
+		})
+		tool, ok := got.(*brtypes.ToolChoiceMemberTool)
+		if !ok {
+			t.Fatalf("expected ToolChoiceMemberTool, got %T — without this branch the forced-tool pin is silently dropped on the VPCE intercept path", got)
+		}
+		if tool.Value.Name == nil || *tool.Value.Name != "lw_so_ClassifierRelevance" {
+			t.Fatalf("expected tool name lw_so_ClassifierRelevance, got %v", tool.Value.Name)
+		}
+	})
+
+	t.Run("struct form: function with empty name => nil", func(t *testing.T) {
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{
+			ChatToolChoiceStruct: &bfschemas.ChatToolChoiceStruct{
+				Type:     bfschemas.ChatToolChoiceTypeFunction,
+				Function: &bfschemas.ChatToolChoiceFunction{Name: ""},
+			},
+		})
+		if got != nil {
+			t.Fatalf("expected nil for empty function name, got %#v", got)
+		}
+	})
+
+	t.Run("struct form: any => ToolChoiceMemberAny", func(t *testing.T) {
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{
+			ChatToolChoiceStruct: &bfschemas.ChatToolChoiceStruct{Type: bfschemas.ChatToolChoiceTypeAny},
+		})
+		if _, ok := got.(*brtypes.ToolChoiceMemberAny); !ok {
+			t.Fatalf("expected ToolChoiceMemberAny, got %T", got)
+		}
+	})
+
+	t.Run("struct form: auto => ToolChoiceMemberAuto", func(t *testing.T) {
+		got := mapBedrockToolChoice(&bfschemas.ChatToolChoice{
+			ChatToolChoiceStruct: &bfschemas.ChatToolChoiceStruct{Type: bfschemas.ChatToolChoiceTypeAuto},
+		})
+		if _, ok := got.(*brtypes.ToolChoiceMemberAuto); !ok {
+			t.Fatalf("expected ToolChoiceMemberAuto, got %T", got)
+		}
+	})
+}
+
+// TestMapBedrockToolConfig_ForwardsForcedToolChoice pins the end-to-end
+// behavior at the public mapper boundary: when a request comes in with
+// tools + a forced tool_choice (the shape nlpgo's executor.go emits for
+// bedrock+anthropic structured outputs), the ToolConfiguration must
+// include BOTH the tools array AND the ToolChoice pin.
+func TestMapBedrockToolConfig_ForwardsForcedToolChoice(t *testing.T) {
+	params := &bfschemas.ChatParameters{
+		Tools: []bfschemas.ChatTool{
+			{
+				Function: &bfschemas.ChatToolFunction{
+					Name:        "lw_so_ClassifierRelevance",
+					Description: strPtr("Return the response as a JSON object matching the declared output schema."),
+				},
+			},
+		},
+		ToolChoice: &bfschemas.ChatToolChoice{
+			ChatToolChoiceStruct: &bfschemas.ChatToolChoiceStruct{
+				Type:     bfschemas.ChatToolChoiceTypeFunction,
+				Function: &bfschemas.ChatToolChoiceFunction{Name: "lw_so_ClassifierRelevance"},
+			},
+		},
+	}
+	cfg := mapBedrockToolConfig(params)
+	if cfg == nil {
+		t.Fatal("expected non-nil ToolConfiguration")
+	}
+	if len(cfg.Tools) != 1 {
+		t.Fatalf("expected 1 tool, got %d", len(cfg.Tools))
+	}
+	tool, ok := cfg.ToolChoice.(*brtypes.ToolChoiceMemberTool)
+	if !ok {
+		t.Fatalf("expected forced tool choice, got %T — pre-fix this was nil and the VPCE intercept dropped the pin", cfg.ToolChoice)
+	}
+	if tool.Value.Name == nil || *tool.Value.Name != "lw_so_ClassifierRelevance" {
+		t.Fatalf("expected forced tool name lw_so_ClassifierRelevance, got %v", tool.Value.Name)
 	}
 }

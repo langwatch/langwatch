@@ -120,7 +120,7 @@ For each resource, do these in order before opening the route file:
    but explicit-is-better-than-implicit on the hot path).
 
 4. **Hono route file**. Mirror `langwatch/src/app/api/governance/[[...route]]/app.ts`
-   structure: snake_case Zod schemas, snake_case wire, `requirePatPermission`
+   structure: snake_case Zod schemas, snake_case wire, `requireApiKeyPermission`
    per route, `resolveSurfaceFromRequest` for CLI surface attribution
    on Hono mutations, `mapServiceError` helper for service→HTTP code mapping.
 
@@ -138,7 +138,7 @@ For each resource, do these in order before opening the route file:
 
 7. **Tests**. REST integration test (mirror
    `governance-rest-api.integration.test.ts` for legacy-token routes
-   or `governance-bindings-rest-api.integration.test.ts` for PAT-gated).
+   or `governance-bindings-rest-api.integration.test.ts` for user-bound-key-gated).
    MCP audit-uniform regression (mirror `governance-tools.audit-uniform.integration.test.ts`).
    Cross-surface uniformity case (extend
    `auditSurface.crossSurface.integration.test.ts` with the new
@@ -170,7 +170,7 @@ is proven for the v1 pair via:
 - **Single-surface MCP regression**: `src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`
   asserts surface=mcp on 2 mutating tools + AUTH_REQUIRED fail-closed.
 - **REST integration coverage**: 14-scenario ingestion-templates +
-  9-scenario PAT-gated bindings (locks human_caller_required + token
+  9-scenario user-bound-key-gated bindings (locks human_caller_required + token
   rotation audit + cross-org NOT_FOUND).
 - **No-bypass CI lock**: `ee/governance/repositories/__tests__/no-bypass.unit.test.ts`
   fails the build if any future PR introduces a direct

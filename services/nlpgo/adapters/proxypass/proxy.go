@@ -137,7 +137,7 @@ func New(opts Options) (http.Handler, error) {
 // explicitly (http://example.com → "example.com", no ":80"), so dialing
 // it raw fails with "missing port in address" and our cold-start probe
 // silently returns 503 every time. Resolve the scheme default
-// (80 for http, 443 for https) before joining; an unrecognised scheme
+// (80 for http, 443 for https) before joining; an unrecognized scheme
 // without a port is a configuration error and surfaces from New().
 func probeAddress(u *url.URL) (string, error) {
 	host := u.Hostname()
@@ -179,7 +179,7 @@ func waitForUpstream(next http.Handler, host string, opts Options) http.Handler 
 		deadline := time.Now().Add(opts.ColdStartWait)
 		probeStart := time.Now()
 		for {
-			if conn, err := net.DialTimeout("tcp", host, opts.ColdStartProbeTimeout); err == nil {
+			if conn, err := (&net.Dialer{Timeout: opts.ColdStartProbeTimeout}).DialContext(r.Context(), "tcp", host); err == nil {
 				_ = conn.Close()
 				if waited := time.Since(probeStart); waited > opts.ColdStartProbeInterval {
 					// Only log when we actually waited — happy path stays quiet.

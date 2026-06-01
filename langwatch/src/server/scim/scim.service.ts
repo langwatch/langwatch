@@ -2,13 +2,16 @@ import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generate } from "@langwatch/ksuid";
 import { UserService } from "../users/user.service";
+import { CostCenterService } from "@ee/governance/services/cost-center/costCenter.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type {
-  ScimUser,
-  ScimListResponse,
-  ScimError,
-  ScimCreateUserRequest,
-  ScimPatchRequest,
+import {
+  SCIM_ENTERPRISE_USER_SCHEMA,
+  type ScimUser,
+  type ScimListResponse,
+  type ScimError,
+  type ScimCreateUserRequest,
+  type ScimPatchOperation,
+  type ScimPatchRequest,
 } from "./scim.types";
 
 /**
@@ -17,13 +20,99 @@ import type {
  */
 export class ScimService {
   private readonly userService: UserService;
+  private readonly costCenterService: CostCenterService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.userService = UserService.create(prisma);
+    this.costCenterService = CostCenterService.create(prisma);
   }
 
   static create(prisma: PrismaClient): ScimService {
     return new ScimService(prisma);
+  }
+
+  /**
+   * Apply the SCIM enterprise costCenter attribute to a membership. A
+   * non-empty name resolves (creating if absent) and assigns; an explicit
+   * empty/null value clears the assignment so spend rolls up under
+   * Unassigned. `undefined` means the attribute was not in this request, so
+   * the current assignment is left untouched.
+   */
+  private async syncCostCenterFromScim({
+    userId,
+    organizationId,
+    costCenter,
+  }: {
+    userId: string;
+    organizationId: string;
+    costCenter: string | null | undefined;
+  }): Promise<void> {
+    if (costCenter === undefined) return;
+
+    const trimmed = typeof costCenter === "string" ? costCenter.trim() : "";
+    if (trimmed === "") {
+      await this.costCenterService.assignUser({
+        organizationId,
+        userId,
+        costCenterId: null,
+      });
+      return;
+    }
+
+    const center = await this.costCenterService.resolveByNameOrCreate({
+      organizationId,
+      name: trimmed,
+    });
+    await this.costCenterService.assignUser({
+      organizationId,
+      userId,
+      costCenterId: center.id,
+    });
+  }
+
+  /**
+   * Read the enterprise costCenter from a create/replace body. Returns
+   * `undefined` when the enterprise extension is absent so callers can tell
+   * "not provided" from "explicitly cleared".
+   */
+  private costCenterFromRequest(
+    request: ScimCreateUserRequest,
+  ): string | null | undefined {
+    const ext = (request as Record<string, unknown>)[
+      SCIM_ENTERPRISE_USER_SCHEMA
+    ] as { costCenter?: string | null } | undefined;
+    if (!ext || !("costCenter" in ext)) return undefined;
+    return ext.costCenter ?? null;
+  }
+
+  /**
+   * Read the enterprise costCenter from a PATCH operation, supporting both
+   * the schema-qualified path form (`...:User:costCenter`) and the
+   * value-object form. Returns `{ present: false }` when the op does not
+   * touch costCenter.
+   */
+  private costCenterFromPatchOp(
+    operation: ScimPatchOperation,
+  ): { present: true; value: string | null } | { present: false } {
+    const costCenterPath = `${SCIM_ENTERPRISE_USER_SCHEMA}:costCenter`;
+
+    if (operation.path === costCenterPath) {
+      if (operation.op === "remove") return { present: true, value: null };
+      const v = operation.value;
+      return { present: true, value: typeof v === "string" ? v : null };
+    }
+
+    if (operation.value != null && typeof operation.value === "object") {
+      const value = operation.value as Record<string, unknown>;
+      const ext = value[SCIM_ENTERPRISE_USER_SCHEMA] as
+        | { costCenter?: string | null }
+        | undefined;
+      if (ext && "costCenter" in ext) {
+        return { present: true, value: ext.costCenter ?? null };
+      }
+    }
+
+    return { present: false };
   }
 
   async createUser({
@@ -82,6 +171,12 @@ export class ScimService {
         await this.userService.reactivate({ id: existingUser.id });
       }
 
+      await this.syncCostCenterFromScim({
+        userId: existingUser.id,
+        organizationId,
+        costCenter: this.costCenterFromRequest(request),
+      });
+
       const reloadedUser = await this.userService.findById({ id: existingUser.id });
       if (!reloadedUser) {
         return this.scimError({ status: "404", detail: "User not found" });
@@ -114,6 +209,12 @@ export class ScimService {
       }
       throw e;
     }
+
+    await this.syncCostCenterFromScim({
+      userId: newUser.id,
+      organizationId,
+      costCenter: this.costCenterFromRequest(request),
+    });
 
     return this.toScimUser(newUser);
   }
@@ -219,6 +320,12 @@ export class ScimService {
       await this.userService.deactivate({ id });
     }
 
+    await this.syncCostCenterFromScim({
+      userId: id,
+      organizationId,
+      costCenter: this.costCenterFromRequest(request),
+    });
+
     const reloadedUser = await this.userService.findById({ id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
@@ -249,6 +356,18 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
+      // Enterprise costCenter can arrive via replace/add (set) or remove
+      // (clear), as a schema-qualified path or inside a value object, so it
+      // is handled before the replace-only profile logic below.
+      const costCenterOp = this.costCenterFromPatchOp(operation);
+      if (costCenterOp.present) {
+        await this.syncCostCenterFromScim({
+          userId: id,
+          organizationId,
+          costCenter: costCenterOp.value,
+        });
+      }
+
       if (operation.op !== "replace") continue;
 
       // Handle path="active" with a scalar boolean value (e.g. Okta/Azure AD style)

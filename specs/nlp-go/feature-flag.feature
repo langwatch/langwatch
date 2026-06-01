@@ -20,11 +20,18 @@ Feature: TS app routes to nlpgo via release_nlp_go_engine_enabled
     And a project "acme-api" exists with valid model providers configured
 
   # ============================================================================
-  # Default-off + per-project enablement
+  # Default-on + per-project opt-out
   # ============================================================================
 
   @integration @v1 @unimplemented
-  Scenario: with the flag off, a workflow run goes to the legacy Python path unchanged
+  Scenario: with no per-project override, a workflow run goes to /go/* (registry default is on)
+    Given no PostHog rule and no operator-store row exist for "release_nlp_go_engine_enabled"
+    When the TS app calls runWorkflow for project "acme-api"
+    Then the TS app POSTs to "${LANGWATCH_NLP_SERVICE}/go/studio/execute_sync"
+    And the langwatch.nlp_engine attribute on the resulting trace span equals "go"
+
+  @integration @v1 @unimplemented
+  Scenario: with the flag forced off for a project, the workflow falls back to the legacy Python path
     Given the flag "release_nlp_go_engine_enabled" is OFF for project "acme-api"
     When the TS app calls runWorkflow for project "acme-api"
     Then the TS app POSTs to "${LANGWATCH_NLP_SERVICE}/studio/execute_sync"

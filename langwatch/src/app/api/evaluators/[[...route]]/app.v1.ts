@@ -1,5 +1,4 @@
 import type { Prisma } from "@prisma/client";
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -9,13 +8,13 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
-  requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -39,23 +38,23 @@ const logger = createLogger("langwatch:api:evaluators");
 
 patchZodOpenapi();
 
-type Variables = EvaluatorServiceMiddlewareVariables &
+export type EvaluatorAppVariables = EvaluatorServiceMiddlewareVariables &
   AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
+export function registerEvaluatorRoutes(
+  secured: SecuredApp<{ Variables: EvaluatorAppVariables }>,
+): void {
+  // organizationMiddleware + evaluatorServiceMiddleware run AFTER the access
+  // chain (which authenticates and sets `project`), so they are applied
+  // per-route rather than app-wide.
 
-// Middleware
-app.use("/*", organizationMiddleware);
-app.use("/*", evaluatorServiceMiddleware);
-
-// Get all evaluators
-app.get(
-  "/",
-  requirePermission("evaluations:view"),
-  describeRoute({
+  // Get all evaluators
+  secured.access(requires("evaluations:view")).get(
+    "/",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Get all evaluators for a project",
     responses: {
       ...baseResponses,
@@ -89,11 +88,12 @@ app.get(
   },
 );
 
-// Get evaluator by ID or slug
-app.get(
-  "/:idOrSlug{.+}",
-  requirePermission("evaluations:view"),
-  describeRoute({
+  // Get evaluator by ID or slug
+  secured.access(requires("evaluations:view")).get(
+    "/:idOrSlug{.+}",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Get a specific evaluator by ID or slug",
     responses: {
       ...baseResponses,
@@ -153,12 +153,13 @@ app.get(
   },
 );
 
-// Create evaluator
-app.post(
-  "/",
-  requirePermission("evaluations:manage"),
-  resourceLimitMiddleware("evaluators"),
-  describeRoute({
+  // Create evaluator
+  secured.access(requires("evaluations:manage")).post(
+    "/",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    resourceLimitMiddleware("evaluators"),
+    describeRoute({
     description: "Create a new evaluator",
     responses: {
       ...baseResponses,
@@ -235,11 +236,12 @@ app.post(
   },
 );
 
-// Update evaluator
-app.put(
-  "/:id",
-  requirePermission("evaluations:manage"),
-  describeRoute({
+  // Update evaluator
+  secured.access(requires("evaluations:manage")).put(
+    "/:id",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Update an existing evaluator",
     responses: {
       ...baseResponses,
@@ -338,11 +340,12 @@ app.put(
   },
 );
 
-// Delete (archive) evaluator
-app.delete(
-  "/:id",
-  requirePermission("evaluations:manage"),
-  describeRoute({
+  // Delete (archive) evaluator
+  secured.access(requires("evaluations:manage")).delete(
+    "/:id",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Archive (soft-delete) an evaluator",
     responses: {
       ...baseResponses,
@@ -398,4 +401,5 @@ app.delete(
 
     return c.json({ success: true });
   },
-);
+  );
+}

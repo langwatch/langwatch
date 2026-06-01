@@ -16,9 +16,17 @@
  * mocked to keep these tests scoped to the storage path.
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { prisma } from "~/server/db";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "~/server/db";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — declared before any imports that might trigger module load
@@ -29,6 +37,13 @@ import { projectFactory } from "~/factories/project.factory";
 // the `/*` chain before the POST handler; without it the middleware throws
 // "Cannot read properties of undefined (reading 'checkLimit')" and the
 // onError handler turns that into a 500 — masking the route logic entirely.
+// Hoisted so the DELETE scope-guard tests can control the scoped run-id
+// lookup and assert which runs get archived (or that none do).
+const { mockGetRunIdsForScope, mockDeleteRun } = vi.hoisted(() => ({
+  mockGetRunIdsForScope: vi.fn().mockResolvedValue([] as string[]),
+  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     simulations: {
@@ -37,8 +52,8 @@ vi.mock("~/server/app-layer/app", () => ({
       textMessageStart: vi.fn().mockResolvedValue(undefined),
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
-      deleteRun: vi.fn().mockResolvedValue(undefined),
-      runs: { getAllRunIdsForProject: vi.fn().mockResolvedValue([]) },
+      deleteRun: mockDeleteRun,
+      runs: { getRunIdsForScope: mockGetRunIdsForScope },
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
@@ -55,12 +70,9 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-vi.mock(
-  "~/app/api/scenario-events/[[...route]]/scenario-set-limit",
-  () => ({
-    checkScenarioSetLimitForRunStarted: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+vi.mock("~/app/api/scenario-events/[[...route]]/scenario-set-limit", () => ({
+  checkScenarioSetLimitForRunStarted: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Mock the auth-middleware module to neutralize requirePermission's RBAC
 // check. The integration test's postgres schema doesn't grant the test
@@ -70,14 +82,14 @@ vi.mock(
 // the actual authMiddleware (project resolution from X-Auth-Token); only
 // the project-permission gate is replaced with a passthrough.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/app/api/middleware/auth")
-  >();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    requirePermission: () => async (_c: unknown, next: () => Promise<unknown>) => {
-      await next();
-    },
+    requirePermission:
+      () => async (_c: unknown, next: () => Promise<unknown>) => {
+        await next();
+      },
   };
 });
 
@@ -98,12 +110,14 @@ vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
 // route emits (e.g. AC34: the ingest log line must list every stored_objects
 // id extracted for an event). Each createLogger() call returns the same
 // proxy backed by a single vi.fn() ledger keyed by level.
-const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(() => ({
-  mockLogInfo: vi.fn(),
-  mockLogWarn: vi.fn(),
-  mockLogError: vi.fn(),
-  mockLogDebug: vi.fn(),
-}));
+const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(
+  () => ({
+    mockLogInfo: vi.fn(),
+    mockLogWarn: vi.fn(),
+    mockLogError: vi.fn(),
+    mockLogDebug: vi.fn(),
+  }),
+);
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
@@ -117,12 +131,11 @@ vi.mock("~/utils/logger/server", () => ({
 // Tracer pass-through
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
-      const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
       return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
@@ -235,7 +248,9 @@ beforeAll(async () => {
   });
   teamId = team.id;
 
-  const project = projectFactory.build({ slug: `--so-ingest-proj-${nanoid(6)}` });
+  const project = projectFactory.build({
+    slug: `--so-ingest-proj-${nanoid(6)}`,
+  });
   const created = await prisma.project.create({
     data: { ...project, teamId: team.id, personalFeatures: {} },
   });
@@ -249,7 +264,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Best-effort cleanup. Some integration-suite postgres schemas do not
-  // include the unified-PAT ApiKey table; deleting a project that has
+  // include the unified API-key ApiKey table; deleting a project that has
   // related ApiKey rows would FK-cascade through a missing table and
   // throw. Swallowing here keeps test-suite teardown from masking real
   // test failures with cleanup noise.
@@ -259,7 +274,7 @@ afterAll(async () => {
     await prisma.organization.deleteMany({ where: { id: orgId } });
   } catch (error) {
     // The integration suite's postgres schema does not always include the
-    // unified-PAT ApiKey table; deleting a project that has related ApiKey
+    // unified API-key ApiKey table; deleting a project that has related ApiKey
     // rows would FK-cascade through a missing table and throw P2003 (FK
     // constraint failed) or P2021 (table does not exist). Swallow ONLY
     // those two known shapes — anything else means cleanup is genuinely
@@ -271,7 +286,10 @@ afterAll(async () => {
       (error.code === "P2003" || error.code === "P2021");
     if (!knownMissingFixture) {
       // eslint-disable-next-line no-console
-      console.warn("Unexpected cleanup error in scenario-events-ingest integration suite:", error);
+      console.warn(
+        "Unexpected cleanup error in scenario-events-ingest integration suite:",
+        error,
+      );
     }
   }
   if (previousBaseHost === undefined) {
@@ -311,7 +329,9 @@ describe("POST /api/scenario-events (ingest)", () => {
     /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("returns a 5xx and does not partially persist any data", async () => {
       // Arrange: storage PUT will throw
-      mockStoreFromBytes.mockRejectedValueOnce(new Error("storage unavailable"));
+      mockStoreFromBytes.mockRejectedValueOnce(
+        new Error("storage unavailable"),
+      );
 
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeEventWithInlineImage(scenarioRunId);
@@ -415,9 +435,61 @@ describe("POST /api/scenario-events (ingest)", () => {
         return Array.isArray(ctx?.stored_object_ids);
       });
 
-      expect(matchingCall, "expected an info-level log with stored_object_ids").toBeDefined();
+      expect(
+        matchingCall,
+        "expected an info-level log with stored_object_ids",
+      ).toBeDefined();
       const ctx = matchingCall![0] as { stored_object_ids: string[] };
       expect(ctx.stored_object_ids).toContain(id1);
+    });
+  });
+});
+
+describe("DELETE /api/scenario-events (scoped archive)", () => {
+  beforeEach(() => {
+    mockGetRunIdsForScope.mockClear();
+    mockDeleteRun.mockClear();
+    mockGetRunIdsForScope.mockResolvedValue([] as string[]);
+  });
+
+  describe("when no batchRunId or scenarioSetId is provided", () => {
+    /** @scenario "Archiving scenario runs without a scope is rejected" */
+    it("returns 400 and archives nothing — never wipes the whole project", async () => {
+      const res = await app.request("/api/scenario-events", {
+        method: "DELETE",
+        headers: { "X-Auth-Token": testApiKey },
+      });
+
+      expect(res.status).toBe(400);
+      // The footgun guard: neither the run lookup nor any archive ran.
+      expect(mockGetRunIdsForScope).not.toHaveBeenCalled();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a batchRunId is provided", () => {
+    /** @scenario "Archiving scenario runs by batchRunId archives only that batch" */
+    it("archives only the runs the scoped lookup returns", async () => {
+      mockGetRunIdsForScope.mockResolvedValueOnce(["run-a", "run-b"]);
+
+      const res = await app.request(
+        "/api/scenario-events?batchRunId=batch-xyz",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetRunIdsForScope).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          batchRunId: "batch-xyz",
+        }),
+      );
+      // Only the two runs the scoped lookup returned are archived.
+      expect(mockDeleteRun).toHaveBeenCalledTimes(2);
+      const archivedIds = mockDeleteRun.mock.calls.map(
+        (args) => (args[0] as { scenarioRunId: string }).scenarioRunId,
+      );
+      expect(archivedIds).toEqual(["run-a", "run-b"]);
     });
   });
 });

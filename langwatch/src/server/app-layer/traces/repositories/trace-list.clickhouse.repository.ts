@@ -25,7 +25,6 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrUserId: string;
   AttrOrigin: string;
   LastEventOccurredAt: number;
-  TotalCount: number;
 }
 
 /**
@@ -109,15 +108,30 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Subquery so WHERE/ORDER BY operate on raw DateTime columns —
-    // aliasing DateTime to millis in the same scope shadows the column
-    // and breaks the WHERE comparison. The inner SELECT also lists
-    // explicit columns (no `SELECT *`) so ClickHouse doesn't read the
-    // whole `Attributes` Map off storage just to drop it on the floor.
-    // Only five attribute keys flow through to the list mapper — see
-    // `mapToTraceListItem`.
-    const result = await client.query({
-      query: `
+    // Latest-version dedup, shared by the page, the heavy read, and the count.
+    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM ${TABLE_NAME}
+          WHERE ${whereClause}
+          GROUP BY TenantId, TraceId
+        )`;
+
+    // Page the matching TraceIds first (key + sort columns only), then read
+    // the heavy columns (ComputedInput/ComputedOutput and the rest) for that
+    // bounded page alone. The previous single query materialized those
+    // payloads for every deduped trace in the window before ORDER BY ... LIMIT
+    // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
+    // — together the dominant read-bytes cost on this list. The total is now a
+    // separate light count that never touches the payload columns.
+    //
+    // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
+    // aliasing DateTime to millis in the same scope shadows the column and
+    // breaks the comparison. It also lists explicit columns (no `SELECT *`) so
+    // ClickHouse skips reading the full `Attributes` Map; only five keys flow
+    // through to the list mapper (see `mapToTraceListItem`).
+    const [result, countResult] = await Promise.all([
+      client.query({
+        query: `
         SELECT
           TraceId,
           TenantId,
@@ -161,8 +175,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           TopicId,
           SubTopicId,
           AnnotationIds,
-          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt,
-          TotalCount
+          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
         FROM (
           SELECT
             TraceId,
@@ -207,31 +220,46 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TopicId,
             SubTopicId,
             AnnotationIds,
-            LastEventOccurredAt,
-            count() OVER () AS TotalCount
+            LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
+            AND TraceId IN (
+              SELECT TraceId
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
-              GROUP BY TenantId, TraceId
+                AND ${dedupFilter}
+              ORDER BY ${sortExpression} ${sortDir}
+              LIMIT {limit:UInt32}
+              OFFSET {offset:UInt32}
             )
+            AND ${dedupFilter}
           ORDER BY ${sortExpression} ${sortDir}
           LIMIT {limit:UInt32}
-          OFFSET {offset:UInt32}
         )
       `,
-      query_params: {
-        ...params,
-        limit: query.limit,
-        offset: query.offset,
-      },
-      format: "JSONEachRow",
-    });
+        query_params: {
+          ...params,
+          limit: query.limit,
+          offset: query.offset,
+        },
+        format: "JSONEachRow",
+      }),
+      client.query({
+        query: `
+        SELECT count() AS totalHits
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND ${dedupFilter}
+      `,
+        query_params: { ...params },
+        format: "JSONEachRow",
+      }),
+    ]);
 
     const rows = await result.json<ClickHouseSummaryRow>();
-    const totalHits = rows.length > 0 ? Number(rows[0]!.TotalCount) : 0;
+    const countRows = await countResult.json<{ totalHits: number | string }>();
+    const totalHits =
+      countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
       rows: rows.map((row) => this.toTraceSummaryData(row)),

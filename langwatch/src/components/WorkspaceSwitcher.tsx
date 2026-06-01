@@ -2,17 +2,19 @@ import {
   Box,
   Button,
   HStack,
+  IconButton,
   Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Folder, User, Users } from "lucide-react";
+import { Check, ChevronDown, Folder, Plus, User, Users } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
 import { Menu } from "./ui/menu";
 import { Link } from "./ui/link";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { Tooltip } from "./ui/tooltip";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 
@@ -31,6 +33,12 @@ export type WorkspaceSwitcherEntry =
       href: string;
       label: string;
       subtitle?: string;
+      /**
+       * Whether the current user may create a project in this team (org or
+       * team admin). Drives the per-team "Create project" affordance — viewers
+       * never see it. Defaults to false when omitted.
+       */
+      canCreateProject?: boolean;
     }
   | {
       kind: "project";
@@ -58,7 +66,12 @@ export type WorkspaceSwitcherCurrent =
   | { kind: "unknown" };
 
 export type WorkspaceSwitcherProps = {
-  personal: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
+  /**
+   * The "My Workspace" personal entry. Omitted when the personal portal is
+   * not available to the user (no organization has the governance flag), so
+   * the switcher hides the entry rather than linking to a page that 404s.
+   */
+  personal?: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
   teams: Array<Extract<WorkspaceSwitcherEntry, { kind: "team" }>>;
   projects: Array<Extract<WorkspaceSwitcherEntry, { kind: "project" }>>;
   /**
@@ -68,6 +81,13 @@ export type WorkspaceSwitcherProps = {
    * URL-driven selection (e.g. tests, programmatic preview cards).
    */
   current?: WorkspaceSwitcherCurrent;
+  /**
+   * Invoked when the user clicks a team row's "Create project" button. The
+   * consumer opens the create-project drawer scoped to that team. The button
+   * only renders for teams whose `canCreateProject` is true and only when
+   * this callback is provided.
+   */
+  onCreateProjectForTeam?: (args: { teamId: string; orgId: string }) => void;
 };
 
 const ICON_BY_KIND = {
@@ -96,7 +116,7 @@ function currentLabel(
   projects: WorkspaceSwitcherProps["projects"],
 ): { label: string; kind: keyof typeof ICON_BY_KIND } {
   if (current.kind === "personal") {
-    return { label: personal.label, kind: "personal" };
+    return { label: personal?.label ?? "My Workspace", kind: "personal" };
   }
   if (current.kind === "team") {
     const t = teams.find((t) => t.teamId === current.teamId);
@@ -132,6 +152,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   teams,
   projects,
   current: currentProp,
+  onCreateProjectForTeam,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -250,16 +271,18 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content minWidth="280px" maxHeight="70vh" overflowY="auto">
-              <Group title="My Workspace">
-                <SwitcherItem
-                  entry={personal}
-                  active={entryIsCurrent(personal, current)}
-                  onSelect={() => {
-                    setOpen(false);
-                    void router.push(personal.href);
-                  }}
-                />
-              </Group>
+              {personal && (
+                <Group title="My Workspace">
+                  <SwitcherItem
+                    entry={personal}
+                    active={entryIsCurrent(personal, current)}
+                    onSelect={() => {
+                      setOpen(false);
+                      void router.push(personal.href);
+                    }}
+                  />
+                </Group>
+              )}
 
               {orgs.map((org) => (
                 <Group
@@ -270,14 +293,23 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                     const teamProjects = projectsByTeam.get(team.teamId) ?? [];
                     return (
                       <Box key={team.teamId}>
-                        <SwitcherItem
-                          entry={team}
-                          active={entryIsCurrent(team, current)}
-                          onSelect={() => {
-                            setOpen(false);
-                            void router.push(team.href);
-                          }}
-                        />
+                        <Box position="relative">
+                          <SwitcherItem
+                            entry={team}
+                            active={entryIsCurrent(team, current)}
+                            onSelect={() => {
+                              setOpen(false);
+                              void router.push(team.href);
+                            }}
+                          />
+                          {team.canCreateProject && onCreateProjectForTeam && (
+                            <TeamCreateProjectButton
+                              team={team}
+                              onCreateProjectForTeam={onCreateProjectForTeam}
+                              setOpen={setOpen}
+                            />
+                          )}
+                        </Box>
                         {teamProjects.length > 0 && (
                           <VStack gap={0} align="stretch" paddingLeft={5}>
                             {teamProjects.map((project) => (
@@ -378,6 +410,7 @@ function SwitcherItem({
     <Menu.Item
       value={itemValue}
       fontSize="14px"
+      paddingY="5px"
       onClick={onSelect}
       asChild
     >
@@ -401,36 +434,109 @@ function SwitcherItem({
           e.preventDefault();
         }}
       >
-        <HStack gap={3} width="full" alignItems="start" paddingY={1}>
-          <Box paddingTop="2px">
-            {entry.kind === "project" ? (
-              <ProjectAvatar name={entry.label} />
-            ) : (
-              <Icon size={14} />
-            )}
-          </Box>
-          <VStack gap={0} alignItems="start" flex={1} minWidth={0}>
-            <HStack gap={2} width="full">
-              <Text
-                fontWeight={active ? "semibold" : "normal"}
-                truncate
-              >
-                {entry.label}
-              </Text>
-              {active && (
-                <Box marginLeft="auto" color="fg.muted">
-                  <Check size={14} />
-                </Box>
+        <VStack gap={0} width="full" alignItems="stretch">
+          <HStack gap={3} width="full" alignItems="center">
+            <Box
+              width="20px"
+              display="flex"
+              justifyContent="center"
+              flexShrink={0}
+            >
+              {entry.kind === "project" ? (
+                <ProjectAvatar name={entry.label} />
+              ) : (
+                <Icon size={14} />
               )}
-            </HStack>
-            {entry.subtitle && (
-              <Text fontSize="xs" color="fg.muted" truncate>
-                {entry.subtitle}
-              </Text>
+            </Box>
+            <Text
+              fontWeight={active ? "semibold" : "normal"}
+              truncate
+              flex={1}
+              minWidth={0}
+            >
+              {entry.label}
+            </Text>
+            {active && (
+              <Box color="fg.muted" flexShrink={0}>
+                <Check size={14} />
+              </Box>
             )}
-          </VStack>
-        </HStack>
+          </HStack>
+          {entry.subtitle && (
+            <Text fontSize="xs" color="fg.muted" truncate paddingLeft="32px">
+              {entry.subtitle}
+            </Text>
+          )}
+        </VStack>
       </Link>
     </Menu.Item>
+  );
+}
+
+/**
+ * Per-team "+" button with a controlled "Create project" tooltip.
+ *
+ * Tooltip visibility is owned by local state and only flips on pointer
+ * enter / leave. Ark Menu auto-moves focus into the dropdown when it
+ * opens, which would otherwise trip Zag's focus-opens-tooltip behavior
+ * (the underlying machine has no `openOnFocus={false}` knob); passing a
+ * no-op `onOpenChange` shorts out Zag's internal open transitions, and
+ * the explicit `onFocus` reset is belt-and-braces against any path that
+ * still tries to flip us open from focus.
+ */
+function TeamCreateProjectButton({
+  team,
+  onCreateProjectForTeam,
+  setOpen,
+}: {
+  team: Extract<WorkspaceSwitcherEntry, { kind: "team" }>;
+  onCreateProjectForTeam: NonNullable<
+    WorkspaceSwitcherProps["onCreateProjectForTeam"]
+  >;
+  setOpen: (open: boolean) => void;
+}) {
+  const [tipOpen, setTipOpen] = React.useState(false);
+  return (
+    <Tooltip
+      content="Create project"
+      open={tipOpen}
+      onOpenChange={() => {
+        /* controlled — ignore Zag's hover / focus transitions */
+      }}
+    >
+      <IconButton
+        aria-label={`Create project in ${team.label}`}
+        size="xs"
+        variant="ghost"
+        position="absolute"
+        right={2}
+        top="50%"
+        transform="translateY(-50%)"
+        // Out of the menu's focus reach. Ark Menu auto-focuses the first
+        // focusable child of Menu.Content on open; since this button sits
+        // next to (not inside) a Menu.Item, it competes for that initial
+        // focus and ends up with the visible ring on every menu open.
+        // tabIndex=-1 takes it out of natural tab order so the menu's
+        // initial focus lands on the first Menu.Item (the team link).
+        // Click still works; the team page has its own create-project
+        // affordance for keyboard-only users.
+        tabIndex={-1}
+        onMouseEnter={() => setTipOpen(true)}
+        onMouseLeave={() => setTipOpen(false)}
+        onFocus={() => setTipOpen(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setTipOpen(false);
+          setOpen(false);
+          onCreateProjectForTeam({
+            teamId: team.teamId,
+            orgId: team.orgId,
+          });
+        }}
+      >
+        <Plus size={14} />
+      </IconButton>
+    </Tooltip>
   );
 }

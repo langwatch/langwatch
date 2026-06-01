@@ -313,6 +313,7 @@ async function upsertModelProviderByName(input: {
       name: input.name,
       provider: input.provider,
       enabled: true,
+      organizationId: input.organizationId,
       customKeys: input.customKeys
         ? (input.customKeys as Prisma.InputJsonValue)
         : Prisma.DbNull,

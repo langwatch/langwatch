@@ -107,6 +107,7 @@ generate/api-client: ensure-openapi-python-client
 	uv run openapi-python-client generate \
 		--path ../langwatch/src/app/api/openapiLangWatch.json \
 		--output-path .tmp/api-client \
+		--custom-template-path openapi-templates \
 		--overwrite
 	@echo "Copying necessary files to SDK..."
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
