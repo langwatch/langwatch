@@ -132,6 +132,47 @@ describe("PinnedTraceService", () => {
     });
   });
 
+  describe("given a share→manual promotion whose share is still active", () => {
+    /**
+     * Regression: an earlier guard only blocked unpin when `pin.source ===
+     * share`. A user who shared a trace AND then explicitly clicked pin
+     * promoted the row to `source=manual` while the share was still live.
+     * The next unpin slipped past the source check and deleted the only
+     * row holding the trace past retention TTL — the public share link
+     * would silently return expired data on the next CH merge.
+     *
+     * The guard is now "is there an active share?" regardless of source,
+     * so promotion does not open a hole.
+     */
+    describe("when unpin() is called manually", () => {
+      it("throws PinnedToActiveShareError — share keeps the trace pinned regardless of source", async () => {
+        const repository = new PinnedTraceRepository(
+          createPinnedTracePrisma() as any,
+        );
+        const service = new PinnedTraceService(
+          repository,
+          async () => true, // share is still active
+        );
+
+        await service.autoPin({ projectId: "project-1", traceId: "abc123" });
+        // Promote share → manual via explicit pin.
+        await service.pin({
+          projectId: "project-1",
+          traceId: "abc123",
+          reason: "regression investigation",
+        });
+
+        await expect(
+          service.unpin({ projectId: "project-1", traceId: "abc123" }),
+        ).rejects.toBeInstanceOf(PinnedToActiveShareError);
+
+        await expect(
+          service.isPinned({ projectId: "project-1", traceId: "abc123" }),
+        ).resolves.toBe(true);
+      });
+    });
+  });
+
   describe("given a source=share pin whose share has already been removed", () => {
     describe("when unpin() is called manually", () => {
       it("allows the unpin — there's no longer a share to protect", async () => {

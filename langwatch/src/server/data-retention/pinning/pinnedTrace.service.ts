@@ -46,19 +46,18 @@ export class PinnedTraceService {
   }
 
   async unpin(params: UnpinTraceParams): Promise<void> {
-    // A `source=share` pin protects the trace from retention TTL for as long
-    // as the share is live. Manually deleting it would let CH delete the
-    // trace on the next merge while the public link is still in someone's
-    // address bar — the link returns expired data. Force the user to
-    // unshare first; that path runs autoUnpin and removes the pin cleanly.
-    const pin = await this.repository.findByProjectAndTrace(params);
-    if (pin?.source === PinSource.share) {
-      const stillShared = await this.hasActiveShareForTrace(params);
-      if (stillShared) {
-        throw new PinnedToActiveShareError(
-          "This trace is auto-pinned because it's shared. Disable the share before unpinning.",
-        );
-      }
+    // While a share is live, the pin row is what keeps the trace alive past
+    // retention TTL — deleting it would let CH delete the trace on the next
+    // merge and the public link would return expired data. The guard checks
+    // for an active share regardless of `pin.source`: a share→manual
+    // promotion (autoPin then explicit pin) still needs the row to exist
+    // until the share is removed. After unshare, `autoUnpin` preserves the
+    // row when source=manual so the user's manual pin survives cleanly.
+    const stillShared = await this.hasActiveShareForTrace(params);
+    if (stillShared) {
+      throw new PinnedToActiveShareError(
+        "This trace is currently shared. Disable the share before unpinning.",
+      );
     }
     await this.repository.delete(params);
   }
