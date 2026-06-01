@@ -796,7 +796,7 @@ function RetentionAndUsageCard({
               The retention currently applied to current project.
             </Text>
           </VStack>
-          <Text fontWeight="bold" fontSize="lg" flexShrink={0}>
+          <Text fontWeight="semibold" flexShrink={0}>
             {summary}
           </Text>
         </HStack>
@@ -828,7 +828,7 @@ function RetentionAndUsageCard({
                 </Text>
               </VStack>
               {!isLoading && data && (
-                <Text fontWeight="bold" fontSize="lg" flexShrink={0}>
+                <Text fontWeight="semibold" flexShrink={0}>
                   {formatBytes(data.totalBytes)}
                 </Text>
               )}
