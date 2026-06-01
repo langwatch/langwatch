@@ -1,9 +1,11 @@
 import {
   Alert,
   Badge,
+  Box,
   Button,
   Card,
   createListCollection,
+  EmptyState,
   Field,
   Heading,
   HStack,
@@ -412,7 +414,51 @@ function DataRetentionPage({
           </Alert.Root>
         )}
 
-        {snapshot && (
+        {snapshot && snapshot.rules.length === 0 ? (
+          // No overrides anywhere — surface the platform default front-and-
+          // centre so an empty table doesn't read as a config bug. The
+          // "Effective for this project" row alone was too quiet about
+          // what the number means.
+          <Card.Root width="full">
+            <Card.Body>
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <VStack textAlign="center" gap={2}>
+                    <EmptyState.Title>
+                      Using the platform default
+                    </EmptyState.Title>
+                    <EmptyState.Description>
+                      No retention policies configured. Every category in this
+                      project uses{" "}
+                      <Box as="span" fontWeight="semibold">
+                        {renderPolicyValue(snapshot.effective)}
+                      </Box>
+                      .
+                    </EmptyState.Description>
+                    {canWrite && (
+                      <Button
+                        colorPalette="blue"
+                        size="sm"
+                        onClick={() => setDrawerOpen(true)}
+                        marginTop={2}
+                      >
+                        Add retention policy
+                      </Button>
+                    )}
+                  </VStack>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            </Card.Body>
+          </Card.Root>
+        ) : snapshot && scopeGroups.length === 0 ? (
+          <Card.Root width="full">
+            <Card.Body>
+              <Text fontSize="sm" color="fg.muted" textAlign="center">
+                No retention policies match the current scope filter.
+              </Text>
+            </Card.Body>
+          </Card.Root>
+        ) : snapshot && (
           <Card.Root width="full" overflow="hidden">
             <Card.Body paddingY={0} paddingX={0}>
               <Table.Root variant="line" size="md" width="full">
@@ -892,7 +938,6 @@ function AddOverrideDrawer({
                 availableTeams={available.teams}
                 availableProjects={available.projects}
                 label=""
-                showQuickPicks
                 currentOrganizationId={
                   available.organization ? currentOrganizationId : undefined
                 }
