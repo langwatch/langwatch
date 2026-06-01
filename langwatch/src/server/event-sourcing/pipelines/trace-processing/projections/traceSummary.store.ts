@@ -1,5 +1,6 @@
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 
@@ -20,7 +21,8 @@ export class TraceSummaryStore
     const stateWithId = state.traceId
       ? state
       : { ...state, traceId: String(context.aggregateId) };
-    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
   }
 
@@ -34,7 +36,8 @@ export class TraceSummaryStore
           ? state
           : { ...state, traceId: String(context.aggregateId) },
         tenantId: String(context.tenantId),
-        retentionDays: context.retentionPolicy?.traces ?? 0,
+        retentionDays:
+          context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
       }));
 
     if (batchEntries.length === 0) return;

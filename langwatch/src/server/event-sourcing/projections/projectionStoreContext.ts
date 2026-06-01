@@ -15,6 +15,12 @@ export interface ProjectionStoreContext {
   /** Custom projection key. Defaults to aggregateId when not set. */
   key?: string;
 
-  /** Resolved retention policy for the tenant. Absent = indefinite (0). */
+  /**
+   * Resolved retention policy for the tenant. Absent/null means the resolver
+   * could not produce a value (no resolver wired, or project unresolvable); the
+   * write path then stamps PLATFORM_DEFAULT_RETENTION_DAYS, NOT indefinite —
+   * retention is default-on, so a missing policy must never leave rows
+   * unbounded.
+   */
   retentionPolicy?: ResolvedRetention | null;
 }

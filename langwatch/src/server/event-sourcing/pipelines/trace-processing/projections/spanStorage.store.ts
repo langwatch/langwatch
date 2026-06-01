@@ -2,6 +2,7 @@ import { GovernanceContentStripService } from "@ee/governance/services/governanc
 
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedSpan } from "../schemas/spans";
@@ -103,7 +104,8 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
     context: ProjectionStoreContext,
   ): Promise<void> {
     const transformed = await applyGovernanceStrip(record, this.stripService);
-    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.insertSpan(toAppLayer(transformed, retentionDays));
   }
 
@@ -115,7 +117,8 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
     const transformed = await Promise.all(
       records.map((r) => applyGovernanceStrip(r, this.stripService)),
     );
-    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.insertSpans(transformed.map((r) => toAppLayer(r, retentionDays)));
   }
 }

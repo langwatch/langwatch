@@ -30,9 +30,9 @@ export const MAX_RETENTION_DAYS = 65534;
 
 /**
  * The default retention proposed when creating an override: 7 weeks, the same
- * as the minimum. The absence of any override still means indefinite retention
- * — this is only the suggested starting value in the UI, not an automatically
- * applied policy.
+ * as the minimum. This is only the suggested starting value in the UI; the
+ * value actually stamped when no override exists is PLATFORM_DEFAULT_RETENTION_DAYS
+ * (see below), not indefinite.
  */
 export const DEFAULT_RETENTION_DAYS = MIN_RETENTION_DAYS;
 
@@ -86,7 +86,10 @@ export const retentionCategorySchema = z.enum(RETENTION_CATEGORIES);
 
 /**
  * The fully-resolved retention for a project: a concrete day count per
- * category (0 = indefinite, the cascade fell through to no override).
+ * category. `resolveRetention` floors every category to
+ * PLATFORM_DEFAULT_RETENTION_DAYS when no override exists in the cascade, so a
+ * resolved value is never 0 — 0 (indefinite) is only a TTL-expression sentinel,
+ * not a value the resolver ever returns.
  */
 export type ResolvedRetention = Record<RetentionCategory, number>;
 
