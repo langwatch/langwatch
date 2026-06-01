@@ -250,10 +250,11 @@ describe("ScenarioService", () => {
         // Archive one
         await service.archive({ id: toArchive.id, projectId });
 
-        // Count should only include active (non-archived) scenarios
+        // Count should only include active (non-archived) scenarios.
+        // Scope by projectId so the multitenancy middleware accepts the query.
         const count = await prisma.scenario.count({
           where: {
-            project: { team: { organizationId: organization!.id } },
+            projectId,
             archivedAt: null,
           },
         });
