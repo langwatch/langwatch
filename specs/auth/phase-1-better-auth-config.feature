@@ -23,7 +23,14 @@ Feature: BetterAuth config (unmounted)
     Then email-and-password signin is enabled
     And no social providers are configured
 
-  @unit
+  # @unimplemented: testing auth0/google mode requires vi.resetModules() +
+  # vi.stubEnv() to re-initialize index.ts with a different NEXTAUTH_PROVIDER.
+  # In Vitest 4.x vmThreads, vi.resetModules() in beforeAll/afterAll clears the
+  # shared shard registry, causing other test files to reload modules and leave
+  # open handles — reliably timing out the shard at ~25 min. A dedicated test
+  # file with a custom vitest.config that sets pool:"forks" would isolate the
+  # reset to its own process. Tracked for that approach.
+  @unit @unimplemented
   Scenario: Auth0 enterprise mode
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ISSUER are set
@@ -31,7 +38,7 @@ Feature: BetterAuth config (unmounted)
     Then the generic-oauth plugin lists an "auth0" provider
     And email-and-password is disabled (SSO-only enforcement — no email/password bypass)
 
-  @unit
+  @unit @unimplemented
   Scenario: Google mode
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set
