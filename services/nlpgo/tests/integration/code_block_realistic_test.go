@@ -77,6 +77,62 @@ func TestSync_CodeBlock_StdlibHeavyComputation(t *testing.T) {
 	assert.Contains(t, got, `Y3VzdG9tZXItZGF0YS0yMDI2`)
 }
 
+// TestSync_CodeBlock_SecretsNamespaceFromWorkflow is the end-to-end
+// guard for the customer-reported bug: a project secret declared on the
+// workflow DSL (`workflow.secrets`, populated upstream by addEnvs.ts)
+// must reach user code as `secrets.NAME`. This proves the full thread —
+// DSL → engine.runCode → codeblock.Request → runner.py namespace — that
+// was previously broken (the Go engine dropped secrets on the floor for
+// code nodes, so `secrets.NAME` raised NameError).
+func TestSync_CodeBlock_SecretsNamespaceFromWorkflow(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not installed")
+	}
+	stack := setupStack(t)
+	defer stack.close()
+
+	body := `{
+	  "type": "execute_flow",
+	  "payload": {
+	    "trace_id": "secrets-ns",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "secrets":{"CLOUDFLARE_ACCESS_CLIENT_ID":"id-123"},
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"q","type":"str"}],
+	          "dataset":{"inline":{"records":{"q":["x"]}}},
+	          "entry_selection":0,
+	          "train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"useSecret","type":"code","data":{
+	          "parameters":[
+	            {"identifier":"code","type":"code","value":"def execute(q):\n    return {'token': secrets.CLOUDFLARE_ACCESS_CLIENT_ID}\n"}
+	          ],
+	          "inputs":[{"identifier":"q","type":"str"}],
+	          "outputs":[{"identifier":"token","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{
+	          "inputs":[{"identifier":"token","type":"str"}]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"useSecret","targetHandle":"inputs.q","type":"default"},
+	        {"id":"e2","source":"useSecret","sourceHandle":"outputs.token","target":"end","targetHandle":"inputs.token","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}],
+	    "origin":"workflow"
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "id-123", res.Result["token"])
+}
+
 // TestSync_CodeBlock_ThirdPartyImportSkipsCleanly proves the failure
 // mode for missing third-party packages: the user code raises
 // ImportError, the engine surfaces a structured error with the
