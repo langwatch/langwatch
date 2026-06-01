@@ -97,14 +97,53 @@ teardown() {
 
 # --- dev-infra ---
 
-@test "dev-infra writes no URL overrides (operator's .env points at shared dev)" {
+@test "dev-infra does NOT pin NEXTAUTH_PROVIDER (operator's .env decides OAuth vs email)" {
+  # Shared dev Postgres already has OAuth users provisioned. Forcing
+  # NEXTAUTH_PROVIDER=email in the overlay would prevent operators from
+  # signing in as their existing OAuth identity. Leave the choice to .env.
   write_dev_overrides dev-infra "$OUT"
   result=$(cat "$OUT")
-  [[ "$result" == *"NEXTAUTH_PROVIDER=email"* ]]
+  [[ "$result" != *"NEXTAUTH_PROVIDER"* ]]
+}
+
+@test "dev-infra pins S3 shape (bucket+endpoint+region) so stored-objects route to dev S3" {
+  # Without S3_BUCKET_NAME the destination resolver falls through to local
+  # filesystem when LANGWATCH_LOCAL_STORAGE_PATH is set in .env. Pinning
+  # the S3 shape forces resolveProjectStorageDestination to pick S3.
+  write_dev_overrides dev-infra "$OUT"
+  result=$(cat "$OUT")
+  [[ "$result" == *"S3_BUCKET_NAME=runtime-storage-dev"* ]]
+  [[ "$result" == *"S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com"* ]]
+  [[ "$result" == *"S3_REGION=eu-central-1"* ]]
+}
+
+@test "dev-infra pins REDIS_URL to localhost (local redis + workers containers, host-side pnpm dev)" {
+  # The dev-infra launcher brings up the `redis` and `workers` compose
+  # services so BullMQ jobs / GroupQueue streams stay isolated from other
+  # operators on shared dev. The operator runs `pnpm dev` on the HOST (not
+  # in docker), so this overlay's URL MUST be host-side localhost (not the
+  # in-network `redis:6379` DNS name) — the host app reads this overlay.
+  write_dev_overrides dev-infra "$OUT"
+  result=$(cat "$OUT")
+  [[ "$result" == *"REDIS_URL=redis://localhost:6379"* ]]
+}
+
+@test "dev-infra writes no DB / CH URL overrides (operator's .env points at shared dev)" {
+  write_dev_overrides dev-infra "$OUT"
+  result=$(cat "$OUT")
   [[ "$result" != *"DATABASE_URL"* ]]
-  [[ "$result" != *"REDIS_URL"* ]]
   [[ "$result" != *"CLICKHOUSE_URL"* ]]
-  [[ "$result" != *"S3_BUCKET_NAME"* ]]
+}
+
+@test "dev-infra overlay NEVER contains S3 credentials" {
+  # Credentials always come from langwatch/.env, rotated by
+  # refresh-dev-s3-env.sh. Leaking them into the overlay would be both a
+  # security regression and a source of state-staleness bugs.
+  write_dev_overrides dev-infra "$OUT"
+  result=$(cat "$OUT")
+  [[ "$result" != *"S3_ACCESS_KEY_ID"* ]]
+  [[ "$result" != *"S3_SECRET_ACCESS_KEY"* ]]
+  [[ "$result" != *"S3_SESSION_TOKEN"* ]]
 }
 
 # --- frontend-only ---

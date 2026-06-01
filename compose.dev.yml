@@ -234,6 +234,11 @@ services:
   # =============================================================================
   # WORKERS (profile: workers)
   # =============================================================================
+  # Started by quickstart presets: all-local, all-local-nlp, dev-storage, dev-infra, full-local.
+  # Skipped by: frontend-only (which uses `pnpm dev` on the host with
+  # START_WORKERS=true so workers run in-process there).
+  # migration is a short-lived host-port stack for prisma/clickhouse migrate;
+  # it never runs the app, so no workers.
 
   workers:
     image: node:24
@@ -255,6 +260,8 @@ services:
       # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
       LANGWATCH_ENDPOINT: http://app:5560
+      # Override REDIS_URL: host app uses localhost:6379, workers must use compose service name
+      REDIS_URL: redis://redis:6379
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
