@@ -316,6 +316,23 @@ export const automationRouter = createTRPCRouter({
         return map;
       }, {});
 
+      // ADR-029 ship-now: per-trigger fired-count over the last 24h, sourced
+      // from TriggerSent (one row per dispatched (trigger, trace) pair so this
+      // counts every match the operator actually received). Pending / failed
+      // / dead come later, once notify dispatch flows through ReactorOutbox.
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const firedCounts = await ctx.prisma.triggerSent.groupBy({
+        by: ["triggerId"],
+        where: {
+          projectId: input.projectId,
+          createdAt: { gte: since24h },
+        },
+        _count: { _all: true },
+      });
+      const firedCountByTrigger = new Map(
+        firedCounts.map((c) => [c.triggerId, c._count._all]),
+      );
+
       const enhancedTriggers = triggers.map((trigger) => {
         let triggerFilters: Record<string, any> = {};
 
@@ -330,6 +347,7 @@ export const automationRouter = createTRPCRouter({
         return {
           ...trigger,
           checks,
+          firedCount24h: firedCountByTrigger.get(trigger.id) ?? 0,
         };
       });
 

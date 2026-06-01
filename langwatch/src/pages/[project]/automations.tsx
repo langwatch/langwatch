@@ -12,6 +12,10 @@ import {
 import type { Monitor, TriggerAction } from "@prisma/client";
 import { Bell, Edit2, Filter, MoreVertical, Plus, Trash } from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import {
+  NOTIFY_TRIGGER_ACTIONS,
+  type NotificationCadence,
+} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
@@ -27,6 +31,24 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
+
+const CADENCE_LABELS: Record<NotificationCadence, string> = {
+  immediate: "Immediate",
+  "5min_digest": "Every 5 minutes",
+  "15min_digest": "Every 15 minutes",
+  hourly_digest: "Every hour",
+};
+
+function cadenceLabel(
+  action: TriggerAction,
+  cadence: string,
+): string {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "—";
+  if ((cadence as NotificationCadence) in CADENCE_LABELS) {
+    return CADENCE_LABELS[cadence as NotificationCadence];
+  }
+  return CADENCE_LABELS.immediate;
+}
 
 function Automations() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -262,6 +284,12 @@ function Automations() {
                   <Table.ColumnHeader>Destination</Table.ColumnHeader>
                   <Table.ColumnHeader>Filters</Table.ColumnHeader>
                   <Table.ColumnHeader whiteSpace="nowrap">
+                    Cadence
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader whiteSpace="nowrap" textAlign="end">
+                    Fired (24h)
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader whiteSpace="nowrap">
                     Last Triggered At
                   </Table.ColumnHeader>
                   <Table.ColumnHeader>Active</Table.ColumnHeader>
@@ -271,7 +299,7 @@ function Automations() {
               <Table.Body>
               {triggers.isLoading ? (
                 <Table.Row>
-                  <Table.Cell colSpan={5}>Loading...</Table.Cell>
+                  <Table.Cell colSpan={9}>Loading...</Table.Cell>
                 </Table.Row>
               ) : (
                 triggers.data?.map((trigger) => {
@@ -304,6 +332,15 @@ function Automations() {
                             />
                           ) : null}
                         </VStack>
+                      </Table.Cell>
+                      <Table.Cell whiteSpace="nowrap">
+                        {cadenceLabel(
+                          trigger.action,
+                          trigger.notificationCadence,
+                        )}
+                      </Table.Cell>
+                      <Table.Cell whiteSpace="nowrap" textAlign="end">
+                        {trigger.firedCount24h}
                       </Table.Cell>
                       <Table.Cell whiteSpace="nowrap">
                         {formatTimeAgo(trigger.lastRunAt)}
