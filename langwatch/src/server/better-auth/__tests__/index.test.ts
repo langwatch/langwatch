@@ -125,7 +125,7 @@ describe("better-auth config", () => {
 // to avoid interfering with its cached module instance.
 describe("better-auth config — env-mocked provider modes", () => {
   describe("when NEXTAUTH_PROVIDER is auth0", () => {
-    let authModule: Awaited<ReturnType<typeof import("../index")>>;
+    let authModule: Awaited<typeof import("../index")>;
 
     beforeAll(async () => {
       vi.resetModules();
@@ -156,7 +156,7 @@ describe("better-auth config — env-mocked provider modes", () => {
   });
 
   describe("when NEXTAUTH_PROVIDER is google", () => {
-    let authModule: Awaited<ReturnType<typeof import("../index")>>;
+    let authModule: Awaited<typeof import("../index")>;
 
     beforeAll(async () => {
       vi.resetModules();
