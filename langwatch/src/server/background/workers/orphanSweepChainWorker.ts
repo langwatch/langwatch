@@ -103,6 +103,41 @@ export async function runOrphanSweepChainJob(
   }
 }
 
+/**
+ * The chain's self-perpetuating link, extracted so it can be unit-tested
+ * without standing up a BullMQ Worker. Re-enqueue MUST happen AFTER the
+ * previous job has transitioned out of `active` AND been removed
+ * (`removeOnComplete: true`); otherwise the same jobId would still be
+ * resident and the new `add()` would dedup into a no-op, stalling the
+ * chain after one step.
+ */
+export async function handleChainStepCompleted(
+  job: Pick<
+    Job<OrphanSweepChainJob, OrphanSweepChainOutcome, string>,
+    "data"
+  > | undefined,
+  outcome: OrphanSweepChainOutcome | undefined,
+): Promise<void> {
+  if (!job?.data?.tenantId) return;
+  if (outcome?.stopChain) {
+    logger.info(
+      { tenantId: job.data.tenantId },
+      "orphan sweep chain ended for tenant — project archived or deleted",
+    );
+    return;
+  }
+  try {
+    await seedOrphanSweepChain(job.data.tenantId, {
+      delayMs: ORPHAN_SWEEP_CHAIN_INTERVAL_MS,
+    });
+  } catch (error) {
+    logger.error(
+      { tenantId: job.data.tenantId, error },
+      "failed to schedule next orphan sweep chain step — chain may stall for this tenant until next ingest",
+    );
+  }
+}
+
 export const startOrphanSweepChainWorker = () => {
   if (!connection) {
     logger.info("no redis connection, skipping orphan sweep chain worker");
@@ -123,39 +158,26 @@ export const startOrphanSweepChainWorker = () => {
     logger.info("orphan sweep chain worker active, waiting for jobs!");
   });
 
-  // The self-perpetuating link. Re-enqueue MUST happen here, after the
-  // previous job has transitioned out of `active` and its jobId is free —
-  // otherwise BullMQ dedups the add into a no-op and the chain stalls.
-  worker.on("completed", async (job, returnValue) => {
-    const outcome = returnValue as OrphanSweepChainOutcome | undefined;
-    if (!job?.data?.tenantId) return;
-    if (outcome?.stopChain) {
-      logger.info(
-        { tenantId: job.data.tenantId },
-        "orphan sweep chain ended for tenant — project archived or deleted",
-      );
-      return;
-    }
-    try {
-      await seedOrphanSweepChain(job.data.tenantId, {
-        delayMs: ORPHAN_SWEEP_CHAIN_INTERVAL_MS,
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId: job.data.tenantId, error },
-        "failed to schedule next orphan sweep chain step — chain may stall for this tenant until next ingest",
-      );
-    }
-  });
+  // The chain's only re-enqueue point: a successful step's completion. A
+  // permanently-failed job (below) does NOT re-enqueue — transient sweep
+  // errors are already swallowed inside the worker function so the chain
+  // continues, and a job hitting permanent failure means something deeper
+  // than a flaky sweep. Stalling until the next ingest re-seeds matches
+  // the cold-start tolerance we already accept.
+  worker.on("completed", (job, returnValue) =>
+    handleChainStepCompleted(
+      job,
+      returnValue as OrphanSweepChainOutcome | undefined,
+    ),
+  );
 
-  // If a step exhausts retries we still try to re-link the chain — a
-  // permanent failure on one step shouldn't kill the tenant's cleanup
-  // forever. Worst case the next step also fails and BullMQ telemetry
-  // surfaces it.
+  // Permanent failure: log + capture, but do NOT silently re-arm the
+  // chain. The next ingest for this tenant re-seeds it; in the meantime
+  // the surfaced error is the signal that something needs attention.
   worker.on("failed", async (job, err) => {
     logger.error(
-      { jobId: job?.id, error: err.message },
-      "orphan sweep chain step failed permanently; attempting to keep the chain alive",
+      { jobId: job?.id, tenantId: job?.data?.tenantId, error: err.message },
+      "orphan sweep chain step failed permanently; chain stalls until next ingest re-seeds",
     );
     getJobProcessingCounter("orphan_sweep_chain", "failed").inc();
     await withScope((scope) => {
@@ -163,17 +185,6 @@ export const startOrphanSweepChainWorker = () => {
       scope.setExtra?.("job", job?.data);
       captureException(err);
     });
-    if (!job?.data?.tenantId) return;
-    try {
-      await seedOrphanSweepChain(job.data.tenantId, {
-        delayMs: ORPHAN_SWEEP_CHAIN_INTERVAL_MS,
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId: job.data.tenantId, error },
-        "failed to schedule next orphan sweep chain step after permanent failure",
-      );
-    }
   });
 
   logger.info("orphan sweep chain worker registered");

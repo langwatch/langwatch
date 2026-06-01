@@ -30,15 +30,19 @@ export const orphanSweepChainQueue = new QueueWithFallback<
   defaultJobOptions: {
     backoff: { type: "exponential", delay: 5000 },
     attempts: 3,
-    removeOnComplete: {
-      // Hold for 24h so the jobId stays "warm" for the same period as the
-      // chain delay. Avoids a stale ingest seed re-creating a chain that's
-      // about to fire anyway.
-      age: ORPHAN_SWEEP_CHAIN_INTERVAL_MS / 1000,
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 7,
-    },
+    // Remove finished jobs atomically. BullMQ's `jobId` uniqueness spans
+    // ALL states including `completed` / `failed` — if we held the
+    // completed history with `age: …`, the listener's re-enqueue (same
+    // jobId, +24h delay) would dedup against the still-resident
+    // completed job and silently no-op, killing the chain after one run.
+    //
+    // The 24h dedup property we need for bursty ingest is still upheld:
+    // between chain steps, the next job lives in `delayed` state holding
+    // the jobId. Ingest re-seeds during that window are no-ops. Job
+    // history visibility lives in our logger + posthog capture, not the
+    // queue's retention window.
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
 
