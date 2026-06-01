@@ -120,6 +120,7 @@ describe("createProjectMetadataReactor()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
+    /** @scenario "Project marks as integrated after first trace ingestion" */
     it("sets firstMessage to true", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);

@@ -79,6 +79,7 @@ describe("PromptService", () => {
 
     describe("given a prompt with auto-detected variables already synced", () => {
       describe("when the same prompt is synced again with the same text", () => {
+        /** @scenario 'CLI hardcoded "input" default is kept only when it appears in the template' */
         it("returns up_to_date because auto-detected inputs match stored inputs", async () => {
           // Remote has the auto-detected input from previous sync
           const existingPrompt = buildExistingPrompt({

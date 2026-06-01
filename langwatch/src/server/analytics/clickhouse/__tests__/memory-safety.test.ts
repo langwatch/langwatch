@@ -261,6 +261,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("memory safety settings on query execution paths", () => {
     describe("when ANALYTICS_CLICKHOUSE_SETTINGS is inspected in source", () => {
+      /** @scenario "Analytics queries include a memory spill-to-disk safety setting" */
       it("defines max_bytes_before_external_group_by with a positive value", () => {
         const servicePath = path.resolve(
           __dirname,
