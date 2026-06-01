@@ -278,7 +278,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentEnd:
 		return inputs, nil
 	case dsl.ComponentCode:
-		return e.runCode(ctx, node, inputs, ns)
+		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns)
 	case dsl.ComponentSignature:
@@ -335,7 +335,7 @@ func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *
 	return map[string]any{}, nil
 }
 
-func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
 	}
@@ -345,6 +345,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 		Code:            code,
 		Inputs:          inputs,
 		DeclaredOutputs: declared,
+		Secrets:         secrets,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
@@ -754,7 +755,7 @@ func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case "http":
 		return e.runHTTP(ctx, node, inputs, ns)
 	case "code":
-		return e.runCode(ctx, node, inputs, ns)
+		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "workflow":
 		return e.runAgentWorkflow(ctx, req, node, inputs, ns)
 	case "":
