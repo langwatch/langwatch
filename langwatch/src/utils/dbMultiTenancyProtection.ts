@@ -61,12 +61,6 @@ const EXEMPT_MODELS = [
    */
   "ApiKey",
   /**
-   * Cost centers are organization-level accounting dimensions, scoped by
-   * organizationId (never projectId). The service layer enforces org
-   * scoping on every query. See cost-centers.feature.
-   */
-  "CostCenter",
-  /**
    * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
    * - GatewayBudget: org-level (scopeType + scopeId identifies which
    *   target); no projectId column by design.
@@ -300,18 +294,15 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires a row id, organizationId, or scope predicate in the where clause";
+        return "requires a row id or scope predicate in the where clause";
       }
       const ok = validateRecursive(
         where,
-        (c) =>
-          hasIdOrInPredicate(c) ||
-          typeof c.organizationId === "string" ||
-          hasScopePredicate(c),
+        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires a row id, organizationId, or scope predicate in the where clause";
+        : "requires a row id or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -351,38 +342,6 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof d.scopeId !== "string"
         ) {
           return "create requires modelProviderId + scopeType + scopeId in the data payload";
-        }
-      }
-      return null;
-    },
-  },
-  RoutingPolicyScope: {
-    validateWhere: (where) => {
-      if (!where) {
-        return "requires a row id, routingPolicyId, or scope predicate";
-      }
-      const ok = validateRecursive(
-        where,
-        (c) =>
-          hasIdOrInPredicate(c) ||
-          typeof c.routingPolicyId === "string" ||
-          (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
-          hasScopePredicate(c),
-      );
-      return ok
-        ? null
-        : "requires a row id, routingPolicyId, or scope predicate";
-    },
-    validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
-      for (const d of records) {
-        if (!d) return "create requires a data payload";
-        if (
-          typeof d.routingPolicyId !== "string" ||
-          typeof d.scopeType !== "string" ||
-          typeof d.scopeId !== "string"
-        ) {
-          return "create requires routingPolicyId + scopeType + scopeId in the data payload";
         }
       }
       return null;
@@ -459,17 +418,12 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id, organizationId, or scope predicate";
+      if (!where) return "requires a row id or scope predicate";
       const ok = validateRecursive(
         where,
-        (c) =>
-          hasIdOrInPredicate(c) ||
-          typeof c.organizationId === "string" ||
-          hasScopePredicate(c),
+        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, organizationId, or scope predicate";
+      return ok ? null : "requires a row id or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -514,43 +468,16 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // Inline single-scope-per-row (ADR-021). A query is bounded by a row id,
-  // the organizationId anchor, a (scopeType, scopeId) predicate, or the
-  // legacy projectId column (one-release read compat). Every new row must
-  // declare its owning organizationId.
-  CustomLLMModelCost: {
-    validateWhere: (where) => {
-      if (!where) {
-        return "requires a row id, organizationId, scope predicate, or projectId in the where clause";
-      }
-      const ok = validateRecursive(
-        where,
-        (c) =>
-          hasIdOrInPredicate(c) ||
-          typeof c.organizationId === "string" ||
-          (c.organizationId && Array.isArray(c.organizationId.in)) ||
-          hasScopePredicate(c) ||
-          typeof c.projectId === "string",
-      );
-      return ok
-        ? null
-        : "requires a row id, organizationId, scope predicate, or projectId in the where clause";
-    },
-    validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
-      for (const d of records) {
-        if (!d) return "create requires a data payload";
-        if (typeof d.organizationId !== "string") {
-          return "create requires an organizationId in the data payload";
-        }
-      }
-      return null;
-    },
-  },
 };
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  if (params.model && EXEMPT_MODELS.includes(params.model)) return;
+  // Raw queries ($queryRaw / $executeRaw) carry no model and no
+  // structured `where` clause for this guard to inspect — tenancy is
+  // the SQL author's responsibility (e.g. the outbox lease query filters
+  // by projectId in its SQL text). Mirrors guardOrganizationId, which
+  // also short-circuits when there is no model.
+  if (!params.model) return;
+  if (EXEMPT_MODELS.includes(params.model)) return;
 
   const action = params.action;
   const model = params.model;

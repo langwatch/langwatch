@@ -47,7 +47,17 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
-import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
+import {
+  auditDedupKey,
+  TRIGGER_NOTIFY_REACTOR_NAME,
+  type SettleStagePayload,
+} from "./outbox/payload";
+import type { OutboxStack } from "./outbox/setup";
+import {
+  type EnqueueSettle,
+  type TriggerActionDispatchDeps,
+} from "./pipelines/shared/triggerActionDispatch";
+import { DEFAULT_TRACE_DEBOUNCE_MS } from "~/automations/cadences";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
@@ -192,6 +202,14 @@ export interface PipelineRegistryDeps {
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  /**
+   * Wired by the worker composition root (`presets.ts`) and `undefined`
+   * on the web process. When set, both trigger reactors route
+   * NOTIFY-class matches into the unified outbox queue's settle stage
+   * (ADR-021 revision + ADR-030) instead of inline-dispatching. Persist
+   * actions always run inline regardless.
+   */
+  outbox?: OutboxStack;
 }
 
 /**
@@ -221,7 +239,7 @@ export class PipelineRegistry {
    */
   private buildTraceReactorContext(): Pick<
     TriggerActionDispatchDeps,
-    "traceById" | "addToAnnotationQueue" | "addToDataset"
+    "traceById" | "addToAnnotationQueue" | "addToDataset" | "enqueueSettle"
   > & {
     deriveEvents: (params: {
       tenantId: string;
@@ -233,6 +251,36 @@ export class PipelineRegistry {
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
     );
+    const outbox = this.deps.outbox;
+    const enqueueSettle: EnqueueSettle | undefined = outbox
+      ? async ({ projectId, triggerId, traceId, foldState, traceDebounceMs }) => {
+          const payload: SettleStagePayload = {
+            stage: "settle",
+            projectId,
+            triggerId,
+            traceId,
+            reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+            auditDedupKey: auditDedupKey({ projectId, triggerId, traceId }),
+            foldSnapshotAtEnqueue: {
+              computedInput: foldState.computedInput ?? "",
+              computedOutput: foldState.computedOutput ?? "",
+            },
+          };
+          // Per-trigger TTL override comes from `Trigger.traceDebounceMs`
+          // (ADR-030). The reactor reads it off the trigger row and passes
+          // it through; absent an override the queue uses its built-in
+          // default so historical triggers keep the same 30s behavior.
+          await outbox.queue.send(payload, {
+            deduplication: {
+              makeId: () =>
+                `${projectId}/${TRIGGER_NOTIFY_REACTOR_NAME}:${triggerId}:${traceId}`,
+              ttlMs: traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+              extend: true,
+              replace: true,
+            },
+          });
+        }
+      : undefined;
     return {
       traceById: async (projectId, traceId) => {
         const traceService = TraceService.create(this.deps.prisma);
@@ -248,6 +296,7 @@ export class PipelineRegistry {
         await createManyDatasetRecords(params);
       },
       deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+      enqueueSettle,
     };
   }
 

@@ -160,6 +160,7 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
+                isReplay: false,
               });
             },
           },
@@ -189,6 +190,7 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
+                isReplay: false,
               });
             },
           },
@@ -800,6 +802,7 @@ export class ProjectionRouter<
                 tenantId: event.tenantId,
                 aggregateId: String(event.aggregateId),
                 foldState,
+                isReplay: false,
               }),
               onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
               onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
@@ -828,6 +831,7 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
               aggregateId: String(event.aggregateId),
               foldState,
+              isReplay: false,
             }),
             onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },

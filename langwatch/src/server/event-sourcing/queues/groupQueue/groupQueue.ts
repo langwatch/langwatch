@@ -17,6 +17,7 @@ import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  QueueAuditAdapter,
   QueueSendOptions,
 } from "../../queues";
 import { categorizeError, ConfigurationError, ErrorCategory, QueueError } from "../../services/errorHandling";
@@ -102,6 +103,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly groupKey: (payload: Payload) => string;
   private readonly score?: (payload: Payload) => number;
+  private readonly auditAdapter?: QueueAuditAdapter<Payload>;
   private readonly redisConnection: IORedis | Cluster;
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
@@ -131,6 +133,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       deduplication,
       groupKey,
       score,
+      auditAdapter,
     } = definition;
 
     const effectiveConnection = redisConnection ?? connection;
@@ -168,6 +171,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.process = process;
     this.processBatch = processBatch;
     this.coalesceMaxBatch = coalesceMaxBatch;
+    this.auditAdapter = auditAdapter;
     this.globalConcurrency =
       defOptions?.globalConcurrency ??
       GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
@@ -317,6 +321,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (tenantId) {
         void this.rateTracker.record(tenantId);
       }
+      // Audit hook (ADR-021 revision): only on the new-stage path, not on
+      // dedup-collapse. The adapter's audit row already exists for the
+      // first send under this dedup ID.
+      await this.runAudit(() =>
+        this.auditAdapter?.onEnqueue({
+          payload,
+          groupKey: groupId,
+          dedupKey: dedupId || undefined,
+          scheduledAt: new Date(dispatchAfterMs),
+        }),
+      );
     } else {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName });
     }
@@ -419,6 +434,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
     }
 
+    // Audit hooks (ADR-021 revision). The Lua's stageBatch returns a count,
+    // not a per-payload new/dedup map, so we fire onEnqueue for every
+    // payload and let the adapter's idempotency (createMany skipDuplicates)
+    // absorb dedup-collapsed duplicates.
+    if (this.auditAdapter) {
+      for (const job of jobsToStage) {
+        await this.runAudit(() =>
+          this.auditAdapter?.onEnqueue({
+            payload: payloads[jobsToStage.indexOf(job)]!,
+            groupKey: job.groupId,
+            dedupKey: job.dedupId || undefined,
+            scheduledAt: new Date(job.dispatchAfterMs),
+          }),
+        );
+      }
+    }
+
     this.logger.debug(
       {
         queueName: this.queueName,
@@ -428,6 +460,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       },
       "Batch of jobs staged",
     );
+  }
+
+  /**
+   * Best-effort audit-adapter invocation. PG outages log + continue;
+   * the queue stays available. See ADR-021 revision for the "audit lags
+   * but never blocks dispatch" property.
+   */
+  private async runAudit(op: () => Promise<unknown> | undefined): Promise<void> {
+    if (!this.auditAdapter) return;
+    try {
+      await op();
+    } catch (err) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "Audit adapter hook failed; queue continues, projection lags",
+      );
+    }
   }
 
   /**
@@ -559,6 +611,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             }
 
             try {
+              // Audit hook: onLeased fires once per leased payload (including
+              // each drained sibling in a coalesced batch). Best-effort —
+              // PG outage logs+continues.
+              await this.runAudit(() =>
+                this.auditAdapter?.onLeased({ payload }),
+              );
+              if (batchPayloads && this.auditAdapter) {
+                for (const sibling of batchPayloads.slice(1)) {
+                  await this.runAudit(() =>
+                    this.auditAdapter?.onLeased({ payload: sibling }),
+                  );
+                }
+              }
+
               // Run the actual handler with request context propagation
               const requestContext = createContextFromJobData(contextMetadata);
               await runWithContext(requestContext, async () => {
@@ -575,6 +641,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
               gqJobsCompletedTotal.inc(routingLabels);
+
+              // Audit hook: onDispatched fires once per dispatched payload
+              // (dispatched + every drained sibling on success).
+              const dispatchedAt = new Date();
+              await this.runAudit(() =>
+                this.auditAdapter?.onDispatched({ payload, at: dispatchedAt }),
+              );
+              if (batchPayloads && this.auditAdapter) {
+                for (const sibling of batchPayloads.slice(1)) {
+                  await this.runAudit(() =>
+                    this.auditAdapter?.onDispatched({
+                      payload: sibling,
+                      at: dispatchedAt,
+                    }),
+                  );
+                }
+              }
 
               this.logger.debug(
                 {
@@ -621,6 +704,30 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   backoffMs,
                 });
 
+                // Audit hook: willRetry=true. Fires for the dispatched
+                // payload + every drained sibling (they all get re-staged).
+                const nextAttemptAt = new Date(Date.now() + backoffMs);
+                await this.runAudit(() =>
+                  this.auditAdapter?.onFailed({
+                    payload,
+                    error: error.message,
+                    willRetry: true,
+                    nextAttemptAt,
+                  }),
+                );
+                if (batchPayloads && this.auditAdapter) {
+                  for (const sibling of batchPayloads.slice(1)) {
+                    await this.runAudit(() =>
+                      this.auditAdapter?.onFailed({
+                        payload: sibling,
+                        error: error.message,
+                        willRetry: true,
+                        nextAttemptAt,
+                      }),
+                    );
+                  }
+                }
+
                 this.logger.warn(
                   {
                     queueName: this.queueName,
@@ -661,6 +768,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   contextMetadata,
                   routingLabels,
                 });
+
+                // Audit hook: terminal — onDead fires for the dispatched
+                // payload + every drained sibling.
+                await this.runAudit(() =>
+                  this.auditAdapter?.onDead({
+                    payload,
+                    lastError: error.message,
+                  }),
+                );
+                if (batchPayloads && this.auditAdapter) {
+                  for (const sibling of batchPayloads.slice(1)) {
+                    await this.runAudit(() =>
+                      this.auditAdapter?.onDead({
+                        payload: sibling,
+                        lastError: error.message,
+                      }),
+                    );
+                  }
+                }
               }
             }
           },
