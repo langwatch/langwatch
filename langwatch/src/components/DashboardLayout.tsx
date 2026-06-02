@@ -26,7 +26,6 @@ import { CommandBarTrigger } from "../features/command-bar";
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
