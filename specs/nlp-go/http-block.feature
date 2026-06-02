@@ -106,8 +106,10 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine invokes the node
       Then the upstream observed header matching `^Authorization: Basic dTpw$`
 
-    # Pinned by tests/integration/http_block_secrets_test.go.
-    @integration
+    # Covered by services/nlpgo/tests/integration/http_block_secrets_test.go,
+    # but kept @unimplemented because the TS feature-parity checker only scans
+    # TS test roots and cannot bind Go-side tests yet (see file header).
+    @integration @unimplemented
     Scenario: secret references resolve at request time, not at parse time
       Given an HTTP node with auth {"type": "bearer", "token": "{{ secrets.UPSTREAM_TOKEN }}"}
       And the project has secret UPSTREAM_TOKEN="rotated-value"

@@ -3,8 +3,9 @@ package engine
 import (
 	"testing"
 
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
 func TestResolveSecretRefs(t *testing.T) {
