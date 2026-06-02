@@ -65,29 +65,6 @@ describe("LicenseEnforcementRepository", () => {
     );
   });
 
-  describe("getProjectCount", () => {
-    /** @scenario Counts projects across all teams */
-    /** @scenario Counts only non-archived projects toward limit */
-    it("queries non-archived projects with organization filter that traverses every team", async () => {
-      mockPrisma.project.count.mockResolvedValue(4);
-
-      const result = await repository.getProjectCount(organizationId);
-
-      expect(mockPrisma.project.count).toHaveBeenCalledWith({
-        where: { team: { organizationId }, archivedAt: null },
-      });
-      expect(result).toBe(4);
-    });
-
-    it("returns zero when no projects exist", async () => {
-      mockPrisma.project.count.mockResolvedValue(0);
-
-      const result = await repository.getProjectCount(organizationId);
-
-      expect(result).toBe(0);
-    });
-  });
-
   describe("getMemberCount", () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -473,15 +450,6 @@ describe("LicenseEnforcementRepository", () => {
       const result = await repository.getMembersLiteCount(organizationId);
 
       expect(result).toBe(2);
-    });
-  });
-
-  describe("query structure validation", () => {
-    it("project query excludes archived projects", async () => {
-      await repository.getProjectCount(organizationId);
-
-      const call = mockPrisma.project.count.mock.calls[0]?.[0];
-      expect(call?.where).toHaveProperty("archivedAt", null);
     });
   });
 

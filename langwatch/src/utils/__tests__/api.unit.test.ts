@@ -145,18 +145,18 @@ describe("Global mutation error handler", () => {
       const store = useUpgradeModalStore.getState();
       expect(store.isOpen).toBe(false);
 
-      store.open("projects", 10, 10);
+      store.open("members", 10, 10);
 
       const updatedState = useUpgradeModalStore.getState();
       expect(updatedState.isOpen).toBe(true);
-      expect(updatedState.limitType).toBe("projects");
+      expect(updatedState.limitType).toBe("members");
       expect(updatedState.current).toBe(10);
       expect(updatedState.max).toBe(10);
     });
 
     it("closes modal and resets state", () => {
       const store = useUpgradeModalStore.getState();
-      store.open("teams", 5, 5);
+      store.open("membersLite", 5, 5);
       store.close();
 
       const updatedState = useUpgradeModalStore.getState();
@@ -170,7 +170,7 @@ describe("Global mutation error handler", () => {
   describe("Global mutation cache integration", () => {
     it("opens upgrade modal when limit error is detected", () => {
       const limitInfo = {
-        limitType: "projects" as const,
+        limitType: "members" as const,
         current: 10,
         max: 10,
       };
@@ -182,7 +182,7 @@ describe("Global mutation error handler", () => {
 
       const state = useUpgradeModalStore.getState();
       expect(state.isOpen).toBe(true);
-      expect(state.limitType).toBe("projects");
+      expect(state.limitType).toBe("members");
     });
 
     it("does not open modal for non-limit errors", () => {

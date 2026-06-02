@@ -5,15 +5,14 @@ import { z } from "zod";
  * Adding a new type here will cause compile errors in all switch statements
  * that use `assertNever`, ensuring exhaustive handling.
  *
- * Only the structural/seat levers remain enforced: projects, teams, members,
- * and lite members. Experimentation resources (workflows, prompts, evaluators,
- * scenarios, agents, experiments, online evaluations, datasets, dashboards,
- * custom graphs, automations) are OSS (Apache 2.0) and have no creation cap on
- * any plan — cloud monetizes via traces/seats, not by counting these.
+ * Only the seat levers remain enforced: members and lite members. Workspace
+ * structure (projects, teams) and all experimentation resources (workflows,
+ * prompts, evaluators, scenarios, agents, experiments, online evaluations,
+ * datasets, dashboards, custom graphs, automations) are OSS (Apache 2.0) and
+ * have no creation cap on any plan — cloud monetizes via traces/messages
+ * volume and seats, not by counting workspaces or experimentation artifacts.
  */
 export const limitTypes = [
-  "projects",
-  "teams",
   "members",
   "membersLite",
 ] as const;

@@ -54,8 +54,6 @@ interface MemberClassificationContext {
  * only do database queries - delegation to other services violates SRP.
  */
 export interface ILicenseEnforcementRepository {
-  getProjectCount(organizationId: string): Promise<number>;
-  getTeamCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
@@ -70,24 +68,6 @@ export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
   constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
-
-  /**
-   * Counts non-archived projects in organization.
-   */
-  async getProjectCount(organizationId: string): Promise<number> {
-    return this.prisma.project.count({
-      where: { team: { organizationId }, archivedAt: null },
-    });
-  }
-
-  /**
-   * Counts teams in organization.
-   */
-  async getTeamCount(organizationId: string): Promise<number> {
-    return this.prisma.team.count({
-      where: { organizationId },
-    });
-  }
 
   /**
    * Counts full members in organization:

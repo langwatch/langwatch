@@ -330,15 +330,19 @@ describe("backward compatibility: licenses issued before experimentation limits 
     expect(result.valid).toBe(true);
     if (!result.valid) return;
 
-    // Tier + seat/structure entitlements still come from the license.
+    // Tier + seat entitlements still come from the license.
     expect(result.planInfo.type).toBe("ENTERPRISE");
     expect(result.planInfo.maxMembers).toBe(100);
-    expect(result.planInfo.maxProjects).toBe(500);
 
-    // Experimentation caps are no longer part of the active plan (uncapped).
+    // Experimentation caps AND workspace-structure caps (projects/teams) are no
+    // longer part of the active plan — those resources are OSS/uncapped. The
+    // signed payload still carries them; plan resolution simply does not surface
+    // them, so existing licenses keep validating without re-issuance.
     expect("maxPrompts" in result.planInfo).toBe(false);
     expect("maxWorkflows" in result.planInfo).toBe(false);
     expect("maxScenarios" in result.planInfo).toBe(false);
+    expect("maxProjects" in result.planInfo).toBe(false);
+    expect("maxTeams" in result.planInfo).toBe(false);
   });
 });
 

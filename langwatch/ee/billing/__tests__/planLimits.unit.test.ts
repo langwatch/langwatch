@@ -4,16 +4,16 @@ import { PlanTypes } from "../planTypes";
 
 describe("PLAN_LIMITS", () => {
   describe("when checking critical plan-specific fields", () => {
-    it("sets PRO maxProjects to 9999", () => {
-      expect(PLAN_LIMITS[PlanTypes.PRO].maxProjects).toBe(9999);
+    it("sets PRO maxMembers to 5", () => {
+      expect(PLAN_LIMITS[PlanTypes.PRO].maxMembers).toBe(5);
     });
 
-    it("sets ENTERPRISE maxProjects to 9999", () => {
-      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxProjects).toBe(9999);
+    it("sets ENTERPRISE maxMembers to 1000", () => {
+      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers).toBe(1000);
     });
 
-    it("sets FREE maxProjects to 2", () => {
-      expect(PLAN_LIMITS[PlanTypes.FREE].maxProjects).toBe(2);
+    it("sets FREE maxMembers to 2", () => {
+      expect(PLAN_LIMITS[PlanTypes.FREE].maxMembers).toBe(2);
     });
   });
 });

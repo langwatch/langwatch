@@ -103,14 +103,12 @@ export interface IUsageUnitResolver {
  * Usage statistics result for an organization.
  */
 export interface UsageStats {
-  projectsCount: number;
   currentMonthMessagesCount: number | null;
   currentMonthCost: number;
   activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
-  teamsCount: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -157,24 +155,20 @@ export class UsageStatsService {
     user: MinimalUser,
   ): Promise<UsageStats> {
     const [
-      projectsCount,
       currentMonthMessagesCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
-      teamsCount,
       usageUnit,
     ] = await Promise.all([
-      this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
-      this.repository.getTeamCount(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -188,14 +182,12 @@ export class UsageStatsService {
     );
 
     return {
-      projectsCount,
       currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
-      teamsCount,
       messageLimitInfo,
       usageUnit,
     };

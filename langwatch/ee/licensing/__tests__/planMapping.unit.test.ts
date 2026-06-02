@@ -45,7 +45,7 @@ describe("mapToPlanInfo", () => {
   it("maps all numeric limits correctly", () => {
     const licenseData = createLicenseData({
       maxMembers: 5,
-      maxProjects: 10,
+      maxMembersLite: 10,
       maxMessagesPerMonth: 50000,
       evaluationsCredit: 100,
       maxWorkflows: 25,
@@ -57,7 +57,7 @@ describe("mapToPlanInfo", () => {
     const result = mapToPlanInfo(licenseData);
 
     expect(result.maxMembers).toBe(5);
-    expect(result.maxProjects).toBe(10);
+    expect(result.maxMembersLite).toBe(10);
     expect(result.maxMessagesPerMonth).toBe(50000);
   });
 

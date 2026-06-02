@@ -13,8 +13,6 @@ import type { LimitType } from "./types";
  * // "You've reached the limit of team members"
  */
 export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
-  projects: "projects",
-  teams: "teams",
   members: "team members",
   membersLite: "lite members",
 } as const;
@@ -30,8 +28,6 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
  * // "Team Members:"
  */
 export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
-  projects: "Projects",
-  teams: "Teams",
   members: "Team Members",
   membersLite: "Lite Members",
 } as const;

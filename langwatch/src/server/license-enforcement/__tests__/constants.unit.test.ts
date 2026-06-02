@@ -12,8 +12,6 @@ describe("LIMIT_TYPE_LABELS", () => {
   });
 
   it("has the expected labels for each limit type", () => {
-    expect(LIMIT_TYPE_LABELS.projects).toBe("projects");
-    expect(LIMIT_TYPE_LABELS.teams).toBe("teams");
     expect(LIMIT_TYPE_LABELS.members).toBe("team members");
     expect(LIMIT_TYPE_LABELS.membersLite).toBe("lite members");
   });
@@ -34,8 +32,6 @@ describe("LIMIT_TYPE_DISPLAY_LABELS", () => {
   });
 
   it("has the expected display labels for each limit type (title case)", () => {
-    expect(LIMIT_TYPE_DISPLAY_LABELS.projects).toBe("Projects");
-    expect(LIMIT_TYPE_DISPLAY_LABELS.teams).toBe("Teams");
     expect(LIMIT_TYPE_DISPLAY_LABELS.members).toBe("Team Members");
     expect(LIMIT_TYPE_DISPLAY_LABELS.membersLite).toBe("Lite Members");
   });

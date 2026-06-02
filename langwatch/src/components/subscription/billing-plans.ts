@@ -55,9 +55,7 @@ export const FREE_PLAN_FEATURES = [
   "50,000 events included",
   "14 days data retention",
   "2 users",
-  "3 scenarios",
-  "3 simulations",
-  "3 custom evaluations",
+  "Unlimited scenarios, simulations & evals",
   "Community support",
 ];
 
@@ -93,12 +91,10 @@ export const ENTERPRISE_PLAN_FEATURES = [
 export function buildTieredCapabilities({
   maxMembers,
   maxMessagesPerMonth,
-  maxProjects,
   maxMembersLite,
 }: {
   maxMembers: number;
   maxMessagesPerMonth: number;
-  maxProjects: number;
   maxMembersLite: number;
 }) {
   const coreUsersText =
@@ -111,12 +107,6 @@ export function buildTieredCapabilities({
       : maxMessagesPerMonth > 0
         ? `${formatNumber(maxMessagesPerMonth)} events included`
         : "Custom event limits";
-  const projectsText =
-    maxProjects >= 9999
-      ? "Unlimited projects"
-      : maxProjects > 0
-        ? `Up to ${formatNumber(maxProjects)} projects`
-        : "Custom project limits";
   const liteUsersText =
     maxMembersLite >= 9999
       ? "Unlimited lite users"
@@ -126,7 +116,6 @@ export function buildTieredCapabilities({
   return [
     coreUsersText,
     eventsText,
-    projectsText,
     liteUsersText,
   ];
 }

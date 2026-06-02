@@ -7,8 +7,6 @@ import { LIMIT_TYPE_DISPLAY_LABELS } from "~/server/license-enforcement/constant
 export type ResourceKey =
   | "members"
   | "membersLite"
-  | "teams"
-  | "projects"
   | "messagesPerMonth"
   | "eventsPerMonth"
   | "tracesPerMonth"
@@ -41,8 +39,6 @@ const RESOURCE_ORDER: (keyof ResourceLimits)[] = [
 export interface ResourceLimits {
   members: { current: number; max: number };
   membersLite: { current: number; max: number };
-  teams: { current: number; max: number };
-  projects: { current: number; max: number };
   messagesPerMonth: { current: number; max: number };
 }
 
@@ -52,10 +48,6 @@ interface LicenseStatusWithPlan {
   maxMembers: number;
   currentMembersLite: number;
   maxMembersLite: number;
-  currentTeams: number;
-  maxTeams: number;
-  currentProjects: number;
-  maxProjects: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
 }
@@ -64,8 +56,6 @@ interface LicenseStatusWithPlan {
 interface UsageData {
   membersCount: number;
   membersLiteCount: number;
-  teamsCount: number;
-  projectsCount: number;
   currentMonthMessagesCount: number | null;
 }
 
@@ -79,8 +69,6 @@ export function mapLicenseStatusToLimits(
   return {
     members: { current: licenseData.currentMembers, max: licenseData.maxMembers },
     membersLite: { current: licenseData.currentMembersLite, max: licenseData.maxMembersLite },
-    teams: { current: licenseData.currentTeams, max: licenseData.maxTeams },
-    projects: { current: licenseData.currentProjects, max: licenseData.maxProjects },
     messagesPerMonth: { current: licenseData.currentMessagesPerMonth, max: licenseData.maxMessagesPerMonth },
   };
 }
@@ -96,8 +84,6 @@ export function mapUsageToLimits(
   return {
     members: { current: usage.membersCount, max: plan.maxMembers },
     membersLite: { current: usage.membersLiteCount, max: plan.maxMembersLite },
-    teams: { current: usage.teamsCount, max: plan.maxTeams },
-    projects: { current: usage.projectsCount, max: plan.maxProjects },
     messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0, max: plan.maxMessagesPerMonth },
   };
 }

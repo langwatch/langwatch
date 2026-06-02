@@ -16,8 +16,6 @@ const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
   overrideAddingLimitations: false,
   maxMembers: 100,
   maxMembersLite: 50,
-  maxTeams: 20,
-  maxProjects: 50,
   maxMessagesPerMonth: 1_000_000,
   canPublish: true,
   usageUnit: "traces",
@@ -32,8 +30,6 @@ const SAAS_PRO_PLAN: PlanInfo = {
   overrideAddingLimitations: false,
   maxMembers: 5,
   maxMembersLite: 3,
-  maxTeams: 3,
-  maxProjects: 10,
   maxMessagesPerMonth: 50_000,
   canPublish: true,
   usageUnit: "traces",
@@ -249,7 +245,7 @@ describe("createCompositePlanProvider", () => {
 
       // Verify no field mixing — all values come from license plan
       expect(plan.maxMembers).toBe(ENTERPRISE_LICENSE_PLAN.maxMembers);
-      expect(plan.maxProjects).toBe(ENTERPRISE_LICENSE_PLAN.maxProjects);
+      expect(plan.maxMembersLite).toBe(ENTERPRISE_LICENSE_PLAN.maxMembersLite);
       expect(plan.prices).toEqual(ENTERPRISE_LICENSE_PLAN.prices);
       expect(plan.canPublish).toBe(ENTERPRISE_LICENSE_PLAN.canPublish);
     });
@@ -265,7 +261,7 @@ describe("createCompositePlanProvider", () => {
       });
 
       expect(plan.maxMembers).toBe(SAAS_PRO_PLAN.maxMembers);
-      expect(plan.maxProjects).toBe(SAAS_PRO_PLAN.maxProjects);
+      expect(plan.maxMembersLite).toBe(SAAS_PRO_PLAN.maxMembersLite);
       expect(plan.prices).toEqual(SAAS_PRO_PLAN.prices);
       expect(plan.canPublish).toBe(SAAS_PRO_PLAN.canPublish);
     });

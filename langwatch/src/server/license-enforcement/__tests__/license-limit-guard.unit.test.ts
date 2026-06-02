@@ -41,8 +41,6 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     return {
       getMemberCount: vi.fn().mockResolvedValue(memberCount),
       getMembersLiteCount: vi.fn().mockResolvedValue(membersLiteCount),
-      getProjectCount: vi.fn(),
-      getTeamCount: vi.fn(),
       getCurrentMonthCost: vi.fn(),
       getCurrentMonthCostForProjects: vi.fn(),
     };
