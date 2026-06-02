@@ -442,6 +442,128 @@ describe("extractInlineMediaFromEvent", () => {
     });
   });
 
+  describe("when an event has an AI-SDK file+audio part (typescript scenario SDK shape)", () => {
+    /** @scenario "file parts with audio/* mediaType are externalized to a clean input_audio reference" */
+    it("calls storeFromBytes with the audio mediaType and rewrites the part to {type:'input_audio', input_audio:{url, mimeType}}", async () => {
+      const base64Payload = makeBase64Payload("PCM16_AUDIO_BYTES");
+      const mimeType = "audio/pcm16";
+      const storedId = "stored-file-audio-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: mimeType,
+          isDuplicate: false,
+        }),
+      });
+
+      // Shape emitted by the typescript scenario SDK's `createAudioMessage`
+      // (voice/messages.ts) before the SDK-side translation patch. Older
+      // builds (and any future caller that ships raw AI-SDK file parts)
+      // hit this branch; the extractor must externalise the bytes rather
+      // than let them flow to ClickHouse Messages.Content inline.
+      const event = makeEventWithContent([
+        { type: "text", text: "Hi" },
+        {
+          type: "file",
+          mediaType: "audio/pcm16",
+          data: base64Payload,
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "audio/pcm16",
+          bytes: Buffer.from("PCM16_AUDIO_BYTES"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content).toHaveLength(2);
+      expect(content[0]).toEqual({ type: "text", text: "Hi" });
+      // File-shape inputs rewrite to a clean input_audio reference — NOT a
+      // chimera of {type:"file", mediaType, input_audio:{...}}. The
+      // downstream UI MediaPart consumes the input_audio shape.
+      expect(content[1]).toEqual({
+        type: "input_audio",
+        input_audio: {
+          data: undefined,
+          url: `/api/files/${storedId}`,
+          mimeType: "audio/pcm16",
+        },
+      });
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBe(storedId);
+    });
+  });
+
+  describe("when an event has an AI-SDK file part with a non-audio mediaType", () => {
+    /** @scenario "non-audio file parts route through the binary handler — externalised the same way as native binary parts" */
+    it("calls storeFromBytes and rewrites the part with id and url", async () => {
+      const base64Payload = makeBase64Payload("PNG_BYTES");
+      const mimeType = "image/png";
+      const storedId = "stored-file-image-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: mimeType,
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          mediaType: "image/png",
+          data: base64Payload,
+          filename: "preview.png",
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "image/png",
+          bytes: Buffer.from("PNG_BYTES"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      const part = content[0] as {
+        type: string;
+        id: string;
+        url: string;
+        data: unknown;
+        filename: string;
+      };
+      expect(part.type).toBe("binary");
+      expect(part.id).toBe(storedId);
+      expect(part.url).toBe(`/api/files/${storedId}`);
+      expect(part.data).toBeUndefined();
+      expect(part.filename).toBe("preview.png");
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBe(storedId);
+    });
+  });
+
   describe("when the same content appears twice in one event", () => {
     it("returns two refs both pointing at the same id, second isDuplicate=true", async () => {
       const base64 = makeBase64Payload("same-data");
