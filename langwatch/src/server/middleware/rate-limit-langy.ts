@@ -27,11 +27,18 @@ export async function checkLangyMessageRateLimit({
   }
   const bucket = Math.floor(Date.now() / 60_000);
   const key = `langy:rl:msg:${projectId}:${userId}:${bucket}`;
-  const count = await (connection as { incr: (k: string) => Promise<number> }).incr(key);
-  if (count === 1) {
-    await (
-      connection as { expire: (k: string, s: number) => Promise<number> }
-    ).expire(key, 65);
+  let count: number;
+  try {
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(key);
+    if (count === 1) {
+      await (
+        connection as { expire: (k: string, s: number) => Promise<number> }
+      ).expire(key, 65);
+    }
+  } catch {
+    // Redis hiccup — fail open rather than 500 the chat request, matching the
+    // no-connection branch above.
+    return { allowed: true, remaining: limit };
   }
   const remaining = Math.max(0, limit - count);
   if (count > limit) {
