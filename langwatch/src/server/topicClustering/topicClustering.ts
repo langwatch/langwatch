@@ -255,14 +255,20 @@ export async function fetchTracesFromClickHouse(
   // by the surviving subset and could strand older eligible traces behind a
   // run of empty-input traces.
   //
-  // The outer query also has NO `ORDER BY`. The page CTE has already chosen the
-  // exact set of traces to return, so an outer sort would only re-order that
-  // fixed set — but `ORDER BY ... LIMIT` makes ClickHouse buffer a top-N of full
-  // rows, retaining every row's ComputedInput payload at once. For tenants with
-  // large inputs that buffer alone exceeded max_memory_usage_per_query (3.5 GiB)
-  // and the read failed with MEMORY_LIMIT_EXCEEDED. Without the sort the rows
-  // stream out (ComputedInput is read in small adaptive blocks and released),
-  // and the page ordering is reapplied in JS over the small result set below.
+  // The outer query also has NO `ORDER BY` and NO outer `LIMIT`. The page CTE
+  // has already chosen the exact (<=2000) set of traces to return, so an outer
+  // sort would only re-order that fixed set — but `ORDER BY ... LIMIT` makes
+  // ClickHouse buffer a top-N of full rows, retaining every row's ComputedInput
+  // payload at once. For tenants with large inputs that buffer alone exceeded
+  // max_memory_usage_per_query (3.5 GiB) and the read failed with
+  // MEMORY_LIMIT_EXCEEDED. Without the sort the rows stream out (ComputedInput
+  // is read in small adaptive blocks and released), and the page ordering is
+  // reapplied in JS over the small result set below.
+  //
+  // An outer `LIMIT 2000` is also omitted: it would cap physical rows *before*
+  // the JS TraceId de-dupe, so if a trace had duplicate latest-version rows the
+  // cap could drop other selected TraceIds and break `returnedCount`/`lastSort`
+  // pagination. The page CTE bounds the result, so the cap is unnecessary.
   const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
@@ -326,7 +332,6 @@ export async function fetchTracesFromClickHouse(
             AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
         )
-      LIMIT 2000
     `,
     query_params: {
       tenantId: projectId,
