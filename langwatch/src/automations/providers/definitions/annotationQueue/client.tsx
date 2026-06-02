@@ -55,7 +55,7 @@ function AnnotationQueueConfigForm({
               : value,
         })
       }
-      queueDrawerOpen={{ open: false, onOpen: () => {}, onClose: () => {} }}
+      queueDrawerOpen={{ onOpen: () => {}, onClose: () => {} }}
       isTrigger={true}
     />
   );

@@ -6,7 +6,8 @@ import {
   type SliceFor,
 } from "~/automations/providers/client";
 import { isNotifyEntry } from "~/automations/providers/types";
-import type { FilterField, FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterField } from "~/server/filters/types";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,

@@ -15,7 +15,7 @@ import {
 } from "../draftReducer";
 
 const emailWith = (members: string[]) => ({
-  ...CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice(),
+  ...(CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice() as object),
   members,
 });
 

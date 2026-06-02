@@ -3,7 +3,10 @@ import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 
-type DrawerSize = "md" | "lg" | "xl" | "2xl";
+// Chakra v3's Drawer accepts xs|sm|md|lg|xl|full but not 2xl. Use `full`
+// for the expanded width — it pins the drawer to the viewport which is
+// what the editor-mode wants anyway, and avoids the unsupported size.
+type DrawerSize = "md" | "lg" | "xl" | "full";
 
 /**
  * Common shell for the secondary drawers — back-arrow header, body, and
@@ -11,7 +14,7 @@ type DrawerSize = "md" | "lg" | "xl" | "2xl";
  * optional header-right (e.g. the Conditions Code-mode switch).
  *
  * The header carries a width-toggle: clicking the maximise icon expands
- * the drawer to `2xl` (full-bleed for editor work); clicking the
+ * the drawer to `full` (full-bleed for editor work); clicking the
  * minimise icon returns to the default size. The toggle resets when the
  * drawer reopens — width is a transient preference, not a saved one.
  */
@@ -33,7 +36,7 @@ export function SecondaryDrawerShell({
   children: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const effectiveSize: DrawerSize = expanded ? "2xl" : size;
+  const effectiveSize: DrawerSize = expanded ? "full" : size;
 
   return (
     <Drawer.Root

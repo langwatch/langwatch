@@ -23,8 +23,8 @@ export function SectionRow({
 }) {
   return (
     <Box
-      as="button"
-      type="button"
+      role="button"
+      tabIndex={disabled ? -1 : 0}
       width="full"
       textAlign="left"
       padding={3}
@@ -35,6 +35,13 @@ export function SectionRow({
       opacity={disabled ? 0.6 : 1}
       cursor={disabled ? "not-allowed" : "pointer"}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={(e) => {
+        if (disabled) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       _hover={
         disabled
           ? undefined

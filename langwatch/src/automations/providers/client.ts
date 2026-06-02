@@ -46,15 +46,30 @@ export type NotifyPreview = PreviewFor[keyof PreviewFor];
 export type AllSlices = { [K in TriggerAction]: SliceFor[K] };
 
 /** The client-side provider registry — pairs each shared definition with
- *  its client peer. Indexed by `TriggerAction`. */
+ *  its client peer. Indexed by `TriggerAction`.
+ *
+ *  Each provider's slice + preview generics are independent, so the
+ *  registry's value type can only be `ClientEntry` (the unknown-erased
+ *  shape). Specific providers stay typed at their own call sites — the
+ *  drawer's helpers (notifyChannel, slice access via SliceFor) keep
+ *  per-action narrowing. */
 export const CLIENT_PROVIDERS: Record<TriggerAction, ClientEntry> = {
-  [TriggerAction.SEND_EMAIL]: { shared: emailShared, client: emailClient },
-  [TriggerAction.SEND_SLACK_MESSAGE]: { shared: slackShared, client: slackClient },
-  [TriggerAction.ADD_TO_DATASET]: { shared: datasetShared, client: datasetClient },
+  [TriggerAction.SEND_EMAIL]: {
+    shared: emailShared,
+    client: emailClient,
+  } as ClientEntry,
+  [TriggerAction.SEND_SLACK_MESSAGE]: {
+    shared: slackShared,
+    client: slackClient,
+  } as ClientEntry,
+  [TriggerAction.ADD_TO_DATASET]: {
+    shared: datasetShared,
+    client: datasetClient,
+  } as ClientEntry,
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: {
     shared: annotationQueueShared,
     client: annotationQueueClient,
-  },
+  } as ClientEntry,
 };
 
 /** Convenience indexes for the UI. */

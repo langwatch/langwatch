@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import dynamic from "~/utils/compat/next-dynamic";
 import { Switch } from "~/components/ui/switch";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import type { FilterField, FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
+  type FilterField,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import {

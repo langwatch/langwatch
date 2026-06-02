@@ -149,7 +149,7 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   extends ClientDef<S, TPreview> {
   /** The channel string the preview/testFire endpoints accept. Each
    *  provider names its own — the shared layer doesn't enumerate. */
-  readonly channel: string;
+  readonly channel: "email" | "slack";
   /** Recipients / webhook for the test-fire mutation. */
   testFireTarget(slice: S): { recipients: string[]; webhook: string | null };
   /** Template strings contributed to the save payload (`templates`). */
