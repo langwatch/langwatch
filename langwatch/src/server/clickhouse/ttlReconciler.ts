@@ -49,7 +49,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "evaluation_runs",
     ttlColumn: "UpdatedAt",
-    retentionTTLColumn: "ScheduledAt",
+    // Retention anchors on UpdatedAt (= partition key `toYearWeek(UpdatedAt)`),
+    // not ScheduledAt/StartedAt. Both of those are Nullable(DateTime64) on this
+    // table and ClickHouse rejects Nullable in TTL expressions with
+    // BAD_TTL_EXPRESSION (code 450). UpdatedAt is non-null and partition-aligned,
+    // so TTL drops whole weekly partitions at the part level instead of running
+    // row-level mutations across still-warm parts.
+    retentionTTLColumn: "UpdatedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
