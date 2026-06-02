@@ -77,15 +77,24 @@ export function useLangyConversations({
   // Avoid stale closures inside async flows.
   const projectIdRef = useRef<string | undefined>(projectId);
   projectIdRef.current = projectId;
+  // Monotonic token so a slow in-flight load can't overwrite a newer one.
+  const latestLoadTokenRef = useRef(0);
 
   const loadConversation = useCallback(
     async (id: string, projectIdForCall: string) => {
+      const token = ++latestLoadTokenRef.current;
       const res = await fetch(
         `/api/langy/conversations/${id}?projectId=${encodeURIComponent(projectIdForCall)}`,
       );
       if (!res.ok) throw new Error(`Failed to load conversation ${id}`);
       const data = (await res.json()) as ConversationDetailResponse;
-      if (projectIdRef.current !== projectIdForCall) return;
+      // Drop the result if the project changed or a newer load superseded us.
+      if (
+        projectIdRef.current !== projectIdForCall ||
+        token !== latestLoadTokenRef.current
+      ) {
+        return;
+      }
       setCurrentConversationId(data.conversation.id);
       writeLastConversationId(projectIdForCall, data.conversation.id);
       setMessages(data.messages);
@@ -97,9 +106,14 @@ export function useLangyConversations({
     if (!projectId) {
       setConversations([]);
       setCurrentConversationId(null);
+      setMessages([]);
       return;
     }
     let cancelled = false;
+    // Clear visible conversation state up front so stale messages from the
+    // previous project don't linger while the new project's data loads.
+    setCurrentConversationId(null);
+    setMessages([]);
     setIsLoading(true);
     setHasListError(false);
     (async () => {

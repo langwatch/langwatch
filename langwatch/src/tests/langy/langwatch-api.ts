@@ -17,52 +17,57 @@ async function lwGet(path: string): Promise<any> {
   return res.json();
 }
 
+// Normalize the various list payload shapes ({ data: [...] }, a bare array, or
+// neither) to an array, so downstream .map/.filter never throws on an object.
+function toArray<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
 export async function listDatasets(): Promise<Array<{ id: string; name: string; recordCount: number }>> {
-  const j = await lwGet("/api/dataset");
-  return j.data ?? [];
+  return toArray(await lwGet("/api/dataset"));
 }
 
 export async function listAgents(): Promise<Array<{ id: string; name: string }>> {
-  const j = await lwGet("/api/agents");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/agents"));
 }
 
 export async function listEvaluators(): Promise<Array<{ id: string; name: string }>> {
-  const j = await lwGet("/api/evaluators");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/evaluators"));
 }
 
 export async function listScenarios(): Promise<Array<{ id: string; name: string }>> {
-  const j = await lwGet("/api/scenarios");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/scenarios"));
 }
 
 export async function listPrompts(): Promise<Array<{ id: string; name?: string; handle?: string }>> {
-  const j = await lwGet("/api/prompts");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/prompts"));
 }
 
 export async function listMonitors(): Promise<Array<{ id: string; name?: string }>> {
-  const j = await lwGet("/api/monitors");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/monitors"));
 }
 
 export async function listDashboards(): Promise<Array<{ id: string; name?: string }>> {
-  const j = await lwGet("/api/dashboards");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/dashboards"));
 }
 
 export async function listWorkflows(): Promise<Array<{ id: string; name?: string }>> {
-  const j = await lwGet("/api/workflows");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/workflows"));
 }
 
 export async function listAnnotations(): Promise<Array<{ id: string }>> {
-  const j = await lwGet("/api/annotations");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/annotations"));
 }
 
 export async function listTriggers(): Promise<Array<{ id: string; name?: string }>> {
-  const j = await lwGet("/api/triggers");
-  return j.data ?? j ?? [];
+  return toArray(await lwGet("/api/triggers"));
 }

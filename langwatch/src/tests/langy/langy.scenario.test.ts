@@ -33,12 +33,17 @@ async function deleteAllTestDatasets() {
     (d) => d.name?.includes("langy-") || d.name?.includes("failures-") || d.name?.includes("langy-scenario"),
   );
   await Promise.all(
-    test.map((d) =>
-      fetch(`${LW_BASE}/api/dataset/${d.id}`, {
+    test.map(async (d) => {
+      const res = await fetch(`${LW_BASE}/api/dataset/${d.id}`, {
         method: "DELETE",
         headers: { "X-Auth-Token": LW_KEY },
-      }),
-    ),
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Failed deleting dataset ${d.id}: ${res.status} ${await res.text()}`,
+        );
+      }
+    }),
   );
   if (test.length) console.log(`[setup] Deleted ${test.length} stale test datasets`);
 }
@@ -816,9 +821,13 @@ describe("Langy via HTTP wrapper", () => {
     });
     if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
     expect(result.success).toBe(true);
+
+    // Layer 2: re-fetch from the backend and assert the rename actually landed.
+    const after = await listEvaluators();
+    expect(after.some((e) => e.name === newName)).toBe(true);
   });
 
-  it("updates a prompt (Layer 2: content changed)", async () => {
+  it("updates a prompt", async () => {
     const langy = makeLangyAdapter();
     const before = await listPrompts();
     if (before.length === 0) {

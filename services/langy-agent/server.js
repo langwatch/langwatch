@@ -48,6 +48,7 @@ const READINESS_TIMEOUT_MS = parseInt(
 );
 const REAPER_INTERVAL_MS = 30_000;
 const SESSIONS_ROOT = "/workspace/sessions";
+const MAX_BODY_BYTES = 1_000_000; // 1MB — cap /chat body to avoid memory exhaustion.
 
 if (!INTERNAL_SECRET) {
   console.error("fatal: LANGY_INTERNAL_SECRET is required");
@@ -57,6 +58,30 @@ if (!INTERNAL_SECRET) {
 // ---------- Worker registry ----------
 // conversationId -> { child, port, openCodeSessionId, lastSeen }
 const workers = new Map();
+// conversationId -> in-flight spawnWorker() promise. Serializes creation so
+// two concurrent first-turn requests for the same conversation can't both miss
+// workers.get() and spawn duplicate (orphan) workers that bypass the cap.
+const workerSpawns = new Map();
+
+// Restrict conversationId to a filesystem-safe charset before it ever reaches
+// path.join — otherwise values like "../../etc" escape SESSIONS_ROOT.
+function isValidConversationId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+async function getOrCreateWorker(conversationId, credentials) {
+  const existing = workers.get(conversationId);
+  if (existing) return existing;
+
+  const inflight = workerSpawns.get(conversationId);
+  if (inflight) return inflight;
+
+  const spawnPromise = spawnWorker(conversationId, credentials).finally(() => {
+    workerSpawns.delete(conversationId);
+  });
+  workerSpawns.set(conversationId, spawnPromise);
+  return spawnPromise;
+}
 
 // ---------- OpenCode SSE event types we treat as terminal ----------
 const TERMINAL_EVENT_TYPES = new Set([
@@ -263,6 +288,12 @@ async function spawnWorker(conversationId, credentials) {
   }
 
   const workerHome = path.join(SESSIONS_ROOT, conversationId);
+  // Defense-in-depth: even with isValidConversationId at the edge, assert the
+  // resolved path stays under SESSIONS_ROOT before we mkdir/spawn into it.
+  const resolvedRoot = path.resolve(SESSIONS_ROOT);
+  if (!path.resolve(workerHome).startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error("invalid conversationId");
+  }
   fs.mkdirSync(workerHome, { recursive: true });
   setupWorkerHome(workerHome, credentials);
 
@@ -272,12 +303,17 @@ async function spawnWorker(conversationId, credentials) {
   // AGENTS.md (with concrete URLs) and per-worker config (with the right
   // MCP env). Env vars carry the per-session credentials redundantly so
   // the MCP server gets them via env OR via config.json — defense in depth.
+  // Strip the manager's internal bearer secret from the worker env — workers
+  // never call back into the manager, and forwarding it would break the
+  // per-session isolation boundary this whole process model exists to enforce.
+  const { LANGY_INTERNAL_SECRET: _internalSecret, ...baseEnv } = process.env;
+
   const child = spawn(
     "opencode",
     ["serve", "--port", String(port), "--hostname", "127.0.0.1"],
     {
       env: {
-        ...process.env,
+        ...baseEnv,
         HOME: workerHome,
         OPENAI_BASE_URL: credentials.gatewayBaseUrl,
         OPENAI_API_KEY: credentials.llmVirtualKey,
@@ -372,10 +408,19 @@ const server = http.createServer((req, res) => {
     }
 
     let body = "";
+    let tooLarge = false;
     req.on("data", (c) => {
+      if (tooLarge) return;
       body += c;
+      if (Buffer.byteLength(body, "utf8") > MAX_BODY_BYTES) {
+        tooLarge = true;
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "request body too large" }));
+        req.destroy();
+      }
     });
     req.on("end", async () => {
+      if (tooLarge) return;
       let parsed;
       try {
         parsed = JSON.parse(body);
@@ -387,6 +432,10 @@ const server = http.createServer((req, res) => {
       const { conversationId, prompt, system, credentials } = parsed;
       if (!conversationId || !prompt || !credentials) {
         badRequest(res, "missing required: conversationId, prompt, credentials");
+        return;
+      }
+      if (!isValidConversationId(conversationId)) {
+        badRequest(res, "invalid conversationId");
         return;
       }
       if (
@@ -408,20 +457,18 @@ const server = http.createServer((req, res) => {
       req.on("close", () => abort.abort());
 
       try {
-        let worker = workers.get(conversationId);
-        if (!worker) {
-          try {
-            worker = await spawnWorker(conversationId, credentials);
-          } catch (err) {
-            if (err.code === "max-workers-reached") {
-              res.write(
-                JSON.stringify({ type: "error", error: "at-capacity" }) + "\n",
-              );
-              res.end();
-              return;
-            }
-            throw err;
+        let worker;
+        try {
+          worker = await getOrCreateWorker(conversationId, credentials);
+        } catch (err) {
+          if (err.code === "max-workers-reached") {
+            res.write(
+              JSON.stringify({ type: "error", error: "at-capacity" }) + "\n",
+            );
+            res.end();
+            return;
           }
+          throw err;
         }
         worker.lastSeen = Date.now();
 

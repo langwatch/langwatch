@@ -20,9 +20,9 @@
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
-  type UIMessage,
 } from "ai";
 import { Hono } from "hono";
+import { z } from "zod";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -47,6 +47,19 @@ import type { NextRequestShim as any } from "./types";
 const logger = createLogger("langwatch:api:langy");
 
 const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
+
+// Runtime validation for the untrusted /langy/chat body. Zod-only with infer
+// (no parallel TS interface) per the repo's validation convention.
+const chatMessageSchema = z.object({
+  role: z.enum(["user", "assistant", "system"]),
+  parts: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+const chatRequestSchema = z.object({
+  projectId: z.string().min(1),
+  conversationId: z.string().nullable().optional(),
+  messages: z.array(chatMessageSchema).min(1),
+});
+type ChatMessage = z.infer<typeof chatMessageSchema>;
 
 function extractAssistantText(
   parts: Array<Record<string, unknown>> | undefined,
@@ -85,12 +98,12 @@ async function persistAssistantMessage(opts: {
 async function persistUserMessage(opts: {
   conversationId: string;
   projectId: string;
-  message: UIMessage;
+  message: ChatMessage;
   model: string;
 }) {
   const text =
     Array.isArray(opts.message.parts) && opts.message.parts.length
-      ? extractAssistantText(opts.message.parts as Array<Record<string, unknown>>)
+      ? extractAssistantText(opts.message.parts)
       : "";
   const tokenizer = new TiktokenClient();
   const tokenCount = (await tokenizer.countTokens(opts.model, text)) ?? null;
@@ -130,19 +143,15 @@ app.post("/langy/chat", async (c) => {
     );
   }
 
+  const parsedBody = chatRequestSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: "Invalid request body" }, { status: 400 });
+  }
   const {
     messages,
     projectId,
     conversationId: requestedConversationId,
-  } = (await c.req.json()) as {
-    messages: UIMessage[];
-    projectId: string;
-    conversationId?: string | null;
-  };
-
-  if (!projectId) {
-    return c.json({ error: "Missing projectId" }, { status: 400 });
-  }
+  } = parsedBody.data;
 
   const agentUrl = process.env.OPENCODE_AGENT_URL;
   if (!agentUrl) {
@@ -195,8 +204,8 @@ app.post("/langy/chat", async (c) => {
       userId: session.user.id,
       conversationId: requestedConversationId ?? null,
       title:
-        messages[0] && extractAssistantText(messages[0].parts as any)
-          ? extractAssistantText(messages[0].parts as any).slice(0, 80)
+        messages[0] && extractAssistantText(messages[0].parts)
+          ? extractAssistantText(messages[0].parts).slice(0, 80)
           : null,
     });
   } catch (error) {
@@ -234,9 +243,7 @@ app.post("/langy/chat", async (c) => {
     });
   }
 
-  const userText = extractAssistantText(
-    lastUserMessage?.parts as Array<Record<string, unknown>> | undefined,
-  );
+  const userText = extractAssistantText(lastUserMessage?.parts);
 
   // The pod's AGENTS.md is written for CLI/codebase instrumentation
   // (the OpenCode default), not in-product Langy. We override with a
@@ -301,6 +308,42 @@ app.post("/langy/chat", async (c) => {
       const decoder = new TextDecoder();
       let buffer = "";
 
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        try {
+          const event = JSON.parse(line) as {
+            type: string;
+            part?: { type?: string; text?: string };
+            properties?: {
+              field?: string;
+              delta?: string;
+              part?: { type?: string; text?: string };
+            };
+          };
+          // Legacy shape (kept for older agent versions).
+          if (event.type === "text" && event.part?.text) {
+            fullText += event.part.text;
+            writer.write({ type: "text-delta", delta: event.part.text, id: textId });
+            return;
+          }
+          // OpenCode shape: text deltas arrive as message.part.delta with field=text.
+          if (
+            event.type === "message.part.delta" &&
+            event.properties?.field === "text" &&
+            typeof event.properties?.delta === "string"
+          ) {
+            fullText += event.properties.delta;
+            writer.write({
+              type: "text-delta",
+              delta: event.properties.delta,
+              id: textId,
+            });
+          }
+        } catch {
+          // Ignore malformed/partial JSON lines from the agent stream.
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -309,39 +352,12 @@ app.post("/langy/chat", async (c) => {
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line) as {
-              type: string;
-              part?: { type?: string; text?: string };
-              properties?: {
-                field?: string;
-                delta?: string;
-                part?: { type?: string; text?: string };
-              };
-            };
-            // Legacy shape (kept for older agent versions).
-            if (event.type === "text" && event.part?.text) {
-              fullText += event.part.text;
-              writer.write({ type: "text-delta", delta: event.part.text, id: textId });
-              continue;
-            }
-            // OpenCode shape: text deltas arrive as message.part.delta with field=text.
-            if (
-              event.type === "message.part.delta" &&
-              event.properties?.field === "text" &&
-              typeof event.properties?.delta === "string"
-            ) {
-              fullText += event.properties.delta;
-              writer.write({
-                type: "text-delta",
-                delta: event.properties.delta,
-                id: textId,
-              });
-            }
-          } catch {}
+          handleLine(line);
         }
       }
+      // Flush the trailing record when the stream ends without a final newline,
+      // otherwise the last delta is silently dropped and the reply is truncated.
+      if (buffer.trim()) handleLine(buffer);
 
       writer.write({ type: "text-end", id: textId });
 
