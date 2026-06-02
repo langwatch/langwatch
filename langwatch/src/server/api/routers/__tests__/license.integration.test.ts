@@ -388,15 +388,7 @@ describe("License Router Integration", () => {
       plan: {
         maxMembers: 10,
         maxMembersLite: 5,
-        maxTeams: 10,
-        maxProjects: 20,
         maxMessagesPerMonth: 100000,
-        maxWorkflows: 50,
-        maxPrompts: 50,
-        maxEvaluators: 50,
-        maxScenarios: 50,
-        maxAgents: 50,
-        maxExperiments: 50,
         canPublish: true,
         usageUnit: "traces" as const,
       },
@@ -434,7 +426,7 @@ describe("License Router Integration", () => {
 
       const parsedLicense = parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.maxMembers).toBe(10);
-      expect(parsedLicense?.data.plan.maxProjects).toBe(20);
+      expect(parsedLicense?.data.plan.maxMembersLite).toBe(5);
       expect(parsedLicense?.data.plan.maxMessagesPerMonth).toBe(100000);
     });
 
@@ -466,15 +458,7 @@ describe("License Router Integration", () => {
         plan: {
           maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
           maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
-          maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
-          maxProjects: ENTERPRISE_TEMPLATE.maxProjects ?? 500,
           maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-          maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows ?? 1000,
-          maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
-          maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
-          maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
-          maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
-          maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
           canPublish: true,
           usageUnit: "traces" as const,
         },
