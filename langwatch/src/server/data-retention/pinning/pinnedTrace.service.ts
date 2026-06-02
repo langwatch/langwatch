@@ -14,9 +14,10 @@ interface UnpinTraceParams {
 }
 
 /**
- * Thrown when an unpin is attempted against a `source=share` pin whose share
- * is still active. Letting the pin go would let retention TTL delete the
- * still-shared trace and the public link would silently break.
+ * Thrown when an unpin is attempted while the trace still has an active share.
+ * Pins are UI annotations only and do not exempt ClickHouse rows from retention,
+ * but a live share owns the share-created pin annotation until the share is
+ * removed.
  *
  * Caught in the tRPC router and translated to CONFLICT.
  */
@@ -46,13 +47,13 @@ export class PinnedTraceService {
   }
 
   async unpin(params: UnpinTraceParams): Promise<void> {
-    // While a share is live, the pin row is what keeps the trace alive past
-    // retention TTL — deleting it would let CH delete the trace on the next
-    // merge and the public link would return expired data. The guard checks
-    // for an active share regardless of `pin.source`: a share→manual
-    // promotion (autoPin then explicit pin) still needs the row to exist
-    // until the share is removed. After unshare, `autoUnpin` preserves the
-    // row when source=manual so the user's manual pin survives cleanly.
+    // While a share is live, the share-created pin annotation belongs to that
+    // share lifecycle. Pins are not retention exemptions: CH rows still age out
+    // under the resolved policy. The guard checks for an active share regardless
+    // of `pin.source`, so a share->manual promotion (autoPin then explicit pin)
+    // keeps the annotation until the share is removed. After unshare,
+    // `autoUnpin` preserves the row when source=manual so the user's manual pin
+    // survives cleanly.
     const stillShared = await this.hasActiveShareForTrace(params);
     if (stillShared) {
       throw new PinnedToActiveShareError(

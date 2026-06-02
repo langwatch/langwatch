@@ -3,11 +3,14 @@
 -- Retention policies are scoped resources (ADR-021): single-scope-per-row,
 -- inline (scopeType, scopeId) + an organizationId anchor, one row per
 -- (scope, category). Resolution cascades PROJECT -> TEAM -> ORGANIZATION ->
--- indefinite. No JSON policy columns on Organization/Project — those are the
--- shape ADR-021 explicitly rejects.
+-- platform default (49 days). The ClickHouse migration default for rows that
+-- predate the retention column is separate and intentionally 308 days. No JSON
+-- policy columns on Organization/Project — those are the shape ADR-021
+-- explicitly rejects.
 --
--- PinnedTrace marks traces exempt from retention; `source` distinguishes a
--- manual pin from an auto-pin created on share.
+-- PinnedTrace records trace pin/share UI annotations. Pins do not exempt
+-- ClickHouse rows from retention; `source` distinguishes a manual pin from an
+-- auto-pin created on share.
 
 -- CreateEnum
 CREATE TYPE "PinSource" AS ENUM ('manual', 'share');

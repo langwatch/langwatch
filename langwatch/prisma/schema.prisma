@@ -1123,10 +1123,12 @@ enum RetentionPolicyScopeType {
 // A data-retention override for one category at one scope. Single-scope-per-row
 // (ADR-021): the row applies at exactly one scope, identified inline by
 // (scopeType, scopeId), anchored to one owning organization. Resolution cascades
-// PROJECT -> TEAM -> ORGANIZATION -> indefinite (no row = keep forever), per
-// category, so an org admin can set a retention once and have it apply to every
-// project that has no closer override. One row per (scope, category): each row
-// holds a single category's day count, so categories cascade independently.
+// PROJECT -> TEAM -> ORGANIZATION -> platform default (49 days), per category,
+// so an org admin can set a retention once and have it apply to every project
+// that has no closer override. The ClickHouse migration default for rows that
+// predate the retention column is separate and intentionally 308 days.
+// One row per (scope, category): each row holds a single category's day count,
+// so categories cascade independently.
 model RetentionPolicy {
   id             String                   @id @default(nanoid())
   organizationId String

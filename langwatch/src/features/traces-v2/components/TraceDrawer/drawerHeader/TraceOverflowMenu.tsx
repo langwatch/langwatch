@@ -65,10 +65,11 @@ export function TraceOverflowMenu({
     { enabled: !!project },
   );
   const isPinned = !!pinQuery.data;
-  // `source=share` pins guard a shared trace against retention TTL. The
-  // router rejects manual unpin while the share exists; mirror that in the
-  // menu so users see why the action is unavailable instead of getting a
-  // surprise CONFLICT toast.
+  // Pins are UI annotations only and do not exempt CH rows from TTL. While a
+  // share is live, the share-created pin annotation belongs to that share
+  // lifecycle, so the router rejects manual unpin until the share is removed;
+  // mirror that in the menu so users see why the action is unavailable instead
+  // of getting a surprise CONFLICT toast.
   const isSharePin = pinQuery.data?.source === "share";
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
