@@ -59,11 +59,12 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
       Then the second enqueue is a no-op
       And only one row exists for (reactorName, dedupKey)
 
-  Rule: The outbox queue owns dispatch scheduling and execution
+  Rule: The main event-sourcing queue owns outbox dispatch scheduling and execution
 
-    Scenario: Enqueue sends a stage-discriminated payload on the unified queue
+    Scenario: Enqueue sends a stage-discriminated payload onto the main event-sourcing queue
       When a new row is enqueued
-      Then a payload {stage, projectId, triggerId, …} is sent to the langwatch:outbox GroupQueue
+      Then a payload {stage, projectId, triggerId, …} is sent to the main event-sourcing queue
+      And the queue routes settle/cadence payloads to the outbox dispatcher via a payload-discriminator branch
       And the groupKey begins with "${projectId}/" so per-tenant fairness routing works
       And the payload carries the full dispatch context, not just a wakeup signal
 

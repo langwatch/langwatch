@@ -54,7 +54,7 @@ export interface OutboxDispatcherDeps {
   ) => Promise<Trace | undefined>;
   /**
    * Late-bound — settle stage's match-confirmed branch calls this to
-   * re-enqueue as `cadence`. The queue ref is filled in by `setupOutbox`
+   * re-enqueue as `cadence`. The queue ref is filled in by `buildOutboxRuntime`
    * after the queue is constructed, since the queue's `process`
    * callback (this function) holds the only reference to itself.
    *

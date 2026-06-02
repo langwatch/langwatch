@@ -51,7 +51,6 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import {
   auditDedupKey,
-  settleDedupId,
   TRIGGER_NOTIFY_REACTOR_NAME,
   type SettleStagePayload,
 } from "./outbox/payload";
@@ -280,19 +279,18 @@ export class PipelineRegistry {
             },
           };
           // Per-trigger TTL override comes from `Trigger.traceDebounceMs`
-          // (ADR-030). The reactor reads it off the trigger row and passes
+          // (ADR-023). The reactor reads it off the trigger row and passes
           // it through; absent an override the queue uses its built-in
           // default so historical triggers keep the same 30s behavior.
-          await outbox.queue.send(payload, {
-            deduplication: {
-              // Same shape as the queue's own settleDedupId resolver so any
-              // other producer that sends without an explicit override still
-              // dedups against these jobs.
-              makeId: () => settleDedupId({ projectId, triggerId, traceId }),
-              ttlMs: traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-              extend: true,
-              replace: true,
-            },
+          //
+          // The outbox runtime piggy-backs on the main event-sourcing queue
+          // (ADR-022 revision 3), so `enqueueSettle` is a thin wrapper that
+          // forwards to whichever queue the runtime is attached to. Stage-
+          // aware dedup (Debounce Mode for settle, per-job for cadence) is
+          // configured on the main queue's `deduplication` field; the only
+          // per-send override is `ttlMs`.
+          await outbox.enqueueSettle(payload, {
+            ttlMs: traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
           });
         }
       : undefined;

@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
-import type { ProcessRole } from "~/server/app-layer/config";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -10,64 +9,66 @@ import type { TriggerService } from "~/server/app-layer/triggers/trigger.service
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
-import { DEFAULT_TRACE_DEBOUNCE_MS } from "~/automations/cadences";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
-import { GroupQueueProcessor } from "../queues/groupQueue/groupQueue";
-import { EventSourcedQueueProcessorMemory } from "../queues/memory";
-import type {
-  EventSourcedQueueDefinition,
-  EventSourcedQueueProcessor,
-} from "../queues/queue.types";
+import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createOutboxDispatcher } from "./dispatcher";
-import {
-  cadenceGroupKey,
-  isSettle,
-  settleDedupId,
-  settleGroupKey,
-  type CadenceStagePayload,
-  type OutboxJob,
-} from "./payload";
+import type { CadenceStagePayload, OutboxJob, SettleStagePayload } from "./payload";
 import { PgOutboxAuditAdapter } from "./pgAuditAdapter";
 
-export const OUTBOX_QUEUE_NAME = "langwatch:outbox";
-
-export interface OutboxStack {
-  queue: EventSourcedQueueProcessor<OutboxJob>;
-  auditAdapter: PgOutboxAuditAdapter;
-}
+export type EnqueueSettleParams = Omit<SettleStagePayload, "stage" | "reactorName" | "auditDedupKey" | "foldSnapshotAtEnqueue"> & {
+  payload: SettleStagePayload;
+  deduplicationTtlMs: number;
+};
 
 /**
- * Composition root for the unified outbox stack (ADR-021 revision +
- * ADR-025 + ADR-030).
+ * Outbox runtime — dispatcher + audit adapter + an attachQueue/enqueueSettle
+ * pair the consumer wires up after the queue is constructed. The runtime
+ * does NOT own its own queue.
  *
- * One queue, two stages:
- *   - settle: per-(trigger, trace) Debounce Mode dedup; the timer
- *     elapses without new spans → process callback re-reads fold,
- *     runs filters, claims `TriggerSent`, re-enqueues as cadence.
- *   - cadence: per-trigger group, windowed `delay`; `processBatch`
- *     coalesces same-trigger jobs landing in the same wall-clock
- *     cadence boundary into one digest.
+ * ADR-022 revision (third pass, 2026-06-02): the outbox no longer
+ * constructs a `langwatch:outbox` queue. Settle and cadence payloads ride
+ * the main event-sourcing queue (`event-sourcing/jobs`), routed by
+ * payload discriminator (`stage`). The audit adapter is wired onto that
+ * queue and gates internally on `isSettle || isCadence`, so non-outbox
+ * payloads are no-ops at the adapter and the main queue's projection /
+ * reactor work is unaffected.
  *
- * Audit projection (PG `ReactorOutbox`) is written by the queue's
- * `auditAdapter` — onEnqueue / onLeased / onDispatched / onFailed /
- * onDead hooks fire as the queue moves jobs through their lifecycle.
- * `PgOutboxAuditAdapter` handles BOTH settle and cadence stages: settle
- * inserts a `queued` row keyed by the per-(trigger, trace) dedup key,
- * the post-settle filter check either drops the row or transitions it
- * to the cadence boundary. Operators see settle activity alongside
- * cadence activity in the same table.
- *
- * Consumer loop only runs on `processRole === "worker"`. Web can
- * still `queue.send` (the send-side is producer-only) but never
- * drains. Web should still skip calling `setupOutbox` entirely —
- * gate the call site on processRole to avoid the Redis-client cost.
+ * Trade-off captured here so reviewers see it:
+ * - Win: one Redis prefix, one set of Grafana panels, one crash-recovery
+ *   story. No second queue to operate.
+ * - Loss: trigger dispatches and span projections share the per-tenant
+ *   fairness budget. A notification storm could nibble at the projection
+ *   slot budget for the same tenant (and vice versa). Bounded by
+ *   `TenantRateTracker` so neither side starves catastrophically, but it
+ *   is a regression in isolation guarantees vs the two-queue split.
  */
-export function setupOutbox({
+export interface OutboxRuntime {
+  /** Drives settle / cadence payloads through their stage-specific
+   *  handlers. Wired into the main queue's `process` and `processBatch`
+   *  callbacks for payloads that satisfy `isSettle || isCadence`. */
+  dispatcher: ReturnType<typeof createOutboxDispatcher>;
+  /** Projects every queue lifecycle event onto `ReactorOutbox`. Gates
+   *  internally on outbox-stage payloads — non-outbox queue events
+   *  no-op cheaply. Wired into the main queue's `auditAdapter` slot. */
+  auditAdapter: PgOutboxAuditAdapter;
+  /** Wires the main queue ref into the runtime so `enqueueSettle` (and
+   *  the dispatcher's internal `enqueueCadence`) can send onto it. Call
+   *  this once the main queue has been constructed. */
+  attachQueue(queue: EventSourcedQueueProcessor<Record<string, unknown>>): void;
+  /** Producer entry point for the trigger reactors. Sends a settle
+   *  payload onto the attached queue with the per-trigger debounce TTL
+   *  as the Debounce Mode override. */
+  enqueueSettle(
+    payload: SettleStagePayload,
+    options: { ttlMs: number },
+  ): Promise<void>;
+}
+
+export function buildOutboxRuntime({
   prisma,
   redis,
-  processRole,
   triggers,
   projects,
   evaluations,
@@ -76,13 +77,12 @@ export function setupOutbox({
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
-  processRole: ProcessRole;
   triggers: TriggerService;
   projects: ProjectService;
   evaluations: { runs: EvaluationRunService };
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
-}): OutboxStack {
+}): OutboxRuntime {
   const auditAdapter = new PgOutboxAuditAdapter(prisma);
 
   // Shared trace fold store — settle stage cross-reads it to drive the
@@ -97,11 +97,13 @@ export function setupOutbox({
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 
-  // Late-bound: the settle-stage process callback needs to re-enqueue
-  // as cadence, but the queue handle is built _after_ the dispatcher.
-  // A holder pattern lets the dispatcher reach into the constructed
-  // queue without circular-import gymnastics.
-  const queueHolder: { current?: EventSourcedQueueProcessor<OutboxJob> } = {};
+  // Late-bound queue ref. The dispatcher's settle-confirmed branch and
+  // the public `enqueueSettle` both call into the main queue, but the
+  // main queue is constructed *after* this runtime (so it can route to
+  // the dispatcher). The holder breaks the cycle.
+  const queueHolder: {
+    current?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  } = {};
 
   const dispatcher = createOutboxDispatcher({
     triggers,
@@ -120,53 +122,45 @@ export function setupOutbox({
     ) => {
       if (!queueHolder.current) {
         throw new Error(
-          "Outbox queue not yet wired — enqueueCadence called before setupOutbox returned",
+          "Outbox runtime queue not attached — enqueueCadence called before attachQueue",
         );
       }
-      await queueHolder.current.send(payload, {
+      await queueHolder.current.send(payload as unknown as Record<string, unknown>, {
         delay: delayMs > 0 ? delayMs : undefined,
       });
     },
   });
 
-  const definition: EventSourcedQueueDefinition<OutboxJob> = {
-    name: OUTBOX_QUEUE_NAME,
-    process: dispatcher.process,
-    processBatch: dispatcher.processBatch,
-    // Coalesce only cadence-stage jobs — settle is per-(trigger, trace),
-    // batching it doesn't make sense.
-    coalesceMaxBatch: (payload) => (isSettle(payload) ? 1 : 100),
-    // Per-stage group key: per-trace for settle (so noisy traces don't
-    // head-of-line block other traces), per-trigger for cadence (so
-    // processBatch can coalesce a digest).
-    groupKey: (payload) =>
-      isSettle(payload)
-        ? settleGroupKey(payload)
-        : cadenceGroupKey(payload),
-    deduplication: {
-      // Settle stage: per-(trigger, trace) Debounce Mode (extend +
-      // replace TTL on every send so the latest event wins). Cadence
-      // stage uses a per-job id so it doesn't dedup across digest
-      // members — the digest grouping is done by `groupKey` +
-      // `coalesceMaxBatch`, not by dedup.
-      makeId: (payload) =>
-        isSettle(payload)
-          ? settleDedupId(payload)
-          : `${payload.projectId}/cadence/${payload.auditDedupKey}`,
-      ttlMs: DEFAULT_TRACE_DEBOUNCE_MS,
-      extend: true,
-      replace: true,
-    },
+  return {
+    dispatcher,
     auditAdapter,
+    attachQueue(queue) {
+      queueHolder.current = queue;
+    },
+    async enqueueSettle(payload, { ttlMs }) {
+      if (!queueHolder.current) {
+        throw new Error(
+          "Outbox runtime queue not attached — enqueueSettle called before attachQueue",
+        );
+      }
+      await queueHolder.current.send(
+        payload as unknown as Record<string, unknown>,
+        {
+          // Caller-supplied per-trigger ttl drives the Debounce Mode TTL.
+          // makeId / extend / replace come from the queue's stage-aware
+          // dedup config (see eventSourcing.ts's createGlobalQueue).
+          deduplication: { ttlMs },
+        },
+      );
+    },
   };
-
-  const queue: EventSourcedQueueProcessor<OutboxJob> = redis
-    ? new GroupQueueProcessor(definition, redis, {
-        consumerEnabled: processRole === "worker",
-      })
-    : new EventSourcedQueueProcessorMemory(definition);
-
-  queueHolder.current = queue;
-
-  return { queue, auditAdapter };
 }
+
+/**
+ * Back-compat alias for callers that still import the old name. The
+ * `OutboxStack` shape used to include a `queue` field — that field is
+ * gone now that the runtime shares the main event-sourcing queue.
+ *
+ * @deprecated use `OutboxRuntime` instead.
+ */
+export type OutboxStack = OutboxRuntime;
