@@ -15,12 +15,12 @@ FROM ubuntu:24.04
 ARG LANGWATCH_CLI_VERSION=0.31.0
 ARG LANGWATCH_MCP_VERSION=0.10.1
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates unzip build-essential python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install opencode as root (its installer drops files in $HOME), then copy the
