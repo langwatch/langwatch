@@ -2,18 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { LLMSpan } from "../../../../tracer/types";
 import { addLLMTokensCount } from "../metrics";
 
-// tiktoken.client.ts sets up a setTimeout for a remote WASM fetch that fires
-// after the Vitest environment is torn down, keeping the process alive and
-// causing shard 2 to hang ~25 min until GitHub Actions cancels it.
-vi.mock("~/server/app-layer/clients/tokenizer/tiktoken.client", () => {
-  class TiktokenClient {
-    // Return a plausible token count — tests assert > 0, so we can't return 0.
-    // Real value: each word ≈ 1-2 tokens; 10 is a safe lower bound.
-    async countTokens(_text: string) { return 10; }
-  }
-  return { TiktokenClient };
-});
-
 vi.mock("../../../../modelProviders/llmModelCost", () => ({
   getLLMModelCosts: vi.fn().mockResolvedValue([
     {
