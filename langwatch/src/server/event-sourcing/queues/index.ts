@@ -4,6 +4,7 @@ export type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
+  QueueAuditAdapter,
   QueueSendOptions,
 } from "./queue.types";
 export { resolveDeduplicationStrategy } from "./queue.types";

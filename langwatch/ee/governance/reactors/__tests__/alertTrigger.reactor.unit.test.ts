@@ -103,6 +103,8 @@ function createTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary 
     alertType: "WARNING",
     message: "",
     customGraphId: null,
+    notificationCadence: "immediate",
+    traceDebounceMs: 30000,
     ...overrides,
   };
 }
