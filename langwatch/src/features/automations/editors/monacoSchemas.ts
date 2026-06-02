@@ -8,8 +8,10 @@ import type { Monaco } from "@monaco-editor/react";
  * diagnostics, alongside the regular syntax check.
  *
  * `setDiagnosticsOptions` is a global call that *replaces* the registered
- * schemas, so this module keeps an internal map and re-emits the full list
- * every registration.
+ * schemas — every registration site has to re-emit the full list or the
+ * other modules' schemas get wiped. This module keeps the single source of
+ * truth in `registered`; sibling editors (Liquid + Block Kit) call
+ * `registerJsonSchema` here instead of holding their own map.
  */
 
 // `file:///` URIs make Monaco's JSON language service pick the schemas up
@@ -166,26 +168,36 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
   },
 } as const;
 
-const registered = new Map<string, object>();
+interface RegisteredEntry {
+  schema: object;
+  fileMatch: string[];
+}
+
+const registered = new Map<string, RegisteredEntry>();
 
 /**
  * Registers (or replaces) a JSON Schema keyed to a model URI. Idempotent —
- * calling with the same URI updates the schema, calling with different URIs
+ * calling with the same URI updates the entry, calling with different URIs
  * stacks them. Safe to invoke from `beforeMount` of every editor.
+ *
+ * `fileMatch` defaults to `[modelUri]` (the exact-URI strategy used by the
+ * stable editors). Callers with dynamic shadow URIs (e.g. the Liquid
+ * substitution shadow) pass a basename pattern like `["**\/<basename>"]`.
  */
 export function registerJsonSchema(
   monaco: Monaco,
   modelUri: string,
   schema: object,
+  fileMatch: string[] = [modelUri],
 ): void {
-  registered.set(modelUri, schema);
+  registered.set(modelUri, { schema, fileMatch });
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
     validate: true,
     allowComments: false,
-    schemas: Array.from(registered.entries()).map(([uri, s]) => ({
+    schemas: Array.from(registered.entries()).map(([uri, entry]) => ({
       uri: `inmemory://schemas/${encodeURIComponent(uri)}.schema.json`,
-      fileMatch: [uri],
-      schema: s,
+      fileMatch: entry.fileMatch,
+      schema: entry.schema,
     })),
   });
 }

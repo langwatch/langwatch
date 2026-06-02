@@ -323,11 +323,27 @@ export function CompactSlackPreview({
       existing.focus();
       return;
     }
-    syncedPopup.current = window.open(
+    // We need the returned window handle to push template updates into the
+    // Block Kit Builder as the operator edits, so we cannot use `noopener`
+    // (which would null the handle). Instead, immediately strip
+    // `window.opener` on the popup after open — this breaks the reverse-tab
+    // nabbing vector (the cross-origin Block Kit Builder cannot navigate
+    // this tab via `opener.location = …`) while keeping the forward sync
+    // channel alive.
+    const popup = window.open(
       builderUrl,
       SYNCED_BUILDER_WINDOW_NAME,
-      "width=1200,height=900,noopener=no,noreferrer=no",
+      "width=1200,height=900",
     );
+    if (popup) {
+      try {
+        popup.opener = null;
+      } catch {
+        // Cross-origin write may throw once the popup navigates; the same
+        // cross-origin block then prevents the popup from reading us anyway.
+      }
+    }
+    syncedPopup.current = popup;
   };
 
   if ("text" in payload) {

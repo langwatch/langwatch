@@ -167,11 +167,12 @@ function EmailConfigForm({
             </Text>
           ) : (
             memberEmails.map((email) => (
-              <HStack key={email}>
+              <HStack key={email} as="label" cursor="pointer">
                 <input
                   type="checkbox"
                   checked={slice.members.includes(email)}
                   onChange={(e) => toggleMember(email, e.target.checked)}
+                  aria-label={`Send to ${email}`}
                 />
                 <Text>{email}</Text>
               </HStack>

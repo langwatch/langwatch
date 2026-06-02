@@ -58,12 +58,23 @@ export type DraftAction =
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
   | { type: "SET_CADENCE"; value: NotificationCadence }
   | { type: "SET_TRACE_DEBOUNCE_MS"; value: number }
-  | {
-      type: "SET_SLICE";
-      action: TriggerAction;
-      slice: SliceFor[TriggerAction];
-    }
+  | SetSliceAction
   | { type: "HYDRATE"; value: AutomationDraft };
+
+/**
+ * Distributive shape: each TriggerAction maps to *its own* slice variant so
+ * a SET_SLICE dispatch with action `SEND_EMAIL` can't carry a Slack slice.
+ * Without the distributive `A extends TriggerAction` form, `slice` would be
+ * the union of every action's slice and the discriminator would do nothing
+ * at the type level.
+ */
+export type SetSliceAction = {
+  [A in TriggerAction]: {
+    type: "SET_SLICE";
+    action: A;
+    slice: SliceFor[A];
+  };
+}[TriggerAction];
 
 export const INITIAL_DRAFT: AutomationDraft = {
   action: null,

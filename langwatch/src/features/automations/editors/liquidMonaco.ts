@@ -1,5 +1,6 @@
 import type { Monaco } from "@monaco-editor/react";
 import { substituteLiquidForJsonValidation } from "./liquidJsonSubstitution";
+import { registerJsonSchema } from "./monacoSchemas";
 
 /**
  * Rich variable info the autocomplete uses: path + TypeScript-ish type +
@@ -366,7 +367,6 @@ export function clearLiquidMarkers(
 }
 
 const SCHEMA_MARKER_OWNER = "liquid-json-schema";
-const registeredSchemas = new Map<string, object>();
 
 function basenameOfUri(uri: string): string {
   const slash = uri.lastIndexOf("/");
@@ -596,21 +596,15 @@ export function setupLiquidJsonSchema(params: {
 }): { dispose: () => void } {
   const { monaco, realModel, schema, shadowUri } = params;
 
-  registeredSchemas.set(shadowUri, schema);
-  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-    validate: true,
-    allowComments: false,
-    schemas: Array.from(registeredSchemas.entries()).map(([uri, s]) => ({
-      uri: `inmemory://schemas/${encodeURIComponent(uri)}.schema.json`,
-      // Match the shadow model by basename. Per Monaco's docs the `**`
-      // wildcard spans path separators while a plain `*` does not, so
-      // `**/<basename>` is the right shape to attach the schema to the
-      // shadow URI's path. Basenames must be unique per editor — that's
-      // the caller's responsibility.
-      fileMatch: [`**/${basenameOfUri(uri)}`],
-      schema: s,
-    })),
-  });
+  // Route through the shared registry (monacoSchemas.ts) so this call
+  // doesn't wipe schemas registered by sibling editors. Match the shadow
+  // model by basename — per Monaco's docs the `**` wildcard spans path
+  // separators while a plain `*` does not, so `**/<basename>` is the right
+  // shape. Basenames must be unique per editor — that's the caller's
+  // responsibility (different editors must use different shadow URIs).
+  registerJsonSchema(monaco, shadowUri, schema, [
+    `**/${basenameOfUri(shadowUri)}`,
+  ]);
   const shadowResource = monaco.Uri.parse(shadowUri);
   // Re-mount safety: another instance with the same shadow URI may have left
   // a model behind if it was disposed mid-update.

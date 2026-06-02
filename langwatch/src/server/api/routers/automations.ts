@@ -21,6 +21,7 @@ import {
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
 import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
+import { actionParamsSchemaFor } from "~/automations/providers/server";
 import {
   type DraftProject,
   validateTemplateDraft,
@@ -144,10 +145,10 @@ async function resolveProjectIdentity(projectId: string): Promise<DraftProject> 
 }
 
 /**
- * Mirrors the team-membership check the create procedure already does: every
- * Recipients are validated by RFC shape only — external addresses are
- * intentionally allowed (Slack's "email to a channel" pattern). The UI
- * surfaces an "External" warning badge for non-team addresses.
+ * Validates recipient addresses by RFC shape only — external addresses are
+ * intentionally allowed (Slack's "email to a channel" pattern, partner
+ * inboxes, …). The UI surfaces an "External" warning badge for non-team
+ * addresses so operators know what they're shipping.
  *
  * A future per-project "strict mode" flag will re-enable team-membership
  * enforcement via `RecipientNotInTeamError`; that gate is not in this PR.
@@ -461,6 +462,20 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         validateTemplateDraft(input.templates);
+        // Per-action shape validation: the provider registry's per-action
+        // Zod schema is the authoritative shape for actionParams. The router's
+        // top-level `actionParamsSchema` accepts the union for the wire
+        // format; this pass narrows by action, so a SEND_EMAIL upsert can't
+        // accidentally save a dataset config (and ADD_TO_DATASET can't
+        // persist an empty datasetId, etc.).
+        const perAction = actionParamsSchemaFor(input.action);
+        const perActionParsed = perAction.safeParse(input.actionParams);
+        if (!perActionParsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.errors[0]?.message ?? "validation failed"}`,
+          });
+        }
         if (
           input.action === TriggerAction.SEND_EMAIL &&
           input.actionParams.members &&
