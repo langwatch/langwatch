@@ -13,6 +13,16 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: vi.fn(() => ({
+    project: { id: "project_1" },
+  })),
+}));
+
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("~/hooks/useSSESubscription", () => ({
   useSSESubscription: () => ({
     connectionState: "connected",
