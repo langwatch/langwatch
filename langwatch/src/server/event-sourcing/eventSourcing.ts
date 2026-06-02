@@ -36,7 +36,10 @@ import {
   type OutboxJob,
 } from "./outbox/payload";
 import type { OutboxRuntime } from "./outbox/setup";
-import type { EventSourcedQueueProcessor } from "./queues";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+} from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
@@ -454,8 +457,7 @@ export class EventSourcing {
     // on `isSettle || isCadence`, so non-outbox queue events no-op cheaply.
     const outbox = this._outbox;
     const isOutboxPayload = (payload: Record<string, unknown>): payload is OutboxJob =>
-      isSettle(payload as Record<string, unknown> & { stage?: unknown }) ||
-      isCadence(payload as Record<string, unknown> & { stage?: unknown });
+      isSettle(payload) || isCadence(payload);
 
     const definition = {
       name: queueName,
@@ -518,10 +520,11 @@ export class EventSourcing {
         // Outbox batch: the queue only coalesces same-group jobs, so a
         // homogeneous outbox batch goes through the dispatcher's
         // processBatch directly.
-        if (isOutboxPayload(payloads[0]!)) {
+        const head = payloads[0]!;
+        if (isOutboxPayload(head)) {
           if (!outbox) {
             logger.warn(
-              { stage: (payloads[0] as { stage: string }).stage, count: payloads.length },
+              { stage: head.stage, count: payloads.length },
               "Outbox batch on a queue without a wired outbox runtime; skipping",
             );
             return;
@@ -550,19 +553,29 @@ export class EventSourcing {
       // Stage-aware dedup for outbox payloads: settle is Debounce Mode
       // (collapse + reset TTL on every overwrite), cadence is per-job so
       // digest members don't collide. Caller (enqueueSettle) overrides
-      // `ttlMs` per-trigger with `Trigger.traceDebounceMs`.
+      // `ttlMs` per-trigger with `Trigger.traceDebounceMs`. Non-outbox
+      // payloads return undefined so the queue treats them as unique
+      // (registry entries with their own dedup contribute via the per-
+      // send `deduplication` override on the call site).
       deduplication: {
-        makeId: (payload: Record<string, unknown>) =>
-          isSettle(payload)
-            ? settleDedupId(payload as Record<string, unknown> & { projectId: string; triggerId: string; traceId: string })
-            : isCadence(payload)
-              ? `${(payload as { projectId: string }).projectId}/cadence/${(payload as { auditDedupKey: string }).auditDedupKey}`
-              : undefined,
+        makeId: (payload: Record<string, unknown>): string | undefined => {
+          if (isSettle(payload)) return settleDedupId(payload);
+          if (isCadence(payload)) {
+            return `${payload.projectId}/cadence/${payload.auditDedupKey}`;
+          }
+          return undefined;
+        },
         ttlMs: 30_000,
         extend: true,
         replace: true,
       },
-      auditAdapter: outbox?.auditAdapter,
+      // The adapter is `QueueAuditAdapter<OutboxJob>`; the queue's payload
+      // type is the widened `Record<string, unknown>`. The adapter gates
+      // internally on `isSettle || isCadence` so any non-outbox payload
+      // is a no-op — the cast is structurally safe.
+      auditAdapter: outbox?.auditAdapter as
+        | EventSourcedQueueDefinition<Record<string, unknown>>["auditAdapter"]
+        | undefined,
     };
 
     const effectiveRedis = this._redis;

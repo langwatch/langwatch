@@ -83,12 +83,16 @@ export interface CadenceStagePayload
 
 export type OutboxJob = SettleStagePayload | CadenceStagePayload;
 
-export function isSettle(job: OutboxJob): job is SettleStagePayload {
-  return job.stage === "settle";
+// Widened to accept any unknown payload — these are the discriminators
+// the main event-sourcing queue uses to pick off outbox jobs from
+// non-outbox jobs (ADR-022 r3), so they need to be safe to call on
+// arbitrary `Record<string, unknown>`.
+export function isSettle(job: Record<string, unknown>): job is SettleStagePayload {
+  return (job as { stage?: unknown }).stage === "settle";
 }
 
-export function isCadence(job: OutboxJob): job is CadenceStagePayload {
-  return job.stage === "cadence";
+export function isCadence(job: Record<string, unknown>): job is CadenceStagePayload {
+  return (job as { stage?: unknown }).stage === "cadence";
 }
 
 /**
