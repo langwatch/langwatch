@@ -53,4 +53,27 @@ describe("evaluator schema consistency", () => {
     }
     expect(failures).toEqual([]);
   });
+
+  it("every default value is valid against its own field schema", () => {
+    const failures: string[] = [];
+    for (const [name, schema] of Object.entries(evaluatorsSchema.shape)) {
+      const settings = schema.shape.settings as ZodTypeAny & { shape: Record<string, ZodTypeAny> };
+      const shape = settings.shape ?? {};
+      for (const [field, fieldSchema] of Object.entries(shape)) {
+        const def = (fieldSchema as any)._def;
+        if (def?.defaultValue === undefined) continue;
+        const defaultValue =
+          typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
+        const innerSchema = def.innerType as ZodTypeAny | undefined;
+        if (!innerSchema) continue;
+        const result = innerSchema.safeParse(defaultValue);
+        if (!result.success) {
+          failures.push(
+            `${name}.${field}: default=${JSON.stringify(defaultValue)} rejected — ${result.error.issues.map((i) => `${i.path.join(".")}:${i.code}`).join(",")}`,
+          );
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
 });
