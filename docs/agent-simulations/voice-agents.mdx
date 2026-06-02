@@ -1,0 +1,151 @@
+---
+title: Voice Agent Testing
+sidebarTitle: Voice Agents
+keywords: langwatch, voice agents, voice testing, elevenlabs, openai realtime, twilio, pipecat, audio testing
+---
+
+<Tip>
+  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory) — it detects your transport, picks the matching adapter, and wires it to your deployed agent. Prefer to do it by hand? Follow the steps below.
+</Tip>
+
+# Testing Voice Agents
+
+Scenario tests voice agents **end-to-end over real audio** — it synthesizes a caller, speaks to your agent through its real transport, and judges the conversation. It's the **same `scenario.run()` and the same `JudgeAgent`** you use for text — only the medium changes.
+
+<img src="/images/scenario-voice.webp" alt="Voice Agent Testing" width="100%" />
+
+## The highlights
+
+<CardGroup cols={2}>
+  <Card title="Real-audio, multi-turn calls" icon="phone">
+    A synthesized user actually speaks to your agent and reacts to its replies, turn after turn.
+  </Card>
+  <Card title="Audio effects" icon="waveform-lines">
+    Inject background noise, phone-quality codec degradation, or custom WAV clips to test robustness.
+  </Card>
+  <Card title="Interruptions" icon="hand">
+    Script the user barging in mid-reply — native barge-in or VAD-driven fallback per adapter.
+  </Card>
+  <Card title="Latency metrics" icon="gauge-high">
+    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before users do.
+  </Card>
+</CardGroup>
+
+## Works with your stack
+
+One API, every major voice transport — pick the adapter that matches what you've already deployed:
+
+| Transport | Adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams | `PipecatAgentAdapter` |
+| ElevenLabs hosted ConvAI | `ElevenLabsAgentAdapter` |
+| OpenAI Realtime | `OpenAIRealtimeAgentAdapter` |
+| Gemini Live | `GeminiLiveAgentAdapter` |
+| Twilio phone number (PSTN) | `TwilioAgentAdapter` |
+| Text-only agent (no transport yet) | `ComposableVoiceAgent` |
+
+<Note>
+  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) live in the Scenario docs.
+</Note>
+
+## Get it running
+
+New to Scenario? Start with [Getting Started](/agent-simulations/getting-started) for the basics (API key, writing your agent's `call()` adapter), then come back for the voice specifics.
+
+<Steps>
+  <Step title="Install Scenario">
+    <Tabs>
+      <Tab title="Python">
+        ```bash
+        pip install langwatch-scenario
+        ```
+      </Tab>
+      <Tab title="TypeScript">
+        ```bash
+        npm install @langwatch/scenario
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Point at your agent, add a voice user and a judge">
+    Swap `BOT_WS_URL` for your running bot (or use the adapter for your transport from the table above). The user simulator speaks with a real voice; the judge scores the call against your criteria.
+
+    <Tabs>
+      <Tab title="Python">
+        ```python
+        import scenario
+
+        scenario.configure(default_model="openai/gpt-5-mini")
+
+        BOT_WS_URL = "ws://localhost:8765/stream"  # your deployed bot
+
+        result = await scenario.run(
+            name="billing inquiry",
+            description="An upset customer calls about a duplicate charge.",
+            agents=[
+                scenario.PipecatAgentAdapter(url=BOT_WS_URL),
+                scenario.UserSimulatorAgent(
+                    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
+                    audio_effects=[scenario.effects.phone_quality()],
+                ),
+                scenario.JudgeAgent(criteria=[
+                    "Acknowledged the frustration before logistics",
+                    "Verified identity before any account action",
+                ]),
+            ],
+            script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
+        )
+        assert result.success
+        ```
+      </Tab>
+      <Tab title="TypeScript">
+        ```typescript
+        import scenario, { voice } from "@langwatch/scenario";
+
+        const BOT_WS_URL = "ws://localhost:8765/stream"; // your deployed bot
+
+        const result = await scenario.run({
+          name: "billing inquiry",
+          description: "An upset customer calls about a duplicate charge.",
+          agents: [
+            scenario.pipecatAgent({ url: BOT_WS_URL }),
+            scenario.userSimulatorAgent({
+              voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+              audioEffects: [voice.effects.phoneQuality()],
+            }),
+            scenario.judgeAgent({
+              criteria: [
+                "Acknowledged the frustration before logistics",
+                "Verified identity before any account action",
+              ],
+            }),
+          ],
+          script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
+        });
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Run it">
+    Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run streams to the [Simulations dashboard](/agent-simulations/overview) with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
+
+    <Tip>Voice scenarios are slower than text — TTS + transport + multi-turn means 30–120s per run, so give your test runner a generous timeout.</Tip>
+  </Step>
+</Steps>
+
+## Dig into the full docs
+
+<CardGroup cols={2}>
+  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">
+    The complete five-minute walkthrough with a worked example per adapter.
+  </Card>
+  <Card title="Audio effects & interruptions" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes">
+    Background noise, codec degradation, custom WAVs, and barge-in recipes.
+  </Card>
+  <Card title="Capability matrix" icon="table-list" href="https://langwatch.ai/scenario/voice/capability-matrix">
+    Exactly which features each adapter supports.
+  </Card>
+  <Card title="Runnable examples" icon="github" href="https://github.com/langwatch/scenario/tree/main/python/examples/voice">
+    Demos per adapter and use case on GitHub.
+  </Card>
+</CardGroup>

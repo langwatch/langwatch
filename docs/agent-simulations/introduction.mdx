@@ -1,7 +1,7 @@
 ---
 title: Introduction to Agent Testing
 sidebarTitle: Introduction
-keywords: langwatch, agent simulations, agent testing, agent development, agent development, agent testing
+keywords: langwatch, agent simulations, agent testing, agent development, voice agents, red teaming
 ---
 
 <Tip>
@@ -12,7 +12,26 @@ keywords: langwatch, agent simulations, agent testing, agent development, agent 
 
 Agent simulations are a powerful approach to testing AI agents that goes beyond traditional evaluation methods. Unlike static input-output testing, simulations test your agent's behavior in realistic, multi-turn conversations that mimic how real users would interact with your system.
 
+Powered by the open-source **[Scenario](https://github.com/langwatch/scenario)** framework — the same `scenario.run()` entrypoint and judge work across text, voice, and adversarial testing.
+
 <img src="/images/simulations-hero.gif" alt="Agent Simulations" />
+
+## What you can test
+
+<CardGroup cols={2}>
+  <Card title="Conversational agents" icon="comments" href="/agent-simulations/getting-started">
+    Simulate real users across multi-turn conversations and judge behavior at any step — tool calls, recovery, and end-to-end outcomes.
+  </Card>
+  <Card title="Voice agents" icon="microphone" href="/agent-simulations/voice-agents">
+    Test over real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and more — with background noise, interruptions, and latency metrics.
+  </Card>
+  <Card title="Red teaming" icon="shield-halved" href="/agent-simulations/red-teaming">
+    Run multi-turn adversarial attacks (Crescendo escalation, refusal detection, backtracking) to find security gaps before attackers do.
+  </Card>
+  <Card title="Visualize in LangWatch" icon="chart-line" href="/agent-simulations/overview">
+    Organize runs into sets and batches, step through conversations, and track pass/fail over time across your whole team.
+  </Card>
+</CardGroup>
 
 ## The Three Levels of Agent Quality
 
@@ -83,6 +102,8 @@ script=[
 
 - **Powerful simulations** - Test real agent behavior by simulating users in different scenarios and edge cases
 - **Flexible evaluations** - Judge agent behavior at any point in conversations, combine with evals, test error recovery, and complex workflows
+- **Voice testing** - Test voice agents end-to-end over real audio (ElevenLabs, OpenAI Realtime, Twilio, Pipecat) — [see Voice Agents](/agent-simulations/voice-agents)
+- **Red teaming** - Run multi-turn adversarial attacks to uncover security vulnerabilities — [see Red Teaming](/agent-simulations/red-teaming)
 - **Framework agnostic** - Works with any AI agent framework
 - **Simple integration** - Just implement one `call()` method
 - **Multi-language support** - Python, TypeScript, and Go
@@ -96,7 +117,7 @@ Once you've set up your agent tests with Scenario, LangWatch provides powerful v
 - **Track performance** over time with run history
 - **Collaborate** with your team on agent improvements
 
-The rest of this documentation will show you how to use LangWatch's simulation visualizer to get the most out of your agent testing.
+See [Viewing in LangWatch](/agent-simulations/overview) to learn how to inspect, replay, and compare your runs in the simulation visualizer.
 
 <img
   src="/images/simulations/simulation-set-overview.png"
@@ -106,8 +127,8 @@ The rest of this documentation will show you how to use LangWatch's simulation v
 
 ## Next Steps
 
-- [Overview](/agent-simulations/overview) - Learn about LangWatch's simulation visualizer
 - [Getting Started](/agent-simulations/getting-started) - Set up your first simulation
-- [Individual Run Analysis](/agent-simulations/individual-run) - Learn how to debug specific scenarios
-- [Batch Runs](/agent-simulations/batch-runs) - Understand how to organize multiple tests
+- [Viewing in LangWatch](/agent-simulations/overview) - Inspect and debug your runs in the simulation visualizer
+- [Voice Agents](/agent-simulations/voice-agents) - Test voice agents end-to-end over real audio
+- [Red Teaming](/agent-simulations/red-teaming) - Run adversarial attacks against your agent
 - [Scenario Documentation](https://langwatch.ai/scenario/) - Deep dive into the testing framework

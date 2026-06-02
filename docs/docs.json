@@ -75,11 +75,10 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
-              "agent-simulations/overview",
               "agent-simulations/getting-started",
-              "agent-simulations/set-overview",
-              "agent-simulations/batch-runs",
-              "agent-simulations/individual-run"
+              "agent-simulations/overview",
+              "agent-simulations/voice-agents",
+              "agent-simulations/red-teaming"
             ]
           },
           {
@@ -1291,18 +1290,6 @@
     {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
-    },
-    {
-      "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/set-overview"
-    },
-    {
-      "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/batch-runs"
-    },
-    {
-      "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/individual-run"
     },
     {
       "source": "/simulations/introduction",

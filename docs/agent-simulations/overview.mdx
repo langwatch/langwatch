@@ -1,5 +1,7 @@
 ---
-title: Overview
+title: Viewing Runs in LangWatch
+sidebarTitle: Viewing in LangWatch
+keywords: langwatch, simulations, visualizer, dashboard, scenario runs
 ---
 
 The Simulations visualizer in LangWatch provides a powerful way to inspect and analyze the results of your agent tests built with the [`scenario`](https://github.com/langwatch/scenario) library. It offers a user-friendly interface to dig into simulation runs, helping you debug your agent's behavior and collaborate with your team.
@@ -17,10 +19,12 @@ When you run your scenarios with the LangWatch integration enabled, the results 
 This allows you to:
 
 - Organize your simulations into **Sets** for better management.
-- View a **history of runs** for each set.
-- Drill down into individual **scenario runs** to see the full conversation.
-- Visualize **passing and failing** scenarios in a clear grid view.
+- View a **history of runs** for each set, and **batch runs** grouped by execution (e.g. a single CI job).
+- Drill down into an individual **scenario run** to step through the full conversation and read the judge's verdict.
+- Visualize **passing and failing** scenarios in a clear grid view, and track regressions across runs.
 
-This documentation will guide you through the different parts of the Simulations visualizer and how to make the most of them.
+<Tip>
+  Not sending runs yet? The [Getting Started](/agent-simulations/getting-started) guide shows you how to run a scenario and stream results into LangWatch.
+</Tip>
 
 For technical details on the API, see the [Scenario Event Reference](/api-reference/scenarios/overview).
