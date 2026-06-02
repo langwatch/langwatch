@@ -30,6 +30,9 @@ If the user's request is **specific** ("test the refund flow"):
 If the user's request is about **red teaming** ("find vulnerabilities", "test for jailbreaks"):
 - Use `RedTeamAgent` instead of `UserSimulatorAgent` (see Red Teaming section).
 
+If the user's request is about **voice** ("add voice testing", "test my voice agent", "scenario test for my Twilio / ElevenLabs / OpenAI Realtime / Gemini Live / Pipecat bot"):
+- Use one of Scenario's voice adapters AND seed a `voice=...` on the `UserSimulatorAgent` (see Voice Agents section). A text-only scenario in response to a voice ask is a failure.
+
 ## Detect Context
 
 If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
@@ -243,6 +246,188 @@ describe("Agent Security", () => {
 
 ---
 
+## Voice Agents (Code Approach)
+
+If the user asks for **voice testing** (e.g. "add voice testing to my agent", "test my voice agent", "scenario test for my Twilio bot") use a **voice adapter** instead of writing a generic text scenario. Voice scenarios drive REAL audio over the agent's transport, with the user simulator speaking through TTS and the agent responding through its native voice stack.
+
+CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
+
+### Step 1: Read the voice docs
+
+```bash
+langwatch scenario-docs voice/getting-started
+langwatch scenario-docs voice/choosing-an-adapter
+langwatch scenario-docs voice/capability-matrix
+langwatch scenario-docs voice/recipes/effects
+langwatch scenario-docs voice/recipes/multi-turn
+```
+
+Also browse the runnable voice examples:
+- Python: https://github.com/langwatch/scenario/tree/main/python/examples/voice
+- TypeScript: https://github.com/langwatch/scenario/tree/main/javascript/examples/vitest/tests/voice
+
+There are dozens of patterns there (angry customer with cafe noise, password-reset trap, multi-intent rush, accent + disfluency, background cross-talk, security pressure). Match the user's domain to the closest existing example before writing one from scratch.
+
+### Step 2: Pick the right voice adapter
+
+Detect the user's transport from their codebase and pick the matching adapter:
+
+| User's stack | Adapter |
+| --- | --- |
+| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter` |
+| ElevenLabs hosted ConvAI agent | `scenario.ElevenLabsAgentAdapter` |
+| Pipecat / Twilio Media Streams WebSocket bot | `scenario.PipecatAgentAdapter` |
+| Gemini Live agent | `scenario.GeminiLiveAgentAdapter` |
+| Twilio phone number (real PSTN) | `scenario.TwilioAgentAdapter` |
+
+If the user's stack is text-only and they want voice anyway, default to `OpenAIRealtimeAgentAdapter` (lowest setup: just an OpenAI key) and note the swap in your reply.
+
+### Step 3: Seed a VOICE on the user simulator
+
+Without a `voice=` on the simulator, the "caller" stays silent and the scenario degrades to a text scenario with an audio adapter bolted on, which the judge can't usefully evaluate.
+
+```python
+scenario.UserSimulatorAgent(
+    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",  # Sarah — mature female
+    persona="...",
+)
+```
+
+ElevenLabs voice IDs (`elevenlabs/<id>`) carry tonal markers like `[shouting]`, `[angry]`, `[sigh]`, `[stressed]`, `[hurried]` that the TTS renders as performance cues. Use them in the persona prompt when the scenario calls for an emotionally heightened caller. OpenAI TTS (`openai/alloy`, `openai/nova`) is the fallback when ElevenLabs isn't available.
+
+### Step 4: Layer audio effects when the edge case calls for it
+
+Real callers don't sit in quiet booths. Match the effect to the scenario:
+
+```python
+audio_effects=[
+    scenario.effects.background_noise("cafe", 0.4),  # presets: cafe / office / street / airport
+    scenario.effects.phone_quality(),                 # mulaw + 8kHz + codec degradation
+]
+```
+
+### Step 5: Tell the simulator it's on a phone, not in chat
+
+The default `UserSimulatorAgent` system prompt encodes a text-chat style ("very short inputs, few words, all lowercase, like talking to chatgpt") which TTS-renders robotic. Always nudge the persona toward natural spoken sentences:
+
+> "You are SPEAKING ON A PHONE, not typing. Talk in natural spoken sentences (full clauses with subjects and verbs), not telegraphic phrases. Real callers don't speak like google queries."
+
+### Worked example (Python)
+
+```python
+import pytest
+import scenario
+
+scenario.configure(default_model="openai/gpt-5-mini")
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_angry_customer_billing_error():
+    result = await scenario.run(
+        name="angry billing error in a noisy cafe",
+        description=(
+            "Customer was double-charged and is calling from a noisy cafe. "
+            "The agent must acknowledge the frustration before pivoting to "
+            "logistics, stay calm, and queue a refund."
+        ),
+        agents=[
+            scenario.OpenAIRealtimeAgentAdapter(
+                model="gpt-realtime-mini",
+                instructions="...your agent's system prompt...",
+            ),
+            scenario.UserSimulatorAgent(
+                voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
+                persona=(
+                    "You are SPEAKING ON A PHONE, not typing. Talk in natural "
+                    "spoken sentences, not telegraphic phrases. "
+                    "You were double-charged on your last invoice and you are "
+                    "FURIOUS. Use ElevenLabs tonal markers [shouting], [angry], "
+                    "[frustrated] in every turn so the synthesized voice sounds "
+                    "audibly angry. Keep replies to 1-2 short heated sentences."
+                ),
+                audio_effects=[
+                    scenario.effects.background_noise("cafe", 0.4),
+                    scenario.effects.phone_quality(),
+                ],
+            ),
+            scenario.JudgeAgent(criteria=[
+                "The agent acknowledged the customer's frustration before asking for account info",
+                "The agent stayed calm — did not match the customer's hostility",
+                "The agent moved toward resolving the double charge (refund, escalation, callback)",
+                "The user simulator's turns carried ElevenLabs tonal markers, driving audibly angry speech",
+            ]),
+        ],
+        script=[
+            scenario.agent(),     # the agent greets first (voice convention)
+            scenario.user(),      # heated opening
+            scenario.proceed(turns=5),
+            scenario.judge(),
+        ],
+        max_turns=8,
+    )
+    assert result.success, result.reasoning
+```
+
+### Worked example (TypeScript)
+
+```typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+describe("Voice agent — angry billing", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        scenario.openAIRealtimeAgent({
+          voice: "alloy",
+          instructions: "...your agent's system prompt...",
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(),
+        scenario.user(),
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+```
+
+### Voice-specific gotchas
+
+- **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
+- **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
+- **Voice convention: agent greets first.** Most voice transports send a `first_message` on connect (Twilio, ElevenLabs, OpenAI Realtime). Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
+
+---
+
 ## Platform Approach: CLI
 
 Use this when the user has no codebase. NOTE: If you have a codebase and want test files, use the Code Approach above instead.
@@ -281,6 +466,13 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT use `UserSimulatorAgent` for red teaming — use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
 - Use `attacker.marathon_script()` (instance method) — it pads iterations for backtracking and wires up early exit
 - Do NOT forget a generous timeout (e.g. `180_000` ms) for TypeScript red team tests
+
+### Voice Agents
+- Do NOT write a text-only scenario when the user asked for voice — pick one of `OpenAIRealtimeAgentAdapter` / `ElevenLabsAgentAdapter` / `PipecatAgentAdapter` / `GeminiLiveAgentAdapter` / `TwilioAgentAdapter`
+- Do NOT forget the `voice="elevenlabs/..."` (or `"openai/..."`) on `UserSimulatorAgent` — a silent simulator turns the voice scenario into a text scenario with audio frame headers
+- Do NOT bake an empathy persona into a calm voice — use ElevenLabs tonal markers (`[shouting]`, `[angry]`, `[stressed]`) in the persona prompt so the TTS renders audible emotion
+- Do NOT script multi-turn `user()` audio against `ElevenLabsAgentAdapter` — it's server-VAD-driven and the second `agent()` reliably times out; keep hosted-ConvAI scripts to ONE exchange
+- Do NOT forget a generous timeout (`240_000` ms for vitest, `@pytest.mark.timeout(300)` for pytest) — voice is slow
 
 ### Platform Approach
 - This path uses the CLI — do NOT write code files
