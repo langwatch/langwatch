@@ -1,3 +1,8 @@
+{{- /* ClusterIP is a security boundary, not a default — fail loudly rather
+       than let a values override expose the manager auth surface. */ -}}
+{{- if ne .Values.service.type "ClusterIP" }}
+{{- fail "langy-agent.service.type must be ClusterIP — the agent is never exposed outside the cluster" }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:

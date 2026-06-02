@@ -1,3 +1,9 @@
+{{- /* The single-replica topology below is a hard invariant, not a default —
+       guard against a values override silently breaking per-conversation
+       session affinity. */ -}}
+{{- if ne (int .Values.replicaCount) 1 }}
+{{- fail "langy-agent.replicaCount must remain 1 until conversation-sticky routing exists" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
