@@ -1,6 +1,7 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import type { EmailSlice } from "~/automations/providers/definitions/email/client";
 import {
   type AutomationDraft,
   INITIAL_DRAFT,
@@ -14,8 +15,8 @@ import {
   templatesFromDraft,
 } from "../draftReducer";
 
-const emailWith = (members: string[]) => ({
-  ...(CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice() as object),
+const emailWith = (members: string[]): EmailSlice => ({
+  ...(CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice() as EmailSlice),
   members,
 });
 
@@ -24,7 +25,7 @@ const SAMPLE: AutomationDraft = {
   name: "High latency",
   action: TriggerAction.SEND_EMAIL,
   alertType: AlertType.WARNING,
-  filters: { "trace.tags": ["urgent"] as never },
+  filters: { "traces.origin": ["sample"] as never },
   slices: { ...INITIAL_DRAFT.slices, [TriggerAction.SEND_EMAIL]: emailWith(["a@acme.test"]) },
 };
 
