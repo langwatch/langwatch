@@ -142,6 +142,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         name: "openai",
         provider: "openai",
         enabled: true,
+        organizationId: ORG_ID,
         customKeys: {},
         scopes: {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
@@ -250,12 +251,14 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { projectId: PROJECT_ID },
     });
     await prisma.monitor.deleteMany({
-      where: { projectId: PROJECT_ID, id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] },
+      },
     });
-    // RoutingPolicyScope rows are removed by the onDelete: Cascade on the
-    // routingPolicy relation when the parent policy is deleted below — an
-    // explicit deleteMany here has no projectId column to satisfy the
-    // multitenancy guard and would throw.
+    await prisma.routingPolicyScope.deleteMany({
+      where: { routingPolicyId: RP_ID },
+    });
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
     await prisma.modelProviderScope.deleteMany({
       where: { modelProviderId: MP_ID },
