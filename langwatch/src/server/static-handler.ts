@@ -19,6 +19,11 @@ const MIME_TYPES: Record<string, string> = {
 
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const NO_STORE_CACHE = "no-store, max-age=0";
+// The HTML shell must always be revalidated so a post-deploy reload picks up
+// the new chunk hashes. Vite calls this out as a prerequisite for
+// `vite:preloadError` recovery (see src/utils/chunkReload.ts): a cached shell
+// would reload straight back into the removed hashes and strand the user.
+const HTML_REVALIDATE_CACHE = "no-cache";
 
 /**
  * Production static file + SPA fallback handler.
@@ -71,6 +76,7 @@ export function serveStaticOrFallback({
   const indexHtml = path.join(clientDistDir, "index.html");
   if (fs.existsSync(indexHtml)) {
     res.setHeader("Content-Type", "text/html");
+    res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
     fs.createReadStream(indexHtml).pipe(res);
     return true;
   }
@@ -90,6 +96,10 @@ function serveStaticFile(
   );
   if (pathname.startsWith("/assets/")) {
     res.setHeader("Cache-Control", IMMUTABLE_CACHE);
+  } else if (ext === ".html") {
+    // Direct /index.html hits this path; keep it revalidated like the SPA
+    // fallback so a post-deploy reload never re-serves a stale shell.
+    res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
   }
   fs.createReadStream(filePath).pipe(res);
 }
