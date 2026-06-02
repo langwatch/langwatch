@@ -4,7 +4,6 @@ import {
   PYTHON_BUILTINS,
   PYTHON_BUILTIN_BY_NAME,
   PYTHON_KEYWORDS,
-  PYTHON_STDLIB_MODULES,
   PYTHON_STDLIB_MODULE_BY_NAME,
   PYTHON_STDLIB_MODULE_NAMES,
   type PyMember,
@@ -310,14 +309,26 @@ const CALL_METHOD_SNIPPET = [
 function scanImports(source: string): Map<string, PyModule> {
   const map = new Map<string, PyModule>();
   const importRe =
-    /^(?:[ \t]*)(?:import|from)\s+([\w.]+)(?:\s+as\s+(\w+))?(?:\s+import\s+([\w,\s*]+))?/gm;
+    /^(?:[ \t]*)(import|from)\s+([\w.]+)(?:\s+as\s+(\w+))?(?:\s+import\s+([\w,\s*]+))?/gm;
   for (const match of source.matchAll(importRe)) {
-    const moduleName = match[1];
-    const alias = match[2];
+    const kind = match[1];
+    const moduleName = match[2];
+    const alias = match[3];
     if (!moduleName) continue;
     const mod = PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName);
     if (!mod) continue;
-    map.set(alias ?? moduleName.split(".").pop() ?? moduleName, mod);
+    if (kind === "import") {
+      // `import urllib.parse` binds the full dotted name; `urllib.parse.foo`
+      // therefore needs to look up the dotted owner, not just the leaf.
+      // `import X as Y` binds only the alias.
+      map.set(alias ?? moduleName, mod);
+    } else if (alias) {
+      // `from X import …` only binds the alias for the imported member; the
+      // module itself is not bound at all unless the user wrote
+      // `from X import Y as Z` with an `as` clause on the module… which is
+      // not legal Python. Skip when no alias.
+      map.set(alias, mod);
+    }
   }
   return map;
 }
@@ -1002,10 +1013,15 @@ function registerValidator(
         monaco.editor.setModelMarkers(model, owner, []);
       }
     },
-    // Also re-run validation when the contract changes externally.
-    // (Caller invokes this via setContract.)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as IDisposable & { revalidate?: () => void };
+    // Force a re-run across every python model — call this when the contract
+    // changes so markers refresh immediately (incl. on empty buffers, where
+    // the previous applyEdits-no-op trick produced no change event).
+    revalidate: () => {
+      for (const model of monaco.editor.getModels()) {
+        if (model.getLanguageId() === "python") validate(model);
+      }
+    },
+  };
 }
 
 /**
@@ -1212,33 +1228,6 @@ export function registerPythonProviders({
   const codeActionsDisposer = registerCodeActions(monaco, contractRef);
   const signatureHelpDisposer = registerSignatureHelp(monaco);
 
-  // Re-run validation when the contract changes so output-missing markers
-  // update immediately rather than waiting for the next keystroke.
-  const revalidate = () => {
-    for (const model of monaco.editor.getModels()) {
-      if (model.getLanguageId() !== "python") continue;
-      // Force a no-op content event to re-trigger the validator via
-      // onDidChangeContent listeners. Cheaper than introspecting internals.
-      const value = model.getValue();
-      if (value.length > 0) {
-        // Use applyEdits with a zero-text edit at end-of-document to fire
-        // change listeners without altering content.
-        const last = model.getFullModelRange().getEndPosition();
-        model.applyEdits([
-          {
-            range: {
-              startLineNumber: last.lineNumber,
-              startColumn: last.column,
-              endLineNumber: last.lineNumber,
-              endColumn: last.column,
-            },
-            text: "",
-          },
-        ]);
-      }
-    }
-  };
-
   return {
     dispose: () => {
       completionDisposer.dispose();
@@ -1250,7 +1239,10 @@ export function registerPythonProviders({
     },
     setContract: (next) => {
       contractRef.current = next;
-      revalidate();
+      // Re-run validation directly so contract changes update markers
+      // immediately — including on empty buffers, where the previous
+      // applyEdits no-op trick fired no change event.
+      validatorDisposer.revalidate();
     },
   };
 }

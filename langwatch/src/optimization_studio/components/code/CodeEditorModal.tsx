@@ -15,6 +15,7 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 });
 
 import type { Monaco } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -36,19 +37,12 @@ function vscodeThemeName(colorMode: "light" | "dark"): string {
   return colorMode === "dark" ? "vs-dark" : "vs";
 }
 
-/** Minimal type for the Monaco editor instance (from @monaco-editor/react onMount) */
-type MonacoEditorInstance = {
-  focus: () => void;
-  trigger: (source: string, handlerId: string, payload: unknown) => void;
-  onKeyDown: (
-    handler: (e: {
-      code: string;
-      preventDefault: () => void;
-      stopPropagation: () => void;
-    }) => void,
-  ) => void;
-  getAction: (id: string) => { run: () => void } | null;
-};
+/**
+ * Re-export Monaco's own standalone-editor type under a project-local alias
+ * so consumers (e.g. `onEditorMount` callback in CodeBlockEditor) don't have
+ * to depend on the `monaco-editor` package directly.
+ */
+type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 
 interface ContractProps {
   /** Node inputs — declared in the Inputs section of the properties panel. */
@@ -255,9 +249,13 @@ export function CodeEditor({
       height="100%"
       defaultLanguage={language}
       defaultValue={code}
-      onChange={(code: any) => code && setCode(code)}
+      onChange={(value) => {
+        // Monaco hands us `string | undefined`; treat undefined as empty so
+        // deleting everything still propagates state.
+        setCode(value ?? "");
+      }}
       theme={vscodeThemeName(colorMode)}
-      onMount={(editor: any, monaco: Monaco) => {
+      onMount={(editor: MonacoEditorInstance, monaco: Monaco) => {
         // Restore previously-saved cursor/scroll/folding state so reopening
         // the modal for the same node drops the user back where they were.
         if (viewStateKey) {
@@ -369,7 +367,7 @@ export function CodeEditor({
           });
         }
 
-        editor.onKeyDown((e: any) => {
+        editor.onKeyDown((e) => {
           if (e.code === "Escape") {
             onKeyDown.fn();
             e.preventDefault();
