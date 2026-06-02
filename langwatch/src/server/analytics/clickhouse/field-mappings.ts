@@ -634,6 +634,32 @@ export function extractReferencedEvaluationColumns(
 }
 
 /**
+ * Extract which trace_summaries columns are referenced in a set of SQL
+ * expressions.
+ *
+ * Scans the expressions for references to known trace analytics column names
+ * (including through the table alias `ts.`). Returns the set of column names
+ * suitable for passing to `dedupedTraceSummaries` so the deduped subquery only
+ * reads the columns actually used, instead of the full analytics set with its
+ * wide Attributes map.
+ */
+export function extractReferencedTraceColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.trace_summaries;
+
+  for (const col of TRACE_ANALYTICS_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
  * Build a qualified column reference with table alias
  */
 export function qualifiedColumn(esField: string): string {

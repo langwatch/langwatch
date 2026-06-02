@@ -13,8 +13,10 @@ import {
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
+  TRACE_IDENTITY_COLUMNS,
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
+  extractReferencedTraceColumns,
 } from "./field-mappings";
 import { snakeCase } from "../../../utils/stringCasing";
 import {
@@ -2459,14 +2461,27 @@ export function buildTopDocumentsQuery(
       : "";
 
   // Build query to get top documents from RAG contexts
-  // Documents are stored in SpanAttributes['langwatch.rag.contexts'] as JSON
+  // Documents are stored in SpanAttributes['langwatch.rag.contexts'] as JSON.
+  // The document payload comes entirely from the stored_spans ARRAY JOIN; the
+  // fixed part of this query only uses trace_summaries identity/date columns
+  // (the JOIN keys and the OccurredAt filter). So the deduped subquery reads
+  // just the identity columns plus whatever the user filters reference, instead
+  // of the full analytics set, which avoids materialising the heavy Attributes
+  // map for every deduped trace.
+  const traceColumns = Array.from(
+    new Set([
+      ...TRACE_IDENTITY_COLUMNS,
+      ...extractReferencedTraceColumns([filterWhere]),
+    ]),
+  );
+
   const sql = `
     WITH document_refs AS (
       SELECT
         ${ts}.TraceId,
         toString(context.document_id) AS document_id,
         toString(context.content) AS content
-      FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
       JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
@@ -2489,7 +2504,7 @@ export function buildTopDocumentsQuery(
 
   const totalSql = `
     SELECT uniq(toString(context.document_id)) AS total
-    FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
     WHERE ${ts}.TenantId = {tenantId:String}
@@ -2537,7 +2552,18 @@ export function buildFeedbacksQuery(
       : "";
 
   // Build query to get feedback events
-  // Events are stored in stored_spans as parallel arrays
+  // Events are stored in stored_spans as parallel arrays. As with the documents
+  // query, the fixed part uses only trace_summaries identity/date columns, so
+  // the deduped subquery reads just the identity columns plus whatever the user
+  // filters reference rather than the full analytics set, skipping the heavy
+  // Attributes map.
+  const traceColumns = Array.from(
+    new Set([
+      ...TRACE_IDENTITY_COLUMNS,
+      ...extractReferencedTraceColumns([filterWhere]),
+    ]),
+  );
+
   const sql = `
     SELECT
       ${ts}.TraceId AS trace_id,
@@ -2545,7 +2571,7 @@ export function buildFeedbacksQuery(
       toUnixTimestamp64Milli(event_timestamp) AS started_at,
       event_name AS event_type,
       event_attrs AS attributes
-    FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN
       ${ss}."Events.Timestamp" AS event_timestamp,
