@@ -81,6 +81,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
       const updated = await this.write(() =>
         this.prisma.reactorOutbox.updateMany({
           where: {
+            projectId: p.projectId,
             reactorName: p.reactorName,
             dedupKey: p.auditDedupKey,
           },
@@ -124,7 +125,11 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     if (!isSettle(p) && !isCadence(p)) return;
     await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
-        where: { reactorName: p.reactorName, dedupKey: p.auditDedupKey },
+        where: {
+          projectId: p.projectId,
+          reactorName: p.reactorName,
+          dedupKey: p.auditDedupKey,
+        },
         data: { status: "dispatching", attempts: { increment: 1 } },
       }),
     );
@@ -143,6 +148,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
       await this.write(() =>
         this.prisma.reactorOutbox.updateMany({
           where: {
+            projectId: p.projectId,
             reactorName: p.reactorName,
             dedupKey: p.auditDedupKey,
             status: "dispatching",
@@ -159,7 +165,11 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     if (isCadence(p)) {
       await this.write(() =>
         this.prisma.reactorOutbox.updateMany({
-          where: { reactorName: p.reactorName, dedupKey: p.auditDedupKey },
+          where: {
+            projectId: p.projectId,
+            reactorName: p.reactorName,
+            dedupKey: p.auditDedupKey,
+          },
           data: {
             status: "dispatched",
             dispatchedAt: event.at,
@@ -179,6 +189,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     const p = event.payload;
     if (!isSettle(p) && !isCadence(p)) return;
     const baseWhere = {
+      projectId: p.projectId,
       reactorName: p.reactorName,
       dedupKey: p.auditDedupKey,
     };
@@ -209,6 +220,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     const p = event.payload;
     if (!isSettle(p) && !isCadence(p)) return;
     const baseWhere = {
+      projectId: p.projectId,
       reactorName: p.reactorName,
       dedupKey: p.auditDedupKey,
     };
