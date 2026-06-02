@@ -113,6 +113,178 @@ const MISSING_CLASS_CODE = "langwatch.missing-class-code";
 const MISSING_CALL_CODE = "langwatch.missing-call-method";
 const MISSING_OUTPUT_KEY = "langwatch.missing-output-key";
 const MIXED_INDENT = "langwatch.mixed-indent";
+const OUTPUT_TYPE_MISMATCH = "langwatch.output-type-mismatch";
+
+type LiteralKind = "str" | "number" | "bool" | "list" | "dict" | "none";
+
+/**
+ * What literal kind would a value of this declared type look like, if the
+ * user wrote a bare Python literal? Returns `null` for declared types where
+ * "looks like X" doesn't carry enough signal to flag mismatches.
+ */
+function literalKindFor(type: string): LiteralKind | null {
+  switch (type) {
+    case "str":
+    case "image":
+      return "str";
+    case "float":
+    case "int":
+      return "number";
+    case "bool":
+      return "bool";
+    case "list":
+      return "list";
+    case "dict":
+    case "json_schema":
+      return "dict";
+    default:
+      return null;
+  }
+}
+
+/** Classify a trimmed Python expression. Only recognises bare literals. */
+function literalKindOf(expr: string): LiteralKind | null {
+  const v = expr.trim();
+  if (v === "None") return "none";
+  if (v === "True" || v === "False") return "bool";
+  if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(v)) return "number";
+  if (
+    /^(?:[rfubRFUB]{1,2})?["']/.test(v) &&
+    /["']\s*$/.test(v)
+  )
+    return "str";
+  if (v.startsWith("[") && v.endsWith("]")) return "list";
+  if (v.startsWith("{") && v.endsWith("}")) return "dict";
+  return null;
+}
+
+interface ParsedReturnDict {
+  body: string;
+  bodyStart: number;
+}
+
+/**
+ * Locate the LAST top-level `return { … }` in source. Naive depth tracking
+ * (good enough for code-node templates; doesn't try to handle return values
+ * that are already inside another `{}`).
+ */
+function findLastReturnDict(source: string): ParsedReturnDict | null {
+  const returnRe = /return\s*\{/g;
+  let lastStart = -1;
+  let lastBodyStart = -1;
+  let m: RegExpExecArray | null;
+  while ((m = returnRe.exec(source))) {
+    lastStart = m.index;
+    lastBodyStart = m.index + m[0].length;
+  }
+  if (lastStart === -1) return null;
+  let depth = 1;
+  let i = lastBodyStart;
+  while (i < source.length && depth > 0) {
+    const ch = source[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") depth--;
+    i++;
+  }
+  if (depth !== 0) return null;
+  return { body: source.slice(lastBodyStart, i - 1), bodyStart: lastBodyStart };
+}
+
+interface DictEntry {
+  key: string;
+  value: string;
+  valueOffset: number;
+}
+
+/**
+ * Parse a dict body into top-level "key": value entries. String-aware so
+ * commas inside literals don't split. Skips entries whose key isn't a bare
+ * string literal — those are dynamic and we can't reason about them.
+ */
+function parseSimpleDictEntries(body: string): DictEntry[] {
+  const entries: DictEntry[] = [];
+  let i = 0;
+  while (i < body.length) {
+    while (i < body.length && /\s|,/.test(body[i] ?? "")) i++;
+    if (i >= body.length) break;
+    const keyQuote = body[i];
+    if (keyQuote !== '"' && keyQuote !== "'") {
+      // skip until comma at depth 0
+      i = advancePastEntry(body, i);
+      continue;
+    }
+    let j = i + 1;
+    while (j < body.length && body[j] !== keyQuote) {
+      if (body[j] === "\\") j++;
+      j++;
+    }
+    if (j >= body.length) break;
+    const key = body.slice(i + 1, j);
+    j++;
+    while (j < body.length && body[j] !== ":") j++;
+    if (j >= body.length) break;
+    j++; // past colon
+    while (j < body.length && /\s/.test(body[j] ?? "")) j++;
+    const valueStart = j;
+    j = advancePastEntry(body, j);
+    const value = body.slice(valueStart, j).trim();
+    entries.push({ key, value, valueOffset: valueStart });
+    i = j;
+  }
+  return entries;
+}
+
+function advancePastEntry(body: string, from: number): number {
+  let depth = 0;
+  let inStr: false | '"' | "'" = false;
+  for (let k = from; k < body.length; k++) {
+    const c = body[k];
+    if (inStr) {
+      if (c === "\\") {
+        k++;
+        continue;
+      }
+      if (c === inStr) inStr = false;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      inStr = c;
+      continue;
+    }
+    if (c === "{" || c === "[" || c === "(") depth++;
+    else if (c === "}" || c === "]" || c === ")") depth--;
+    else if (c === "," && depth === 0) return k;
+  }
+  return body.length;
+}
+
+/**
+ * Map a declared output type → a sensible Python literal default. Used in
+ * completion snippets and the quick-fix that inserts a missing key, so the
+ * user gets a value that already matches what the runtime expects.
+ */
+function defaultValueLiteralFor(type: string): string {
+  switch (type) {
+    case "str":
+      return '""';
+    case "float":
+      return "0.0";
+    case "int":
+      return "0";
+    case "bool":
+      return "False";
+    case "list":
+      return "[]";
+    case "dict":
+    case "json_schema":
+      return "{}";
+    case "image":
+      // images are usually a URL string in code nodes
+      return '""';
+    default:
+      return "None";
+  }
+}
 
 const CODE_SCAFFOLD_SNIPPET = [
   "class Code:",
@@ -309,14 +481,15 @@ function registerCompletion(
         /\{[^}]*$/.test(lineBefore.trimStart());
       if (wantsKey) {
         for (const field of contractRef.current.outputs) {
+          const defaultLit = defaultValueLiteralFor(field.type);
           suggestions.push({
             label: `"${field.identifier}"`,
             kind: monaco.languages.CompletionItemKind.Field,
-            detail: field.type,
+            detail: `${field.type}  →  ${defaultLit}`,
             documentation: {
-              value: `Declared node output **${field.identifier}**: \`${field.type}\``,
+              value: `Declared node output **${field.identifier}**: \`${field.type}\`. Inserted with a \`${defaultLit}\` default placeholder so the value already matches the declared type.`,
             },
-            insertText: `"${field.identifier}": $0`,
+            insertText: `"${field.identifier}": \${0:${defaultLit}}`,
             insertTextRules: INSERT_AS_SNIPPET,
             range: replaceRange,
             sortText: `0_output_${field.identifier}`,
@@ -772,6 +945,41 @@ function registerValidator(
           });
         }
       }
+
+      // Cheap literal-type-mismatch lint. Walk the last `return {…}` dict on
+      // the source and, for each declared output that has an obviously-typed
+      // literal value (string, number, bool, list, dict), warn when the
+      // literal kind doesn't match the declared type. Variable references and
+      // function calls fall through unchecked — too many false positives
+      // without a real Python parser.
+      const lastReturn = findLastReturnDict(source);
+      if (lastReturn) {
+        const entries = parseSimpleDictEntries(lastReturn.body);
+        for (const entry of entries) {
+          const declared = declaredOutputs.find(
+            (o) => o.identifier === entry.key,
+          );
+          if (!declared) continue;
+          const expectedKind = literalKindFor(declared.type);
+          const actualKind = literalKindOf(entry.value);
+          if (actualKind && expectedKind && actualKind !== expectedKind) {
+            const valueOffset = lastReturn.bodyStart + entry.valueOffset;
+            const startPos = model.getPositionAt(valueOffset);
+            const endPos = model.getPositionAt(
+              valueOffset + entry.value.length,
+            );
+            markers.push({
+              severity: monaco.MarkerSeverity.Warning,
+              code: `${OUTPUT_TYPE_MISMATCH}:${entry.key}`,
+              message: `Declared output "${entry.key}" expects ${declared.type} but the return value looks like ${actualKind}.`,
+              startLineNumber: startPos.lineNumber,
+              startColumn: startPos.column,
+              endLineNumber: endPos.lineNumber,
+              endColumn: endPos.column,
+            });
+          }
+        }
+      }
     }
 
     monaco.editor.setModelMarkers(model, owner, markers);
@@ -899,10 +1107,15 @@ function registerCodeActions(
           typeof markerCode === "string" &&
           markerCode.startsWith(MISSING_OUTPUT_KEY + ":")
         ) {
-          // Add `"name": None,` to the last `return { ... }` dict on the
-          // class. If we can't find one, no-op (the user can use the scaffold
-          // quick fix to land them in a known state first).
+          // Add `"name": <typed default>` to the last `return { ... }` dict on
+          // the class. If we can't find one, no-op (the user can use the
+          // scaffold quick fix to land them in a known state first).
           const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
+          const outputType =
+            contractRef.current.outputs.find(
+              (o) => o.identifier === outputName,
+            )?.type ?? "str";
+          const defaultLit = defaultValueLiteralFor(outputType);
           const returnRe = /(return\s*\{)([^}]*)\}/g;
           let lastMatch: RegExpExecArray | null = null;
           let m: RegExpExecArray | null;
@@ -919,7 +1132,7 @@ function registerCodeActions(
                 ? " "
                 : "";
             actions.push({
-              title: `Add "${outputName}" key to return dict`,
+              title: `Add "${outputName}" (${outputType}) to return dict`,
               kind: "quickfix",
               diagnostics: [marker],
               edit: {
@@ -934,7 +1147,7 @@ function registerCodeActions(
                         startColumn: startPos.column,
                         endColumn: startPos.column,
                       },
-                      text: `${sep}"${outputName}": None`,
+                      text: `${sep}"${outputName}": ${defaultLit}`,
                     },
                   },
                 ],
