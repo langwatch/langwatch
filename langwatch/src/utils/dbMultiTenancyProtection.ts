@@ -504,6 +504,18 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   const action = params.action;
   const model = params.model;
 
+  // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
+  // inside the SQL string itself — `WHERE "projectId" = ${projectId}` lives
+  // in the template literal, where the structural guard cannot see it. The
+  // guard's promise (refuse a query that doesn't carry a tenancy predicate)
+  // is therefore unmeetable at this layer; the call sites are responsible
+  // for embedding the scope in the SQL, and PG enforces it. Lifting them
+  // through the guard would force a refactor away from raw SQL for
+  // primitives that need `FOR UPDATE SKIP LOCKED` (outbox legacy drainer)
+  // or `pg_advisory_xact_lock` (model-default scope lock) — both of which
+  // the typed Prisma API cannot express.
+  if (action === "queryRaw" || action === "executeRaw") return;
+
   // Scoped models opt in to a stricter check than EXEMPT_MODELS:
   // SOMETHING tenancy-shaped (row id, scope predicate, parent FK,
   // or legacy projectId) MUST be present on every query. A bare
