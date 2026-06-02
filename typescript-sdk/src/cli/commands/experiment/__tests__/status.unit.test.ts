@@ -85,7 +85,7 @@ describe("experimentStatusCommand()", () => {
         pageSize: 1,
       });
       expect(mockGetRunStatus).toHaveBeenCalledWith("latest_run");
-      const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       expect(printed).toContain("3/3 cells");
     });
 
@@ -127,7 +127,7 @@ describe("experimentStatusCommand()", () => {
         runId: "sdk_run",
         experimentSlug: "doc-qa",
       });
-      const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       expect(printed).toContain("5/5 cells");
     });
 
@@ -143,7 +143,7 @@ describe("experimentStatusCommand()", () => {
         runId: "sdk_run",
         format: "json",
       });
-      const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       const payload = JSON.parse(printed);
       expect(payload.runId).toBe("sdk_run");
     });

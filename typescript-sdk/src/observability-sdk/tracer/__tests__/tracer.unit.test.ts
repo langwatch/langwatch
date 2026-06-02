@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SpanStatusCode, SpanKind, trace as otelTrace } from "@opentelemetry/api";
+import { SpanStatusCode, SpanKind, trace as otelTrace, type SpanOptions } from "@opentelemetry/api";
 import {
   getLangWatchTracer,
   getLangWatchTracerFromProvider,
@@ -854,7 +854,7 @@ describe("tracer.ts", () => {
 
         const callArgs = mockTracer.startActiveSpan.mock.calls[0];
         // The options are the second argument
-        const options = callArgs?.[1];
+        const options = callArgs?.[1] as SpanOptions | undefined;
         expect(options?.attributes?.["langwatch.origin"]).toBe("application");
       });
 
@@ -865,7 +865,7 @@ describe("tracer.ts", () => {
 
         // withActiveSpan delegates to target.startActiveSpan
         const callArgs = mockTracer.startActiveSpan.mock.calls[0];
-        const options = callArgs?.[1];
+        const options = callArgs?.[1] as SpanOptions | undefined;
         expect(options?.attributes?.["langwatch.origin"]).toBe("application");
       });
 
@@ -876,7 +876,7 @@ describe("tracer.ts", () => {
         });
 
         const callArgs = mockTracer.startSpan.mock.calls[0];
-        const options = callArgs?.[1];
+        const options = callArgs?.[1] as SpanOptions | undefined;
         expect(options?.kind).toBe(SpanKind.CLIENT);
         expect(options?.attributes?.["custom.attr"]).toBe("value");
         expect(options?.attributes?.["langwatch.origin"]).toBe("application");
@@ -903,7 +903,7 @@ describe("tracer.ts", () => {
         );
 
         const callArgs = mockTracer.startActiveSpan.mock.calls[0];
-        const options = callArgs?.[1];
+        const options = callArgs?.[1] as SpanOptions | undefined;
         expect(options?.attributes?.["langwatch.origin"]).toBe("simulation");
       });
 
@@ -917,7 +917,7 @@ describe("tracer.ts", () => {
         );
 
         const callArgs = mockTracer.startActiveSpan.mock.calls[0];
-        const options = callArgs?.[1];
+        const options = callArgs?.[1] as SpanOptions | undefined;
         expect(options?.attributes?.["langwatch.origin"]).toBe("evaluation");
       });
     });
