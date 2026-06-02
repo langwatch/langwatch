@@ -12,8 +12,8 @@ FROM ubuntu:24.04
 
 # Pin the CLI + MCP versions the agent was validated against. Bump these
 # in lockstep with a tested release rather than tracking `latest`.
-ARG LANGWATCH_CLI_VERSION=0.29.0
-ARG LANGWATCH_MCP_VERSION=0.9.0
+ARG LANGWATCH_CLI_VERSION=0.31.0
+ARG LANGWATCH_MCP_VERSION=0.10.1
 
 RUN apt-get update && apt-get install -y \
     curl git ca-certificates unzip build-essential python3 \
