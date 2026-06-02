@@ -876,7 +876,7 @@ describe("tracer.ts", () => {
         });
 
         const callArgs = mockTracer.startSpan.mock.calls[0];
-        const options = callArgs?.[1] as SpanOptions | undefined;
+        const options = callArgs?.[1];
         expect(options?.kind).toBe(SpanKind.CLIENT);
         expect(options?.attributes?.["custom.attr"]).toBe("value");
         expect(options?.attributes?.["langwatch.origin"]).toBe("application");
