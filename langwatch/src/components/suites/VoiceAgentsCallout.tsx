@@ -136,8 +136,7 @@ export function VoiceAgentsCallout() {
                 color="white/85"
                 lineHeight={1.4}
               >
-                Test your voice agent end-to-end with real voices and judge
-                criteria you write in plain English.
+                Test your voice agent end-to-end with realtime voices.
               </Text>
               <HStack
                 gap={1}
