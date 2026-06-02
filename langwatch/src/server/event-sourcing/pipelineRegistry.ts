@@ -54,7 +54,7 @@ import {
   TRIGGER_NOTIFY_REACTOR_NAME,
   type SettleStagePayload,
 } from "./outbox/payload";
-import type { OutboxStack } from "./outbox/setup";
+import type { OutboxRuntime } from "./outbox/setup";
 import {
   type EnqueueSettle,
   type TriggerActionDispatchDeps,
@@ -220,7 +220,7 @@ export interface PipelineRegistryDeps {
    * (ADR-021 revision + ADR-030) instead of inline-dispatching. Persist
    * actions always run inline regardless.
    */
-  outbox?: OutboxStack;
+  outbox?: OutboxRuntime;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 

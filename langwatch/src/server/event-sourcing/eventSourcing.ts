@@ -32,7 +32,6 @@ import {
   cadenceGroupKey,
   isCadence,
   isSettle,
-  settleDedupId,
   settleGroupKey,
   type OutboxJob,
 } from "./outbox/payload";
@@ -556,25 +555,6 @@ export class EventSourcing {
         }
         await first.entry.processBatch!(resolved.map((r) => r!.clean));
       },
-      // Stage-aware dedup for outbox payloads: settle is Debounce Mode
-      // (collapse + reset TTL on every overwrite), cadence is per-job so
-      // digest members don't collide. Caller (enqueueSettle) overrides
-      // `ttlMs` per-trigger with `Trigger.traceDebounceMs`. Non-outbox
-      // payloads return undefined so the queue treats them as unique
-      // (registry entries with their own dedup contribute via the per-
-      // send `deduplication` override on the call site).
-      deduplication: {
-        makeId: (payload: Record<string, unknown>): string | undefined => {
-          if (isSettle(payload)) return settleDedupId(payload);
-          if (isCadence(payload)) {
-            return `${payload.projectId}/cadence/${payload.auditDedupKey}`;
-          }
-          return undefined;
-        },
-        ttlMs: 30_000,
-        extend: true,
-        replace: true,
-      },
       // The adapter is `QueueAuditAdapter<OutboxJob>`; the queue's payload
       // type is the widened `Record<string, unknown>`. The adapter gates
       // internally on `isSettle || isCadence` so any non-outbox payload
@@ -583,6 +563,11 @@ export class EventSourcing {
         | EventSourcedQueueDefinition<Record<string, unknown>>["auditAdapter"]
         | undefined,
     };
+    // Outbox dedup configuration deliberately lives on the producer side
+    // (settle: enqueueSettle's per-send override, cadence: TriggerSent
+    // claim + per-trigger groupKey + processBatch coalescing). No queue-
+    // level dedup — that would require a default makeId for non-outbox
+    // payloads where no obvious dedup identity exists.
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
