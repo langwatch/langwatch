@@ -88,12 +88,13 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        # Raised from 5000 to 32 KB so evaluations receive full input/output
-        # instead of "... (truncated string)" (#4215). 32 KB matches the gateway
-        # payload cap (ADR-017), bounding the worst case for projects without
-        # server-side blob offload. Set to None to disable client truncation
-        # entirely once server-side offload is enabled for your project.
-        max_string_length: Optional[int] = 32 * 1024,
+        # No client-side truncation by default. Full input/output reaches the
+        # backend, which owns sizing (ADR-022: event_log is the source of truth,
+        # with the edge spool + server-side caps handling oversize). This keeps
+        # the Python SDK consistent with the TS/Go SDKs and stock OpenTelemetry —
+        # none of which truncate span content client-side (#4215). Set to an int
+        # (>= 100) to opt into a client-side per-field byte cap.
+        max_string_length: Optional[int] = None,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -783,12 +784,11 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    # Raised from 5000 to 32 KB to match the LangWatchTrace constructor — see
-    # tracing.py:91 and issue #4215. The default must be the same on both the
-    # public `trace()` factory and the underlying constructor; otherwise users
-    # calling `langwatch.trace(...)` without an explicit kwarg would silently
-    # get 5000 KB while users calling `LangWatchTrace(...)` get 32 KB.
-    max_string_length: Optional[int] = 32 * 1024,
+    # No client-side truncation by default — must stay in lockstep with the
+    # LangWatchTrace constructor default. The backend owns sizing (ADR-022); the
+    # SDK stays consistent with the TS/Go SDKs and stock OpenTelemetry. Set to an
+    # int (>= 100) to opt into a client-side per-field byte cap.
+    max_string_length: Optional[int] = None,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,
