@@ -5,6 +5,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -49,6 +50,7 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -104,12 +106,14 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
+  private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
+    this._retentionPolicyResolver = options.retentionPolicyResolver;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -296,6 +300,7 @@ export class EventSourcing {
           replayMarkerChecker: this._redis
             ? new RedisReplayMarkerChecker(this._redis)
             : undefined,
+          retentionPolicyResolver: this._retentionPolicyResolver,
         });
 
         // Get command dispatchers
@@ -394,6 +399,7 @@ export class EventSourcing {
     if (clickHouseEnabled) {
       this._eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(this._clickhouse!),
+        this._retentionPolicyResolver,
       );
       logger.debug("Using ClickHouse event store");
     } else if (!isProduction) {
@@ -535,12 +541,14 @@ export class EventSourcing {
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
     processRole?: ProcessRole;
+    retentionPolicyResolver?: RetentionPolicyResolver;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
       processRole: options.processRole,
+      retentionPolicyResolver: options.retentionPolicyResolver,
     });
 
     es._initialized = true;

@@ -1,11 +1,11 @@
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 
 export interface LogRecordStorageRepository {
-  insertLogRecord(record: NormalizedLogRecord): Promise<void>;
+  insertLogRecord(record: NormalizedLogRecord, retentionDays?: number): Promise<void>;
 }
 
 export class NullLogRecordStorageRepository
   implements LogRecordStorageRepository
 {
-  async insertLogRecord(_record: NormalizedLogRecord): Promise<void> {}
+  async insertLogRecord(_record: NormalizedLogRecord, _retentionDays?: number): Promise<void> {}
 }

@@ -12,13 +12,17 @@ import {
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
+  LuPin,
+  LuPinOff,
   LuScanSearch,
   LuShare2,
 } from "react-icons/lu";
 import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
+import { toaster } from "~/components/ui/toaster";
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { setTracesV2Preferred } from "../../../hooks/useTracesV2Preference";
 
@@ -54,6 +58,58 @@ export function TraceOverflowMenu({
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
+
+  const utils = api.useUtils();
+  const pinQuery = api.pinnedTrace.getPin.useQuery(
+    project ? { projectId: project.id, traceId } : (undefined as never),
+    { enabled: !!project },
+  );
+  const isPinned = !!pinQuery.data;
+  // Pins are UI annotations only and do not exempt CH rows from TTL. While a
+  // share is live, the share-created pin annotation belongs to that share
+  // lifecycle, so the router rejects manual unpin until the share is removed;
+  // mirror that in the menu so users see why the action is unavailable instead
+  // of getting a surprise CONFLICT toast.
+  const isSharePin = pinQuery.data?.source === "share";
+
+  const pinMutation = api.pinnedTrace.pin.useMutation({
+    onSuccess: () => {
+      if (project) {
+        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+      }
+      toaster.create({ title: "Trace pinned", type: "success" });
+    },
+    onError: (error) =>
+      toaster.create({
+        title: "Failed to pin trace",
+        description: error.message,
+        type: "error",
+      }),
+  });
+
+  const unpinMutation = api.pinnedTrace.unpin.useMutation({
+    onSuccess: () => {
+      if (project) {
+        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+      }
+      toaster.create({ title: "Trace unpinned", type: "success" });
+    },
+    onError: (error) =>
+      toaster.create({
+        title: "Failed to unpin trace",
+        description: error.message,
+        type: "error",
+      }),
+  });
+
+  const handleTogglePin = useCallback(() => {
+    if (!project) return;
+    if (isPinned) {
+      unpinMutation.mutate({ projectId: project.id, traceId });
+    } else {
+      pinMutation.mutate({ projectId: project.id, traceId });
+    }
+  }, [project, traceId, isPinned, pinMutation, unpinMutation]);
 
   const conversationTurns = useConversationTurns(conversationId);
   const conversationTraceIds =
@@ -169,6 +225,27 @@ export function TraceOverflowMenu({
           </HStack>
           <Menu.ItemCommand>soon</Menu.ItemCommand>
         </Menu.Item>
+
+        {project && (
+          <Menu.Item
+            value="pin"
+            onClick={handleTogglePin}
+            disabled={
+              pinMutation.isLoading || unpinMutation.isLoading || isSharePin
+            }
+          >
+            <HStack gap={2}>
+              <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3.5} />
+              <Text>
+                {isSharePin
+                  ? "Pinned by share"
+                  : isPinned
+                    ? "Unpin trace"
+                    : "Pin trace"}
+              </Text>
+            </HStack>
+          </Menu.Item>
+        )}
 
         <Menu.Separator />
 

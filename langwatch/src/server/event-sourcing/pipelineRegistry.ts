@@ -8,6 +8,9 @@ import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 
 import type { TraceSummaryData } from "../app-layer/traces/types";
+import type { ReactorDefinition } from "./reactors/reactor.types";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
@@ -49,6 +52,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
 import {
@@ -199,6 +203,8 @@ export interface PipelineRegistryDeps {
   blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  retentionPolicyResolver?: RetentionPolicyResolver;
+  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -409,6 +415,8 @@ export class PipelineRegistry {
       ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
       : undefined;
 
+    const retentionOrphanSweepReactor = this.deps.retentionOrphanSweepReactor;
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -430,6 +438,7 @@ export class PipelineRegistry {
         blobStore: this.deps.blobStore,
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
+        retentionOrphanSweepReactor,
       }),
     );
 
@@ -660,7 +669,6 @@ export class PipelineRegistry {
     // Create the experimentId lookup function using the experiment run ClickHouse repository
     const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
       try {
-        const { getClickHouseClientForProject } = await import("../clickhouse/clickhouseClient");
         const client = await getClickHouseClientForProject(tenantId);
         if (!client) return null;
 

@@ -107,6 +107,7 @@ model User {
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   userIngestionBindings   UserIngestionBinding[]
+  pinnedTraces            PinnedTrace[]
 }
 
 model VerificationToken {
@@ -409,6 +410,7 @@ model Project {
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
+  pinnedTraces             PinnedTrace[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1092,6 +1094,56 @@ model PublicShare {
 
   @@unique([projectId, resourceType, resourceId])
   @@index([userId])
+}
+
+enum PinSource {
+    manual
+    share
+}
+
+model PinnedTrace {
+    id        String    @id @default(nanoid())
+    projectId String
+    project   Project   @relation(fields: [projectId], references: [id])
+    traceId   String
+    userId    String?
+    user      User?     @relation(fields: [userId], references: [id])
+    source    PinSource @default(manual)
+    reason    String?
+    createdAt DateTime  @default(now())
+
+    @@unique([projectId, traceId])
+    @@index([projectId])
+}
+
+enum RetentionPolicyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A data-retention override for one category at one scope. Single-scope-per-row
+// (ADR-021): the row applies at exactly one scope, identified inline by
+// (scopeType, scopeId), anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> platform default (49 days), per category,
+// so an org admin can set a retention once and have it apply to every project
+// that has no closer override. The ClickHouse migration default for rows that
+// predate the retention column is separate and intentionally 308 days.
+// One row per (scope, category): each row holds a single category's day count,
+// so categories cascade independently.
+model RetentionPolicy {
+  id             String                   @id @default(nanoid())
+  organizationId String
+  scopeType      RetentionPolicyScopeType
+  scopeId        String
+  category       String
+  retentionDays  Int
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId, category])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
 }
 
 enum CustomLLMModelCostScopeType {

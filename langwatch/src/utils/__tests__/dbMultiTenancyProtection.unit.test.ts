@@ -157,6 +157,51 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
   });
 });
 
+describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () => {
+  // Regression: pinning a trace silently threw "requires a 'projectId'
+  // or 'projectId.in' in the where clause" because the repo uses
+  // upsert/findUnique on the (projectId, traceId) compound unique key.
+  // The allowlist must include projectId_traceId alongside the other
+  // compound keys (projectId_slug / projectId_date / etc).
+  describe("findUnique on PinnedTrace with projectId_traceId compound key", () => {
+    it("does NOT throw (compound key carries projectId)", async () => {
+      await expect(
+        runGuard({
+          model: "PinnedTrace",
+          action: "findUnique",
+          args: {
+            where: {
+              projectId_traceId: { projectId: "proj_01", traceId: "t_01" },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("upsert on PinnedTrace with projectId_traceId compound key", () => {
+    it("does NOT throw (compound key carries projectId)", async () => {
+      await expect(
+        runGuard({
+          model: "PinnedTrace",
+          action: "upsert",
+          args: {
+            where: {
+              projectId_traceId: { projectId: "proj_01", traceId: "t_01" },
+            },
+            create: {
+              projectId: "proj_01",
+              traceId: "t_01",
+              source: "manual",
+            },
+            update: {},
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
   describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
     it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {

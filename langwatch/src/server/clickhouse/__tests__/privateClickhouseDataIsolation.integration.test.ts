@@ -276,6 +276,7 @@ function makeSpanInsertData({
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    retentionDays: 0,
   };
 }
 

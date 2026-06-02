@@ -121,6 +121,24 @@ import { SimulationRunStateRepositoryClickHouse, SimulationRunStateRepositoryMem
 import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMemory } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
+import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
+import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
+import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
+import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
+import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
+import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
+import {
+  InMemoryOrphanCursorStore,
+  RedisOrphanCursorStore,
+} from "../data-retention/orphan-sweep/orphanSweepCursor.store";
+import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
+import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
+import type { DataRetentionDependencies } from "./dependencies";
+import { ShareService } from "./share/share.service";
+import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 
 /**
  * Late-bound handle for the scenario execution reactor.
@@ -249,9 +267,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationExecutionService",
   );
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table) and the data-retention
+  // services wired further below.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
+
   const dspySteps = traced(
     new DspyStepService(
-      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient) : new NullDspyStepRepository(),
+      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient, retentionPolicyCache) : new NullDspyStepRepository(),
     ),
     "DspyStepService",
   );
@@ -348,12 +372,70 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
+  const dataRetentionPolicyService = new DataRetentionPolicyService(
+    dataRetentionPolicyRepo,
+    retentionPolicyCache,
+  );
+  const pinnedTraceRepo = new PinnedTraceRepository(prisma);
+  // Construct the share repo here (not inside ShareService) so the pinning
+  // service can ask "is this trace still shared?" without depending on
+  // ShareService — that would close the cycle: ShareService already depends
+  // on PinnedTraceService for auto(un)pin.
+  const shareRepo = new PrismaShareRepository(prisma);
+  const pinnedTraceService = new PinnedTraceService(
+    pinnedTraceRepo,
+    async ({ projectId, traceId }) => {
+      const share = await shareRepo.findByResource({
+        projectId,
+        resourceType: "TRACE",
+        resourceId: traceId,
+      });
+      return share !== null;
+    },
+  );
+  const retroactiveUpdateService = new RetroactiveUpdateService(
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+  const storageMeterService = new StorageMeterService(
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+  const orphanSweepRepo = new OrphanSweepRepository(prisma);
+  // Persist sweep cursors in Redis when available; fall back to the in-memory
+  // store otherwise. The cursor lets the sweep resume across runs instead of
+  // restarting at page 0 every hour and starving the tail.
+  const orphanCursorStore = redis
+    ? new RedisOrphanCursorStore(redis)
+    : new InMemoryOrphanCursorStore();
+  const orphanSweepService = new OrphanSweepService(
+    orphanSweepRepo,
+    clickhouseEnabled ? resolveClickHouseClient : null,
+    orphanCursorStore,
+  );
+  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
+    retentionPolicyCache,
+    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
+  });
+
+  const dataRetention: DataRetentionDependencies = {
+    policy: dataRetentionPolicyService,
+    pinning: pinnedTraceService,
+    retroactive: retroactiveUpdateService,
+    metering: storageMeterService,
+    orphanSweep: orphanSweepService,
+  };
+
+  const share = traced(
+    new ShareService(shareRepo, pinnedTraceService),
+    "ShareService",
+  );
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
     enabled: true,
     isSaas: config.isSaas,
     processRole: config.processRole,
+    retentionPolicyResolver: retentionPolicyCache,
   });
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
@@ -429,6 +511,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
+    retentionOrphanSweepReactor,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -599,6 +682,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     notifications,
     nurturing,
     usageLimits,
+    retentionPolicyCache,
+    dataRetention,
+    share,
     commands,
     ops,
     _eventSourcing: es,
@@ -609,6 +695,17 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
+  const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
+  const testRetentionPolicyCache = new RetentionPolicyCache(
+    testRetentionPolicyRepo,
+  );
+  // Single PinnedTraceService instance shared between dataRetention.pinning
+  // and share, mirroring the production wiring (presets.ts above). Without
+  // this, tests that auto-pin via share would see a different repo state
+  // than tests that pin directly through dataRetention.pinning.
+  const testPinnedTraceService = new PinnedTraceService(
+    new PinnedTraceRepository(testPrisma),
+  );
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -736,6 +833,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["billing"],
       scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
     },
+    retentionPolicyCache: testRetentionPolicyCache,
+    dataRetention: {
+      policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache),
+      pinning: testPinnedTraceService,
+      retroactive: new RetroactiveUpdateService(null),
+      metering: new StorageMeterService(null),
+      orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
+    },
+    share: new ShareService(
+      new PrismaShareRepository(testPrisma),
+      testPinnedTraceService,
+    ),
     ...overrides,
   });
 }

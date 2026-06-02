@@ -1,10 +1,15 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event } from "../domain/types";
-import type { EventStoreReadContext } from "./eventStore.types";
 import { createLogger } from "../../../utils/logger/server";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import type { Event } from "../domain/types";
 import { AbstractEventStore } from "./abstractEventStore";
-import type { EventRepository } from "./repositories/eventRepository.types";
+import type { EventStoreReadContext } from "./eventStore.types";
+import type {
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types";
 
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.
@@ -24,7 +29,10 @@ export class EventStoreClickHouse<
     "langwatch:trace-processing:event-store:clickhouse",
   );
 
-  constructor(repository: EventRepository) {
+  constructor(
+    repository: EventRepository,
+    private readonly retentionPolicyResolver?: RetentionPolicyResolver,
+  ) {
     super(repository);
   }
 
@@ -59,5 +67,23 @@ export class EventStoreClickHouse<
     _events: readonly EventType[],
   ): void {
     // no-op: removed verbose per-store logging
+  }
+
+  // event_log carries the trace category retention. Resolved once per batch
+  // from the tenant policy and stamped on every record. Retention is
+  // default-on: a tenant with no override resolves to the platform default, so
+  // we always stamp a concrete value rather than leaving the column to its
+  // migration default. When no resolver is wired (e.g. tests) we leave the
+  // field off and the repo's fallback stamps the platform default.
+  protected override async enrichRecordsForStorage(
+    records: EventRecord[],
+    context: EventStoreReadContext<EventType>,
+  ): Promise<EventRecord[]> {
+    if (!this.retentionPolicyResolver || records.length === 0) return records;
+    const policy = await this.retentionPolicyResolver.resolve(
+      String(context.tenantId),
+    );
+    const retentionDays = policy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    return records.map((r) => ({ ...r, _retention_days: retentionDays }));
   }
 }

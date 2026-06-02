@@ -1,11 +1,11 @@
 import type { NormalizedMetricRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/metricRecords";
 
 export interface MetricRecordStorageRepository {
-  insertMetricRecord(record: NormalizedMetricRecord): Promise<void>;
+  insertMetricRecord(record: NormalizedMetricRecord, retentionDays?: number): Promise<void>;
 }
 
 export class NullMetricRecordStorageRepository
   implements MetricRecordStorageRepository
 {
-  async insertMetricRecord(_record: NormalizedMetricRecord): Promise<void> {}
+  async insertMetricRecord(_record: NormalizedMetricRecord, _retentionDays?: number): Promise<void> {}
 }

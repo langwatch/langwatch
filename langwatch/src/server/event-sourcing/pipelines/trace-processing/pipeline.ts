@@ -44,6 +44,7 @@ export interface TraceProcessingPipelineDeps {
   blobStore?: BlobStore;
   governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -108,6 +109,14 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       "traceSummary",
       "governanceOcsfEventsSync",
       deps.governanceOcsfEventsSyncReactor,
+    );
+  }
+
+  if (deps.retentionOrphanSweepReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "retentionOrphanSweep",
+      deps.retentionOrphanSweepReactor,
     );
   }
 
