@@ -7,6 +7,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
+import { capInputs, capPayloadText } from "./evaluation-run.payload-cap";
 import type { EvaluationRunRepository, GetByEvaluationIdParams } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -474,6 +475,10 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
+    // Cap unbounded payload columns at write time so a single oversized row
+    // (e.g. a multi-GB `Inputs`) can never produce a part that exceeds
+    // ClickHouse's merge memory budget. See evaluation-run.payload-cap.ts.
+    const capCtx = { tenantId, evaluationId: data.evaluationId };
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -488,10 +493,10 @@ export class EvaluationRunClickHouseRepository
       Score: data.score,
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
-      Details: data.details,
-      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
-      Error: data.error,
-      ErrorDetails: data.errorDetails,
+      Details: capPayloadText(data.details, "Details", capCtx),
+      Inputs: capInputs(data.inputs, capCtx),
+      Error: capPayloadText(data.error, "Error", capCtx),
+      ErrorDetails: capPayloadText(data.errorDetails, "ErrorDetails", capCtx),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
