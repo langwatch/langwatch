@@ -21,10 +21,8 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { Hono } from "hono";
 import { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -117,10 +115,19 @@ async function persistUserMessage(opts: {
   });
 }
 
-export const app = new Hono().basePath("/api");
-app.use(tracerMiddleware({ name: "langy" }));
-app.use(loggerMiddleware());
-app.use("/langy/*", async (c, next) => {
+// Every Langy route does its own authentication in-handler: the app-level
+// guard below validates the session + isLangwatchStaff + release_langy_enabled,
+// and each handler additionally checks the project-scoped evaluations:view
+// permission. We register through the SecuredApp builder with handlerManagedAuth
+// so the routes declare a policy (the auth guarantee test requires every
+// concrete endpoint to be classified) while keeping that in-handler enforcement.
+const LANGY_HANDLER_AUTH_REASON =
+  "Staff-gated UI route: session + isLangwatchStaff + release_langy_enabled " +
+  "enforced by the app-level guard; project evaluations:view checked per-handler.";
+
+const secured = createServiceApp({ basePath: "/api" });
+
+secured.hono.use("/langy/*", async (c, next) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!isLangwatchStaff(session?.user?.email)) {
     return c.json({ error: "Langy is not available for your account" }, 403);
@@ -134,7 +141,11 @@ app.use("/langy/*", async (c, next) => {
   await next();
 });
 
-app.post("/langy/chat", async (c) => {
+// Thin helper so each route reads `langyRoute().<verb>(path, handler)`.
+const langyRoute = () =>
+  secured.access(handlerManagedAuth(LANGY_HANDLER_AUTH_REASON));
+
+langyRoute().post("/langy/chat", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -405,7 +416,7 @@ async function requireSessionAndPermission(c: any, projectId: string | undefined
   return { session };
 }
 
-app.get("/langy/conversations", async (c) => {
+langyRoute().get("/langy/conversations", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
@@ -419,7 +430,7 @@ app.get("/langy/conversations", async (c) => {
   return c.json({ conversations });
 });
 
-app.get("/langy/conversations/:id", async (c) => {
+langyRoute().get("/langy/conversations/:id", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
@@ -439,7 +450,7 @@ app.get("/langy/conversations/:id", async (c) => {
   return c.json({ conversation: conv, messages });
 });
 
-app.patch("/langy/conversations/:id", async (c) => {
+langyRoute().patch("/langy/conversations/:id", async (c) => {
   const body = (await c.req.json()) as {
     projectId: string;
     title?: string | null;
@@ -473,7 +484,7 @@ app.patch("/langy/conversations/:id", async (c) => {
   }
 });
 
-app.delete("/langy/conversations/:id", async (c) => {
+langyRoute().delete("/langy/conversations/:id", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
@@ -492,7 +503,7 @@ app.delete("/langy/conversations/:id", async (c) => {
 // Memory clear-all + GDPR export
 // ============================================================================
 
-app.delete("/langy/memory", async (c) => {
+langyRoute().delete("/langy/memory", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
@@ -511,7 +522,7 @@ app.delete("/langy/memory", async (c) => {
   return c.json({ deletedCount: result.deletedCount });
 });
 
-app.get("/langy/memory/export", async (c) => {
+langyRoute().get("/langy/memory/export", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
@@ -548,3 +559,5 @@ app.get("/langy/memory/export", async (c) => {
   });
 });
 
+
+export const app = secured.hono;
