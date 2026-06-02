@@ -2,22 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup } from "@testing-library/react";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import {
-  RuntimeParametersField,
-  RuntimeParametersReadonly,
-} from "../RuntimeParametersField";
+import { RuntimeParametersField } from "../RuntimeParametersField";
 
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();
@@ -150,40 +141,49 @@ describe("<RuntimeParametersField />", () => {
       );
     });
   });
-});
 
-describe("<RuntimeParametersReadonly />", () => {
-  describe("when parameters exist", () => {
-    it("renders key-value rows", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <RuntimeParametersReadonly
-            value={{ search_iterations: 5, enabled: true }}
-          />
-        </ChakraProvider>,
-      );
+  describe("when a string value looks like another JSON type", () => {
+    // Regression: parameters set via REST/tRPC/SDK carry real JSON. A string
+    // like "007" must not be silently coerced to the number 7 when an
+    // unrelated row is edited. Such strings are shown quoted and round-trip
+    // back to the same string.
+    it("displays type-ambiguous string values quoted", () => {
+      renderField({ port: "123", flag: "true", blob: "{}" });
 
-      const container = screen.getByTestId("runtime-parameters-readonly");
-      expect(
-        within(container).getByText("search_iterations"),
-      ).toBeInTheDocument();
-      expect(within(container).getByText("5")).toBeInTheDocument();
-      expect(within(container).getByText("enabled")).toBeInTheDocument();
-      expect(within(container).getByText("true")).toBeInTheDocument();
+      expect(screen.getByTestId("param-value-0")).toHaveValue('"123"');
+      expect(screen.getByTestId("param-value-1")).toHaveValue('"true"');
+      expect(screen.getByTestId("param-value-2")).toHaveValue('"{}"');
     });
-  });
 
-  describe("when no parameters exist", () => {
-    it("shows empty state", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <RuntimeParametersReadonly value={{}} />
-        </ChakraProvider>,
+    it("preserves the string type when an unrelated row is edited", () => {
+      renderField({ port: "123", other: "x" });
+
+      // Edit the unrelated row, which re-serializes every row.
+      fireEvent.change(screen.getByTestId("param-value-1"), {
+        target: { value: "y" },
+      });
+
+      const stored = screen.getByTestId("parameters-value");
+      // port stays the string "123", does NOT become the number 123.
+      expect(stored).toHaveTextContent('"port":"123"');
+      expect(stored).not.toHaveTextContent('"port":123');
+    });
+
+    it("still coerces unquoted numbers and booleans to their JSON types", async () => {
+      const user = userEvent.setup();
+      renderField();
+
+      await user.click(screen.getByTestId("add-parameter-button"));
+      fireEvent.change(screen.getByTestId("param-key-0"), {
+        target: { value: "count" },
+      });
+      fireEvent.change(screen.getByTestId("param-value-0"), {
+        target: { value: "5" },
+      });
+
+      expect(screen.getByTestId("parameters-value")).toHaveTextContent(
+        '"count":5',
       );
-
-      expect(
-        screen.getByTestId("runtime-parameters-readonly"),
-      ).toHaveTextContent("No parameters defined");
     });
   });
 });

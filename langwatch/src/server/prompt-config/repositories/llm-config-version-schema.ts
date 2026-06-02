@@ -12,6 +12,7 @@ import {
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 import { SchemaVersion } from "../enums";
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+import { sortKeysDeep } from "./sortKeysDeep";
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 
@@ -138,17 +139,6 @@ export function parseRuntimeParameters(value: unknown): RuntimeParameters {
 }
 
 export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
-  const sortKeysDeep = (obj: unknown): unknown => {
-    if (Array.isArray(obj)) return obj.map(sortKeysDeep);
-    if (obj && typeof obj === "object") {
-      return Object.fromEntries(
-        Object.entries(obj)
-          .sort(([x], [y]) => x.localeCompare(y))
-          .map(([k, v]) => [k, sortKeysDeep(v)]),
-      );
-    }
-    return obj;
-  };
   return (
     JSON.stringify(sortKeysDeep(a ?? {})) ===
     JSON.stringify(sortKeysDeep(b ?? {}))

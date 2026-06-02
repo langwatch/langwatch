@@ -7,30 +7,56 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
 
-type ParameterEntry = { key: string; value: string };
+type ParameterEntry = { id: string; key: string; value: string };
 
-function serializeValue(raw: string): unknown {
-  const trimmed = raw.trim();
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
-  if (trimmed === "null") return null;
-  if (trimmed !== "" && !isNaN(Number(trimmed))) return Number(trimmed);
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (typeof parsed === "object") return parsed;
-  } catch {
-    // not JSON — treat as string
-  }
-  return raw;
+// Stable, unique row ids so React keys don't shift when rows are added/removed
+// (using the array index would mis-associate input state/focus on removal).
+let rowIdCounter = 0;
+function nextRowId(): string {
+  rowIdCounter += 1;
+  return `param-row-${rowIdCounter}`;
 }
 
+/**
+ * Parse the text in a value input back into a JSON value.
+ *
+ * Parameters are not UI-only — they are also written via REST/tRPC/SDK with
+ * real JSON (numbers, booleans, objects, and strings). To round-trip
+ * losslessly, the text is interpreted as JSON when it parses, otherwise it is
+ * kept as a plain string. This is the exact inverse of {@link displayValue}:
+ * a string that looks like another type is quoted on display, so it parses
+ * back to a string here.
+ */
+function serializeValue(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Render a stored JSON value as editable text.
+ *
+ * Inverse of {@link serializeValue}: a string whose contents would otherwise
+ * parse as another JSON type (e.g. "007", "true", "{}") is shown quoted so it
+ * cannot be silently coerced on the next edit; plain strings are shown bare.
+ */
 function displayValue(v: unknown): string {
-  if (typeof v === "string") return v;
+  if (typeof v === "string") {
+    try {
+      JSON.parse(v);
+      // Bare text would re-parse as a non-string → quote to disambiguate.
+      return JSON.stringify(v);
+    } catch {
+      return v;
+    }
+  }
   return JSON.stringify(v);
 }
 
@@ -46,6 +72,7 @@ function entriesToRecord(entries: ParameterEntry[]): Record<string, unknown> {
 
 function recordToEntries(record: Record<string, unknown>): ParameterEntry[] {
   return Object.entries(record).map(([key, value]) => ({
+    id: nextRowId(),
     key,
     value: displayValue(value),
   }));
@@ -62,18 +89,28 @@ export function RuntimeParametersField() {
     recordToEntries((parameters as Record<string, unknown>) ?? {}),
   );
 
+  // Tracks the record we last reconciled with the form, so the sync effect can
+  // detect *external* changes (e.g. loading a different version) without
+  // depending on `entries` — reading `entries` there would be a stale closure.
+  const lastRecordJsonRef = useRef(
+    JSON.stringify((parameters as Record<string, unknown>) ?? {}),
+  );
+
   useEffect(() => {
-    const incomingRecord = (parameters as Record<string, unknown>) ?? {};
-    const current = entriesToRecord(entries);
-    if (JSON.stringify(current) !== JSON.stringify(incomingRecord)) {
-      setEntries(recordToEntries(incomingRecord));
+    const incoming = (parameters as Record<string, unknown>) ?? {};
+    const incomingJson = JSON.stringify(incoming);
+    if (incomingJson !== lastRecordJsonRef.current) {
+      lastRecordJsonRef.current = incomingJson;
+      setEntries(recordToEntries(incoming));
     }
   }, [parameters]);
 
   const syncToForm = useCallback(
     (newEntries: ParameterEntry[]) => {
       setEntries(newEntries);
-      methods.setValue("version.parameters", entriesToRecord(newEntries), {
+      const record = entriesToRecord(newEntries);
+      lastRecordJsonRef.current = JSON.stringify(record);
+      methods.setValue("version.parameters", record, {
         shouldDirty: true,
         shouldValidate: true,
       });
@@ -82,8 +119,7 @@ export function RuntimeParametersField() {
   );
 
   const handleAdd = () => {
-    const newEntries = [...entries, { key: "", value: "" }];
-    setEntries(newEntries);
+    setEntries((prev) => [...prev, { id: nextRowId(), key: "", value: "" }]);
   };
 
   const handleRemove = (index: number) => {
@@ -133,7 +169,7 @@ export function RuntimeParametersField() {
       ) : (
         <VStack align="stretch" gap={2}>
           {entries.map((entry, index) => (
-            <HStack key={index} gap={2} width="full">
+            <HStack key={entry.id} gap={2} width="full">
               <Input
                 value={entry.key}
                 onChange={(e) => handleUpdate(index, "key", e.target.value)}
@@ -181,67 +217,6 @@ export function RuntimeParametersField() {
           ))}
         </VStack>
       )}
-    </VStack>
-  );
-}
-
-export function RuntimeParametersReadonly({
-  value,
-}: {
-  value: Record<string, unknown>;
-}) {
-  const entries = Object.entries(value);
-
-  if (entries.length === 0) {
-    return (
-      <Text
-        fontSize="13px"
-        color="fg.subtle"
-        textAlign="center"
-        paddingY={6}
-        data-testid="runtime-parameters-readonly"
-      >
-        No parameters defined
-      </Text>
-    );
-  }
-
-  return (
-    <VStack
-      align="stretch"
-      gap={2}
-      width="full"
-      height="full"
-      data-testid="runtime-parameters-readonly"
-    >
-      {entries.map(([key, val]) => (
-        <HStack
-          key={key}
-          gap={3}
-          paddingY={1.5}
-          paddingX={3}
-          borderRadius="md"
-          background="bg.muted"
-        >
-          <Text
-            fontFamily="monospace"
-            fontSize="13px"
-            fontWeight="semibold"
-            color="fg.default"
-            minWidth="120px"
-          >
-            {key}
-          </Text>
-          <Text
-            fontFamily="monospace"
-            fontSize="13px"
-            color="fg.muted"
-            wordBreak="break-all"
-          >
-            {displayValue(val)}
-          </Text>
-        </HStack>
-      ))}
     </VStack>
   );
 }

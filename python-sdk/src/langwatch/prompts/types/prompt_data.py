@@ -96,14 +96,18 @@ class PromptData(BaseModel):
 
 
 def _read_runtime_parameters(response: object) -> Dict[str, Any]:
-    additional_properties = getattr(response, "additional_properties", None)
-    if isinstance(additional_properties, dict):
-        params = additional_properties.get("parameters")
-    else:
-        params = getattr(response, "__dict__", {}).get("parameters")
+    # Prefer a first-class `parameters` attribute. Generated response models
+    # don't declare it yet (the recursive runtime-parameters schema can't be
+    # serialized by the OpenAPI generator), so the value arrives in the
+    # generator's `additional_properties` extras bag — fall back to that.
+    # Checking first-class first keeps reads correct if the field is later
+    # promoted by a regeneration.
+    params = getattr(response, "parameters", None)
+    if params is None or isinstance(params, Unset):
+        additional_properties = getattr(response, "additional_properties", None)
+        if isinstance(additional_properties, dict):
+            params = additional_properties.get("parameters")
 
-    if isinstance(params, Unset) or params is None:
-        return {}
     if isinstance(params, dict):
         return params
     return {}

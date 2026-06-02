@@ -22,24 +22,9 @@ import {
   type CreateLlmConfigVersionParams,
   LlmConfigVersionsRepository,
 } from "./llm-config-versions.repository";
+import { sortKeysDeep } from "./sortKeysDeep";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
-
-/**
- * Recursively sort all object keys for deterministic JSON serialization.
- * Arrays preserve element order but their object elements get sorted keys.
- */
-export function sortKeysDeep(obj: unknown): unknown {
-  if (Array.isArray(obj)) return obj.map(sortKeysDeep);
-  if (obj && typeof obj === "object" && obj !== null) {
-    return Object.fromEntries(
-      Object.entries(obj)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => [k, sortKeysDeep(v)]),
-    );
-  }
-  return obj;
-}
 
 /**
  * Interface for LLM Config data transfer objects
