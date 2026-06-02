@@ -219,7 +219,14 @@ export function buildRetentionTTLExpression(config: TableTTLEntry): string | nul
 }
 
 export function hasRetentionTTL(engineFull: string): boolean {
-  return engineFull.includes("_retention_days") && engineFull.includes("DELETE");
+  // ClickHouse normalizes a bare-DateTime TTL to an implicit DELETE and drops
+  // the keyword from stored metadata, so engine_full reads e.g.
+  //   TTL if(_retention_days > 0, toDateTime(StartTime) + toIntervalDay(_retention_days), ...)
+  // with no "DELETE". Matching on "DELETE" therefore gives a permanent
+  // false-negative, making the reconciler re-issue ALTER MODIFY TTL on every
+  // run. The `_retention_days` reference is the unique, reliable marker — it
+  // only appears inside the TTL expression (engine_full never lists columns).
+  return engineFull.includes("_retention_days");
 }
 
 interface ReconcileOptions {
@@ -309,10 +316,12 @@ export async function reconcileTTL(
           (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table) &&
           !hasRetentionTTL(tableInfo.engine_full)
         ) {
-          const onCluster = config.clusterName
-            ? ` ON CLUSTER \`${config.clusterName}\``
-            : "";
-          const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
+          // No ON CLUSTER: whenever a cluster is configured the database uses
+          // the Replicated engine (enforced in goose.ts), which auto-replicates
+          // DDL to every replica via Keeper. Adding ON CLUSTER on a table inside
+          // a Replicated DB is rejected: "It's not initial query. ON CLUSTER is
+          // not allowed for Replicated database (INCORRECT_QUERY)".
+          const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
           if (options.verbose) {
             logger.info(
               { table: tableConfig.table },
@@ -376,10 +385,10 @@ export async function reconcileTTL(
         .filter(Boolean)
         .join(",\n  ");
 
-      const onCluster = config.clusterName
-        ? ` ON CLUSTER \`${config.clusterName}\``
-        : "";
-      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
+      // No ON CLUSTER — see note in the retention-only branch above: a
+      // Replicated DB auto-replicates this DDL, and ON CLUSTER on a table inside
+      // it is rejected with INCORRECT_QUERY.
+      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
 
       if (options.verbose) {
         logger.info(

@@ -157,4 +157,75 @@ describe("reconcileTTL()", () => {
       expect(query).not.toContain("TO VOLUME 'cold'");
     });
   });
+
+  describe("when a managed table already has retention TTL normalized by ClickHouse", () => {
+    /**
+     * Regression: hasRetentionTTL() matched on the literal "DELETE" keyword, but
+     * ClickHouse normalizes a bare-DateTime TTL to an implicit DELETE and strips
+     * the keyword from stored metadata (engine_full). The check was a permanent
+     * false-negative, so the reconciler re-issued ALTER MODIFY TTL for every
+     * managed table on every migrate run instead of recognizing the TTL was
+     * already installed. Reconciliation must be idempotent.
+     */
+    it("does not re-issue the ALTER (recognizes the TTL despite no DELETE keyword)", async () => {
+      // engine_full exactly as ClickHouse stores it after our retention ALTER:
+      // the `if(...)` retention expression, on a non-tiered policy, WITHOUT the
+      // implicit DELETE keyword.
+      clickhouseMocks.client.query.mockResolvedValueOnce({
+        json: async () => [
+          {
+            name: "stored_spans",
+            storage_policy: "default",
+            engine_full:
+              "ReplicatedReplacingMergeTree ORDER BY (TenantId) TTL " +
+              "if(_retention_days > 0, " +
+              "toDateTime(StartTime) + toIntervalDay(_retention_days), " +
+              "toDateTime('2106-01-01'))",
+          },
+        ],
+      });
+
+      await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
+        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      );
+      expect(modifyCalls).toHaveLength(0);
+    });
+  });
+
+  describe("when CLICKHOUSE_CLUSTER is set (Replicated database)", () => {
+    /**
+     * Regression: the reconciler appended `ON CLUSTER <name>` whenever a cluster
+     * was configured. But a configured cluster always means the database uses the
+     * Replicated engine (enforced in goose.ts), which auto-replicates DDL to every
+     * replica via Keeper. ClickHouse rejects ON CLUSTER on a table inside a
+     * Replicated DB with "It's not initial query. ON CLUSTER is not allowed for
+     * Replicated database (INCORRECT_QUERY)", crashing clickhouseMigrate on every
+     * run against the cluster. The emitted ALTER must therefore carry no ON CLUSTER.
+     */
+    it("issues the ALTER without an ON CLUSTER clause", async () => {
+      const originalCluster = process.env.CLICKHOUSE_CLUSTER;
+      process.env.CLICKHOUSE_CLUSTER = "main";
+      try {
+        await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
+      } finally {
+        if (originalCluster === undefined) {
+          delete process.env.CLICKHOUSE_CLUSTER;
+        } else {
+          process.env.CLICKHOUSE_CLUSTER = originalCluster;
+        }
+      }
+
+      const modifyCalls = clickhouseMocks.client.command.mock.calls.filter(
+        (c) => /MODIFY TTL/.test((c[0] as { query: string }).query),
+      );
+      expect(modifyCalls.length).toBeGreaterThan(0);
+      for (const call of modifyCalls) {
+        expect((call[0] as { query: string }).query).not.toContain(
+          "ON CLUSTER",
+        );
+      }
+    });
+  });
 });
