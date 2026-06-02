@@ -202,7 +202,7 @@ export function buildPipelineTree({
   return tree;
 }
 
-class OpsMetricsCollector {
+export class OpsMetricsCollector {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
@@ -356,7 +356,7 @@ class OpsMetricsCollector {
     this.emitter.removeAllListeners();
   }
 
-  private async discoverQueues(): Promise<void> {
+  async discoverQueues(): Promise<void> {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
     } catch (err) {
@@ -854,7 +854,7 @@ class OpsMetricsCollector {
     }
   }
 
-  private async collect(): Promise<void> {
+  async collect(): Promise<void> {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
@@ -1025,5 +1025,3 @@ export function getOpsMetricsCollector(params: {
   }
   return singleton;
 }
-
-export type { OpsMetricsCollector };

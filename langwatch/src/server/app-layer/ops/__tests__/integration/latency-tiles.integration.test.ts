@@ -7,6 +7,11 @@ import {
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../../../../event-sourcing/queues/groupQueue/groupQueue";
 import type { EventSourcedQueueDefinition } from "../../../../event-sourcing/queues/queue.types";
+import { OpsMetricsCollector } from "../../metrics-collector";
+import {
+  NullQueueRepository,
+  type QueueRepository,
+} from "../../repositories/queue.repository";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -21,6 +26,7 @@ type TestPayload = { id: string; groupId: string };
 describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
   let redis: Redis;
   const queues: GroupQueueProcessor<TestPayload>[] = [];
+  const queueNames: string[] = [];
 
   beforeAll(async () => {
     await startTestContainers();
@@ -30,7 +36,26 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
   afterEach(async () => {
     await Promise.all(queues.map((q) => q.close().catch(() => {})));
     queues.length = 0;
-    await redis.flushall();
+    // Scoped cleanup: only delete keys this suite created. FLUSHALL would
+    // wipe state owned by other integration tests sharing the same Redis.
+    for (const name of queueNames) {
+      let cursor = "0";
+      do {
+        const [next, batch] = await redis.scan(
+          cursor,
+          "MATCH",
+          `${name}*`,
+          "COUNT",
+          200,
+        );
+        if (batch.length > 0) await redis.unlink(...batch);
+        cursor = next;
+      } while (cursor !== "0");
+    }
+    // Collector-owned state keys this suite touches (KNOWN_PIPELINES_KEY +
+    // REDIS_STATE_KEY in metrics-collector.ts).
+    await redis.unlink("ops:known-pipelines", "ops:metrics:state");
+    queueNames.length = 0;
   });
 
   afterAll(async () => {
@@ -50,7 +75,20 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     };
     const q = new GroupQueueProcessor<TestPayload>(def, redis);
     queues.push(q);
+    queueNames.push(name);
     return { queue: q, name };
+  }
+
+  async function waitForLatencyCount(name: string, target: number, timeoutMs: number) {
+    const key = `${name}:gq:stats:latencies-ms`;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const len = await redis.llen(key);
+      if (len >= target) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const finalLen = await redis.llen(key);
+    throw new Error(`only ${finalLen} entries in ${key} after ${timeoutMs}ms`);
   }
 
   describe("given a group-queue worker has completed several jobs", () => {
@@ -67,27 +105,19 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         await queue.send({ id: "b", groupId: "g2" });
         await queue.send({ id: "c", groupId: "g3" });
 
-        const latencyKey = `${name}:gq:stats:latencies-ms`;
-        await new Promise<void>((resolve, reject) => {
-          const start = Date.now();
-          const tick = async () => {
-            const len = await redis.llen(latencyKey);
-            if (len >= 3) return resolve();
-            if (Date.now() - start > 5000)
-              return reject(new Error(`only ${len} entries after 5s`));
-            setTimeout(tick, 50);
-          };
-          void tick();
-        });
+        await waitForLatencyCount(name, 3, 5000);
 
-        const raw = await redis.lrange(latencyKey, 0, -1);
+        const raw = await redis.lrange(
+          `${name}:gq:stats:latencies-ms`,
+          0,
+          -1,
+        );
         const durations = raw.map((s) => Number(s));
         expect(durations).toHaveLength(3);
         for (const ms of durations) {
           expect(Number.isFinite(ms)).toBe(true);
           expect(ms).toBeGreaterThanOrEqual(0);
         }
-        // At least one job spent ~20ms in the handler.
         expect(Math.max(...durations)).toBeGreaterThanOrEqual(10);
       });
 
@@ -104,27 +134,16 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           await queue.send({ id: `j${i}`, groupId: `g${i % 5}` });
         }
 
-        const latencyKey = `${name}:gq:stats:latencies-ms`;
-        await new Promise<void>((resolve, reject) => {
-          const start = Date.now();
-          const tick = async () => {
-            const len = await redis.llen(latencyKey);
-            if (len >= 200) return resolve();
-            if (Date.now() - start > 15000)
-              return reject(new Error(`only ${len} entries after 15s`));
-            setTimeout(tick, 100);
-          };
-          void tick();
-        });
+        await waitForLatencyCount(name, 200, 15000);
 
         // Give the worker a beat to push past the cap, then re-check.
         await new Promise((r) => setTimeout(r, 200));
-        const len = await redis.llen(latencyKey);
+        const len = await redis.llen(`${name}:gq:stats:latencies-ms`);
         expect(len).toBeLessThanOrEqual(200);
         expect(len).toBeGreaterThanOrEqual(190);
       });
 
-      it("derives non-zero P50/P99 via the collector's LRANGE read path", async () => {
+      it("surfaces non-zero P50/P99 through OpsMetricsCollector.getDashboardData()", async () => {
         const { queue, name } = createQueue({
           process: async () => {
             await new Promise((r) => setTimeout(r, 15));
@@ -136,46 +155,37 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           await queue.send({ id: `j${i}`, groupId: `g${i}` });
         }
 
-        const latencyKey = `${name}:gq:stats:latencies-ms`;
-        await new Promise<void>((resolve, reject) => {
-          const start = Date.now();
-          const tick = async () => {
-            const len = await redis.llen(latencyKey);
-            if (len >= 5) return resolve();
-            if (Date.now() - start > 5000)
-              return reject(new Error(`only ${len} entries after 5s`));
-            setTimeout(tick, 50);
-          };
-          void tick();
+        await waitForLatencyCount(name, 5, 5000);
+
+        // Drive the real collector — stub queueRepo so it sees exactly this
+        // suite's queue. Any future drift in key names, filtering, or
+        // percentile math inside OpsMetricsCollector will break this test.
+        const queueRepoStub: QueueRepository = Object.assign(
+          new NullQueueRepository(),
+          {
+            discoverQueueNames: async () => [name],
+          },
+        );
+        const collector = new OpsMetricsCollector({
+          redis,
+          queueRepo: queueRepoStub,
         });
+        try {
+          await collector.discoverQueues();
+          // Two cycles: the first establishes the baseline (hasBaseline=false
+          // skips throughput math but still reads latencies), the second
+          // exercises the steady-state path.
+          await collector.collect();
+          await collector.collect();
 
-        // Reproduce the body of OpsMetricsCollector.computeJobMetrics() that
-        // reads latencies, so this test stays honest against the same shape
-        // the dashboard renders.
-        const queueNames = [name];
-        const pipeline = redis.pipeline();
-        for (const name of queueNames) {
-          pipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
+          const data = collector.getDashboardData();
+          expect(data.latencyP50Ms).toBeGreaterThan(0);
+          expect(data.latencyP99Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
+          expect(data.peakLatencyP50Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
+          expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(data.latencyP99Ms);
+        } finally {
+          collector.stop();
         }
-        const results = await pipeline.exec();
-        const latencies: number[] = [];
-        for (const [, result] of results ?? []) {
-          if (!Array.isArray(result)) continue;
-          for (const raw of result) {
-            const ms = Number(raw);
-            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
-          }
-        }
-
-        expect(latencies.length).toBeGreaterThanOrEqual(5);
-        latencies.sort((a, b) => a - b);
-        const p50 = latencies[Math.floor(latencies.length * 0.5)]!;
-        const p99 =
-          latencies[
-            Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99))
-          ]!;
-        expect(p50).toBeGreaterThan(0);
-        expect(p99).toBeGreaterThanOrEqual(p50);
       });
     });
   });
