@@ -12,7 +12,7 @@ describe("QueueWithFallback inline-fallback gating", () => {
     const queue = new QueueWithFallback<{ x: number }, string, string>(
       "q-default",
       worker,
-      {},
+      undefined,
     );
 
     const result = await queue.add("job", { x: 1 });
@@ -26,7 +26,7 @@ describe("QueueWithFallback inline-fallback gating", () => {
     const queue = new QueueWithFallback<{ x: number }, string, string>(
       "q-no-inline",
       worker,
-      {},
+      undefined,
       { fallbackToInline: false },
     );
 
