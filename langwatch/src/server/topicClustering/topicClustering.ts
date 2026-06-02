@@ -48,14 +48,13 @@ export const clusterTopicsForProject = async (
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
 
-  const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =
+  const { totalTracesCount, recentTracesCount, assignedTracesCount } =
     await fetchCountsFromClickHouse(clickhouse, projectId);
 
   logger.info(
     {
       projectId,
       totalTraces: totalTracesCount,
-      tracesWithInput: tracesWithInputCount,
       recentTraces: recentTracesCount,
       backend: "clickhouse",
     },
@@ -179,7 +178,6 @@ export const clusterTopicsForProject = async (
 
 type TraceCounts = {
   totalTracesCount: number;
-  tracesWithInputCount: number;
   recentTracesCount: number;
   assignedTracesCount: number;
 };
@@ -201,7 +199,6 @@ async function fetchCountsFromClickHouse(
     query: `
       SELECT
         toString(count(*)) AS total,
-        toString(countIf(length(ComputedInput) > 0)) AS withInput,
         toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
         toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
       FROM trace_summaries t
@@ -221,7 +218,6 @@ async function fetchCountsFromClickHouse(
 
   const rows = (await result.json()) as Array<{
     total: string;
-    withInput: string;
     recent: string;
     assigned: string;
   }>;
@@ -229,7 +225,6 @@ async function fetchCountsFromClickHouse(
 
   return {
     totalTracesCount: parseInt(row?.total ?? "0", 10),
-    tracesWithInputCount: parseInt(row?.withInput ?? "0", 10),
     recentTracesCount: parseInt(row?.recent ?? "0", 10),
     assignedTracesCount: parseInt(row?.assigned ?? "0", 10),
   };
@@ -259,6 +254,21 @@ export async function fetchTracesFromClickHouse(
   // cursor) tracks the page boundary. Filtering here would advance the cursor
   // by the surviving subset and could strand older eligible traces behind a
   // run of empty-input traces.
+  //
+  // The outer query also has NO `ORDER BY` and NO outer `LIMIT`. The page CTE
+  // has already chosen the exact (<=2000) set of traces to return, so an outer
+  // sort would only re-order that fixed set — but `ORDER BY ... LIMIT` makes
+  // ClickHouse buffer a top-N of full rows, retaining every row's ComputedInput
+  // payload at once. For tenants with large inputs that buffer alone exceeded
+  // max_memory_usage_per_query (3.5 GiB) and the read failed with
+  // MEMORY_LIMIT_EXCEEDED. Without the sort the rows stream out (ComputedInput
+  // is read in small adaptive blocks and released), and the page ordering is
+  // reapplied in JS over the small result set below.
+  //
+  // An outer `LIMIT 2000` is also omitted: it would cap physical rows *before*
+  // the JS TraceId de-dupe, so if a trace had duplicate latest-version rows the
+  // cap could drop other selected TraceIds and break `returnedCount`/`lastSort`
+  // pagination. The page CTE bounds the result, so the cap is unnecessary.
   const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
@@ -322,8 +332,6 @@ export async function fetchTracesFromClickHouse(
             AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
         )
-      ORDER BY t.OccurredAt DESC, t.TraceId ASC
-      LIMIT 2000
     `,
     query_params: {
       tenantId: projectId,
@@ -345,14 +353,25 @@ export async function fetchTracesFromClickHouse(
     OccurredAtMs: string;
   }>;
 
+  // Reapply the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
+  // dropped its outer ORDER BY to avoid the top-N memory buffer (see above), so
+  // rows now arrive in scan order; sort the small (<=2000) result set here so
+  // the dedup-first-row and `lastSort` cursor logic below stay correct.
+  rawRows.sort((a, b) => {
+    const aTs = parseInt(a.OccurredAtMs, 10);
+    const bTs = parseInt(b.OccurredAtMs, 10);
+    if (aTs !== bTs) return bTs - aTs; // OccurredAt DESC
+    return a.TraceId < b.TraceId ? -1 : a.TraceId > b.TraceId ? 1 : 0; // TraceId ASC
+  });
+
   // Defensive de-duplication by TraceId. The monotonic `UpdatedAt` invariant
   // should make `(TenantId, TraceId, max(UpdatedAt))` match exactly one row per
   // trace, but `returnedCount` / `lastSort` now drive pagination, so collapse
   // any same-version duplicate here in JS rather than at the SQL layer — the
   // per-key SQL dedup operator is banned in this path for OOM safety (it reads
   // heavy columns for the whole granule; see trace-dedup-oom-safety.unit.test).
-  // Rows arrive ordered by `OccurredAt DESC, TraceId ASC`, so the first row per
-  // TraceId is the one the boundary cursor should land on.
+  // Rows are ordered `OccurredAt DESC, TraceId ASC` (sorted above), so the first
+  // row per TraceId is the one the boundary cursor should land on.
   const seenTraceIds = new Set<string>();
   const rows = rawRows.filter((row) => {
     if (seenTraceIds.has(row.TraceId)) return false;
