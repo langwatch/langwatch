@@ -4,6 +4,11 @@ import { useState } from "react";
 import { CodeEditorModal } from "../../optimization_studio/components/code/CodeEditorModal";
 import { RenderCode } from "../code/RenderCode";
 
+export interface CodeBlockField {
+  identifier: string;
+  type: string;
+}
+
 export type CodeBlockEditorProps = {
   /** The code to display/edit */
   code: string;
@@ -22,6 +27,16 @@ export type CodeBlockEditorProps = {
    * to open the modal from the parent component.
    */
   onEditClick?: () => void;
+  /**
+   * Declared node inputs — surfaced in the Monaco editor as known locals so
+   * autocomplete and the contract validator have something to anchor on.
+   */
+  inputs?: readonly CodeBlockField[];
+  /**
+   * Declared node outputs — surfaced as `"key"` snippets inside `return {…}`
+   * and warned on when missing from the source.
+   */
+  outputs?: readonly CodeBlockField[];
 };
 
 /**
@@ -40,6 +55,8 @@ export function CodeBlockEditor({
   language = "python",
   externalModal = false,
   onEditClick,
+  inputs,
+  outputs,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -113,6 +130,8 @@ export function CodeBlockEditor({
           setCode={onChange}
           open={isModalOpen}
           onClose={handleClose}
+          inputs={inputs}
+          outputs={outputs}
         />
       )}
     </Box>

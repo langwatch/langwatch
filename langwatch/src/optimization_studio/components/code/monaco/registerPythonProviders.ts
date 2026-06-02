@@ -18,19 +18,50 @@ import {
 export interface PythonProviderHandle {
   dispose: () => void;
   /**
-   * Update the editor's view of available secrets without re-registering the
-   * underlying completion provider. The completion callback closes over this
-   * mutable ref, so feeding a new list is enough.
+   * Update the editor's view of available secrets, inputs and outputs without
+   * re-registering the underlying providers. The completion + validator
+   * callbacks close over a mutable ref, so feeding fresh data is enough.
    */
-  setSecrets: (names: readonly string[]) => void;
+  setContract: (next: PythonContract) => void;
+}
+
+export interface PythonField {
+  identifier: string;
+  type: string;
+}
+
+export interface PythonContract {
+  secretNames: readonly string[];
+  /** Inputs are bound as locals on the `input: str` argument of __call__. */
+  inputs: readonly PythonField[];
+  /** Outputs are expected as keys in the `return {...}` dict. */
+  outputs: readonly PythonField[];
 }
 
 export interface RegisterPythonProvidersOptions {
   monaco: Monaco;
-  secretNames: readonly string[];
+  contract: PythonContract;
 }
 
-function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
+interface ContractRef {
+  current: PythonContract;
+}
+
+/**
+ * Monaco's `CompletionItemInsertTextRule` is a flag enum; the runtime API
+ * exposes the singular name (the plural is a long-standing source of
+ * confusion across versions). Bypass the namespace lookup and use the numeric
+ * value directly so we don't trip over const-enum erasure or version drift.
+ *
+ * See microsoft/monaco-editor monaco.d.ts:
+ *   enum CompletionItemInsertTextRule { None = 0, KeepWhitespace = 1, InsertAsSnippet = 4 }
+ */
+const INSERT_AS_SNIPPET = 4;
+
+function itemKind(
+  monaco: Monaco,
+  kind: PyMember["kind"],
+): languages.CompletionItemKind {
   switch (kind) {
     case "function":
       return monaco.languages.CompletionItemKind.Function;
@@ -55,6 +86,7 @@ function memberCompletion(
   const moduleHeader = module ? `${module.name}.${member.name}` : member.name;
   const sig = member.signature ?? label;
   const doc = member.doc ?? "";
+  const isCallable = member.kind === "function" || member.kind === "method";
   return {
     label,
     kind: itemKind(monaco, member.kind),
@@ -62,14 +94,8 @@ function memberCompletion(
     documentation: {
       value: `**${moduleHeader}**\n\n\`${sig}\`\n\n${doc}`,
     },
-    insertText:
-      member.kind === "function" || member.kind === "method"
-        ? `${label}($0)`
-        : label,
-    insertTextRules:
-      member.kind === "function" || member.kind === "method"
-        ? monaco.languages.CompletionItemInsertTextRules.InsertAsSnippet
-        : monaco.languages.CompletionItemInsertTextRules.KeepWhitespace,
+    insertText: isCallable ? `${label}($0)` : label,
+    ...(isCallable ? { insertTextRules: INSERT_AS_SNIPPET } : {}),
     range,
   };
 }
@@ -88,7 +114,8 @@ const ATTR_ACCESS = /(\b[A-Za-z_][\w.]*?)\.([\w]*)$/;
  */
 function scanImports(source: string): Map<string, PyModule> {
   const map = new Map<string, PyModule>();
-  const importRe = /^(?:[ \t]*)(?:import|from)\s+([\w.]+)(?:\s+as\s+(\w+))?(?:\s+import\s+([\w,\s*]+))?/gm;
+  const importRe =
+    /^(?:[ \t]*)(?:import|from)\s+([\w.]+)(?:\s+as\s+(\w+))?(?:\s+import\s+([\w,\s*]+))?/gm;
   for (const match of source.matchAll(importRe)) {
     const moduleName = match[1];
     const alias = match[2];
@@ -100,13 +127,9 @@ function scanImports(source: string): Map<string, PyModule> {
   return map;
 }
 
-interface SecretsRef {
-  current: readonly string[];
-}
-
 function registerCompletion(
   monaco: Monaco,
-  secretsRef: SecretsRef,
+  contractRef: ContractRef,
 ): IDisposable {
   return monaco.languages.registerCompletionItemProvider("python", {
     triggerCharacters: [".", " "],
@@ -162,12 +185,11 @@ function registerCompletion(
       if (attrMatch) {
         const owner = attrMatch[1];
         if (!owner) {
-          // unreachable in practice (regex group is non-optional) — bail safely
           return { suggestions: [] };
         }
         if (owner === "secrets") {
           return {
-            suggestions: secretsRef.current.map((name) => ({
+            suggestions: contractRef.current.secretNames.map((name) => ({
               label: name,
               kind: monaco.languages.CompletionItemKind.Constant,
               detail: "str",
@@ -192,25 +214,23 @@ function registerCompletion(
         return { suggestions: [] };
       }
 
-      // Default: builtins + keywords + already-imported module names.
+      // Default surface: builtins, keywords, imported modules, node inputs,
+      // and a discoverable `secrets` handle.
       const imports = scanImports(model.getValue());
       const importedNames = Array.from(imports.keys());
       const suggestions: languages.CompletionItem[] = [
-        ...PYTHON_BUILTINS.map((b) => ({
-          label: b.name,
-          kind: itemKind(monaco, b.kind),
-          detail: b.signature ?? "",
-          documentation: { value: b.doc ?? "" },
-          insertText:
-            b.kind === "function"
-              ? `${b.name}($0)`
-              : b.name,
-          insertTextRules:
-            b.kind === "function"
-              ? monaco.languages.CompletionItemInsertTextRules.InsertAsSnippet
-              : monaco.languages.CompletionItemInsertTextRules.KeepWhitespace,
-          range: replaceRange,
-        })),
+        ...PYTHON_BUILTINS.map((b) => {
+          const isCallable = b.kind === "function";
+          return {
+            label: b.name,
+            kind: itemKind(monaco, b.kind),
+            detail: b.signature ?? "",
+            documentation: { value: b.doc ?? "" },
+            insertText: isCallable ? `${b.name}($0)` : b.name,
+            ...(isCallable ? { insertTextRules: INSERT_AS_SNIPPET } : {}),
+            range: replaceRange,
+          };
+        }),
         ...PYTHON_KEYWORDS.map((kw) => ({
           label: kw,
           kind: monaco.languages.CompletionItemKind.Keyword,
@@ -224,22 +244,57 @@ function registerCompletion(
           insertText: name,
           range: replaceRange,
         })),
+        // Node inputs — bound as locals from the `input` arg dict in the
+        // runtime adapter. Sort them to the top so users discover the contract.
+        ...contractRef.current.inputs.map((field) => ({
+          label: field.identifier,
+          kind: monaco.languages.CompletionItemKind.Variable,
+          detail: field.type,
+          documentation: {
+            value: `**${field.identifier}**: \`${field.type}\`\n\nNode input. Wired in the properties panel.`,
+          },
+          insertText: field.identifier,
+          range: replaceRange,
+          sortText: `0_input_${field.identifier}`,
+        })),
       ];
 
-      // `secrets` itself is always available — surface it as a known constant
-      // so users discover the namespace from a fresh buffer.
-      if (secretsRef.current.length > 0) {
+      // `secrets` itself is always discoverable from a fresh buffer.
+      if (contractRef.current.secretNames.length > 0) {
         suggestions.push({
           label: "secrets",
           kind: monaco.languages.CompletionItemKind.Variable,
           detail: "SimpleNamespace",
           documentation: {
-            value: `Project secrets namespace. Access with \`secrets.NAME\`.\n\n${secretsRef.current.length} secret${secretsRef.current.length === 1 ? "" : "s"} available.`,
+            value: `Project secrets namespace. Access with \`secrets.NAME\`.\n\n${contractRef.current.secretNames.length} secret${contractRef.current.secretNames.length === 1 ? "" : "s"} available.`,
           },
           insertText: "secrets",
           range: replaceRange,
           sortText: "0_secrets",
         });
+      }
+
+      // Suggest output keys when the user is mid-dict-literal or returning.
+      // Cheap detection: if the surrounding text on/before this line looks
+      // like a return dict, offer the declared outputs as string-key snippets.
+      const wantsKey =
+        /\breturn\s*\{[^}]*$/.test(lineBefore) ||
+        /\{[^}]*$/.test(lineBefore.trimStart());
+      if (wantsKey) {
+        for (const field of contractRef.current.outputs) {
+          suggestions.push({
+            label: `"${field.identifier}"`,
+            kind: monaco.languages.CompletionItemKind.Field,
+            detail: field.type,
+            documentation: {
+              value: `Declared node output **${field.identifier}**: \`${field.type}\``,
+            },
+            insertText: `"${field.identifier}": $0`,
+            insertTextRules: INSERT_AS_SNIPPET,
+            range: replaceRange,
+            sortText: `0_output_${field.identifier}`,
+          });
+        }
       }
 
       return { suggestions };
@@ -270,7 +325,10 @@ function registerHover(monaco: Monaco): IDisposable {
           return {
             contents: [
               { value: `**${mod.name}.${member.name}**` },
-              { value: "```python\n" + (member.signature ?? member.name) + "\n```" },
+              {
+                value:
+                  "```python\n" + (member.signature ?? member.name) + "\n```",
+              },
               { value: member.doc ?? "" },
             ],
           };
@@ -281,7 +339,10 @@ function registerHover(monaco: Monaco): IDisposable {
         return {
           contents: [
             { value: `**${builtin.name}**` },
-            { value: "```python\n" + (builtin.signature ?? builtin.name) + "\n```" },
+            {
+              value:
+                "```python\n" + (builtin.signature ?? builtin.name) + "\n```",
+            },
             { value: builtin.doc ?? "" },
           ],
         };
@@ -334,7 +395,6 @@ function registerFormatter(monaco: Monaco): IDisposable {
           formatted.push(out);
         }
       }
-      // Strip leading blank lines and ensure single trailing newline.
       while (formatted.length > 0 && formatted[0] === "") formatted.shift();
       while (formatted.length > 0 && formatted[formatted.length - 1] === "") {
         formatted.pop();
@@ -354,10 +414,15 @@ function registerFormatter(monaco: Monaco): IDisposable {
 
 /**
  * Lightweight client-side validator — flags mismatched brackets, unterminated
- * strings, and tabs-after-spaces indentation. Not a full Python parser; it
- * catches the structural mistakes users hit most without a server round-trip.
+ * strings, tabs-after-spaces indentation, and (when the node has declared
+ * outputs) any output keys missing from the user's `return {...}` dict. Not a
+ * full Python parser; it catches the structural mistakes users hit most
+ * without a server round-trip.
  */
-function registerValidator(monaco: Monaco): IDisposable {
+function registerValidator(
+  monaco: Monaco,
+  contractRef: ContractRef,
+): IDisposable {
   const owner = "langwatch-python-lint";
 
   const validate = (model: editor.ITextModel): void => {
@@ -366,7 +431,6 @@ function registerValidator(monaco: Monaco): IDisposable {
     const source = model.getValue();
     const lines = source.split("\n");
 
-    // Bracket matcher across the whole file (string-aware).
     const stack: { ch: string; line: number; col: number }[] = [];
     const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
     let inString: false | '"' | "'" | '"""' | "'''" = false;
@@ -387,10 +451,7 @@ function registerValidator(monaco: Monaco): IDisposable {
             col += 3;
             continue;
           }
-          if (
-            (inString === '"' || inString === "'") &&
-            ch === inString
-          ) {
+          if ((inString === '"' || inString === "'") && ch === inString) {
             inString = false;
             col += 1;
             continue;
@@ -403,7 +464,7 @@ function registerValidator(monaco: Monaco): IDisposable {
           continue;
         }
 
-        if (ch === "#") break; // rest of line is comment
+        if (ch === "#") break;
 
         if (next2 === '"""' || next2 === "'''") {
           inString = next2 as '"""' | "'''";
@@ -436,7 +497,6 @@ function registerValidator(monaco: Monaco): IDisposable {
         col += 1;
       }
 
-      // Single-line strings cannot span the newline (triple-quoted can).
       if (inString === '"' || inString === "'") {
         markers.push({
           severity: monaco.MarkerSeverity.Error,
@@ -449,7 +509,6 @@ function registerValidator(monaco: Monaco): IDisposable {
         inString = false;
       }
 
-      // Mixed tabs/spaces in leading indentation.
       const leading = /^([ \t]+)/.exec(line);
       if (leading && /\t/.test(leading[1] ?? "") && / /.test(leading[1] ?? "")) {
         markers.push({
@@ -485,6 +544,27 @@ function registerValidator(monaco: Monaco): IDisposable {
       });
     }
 
+    // Output contract — warn when a declared output is never referenced as a
+    // string key in the source. Cheap: matches `"name"` or `'name'`. Misses
+    // dynamic key construction, which is rare in code nodes.
+    const declaredOutputs = contractRef.current.outputs;
+    if (declaredOutputs.length > 0) {
+      for (const field of declaredOutputs) {
+        const escaped = field.identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const keyRe = new RegExp(`["']${escaped}["']`);
+        if (!keyRe.test(source)) {
+          markers.push({
+            severity: monaco.MarkerSeverity.Warning,
+            message: `Declared output "${field.identifier}" (${field.type}) is never set — make sure your return dict includes it.`,
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: 1,
+            endColumn: 2,
+          });
+        }
+      }
+    }
+
     monaco.editor.setModelMarkers(model, owner, markers);
   };
 
@@ -505,7 +585,10 @@ function registerValidator(monaco: Monaco): IDisposable {
         monaco.editor.setModelMarkers(model, owner, []);
       }
     },
-  };
+    // Also re-run validation when the contract changes externally.
+    // (Caller invokes this via setContract.)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as IDisposable & { revalidate?: () => void };
 }
 
 /**
@@ -516,21 +599,51 @@ function registerValidator(monaco: Monaco): IDisposable {
  */
 export function registerPythonProviders({
   monaco,
-  secretNames,
+  contract,
 }: RegisterPythonProvidersOptions): PythonProviderHandle {
-  const secretsRef: SecretsRef = { current: secretNames };
-  const disposers: IDisposable[] = [
-    registerCompletion(monaco, secretsRef),
-    registerHover(monaco),
-    registerFormatter(monaco),
-    registerValidator(monaco),
-  ];
+  const contractRef: ContractRef = { current: contract };
+  const completionDisposer = registerCompletion(monaco, contractRef);
+  const hoverDisposer = registerHover(monaco);
+  const formatterDisposer = registerFormatter(monaco);
+  const validatorDisposer = registerValidator(monaco, contractRef);
+
+  // Re-run validation when the contract changes so output-missing markers
+  // update immediately rather than waiting for the next keystroke.
+  const revalidate = () => {
+    for (const model of monaco.editor.getModels()) {
+      if (model.getLanguageId() !== "python") continue;
+      // Force a no-op content event to re-trigger the validator via
+      // onDidChangeContent listeners. Cheaper than introspecting internals.
+      const value = model.getValue();
+      if (value.length > 0) {
+        // Use applyEdits with a zero-text edit at end-of-document to fire
+        // change listeners without altering content.
+        const last = model.getFullModelRange().getEndPosition();
+        model.applyEdits([
+          {
+            range: {
+              startLineNumber: last.lineNumber,
+              startColumn: last.column,
+              endLineNumber: last.lineNumber,
+              endColumn: last.column,
+            },
+            text: "",
+          },
+        ]);
+      }
+    }
+  };
+
   return {
     dispose: () => {
-      for (const d of disposers) d.dispose();
+      completionDisposer.dispose();
+      hoverDisposer.dispose();
+      formatterDisposer.dispose();
+      validatorDisposer.dispose();
     },
-    setSecrets: (names) => {
-      secretsRef.current = names;
+    setContract: (next) => {
+      contractRef.current = next;
+      revalidate();
     },
   };
 }

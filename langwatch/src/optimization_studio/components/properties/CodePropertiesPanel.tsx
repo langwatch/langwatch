@@ -153,6 +153,11 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
         code={code}
         onChange={handleCodeChange}
         language="python"
+        inputs={inputs.map((i) => ({ identifier: i.identifier, type: i.type }))}
+        outputs={outputs.map((o) => ({
+          identifier: o.identifier,
+          type: o.type,
+        }))}
       />
 
       {/* Inputs using VariablesSection */}

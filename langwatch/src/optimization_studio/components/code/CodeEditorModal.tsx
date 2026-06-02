@@ -24,6 +24,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "~/utils/api";
 import {
   registerPythonProviders,
+  type PythonField,
   type PythonProviderHandle,
 } from "./monaco/registerPythonProviders";
 import { defineLangwatchThemes, themeNameForColorMode } from "./monaco/themes";
@@ -42,17 +43,26 @@ type MonacoEditorInstance = {
   getAction: (id: string) => { run: () => void } | null;
 };
 
+interface ContractProps {
+  /** Node inputs — declared in the Inputs section of the properties panel. */
+  inputs?: readonly PythonField[];
+  /** Node outputs — declared in the Outputs section of the properties panel. */
+  outputs?: readonly PythonField[];
+}
+
 export function CodeEditorModal({
   code,
   setCode,
   open,
   onClose,
+  inputs,
+  outputs,
 }: {
   code: string;
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
-}) {
+} & ContractProps) {
   const { project } = useOrganizationTeamProject();
   const [localCode, setLocalCode] = useState(code);
   const editorRef = useRef<MonacoEditorInstance | null>(null);
@@ -136,6 +146,8 @@ export function CodeEditorModal({
               onClose={onClose_}
               language="python"
               technologies={["python", "dspy"]}
+              inputs={inputs}
+              outputs={outputs}
               onEditorMount={(ed) => {
                 editorRef.current = ed;
               }}
@@ -157,12 +169,16 @@ const onKeyDown = {
   fn: () => {},
 };
 
+const EMPTY_FIELDS: readonly PythonField[] = [];
+
 export function CodeEditor({
   code,
   setCode,
   onClose,
   language,
   technologies,
+  inputs,
+  outputs,
   onEditorMount,
 }: {
   code: string;
@@ -171,7 +187,7 @@ export function CodeEditor({
   language: string;
   technologies: string[];
   onEditorMount?: (editor: MonacoEditorInstance) => void;
-}) {
+} & ContractProps) {
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
   const providersRef = useRef<PythonProviderHandle | null>(null);
@@ -187,13 +203,20 @@ export function CodeEditor({
     [secretsQuery.data],
   );
 
+  const inputFields = inputs ?? EMPTY_FIELDS;
+  const outputFields = outputs ?? EMPTY_FIELDS;
+
   useEffect(() => {
     onKeyDown.fn = onClose;
   }, [onClose]);
 
   useEffect(() => {
-    providersRef.current?.setSecrets(secretNames);
-  }, [secretNames]);
+    providersRef.current?.setContract({
+      secretNames,
+      inputs: inputFields,
+      outputs: outputFields,
+    });
+  }, [secretNames, inputFields, outputFields]);
 
   useEffect(() => {
     return () => {
@@ -220,7 +243,11 @@ export function CodeEditor({
           providersRef.current?.dispose();
           providersRef.current = registerPythonProviders({
             monaco,
-            secretNames,
+            contract: {
+              secretNames,
+              inputs: inputFields,
+              outputs: outputFields,
+            },
           });
         }
 
