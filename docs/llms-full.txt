@@ -13389,9 +13389,6 @@ Powered by the open-source **[Scenario](https://github.com/langwatch/scenario)**
   <Card title="Red teaming" icon="shield-halved" href="/agent-simulations/red-teaming">
     Run multi-turn adversarial attacks (Crescendo escalation, refusal detection, backtracking) to find security gaps before attackers do.
   </Card>
-  <Card title="Visualize in LangWatch" icon="chart-line" href="/agent-simulations/overview">
-    Organize runs into sets and batches, step through conversations, and track pass/fail over time across your whole team.
-  </Card>
 </CardGroup>
 
 ## The Three Levels of Agent Quality
@@ -13478,7 +13475,7 @@ Once you've set up your agent tests with Scenario, LangWatch provides powerful v
 - **Track performance** over time with run history
 - **Collaborate** with your team on agent improvements
 
-See [Viewing in LangWatch](/agent-simulations/overview) to learn how to inspect, replay, and compare your runs in the simulation visualizer.
+See [the LangWatch Simulations visualizer](https://langwatch.ai/scenario/visualizations) to learn how to inspect, replay, and compare your runs.
 
 <img
   src="/images/simulations/simulation-set-overview.png"
@@ -13489,45 +13486,9 @@ See [Viewing in LangWatch](/agent-simulations/overview) to learn how to inspect,
 ## Next Steps
 
 - [Getting Started](/agent-simulations/getting-started) - Set up your first simulation
-- [Viewing in LangWatch](/agent-simulations/overview) - Inspect and debug your runs in the simulation visualizer
 - [Voice Agents](/agent-simulations/voice-agents) - Test voice agents end-to-end over real audio
 - [Red Teaming](/agent-simulations/red-teaming) - Run adversarial attacks against your agent
 - [Scenario Documentation](https://langwatch.ai/scenario/) - Deep dive into the testing framework
-
----
-
-# FILE: ./agent-simulations/overview.mdx
-
----
-title: Viewing Runs in LangWatch
-sidebarTitle: Viewing in LangWatch
-keywords: langwatch, simulations, visualizer, dashboard, scenario runs
----
-
-The Simulations visualizer in LangWatch provides a powerful way to inspect and analyze the results of your agent tests built with the [`scenario`](https://github.com/langwatch/scenario) library. It offers a user-friendly interface to dig into simulation runs, helping you debug your agent's behavior and collaborate with your team.
-
-<img
-  src="/images/simulations/simulation-set-overview.png"
-  alt="Simulations Sets"
-  width="100%"
-/>
-
-## How it Works
-
-When you run your scenarios with the LangWatch integration enabled, the results are sent to the LangWatch platform and become available in the Simulations section.
-
-This allows you to:
-
-- Organize your simulations into **Sets** for better management.
-- View a **history of runs** for each set, and **batch runs** grouped by execution (e.g. a single CI job).
-- Drill down into an individual **scenario run** to step through the full conversation and read the judge's verdict.
-- Visualize **passing and failing** scenarios in a clear grid view, and track regressions across runs.
-
-<Tip>
-  Not sending runs yet? The [Getting Started](/agent-simulations/getting-started) guide shows you how to run a scenario and stream results into LangWatch.
-</Tip>
-
-For technical details on the API, see the [Scenario Event Reference](/api-reference/scenarios/overview).
 
 ---
 
@@ -13664,7 +13625,7 @@ New to Scenario? Start with [Getting Started](/agent-simulations/getting-started
 
   </Step>
   <Step title="Run it">
-    Run it alongside your test suite. We recommend **50 turns** for thorough coverage — agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn shows up in the [Simulations dashboard](/agent-simulations/overview), and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
+    Run it alongside your test suite. We recommend **50 turns** for thorough coverage — agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn shows up in the [Simulations dashboard](https://langwatch.ai/scenario/visualizations), and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
   </Step>
 </Steps>
 
@@ -13822,7 +13783,7 @@ New to Scenario? Start with [Getting Started](/agent-simulations/getting-started
 
   </Step>
   <Step title="Run it">
-    Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run streams to the [Simulations dashboard](/agent-simulations/overview) with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
+    Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run streams to the [Simulations dashboard](https://langwatch.ai/scenario/visualizations) with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
 
     <Tip>Voice scenarios are slower than text — TTS + transport + multi-turn means 30–120s per run, so give your test runner a generous timeout.</Tip>
   </Step>

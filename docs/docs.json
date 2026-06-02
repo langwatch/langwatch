@@ -76,7 +76,6 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
-              "agent-simulations/overview",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -1282,10 +1281,6 @@
     {
       "source": "/self-hosting/open-source",
       "destination": "/self-hosting/docker-compose"
-    },
-    {
-      "source": "/simulations/overview",
-      "destination": "/agent-simulations/overview"
     },
     {
       "source": "/simulations/getting-started",
