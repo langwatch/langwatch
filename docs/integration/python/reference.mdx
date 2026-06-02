@@ -153,8 +153,8 @@ process_data("Sample Data")
   If `True`, this trace (and its spans) will be processed but not sent to the LangWatch backend. This can be useful for local debugging or conditional tracing.
 </ParamField>
 
-<ParamField path="max_string_length" type="Optional[int]" default="5000">
-  The maximum length for string values captured in inputs, outputs, and metadata. Longer strings will be truncated.
+<ParamField path="max_string_length" type="Optional[int]" default="None">
+  Optional per-field byte cap for string values in inputs, outputs, and metadata. Defaults to `None` (no client-side truncation) — full content is sent to the backend, which owns sizing. Set to an integer (≥ 100) to truncate longer strings client-side before transmission.
 </ParamField>
 
 <ParamField path="skip_root_span" type="bool" default="False">
