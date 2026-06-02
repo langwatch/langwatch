@@ -688,4 +688,100 @@ describe("Scenarios Skill", () => {
     },
     900_000 // longer timeout — agent needs to run tests + generate suggestions
   );
+
+  it.skipIf(isCI)(
+    "creates voice scenario tests for a Python OpenAI bot",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-voice-py-")
+      );
+      console.log(`[voice dogfood] working dir: ${tempFolder}`);
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
+        name: "Python OpenAI voice scenario tests",
+        description:
+          "Adding voice scenario tests to a Python OpenAI bot project — the skill must reach for one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter / ElevenLabsAgentAdapter / PipecatAgentAdapter / GeminiLiveAgentAdapter / TwilioAgentAdapter) and seed an ElevenLabs voice on the user simulator, not write yet another text-only scenario test.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, or TwilioAgentAdapter) — NOT a generic text-only scenario",
+              "Agent seeded a voice on the UserSimulatorAgent (e.g. `voice=\"elevenlabs/...\"` or `voice=\"openai/...\"`) so the simulated caller speaks rather than types",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation, OR explicitly read the voice docs surface (voice/getting-started, voice/choosing-an-adapter, voice/capability-matrix, voice/recipes/*)",
+            ],
+          }),
+        ],
+        script: [
+          // The literal slash-command invocation the docs (PR
+          // https://github.com/langwatch/scenario/pull/598) tell users to
+          // type. This dogfoods that the SKILL itself picks up on the
+          // "voice testing" intent without us coaching it further.
+          scenario.user(
+            "/scenarios add voice testing to my agent"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
+
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(
+              testFiles.length,
+              `Expected at least one test_*.py file in ${tempFolder}`
+            ).toBeGreaterThan(0);
+
+            const testContent = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+
+            // Standard scenario-shape checks (mirrors the existing
+            // red-team test's guardrails so we catch the same regressions
+            // here).
+            expect(testContent).toContain("import scenario");
+            expect(testContent).toMatch(/scenario\.run\(/);
+            expect(testContent).not.toMatch(
+              /from\s+(agent_tester|simulation_framework|langwatch\.testing|voice_test_framework)/
+            );
+
+            // Voice-specific guardrails. At least ONE voice adapter
+            // shows up. The skill can't legitimately write a "voice
+            // scenario test" without picking up an audio transport.
+            // `ComposableVoiceAgent` is included because, for a text-only
+            // fixture without a hosted voice agent, the skill can validly
+            // wrap an STT+LLM+TTS chain rather than invent a fake hosted
+            // agent (verified by the dogfood run on the python-openai
+            // fixture, which has no voice transport of its own).
+            expect(
+              testContent,
+              "Expected the test to instantiate a voice adapter (OpenAIRealtimeAgentAdapter / ElevenLabsAgentAdapter / PipecatAgentAdapter / GeminiLiveAgentAdapter / TwilioAgentAdapter / ComposableVoiceAgent)"
+            ).toMatch(
+              /\b(OpenAIRealtimeAgentAdapter|ElevenLabsAgentAdapter|PipecatAgentAdapter|GeminiLiveAgentAdapter|TwilioAgentAdapter|ComposableVoiceAgent)\b/
+            );
+
+            // The user simulator should carry a voice — either an
+            // ElevenLabs voice ID or an OpenAI TTS voice — otherwise
+            // the "caller" is silent and the scenario degrades to a
+            // text scenario with a voice adapter bolted on. Allow
+            // `voice="elevenlabs/<id>"` (recommended) and `voice="openai/<id>"`.
+            expect(
+              testContent,
+              'Expected UserSimulatorAgent(voice="elevenlabs/..." | "openai/...") so the simulated caller speaks'
+            ).toMatch(/voice\s*=\s*["'](?:elevenlabs|openai)\/[^"']+["']/);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });
