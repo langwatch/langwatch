@@ -582,8 +582,12 @@ function buildColumnPattern(col: string, alias: string): RegExp {
   const rawCol = col.replace(/"/g, "");
   // Escape special regex chars in the column name (e.g. dots in "Events.Name")
   const escaped = rawCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // Match alias.Column or unqualified Column, followed by a boundary
-  const pattern = `(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
+  // Match alias.Column or an unqualified column token, but not a suffix inside
+  // another identifier. The left boundary applies to the whole match (before
+  // the optional alias too), so neither "Attributes" matches the tail of
+  // "SpanAttributes", nor "ts." matches the tail of "Events." in
+  // "Events.Attributes".
+  const pattern = `(?<![\\w."])(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
   return new RegExp(pattern);
 }
 

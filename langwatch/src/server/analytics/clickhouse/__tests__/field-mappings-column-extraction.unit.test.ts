@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
+  extractReferencedTraceColumns,
 } from "../field-mappings";
 
 describe("extractReferencedSpanColumns", () => {
@@ -189,6 +190,50 @@ describe("extractReferencedEvaluationColumns", () => {
     it("matches Status at end of string", () => {
       const result = extractReferencedEvaluationColumns(["es.Status"]);
       expect(result).toContain("Status");
+    });
+  });
+});
+
+describe("extractReferencedTraceColumns", () => {
+  describe("when expression references trace columns", () => {
+    it("extracts the Attributes map for ts-qualified bracket access", () => {
+      const result = extractReferencedTraceColumns([
+        "ts.Attributes['langwatch.user_id'] = {v:String}",
+      ]);
+      expect(result).toContain("Attributes");
+    });
+
+    it("extracts TopicId from a filter predicate", () => {
+      const result = extractReferencedTraceColumns(["ts.TopicId IN ('a')"]);
+      expect(result).toContain("TopicId");
+      expect(result).not.toContain("SubTopicId");
+    });
+  });
+
+  describe("when expression only references span attributes", () => {
+    it("does not match trace Attributes inside SpanAttributes", () => {
+      // Suffix collision: "Attributes" is the tail of "SpanAttributes".
+      const result = extractReferencedTraceColumns([
+        "ss.SpanAttributes['gen_ai.request.model'] = {v:String}",
+      ]);
+      expect(result).not.toContain("Attributes");
+    });
+
+    it('does not match trace Attributes inside quoted "Events.Attributes"', () => {
+      const result = extractReferencedTraceColumns([
+        'mapContains(ss."Events.Attributes", \'x\')',
+      ]);
+      expect(result).not.toContain("Attributes");
+    });
+  });
+
+  describe("when expression references no trace columns", () => {
+    it("returns an empty set", () => {
+      const result = extractReferencedTraceColumns([
+        "ss.DurationMs > 100",
+        "1=1",
+      ]);
+      expect(result.size).toBe(0);
     });
   });
 });
