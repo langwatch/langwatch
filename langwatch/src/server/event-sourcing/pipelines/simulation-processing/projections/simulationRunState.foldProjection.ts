@@ -29,6 +29,57 @@ import {
   SimulationRunDeletedEventSchema,
 } from "../schemas/events";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "~/utils/logger/server";
+
+const projectionLogger = createLogger("simulationRunState.foldProjection");
+
+/**
+ * Per-message size cap for `Messages.Content` / `Messages.Rest`.
+ *
+ * Set generously (64 KiB) so normal text turns — even verbose multi-paragraph
+ * assistant replies — are never truncated. Messages that exceed this are
+ * almost always the symptom of an upstream SDK shipping inline binary media
+ * that the stored-objects pipeline failed to externalise (the original
+ * symptom: scenario voice runs persisting full base64 PCM16 audio in
+ * `Messages.Content`, which then leaked into every `getSuiteRunData`
+ * response). Truncation here keeps the list path bounded and makes the
+ * regression visible (via logs + the surfaced marker) instead of silently
+ * blowing up the simulations page.
+ */
+const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
+const MAX_MESSAGE_REST_BYTES = 64 * 1024;
+
+/**
+ * Cap an oversized message-content / rest string and emit a structured warn
+ * log so an SDK regression doesn't silently land 90+ MB rows in ClickHouse.
+ * The returned marker has a stable prefix so monitoring + retroactive scans
+ * can find affected rows.
+ */
+function capOversizedString(
+  value: string,
+  maxBytes: number,
+  field: "Content" | "Rest",
+  ctx: { scenarioRunId: string; messageId?: string; messageRole?: string },
+): string {
+  // String length is char-count, not bytes; rough byte check via
+  // Buffer.byteLength gives an accurate UTF-8 size. Fast path: skip the
+  // Buffer allocation when length alone already proves the string is small.
+  if (value.length <= maxBytes) return value;
+  const byteLength = Buffer.byteLength(value, "utf8");
+  if (byteLength <= maxBytes) return value;
+  projectionLogger.warn(
+    {
+      scenarioRunId: ctx.scenarioRunId,
+      messageId: ctx.messageId,
+      messageRole: ctx.messageRole,
+      field,
+      byteLength,
+      maxBytes,
+    },
+    `simulation message ${field} exceeds size cap — truncating (probable inline media not externalised)`,
+  );
+  return `[truncated: message ${field.toLowerCase()} was ${byteLength} bytes (cap ${maxBytes}); likely inline media that was not externalised to stored-objects]`;
+}
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
   // When `content` is an array, preserve it in Rest so the renderer can route
@@ -234,12 +285,16 @@ export class SimulationRunStateFoldProjection
           content = JSON.stringify(m.content);
         }
 
+        const messageId = typeof m.id === "string" ? m.id : "";
+        const messageRole = typeof m.role === "string" ? m.role : "";
+        const ctx = { scenarioRunId: state.ScenarioRunId, messageId, messageRole };
+
         return {
-          Id: typeof m.id === "string" ? m.id : "",
-          Role: typeof m.role === "string" ? m.role : "",
-          Content: content,
+          Id: messageId,
+          Role: messageRole,
+          Content: capOversizedString(content, MAX_MESSAGE_CONTENT_BYTES, "Content", ctx),
           TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
-          Rest: buildMessageRestJson(m),
+          Rest: capOversizedString(buildMessageRestJson(m), MAX_MESSAGE_REST_BYTES, "Rest", ctx),
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
@@ -292,12 +347,22 @@ export class SimulationRunStateFoldProjection
       (m) => m.Id === event.data.messageId,
     );
 
+    const ctx = {
+      scenarioRunId: state.ScenarioRunId,
+      messageId: event.data.messageId,
+      messageRole: event.data.role,
+    };
     const row: SimulationMessageRow = {
       Id: event.data.messageId,
       Role: event.data.role,
-      Content: event.data.content,
+      Content: capOversizedString(event.data.content, MAX_MESSAGE_CONTENT_BYTES, "Content", ctx),
       TraceId: event.data.traceId ?? "",
-      Rest: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+      Rest: capOversizedString(
+        buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+        MAX_MESSAGE_REST_BYTES,
+        "Rest",
+        ctx,
+      ),
     };
 
     let updatedMessages: SimulationMessageRow[];
