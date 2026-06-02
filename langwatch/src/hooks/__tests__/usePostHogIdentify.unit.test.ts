@@ -226,11 +226,11 @@ describe("usePostHogIdentify", () => {
       );
 
       // Open upgrade modal
-      useUpgradeModalStore.getState().open("projects", 5, 5);
+      useUpgradeModalStore.getState().open("members", 5, 5);
 
       expect(mockCapture).toHaveBeenCalledWith("upgrade_modal_shown", {
         mode: "limit",
-        limitType: "projects",
+        limitType: "members",
         current: 5,
         max: 5,
       });
@@ -284,7 +284,7 @@ describe("usePostHogIdentify", () => {
         }),
       );
 
-      useUpgradeModalStore.getState().open("projects", 5, 5);
+      useUpgradeModalStore.getState().open("members", 5, 5);
       mockCapture.mockClear();
 
       useUpgradeModalStore.getState().close();

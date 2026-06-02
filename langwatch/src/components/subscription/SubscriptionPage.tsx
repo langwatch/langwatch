@@ -324,7 +324,6 @@ export function SubscriptionPage() {
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
       maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
-      maxProjects: plan?.maxProjects ?? 0,
       maxMembersLite: plan?.maxMembersLite ?? 0,
     })
     : isEnterprisePlan

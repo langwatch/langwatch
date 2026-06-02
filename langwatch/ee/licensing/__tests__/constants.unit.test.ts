@@ -66,7 +66,7 @@ describe("UNLIMITED_PLAN", () => {
     expect(UNLIMITED_PLAN.free).toBe(true);
     expect(UNLIMITED_PLAN.overrideAddingLimitations).toBe(true);
     expect(UNLIMITED_PLAN.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
-    expect(UNLIMITED_PLAN.maxProjects).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.maxMembersLite).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.canPublish).toBe(true);
   });
@@ -87,7 +87,7 @@ describe("FREE_PLAN", () => {
     expect(FREE_PLAN.name).toBe("Free");
     expect(FREE_PLAN.free).toBe(true);
     expect(FREE_PLAN.maxMembers).toBe(1);
-    expect(FREE_PLAN.maxProjects).toBe(2);
+    expect(FREE_PLAN.maxMembersLite).toBe(0);
     expect(FREE_PLAN.maxMessagesPerMonth).toBe(1000);
     expect(FREE_PLAN.canPublish).toBe(false);
   });

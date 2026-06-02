@@ -22,11 +22,6 @@ Feature: Subscription Limit Overrides
   # Existing Overrides Still Work
   # ============================================================================
 
-  Scenario: Subscription with a project override uses that value
-    Given the subscription overrides project capacity to 50
-    When the plan is resolved for the organization
-    Then the plan allows 50 projects
-
   Scenario: Subscription with a monthly message override uses that value
     Given the subscription overrides monthly message capacity to 500000
     When the plan is resolved for the organization

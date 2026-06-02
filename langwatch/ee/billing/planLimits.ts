@@ -10,7 +10,6 @@ import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 export const UNLIMITED_MESSAGES = 999_999_999;
 
 const PAID_FEATURES = {
-  maxTeams: 9999,
   maxMembersLite: 9999,
   canPublish: true,
 } as const;
@@ -20,7 +19,6 @@ type PlanOverrides = Pick<
   | "type"
   | "name"
   | "maxMembers"
-  | "maxProjects"
   | "maxMessagesPerMonth"
   | "prices"
 > &
@@ -54,7 +52,6 @@ const LAUNCH_PLAN = definePaidPlan({
   type: PlanTypes.LAUNCH,
   name: "Launch",
   maxMembers: 3,
-  maxProjects: 99,
   maxMessagesPerMonth: 20_000,
   prices: {
     USD: 59,
@@ -66,7 +63,6 @@ const ACCELERATE_PLAN = definePaidPlan({
   type: PlanTypes.ACCELERATE,
   name: "Accelerate",
   maxMembers: 5,
-  maxProjects: 99,
   maxMessagesPerMonth: 20_000,
   prices: {
     USD: 199,
@@ -83,9 +79,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     // SaaS Free gets the 14-day content visibility window.
     visibilityDays: FREE_VISIBILITY_DAYS,
     maxMembers: 2,
-    maxProjects: 2,
     maxMessagesPerMonth: 50_000,
-    maxTeams: 1,
     maxMembersLite: 0,
     canPublish: true,
     prices: {
@@ -97,7 +91,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     type: PlanTypes.PRO,
     name: "Pro",
     maxMembers: 5,
-    maxProjects: 9999,
     maxMessagesPerMonth: 10_000,
     prices: {
       USD: 99,
@@ -128,7 +121,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     type: PlanTypes.GROWTH,
     name: "Growth",
     maxMembers: 10,
-    maxProjects: 99,
     maxMessagesPerMonth: 100_000,
     prices: {
       USD: 399,
@@ -142,7 +134,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
         type,
         name: "Growth",
         maxMembers: 20,
-        maxProjects: 99,
         maxMessagesPerMonth: UNLIMITED_MESSAGES,
         userPrice: { EUR: 29, USD: 32 },
         prices: { USD: 0, EUR: 0 },
@@ -153,7 +144,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     type: PlanTypes.ENTERPRISE,
     name: "Enterprise",
     maxMembers: 1000,
-    maxProjects: 9999,
     maxMessagesPerMonth: 1_000_000,
     prices: {
       USD: 999,

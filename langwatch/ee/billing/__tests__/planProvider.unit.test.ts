@@ -52,7 +52,7 @@ describe("getFreePlanLimits", () => {
     expect(plan.name).toBe("Free");
     expect(plan.free).toBe(true);
     expect(plan.maxMembers).toBe(baseFree.maxMembers);
-    expect(plan.maxProjects).toBe(baseFree.maxProjects);
+    expect(plan.maxMembersLite).toBe(baseFree.maxMembersLite);
   });
 });
 
@@ -140,7 +140,7 @@ describe("createSaaSPlanProvider", () => {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
           maxMembers: 10,
-          maxProjects: null,
+          maxMembersLite: null,
           maxMessagesPerMonth: null,
         };
 
@@ -150,7 +150,9 @@ describe("createSaaSPlanProvider", () => {
 
         expect(plan.type).toBe(PlanTypes.LAUNCH);
         expect(plan.maxMembers).toBe(10);
-        expect(plan.maxProjects).toBe(PLAN_LIMITS[PlanTypes.LAUNCH].maxProjects);
+        expect(plan.maxMembersLite).toBe(
+          PLAN_LIMITS[PlanTypes.LAUNCH].maxMembersLite,
+        );
       });
 
       describe("when valid subscription exists for SEAT_EVENT org", () => {
@@ -160,7 +162,7 @@ describe("createSaaSPlanProvider", () => {
             plan: PlanTypes.LAUNCH,
             status: SubscriptionStatus.ACTIVE,
             maxMembers: null,
-            maxProjects: null,
+            maxMembersLite: null,
             maxMessagesPerMonth: null,
           };
 
@@ -219,7 +221,7 @@ describe("createSaaSPlanProvider", () => {
     describe("when new override fields are set", () => {
       it.each([
         ["maxMembersLite", 15],
-        ["maxTeams", 10],
+        ["maxMessagesPerMonth", 250_000],
       ] as const)("applies %s override when set to %d", async (field, value) => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
@@ -238,28 +240,6 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan[field]).toBe(value);
-      });
-    });
-
-    describe("when project capacity is overridden", () => {
-      /** @scenario Subscription with a project override uses that value */
-      it("returns the override value for maxProjects", async () => {
-        const subscription = {
-          plan: PlanTypes.LAUNCH,
-          status: SubscriptionStatus.ACTIVE,
-          maxProjects: 50,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxProjects").map(
-              (f) => [f, null],
-            ),
-          ),
-        };
-
-        const db = createMockDb({ findFirstResult: subscription });
-        const provider = createSaaSPlanProvider(db);
-        const plan = await provider.getActivePlan("org_1");
-
-        expect(plan.maxProjects).toBe(50);
       });
     });
 
@@ -290,7 +270,6 @@ describe("createSaaSPlanProvider", () => {
       it("applies each override and leaves remaining fields at plan defaults", async () => {
         const overrides = {
           maxMembers: 20,
-          maxTeams: 50,
           maxMembersLite: 30,
           maxMessagesPerMonth: 200_000,
         };
@@ -310,7 +289,6 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan.maxMembers).toBe(20);
-        expect(plan.maxTeams).toBe(50);
         expect(plan.maxMembersLite).toBe(30);
         expect(plan.maxMessagesPerMonth).toBe(200_000);
 
@@ -369,9 +347,9 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
           status: SubscriptionStatus.ACTIVE,
-          maxTeams: 50,
+          maxMembersLite: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxTeams").map(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
               (f) => [f, null],
             ),
           ),
@@ -382,7 +360,7 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan.type).toBe(PlanTypes.FREE);
-        expect(plan.maxTeams).toBe(50);
+        expect(plan.maxMembersLite).toBe(50);
       });
 
       describe("when SEAT_EVENT org has unknown plan key", () => {

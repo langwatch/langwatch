@@ -27,14 +27,6 @@ type LimitTypeConfig = {
  * No need to modify any switch statements.
  */
 const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
-  projects: {
-    getCount: (repo, orgId) => repo.getProjectCount(orgId),
-    getMax: (plan) => plan.maxProjects,
-  },
-  teams: {
-    getCount: (repo, orgId) => repo.getTeamCount(orgId),
-    getMax: (plan) => plan.maxTeams,
-  },
   members: {
     getCount: (repo, orgId) => repo.getMemberCount(orgId),
     getMax: (plan) => plan.maxMembers,

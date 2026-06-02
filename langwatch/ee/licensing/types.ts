@@ -98,10 +98,6 @@ type LicenseResourceLimits = {
   maxMembers: number;
   currentMembersLite: number;
   maxMembersLite: number;
-  currentTeams: number;
-  maxTeams: number;
-  currentProjects: number;
-  maxProjects: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
 };

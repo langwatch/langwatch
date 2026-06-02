@@ -14,7 +14,6 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * Integration tests for LicenseEnforcementRepository.
  *
  * Tests counting logic against a real database to verify:
- * - Archived projects are excluded from getProjectCount
  * - getMembersLiteCount correctly filters by Lite Member (EXTERNAL) role
  * - getMemberCount counts only ADMIN/MEMBER (excluding Lite Member)
  */
@@ -114,25 +113,6 @@ describe("LicenseEnforcementRepository Integration", () => {
       });
   });
 
-  // Helper to create a project in the test organization
-  async function createProject(options: {
-    archived?: boolean;
-  }): Promise<Project> {
-    const created = await prisma.project.create({
-      data: {
-        name: `Test Project ${nanoid(6)}`,
-        slug: `test-project-${nanoid(6)}`,
-        apiKey: `api-key-${nanoid(8)}`,
-        teamId: team.id,
-        language: "python",
-        framework: "openai",
-        archivedAt: options.archived ? new Date() : null,
-      },
-    });
-    createdProjectIds.push(created.id);
-    return created;
-  }
-
   // Helper to create a user with organization membership
   async function createOrgUser(role: OrganizationUserRole): Promise<User> {
     const user = await prisma.user.create({
@@ -154,62 +134,6 @@ describe("LicenseEnforcementRepository Integration", () => {
 
     return user;
   }
-
-  // ==========================================================================
-  // Project Count Tests
-  // Feature: "Counts only non-archived projects toward limit"
-  // ==========================================================================
-
-  describe("getProjectCount", () => {
-    /** @scenario Counts only non-archived projects toward limit */
-    it("excludes archived projects from count", async () => {
-      // Given: a baseline (the org already has the base project), plus
-      // 2 active projects and 2 archived projects
-      const initialCount = await repository.getProjectCount(organization.id);
-      await createProject({ archived: false });
-      await createProject({ archived: false });
-      await createProject({ archived: true });
-      await createProject({ archived: true });
-
-      // When: counting projects for license enforcement
-      const count = await repository.getProjectCount(organization.id);
-
-      // Then: only active (non-archived) projects increase the count
-      expect(count).toBe(initialCount + 2);
-    });
-
-    it("counts projects across all teams in the organization", async () => {
-      // Given: a second team in the same organization with an active project
-      const initialCount = await repository.getProjectCount(organization.id);
-      const team2 = await prisma.team.create({
-        data: {
-          name: `Test Team 2 ${nanoid(6)}`,
-          slug: `test-team-2-${nanoid(6)}`,
-          organizationId: organization.id,
-        },
-      });
-      const project2 = await prisma.project.create({
-        data: {
-          name: `Project in Team 2`,
-          slug: `project-team-2-${nanoid(6)}`,
-          apiKey: `api-key-team-2-${nanoid(8)}`,
-          teamId: team2.id,
-          language: "python",
-          framework: "openai",
-        },
-      });
-
-      // When: counting projects for the organization
-      const count = await repository.getProjectCount(organization.id);
-
-      // Then: count includes projects from both teams
-      expect(count).toBe(initialCount + 1);
-
-      // Cleanup
-      await prisma.project.delete({ where: { id: project2.id } });
-      await prisma.team.delete({ where: { id: team2.id } });
-    });
-  });
 
   // ==========================================================================
   // Member Count Tests
@@ -267,24 +191,24 @@ describe("LicenseEnforcementRepository Integration", () => {
   });
 
   // ==========================================================================
-  // Cross-project counting verification
-  // Feature: "Project count query bypasses multi-tenancy protection"
+  // Cross-team counting verification
+  // Feature: "Member count query bypasses multi-tenancy protection"
   // ==========================================================================
 
-  describe("cross-project counting", () => {
-    it("counts resources across all projects in organization without multi-tenancy errors", async () => {
-      // This test verifies the repository can count across projects
+  describe("cross-team counting", () => {
+    it("counts resources across the organization without multi-tenancy errors", async () => {
+      // This test verifies the repository can count org-level resources
       // without triggering "requires a 'projectId'" errors that would
       // occur if using standard Prisma middleware patterns
 
-      // Given: projects exist in the test organization
-      const initialCount = await repository.getProjectCount(organization.id);
+      // Given: members exist in the test organization
+      const initialCount = await repository.getMemberCount(organization.id);
 
       // When: we attempt to count (this should not throw)
       let error: Error | null = null;
       let count = 0;
       try {
-        count = await repository.getProjectCount(organization.id);
+        count = await repository.getMemberCount(organization.id);
       } catch (e) {
         error = e as Error;
       }
