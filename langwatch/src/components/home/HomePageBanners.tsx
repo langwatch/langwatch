@@ -39,5 +39,13 @@ export function HomePageBanners() {
 	// the first banner before the snooze check runs.
 	if (!hasMounted) return null;
 
-	return tracesSnoozed ? <VoiceAgentsHomeBanner /> : <TracesV2HomeBanner />;
+	// Wire `onDismissed` so the moment the user clicks ✕ on traces-v2 the
+	// voice banner takes the slot in the same tab. Without this the parent
+	// only reads the snooze flag on `projectId` change and the next banner
+	// only appears on remount/reload, which reads as a layout bug.
+	return tracesSnoozed ? (
+		<VoiceAgentsHomeBanner />
+	) : (
+		<TracesV2HomeBanner onDismissed={() => setTracesSnoozed(true)} />
+	);
 }

@@ -16,7 +16,7 @@ vi.mock("posthog-js", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
-    project: { id: "project-1" },
+    project: { id: "project-1", slug: "my-project" },
   })),
 }));
 
@@ -59,8 +59,14 @@ describe("<HomePageBanners />", () => {
 
   it("renders the traces-v2 banner by default when nothing is snoozed", () => {
     renderWithProviders(<HomePageBanners />);
-    // Traces-v2 banner headline is the deciding marker — voice banner has
-    // its own distinct heading.
+    // Positive marker first — without this assertion the test would pass
+    // even if HomePageBanners rendered null. Negative marker second to
+    // pin that ONLY traces-v2 is in the slot.
+    expect(
+      screen.getByRole("heading", {
+        name: "The new Trace Explorer is here",
+      }),
+    ).toBeDefined();
     expect(
       screen.queryByRole("heading", {
         name: "Voice agent simulations are here",

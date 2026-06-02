@@ -72,7 +72,7 @@ describe("<VoiceAgentsHomeBanner />", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("captures a PostHog event when the CTA is clicked", () => {
+  it("captures a PostHog event, snoozes and hides the banner when the CTA is clicked", () => {
     renderWithProviders(<VoiceAgentsHomeBanner />);
     const link = screen.getByRole("link", {
       name: /Open Voice Agents getting started guide in a new tab/i,
@@ -85,6 +85,14 @@ describe("<VoiceAgentsHomeBanner />", () => {
         projectId: "project-1",
       }),
     );
+    // CTA opens in a new tab — the banner must hide in the current tab too,
+    // not linger until a reload.
+    expect(
+      screen.queryByRole("heading", {
+        name: "Voice agent simulations are here",
+      }),
+    ).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 
   it("snoozes for ~7 days when dismissed and hides immediately", () => {

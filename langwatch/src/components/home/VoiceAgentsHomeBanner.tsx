@@ -91,6 +91,10 @@ export function VoiceAgentsHomeBanner() {
 			projectId,
 		});
 		if (projectId) snooze(projectId);
+		// CTA opens in a new tab, so the home page stays mounted. Without
+		// flipping `dismissed` here the banner would linger in the current
+		// tab until reload even though the snooze key has already been set.
+		setDismissed(true);
 	};
 
 	return (
@@ -185,33 +189,35 @@ export function VoiceAgentsHomeBanner() {
 					</Text>
 					<HStack gap={2} marginTop={1.5}>
 						{/*
-						 * Plain <a> + target=_blank — this points to the public docs
-						 * site, not an internal route, so the in-app `<Link>` (which
-						 * resolves project-scoped paths) is the wrong primitive.
+						 * Render the Chakra Button AS the anchor (no nested
+						 * `<a><button>`, which is invalid interactive nesting).
+						 * The CTA points at the public docs site, not an internal
+						 * route, so we keep plain anchor semantics rather than the
+						 * in-app `<Link>` (which resolves project-scoped paths).
 						 */}
-						<a
-							href={TARGET_URL}
-							target="_blank"
-							rel="noopener noreferrer"
-							onClick={handleClick}
-							aria-label="Open Voice Agents getting started guide in a new tab"
-							style={{ textDecoration: "none" }}
+						<Button
+							asChild
+							size="sm"
+							bg="white"
+							color="teal.700"
+							fontWeight="600"
+							paddingX={4}
+							boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+							_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+							_active={{ bg: "white/80", transform: "translateY(0)" }}
+							transition="background-color 0.12s ease, transform 0.12s ease"
 						>
-							<Button
-								size="sm"
-								bg="white"
-								color="teal.700"
-								fontWeight="600"
-								paddingX={4}
-								boxShadow="0 1px 2px rgba(0,0,0,0.12)"
-								_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-								_active={{ bg: "white/80", transform: "translateY(0)" }}
-								transition="background-color 0.12s ease, transform 0.12s ease"
+							<a
+								href={TARGET_URL}
+								target="_blank"
+								rel="noopener noreferrer"
+								onClick={handleClick}
+								aria-label="Open Voice Agents getting started guide in a new tab"
 							>
 								Try voice agent testing
 								<Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-							</Button>
-						</a>
+							</a>
+						</Button>
 					</HStack>
 				</VStack>
 			</HStack>
