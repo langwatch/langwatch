@@ -267,29 +267,27 @@ export function CodeEditor({
           });
         }
 
-        // React Flow registers a document-level keydown handler that
-        // preventDefaults `Space` (it's the pan-activation key). The
-        // optimization studio mounts the canvas behind this dialog, so any
-        // keystroke that escapes the editor reaches that handler — which is
-        // why typing a space inside the editor silently dropped the keystroke.
-        // Containing key events at the editor root keeps Monaco fully
-        // functional (its own listeners sit deeper, on `.native-edit-context`)
-        // while shielding the canvas from clobbering normal typing.
+        // React Flow's `panActivationKeyCode` defaults to `Space`, so it
+        // registers a document-level keydown handler that preventDefaults
+        // every Space — which swallows the keystroke before the browser
+        // turns it into a `beforeinput` for Monaco. Shield ONLY Space (and
+        // not the other ~dozen keys React Flow watches) so editor shortcuts
+        // that legitimately bubble (Cmd+A select-all, Cmd+Z undo, etc.) still
+        // reach Monaco's standalone keybinding service above the editor root.
         const editorRoot = editor.getDomNode?.();
-        const stopAncestorHandlers = (e: KeyboardEvent) => {
-          e.stopPropagation();
+        const shieldSpace = (e: KeyboardEvent) => {
+          if (e.code === "Space" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            e.stopPropagation();
+          }
         };
         if (editorRoot) {
-          editorRoot.addEventListener("keydown", stopAncestorHandlers);
-          editorRoot.addEventListener("keypress", stopAncestorHandlers);
-          editorRoot.addEventListener("keyup", stopAncestorHandlers);
-          // Auto-remove via dispose. The editor disposes its DOM on unmount,
-          // but listeners on a not-yet-collected node would still fire if
-          // anything else holds a reference; explicit cleanup keeps it clean.
+          editorRoot.addEventListener("keydown", shieldSpace);
+          editorRoot.addEventListener("keypress", shieldSpace);
+          editorRoot.addEventListener("keyup", shieldSpace);
           editor.onDidDispose?.(() => {
-            editorRoot.removeEventListener("keydown", stopAncestorHandlers);
-            editorRoot.removeEventListener("keypress", stopAncestorHandlers);
-            editorRoot.removeEventListener("keyup", stopAncestorHandlers);
+            editorRoot.removeEventListener("keydown", shieldSpace);
+            editorRoot.removeEventListener("keypress", shieldSpace);
+            editorRoot.removeEventListener("keyup", shieldSpace);
           });
         }
 

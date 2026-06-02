@@ -548,6 +548,32 @@ function registerValidator(
       });
     }
 
+    // Required scaffold — the workflow runtime invokes `Code().__call__(input)`
+    // so the user code must define a `Code` class with a `__call__` method.
+    // Surface a real Error marker if either piece is missing so accidental
+    // deletion fails fast in-editor instead of at run time.
+    if (!/\bclass\s+Code\b/.test(source)) {
+      markers.push({
+        severity: monaco.MarkerSeverity.Error,
+        message:
+          "Missing `class Code:` declaration — the workflow runtime calls `Code().__call__(input)`. Add it back so the node can execute.",
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 2,
+      });
+    } else if (!/\bdef\s+__call__\s*\(/.test(source)) {
+      markers.push({
+        severity: monaco.MarkerSeverity.Error,
+        message:
+          "Missing `def __call__(self, input: str):` on `class Code` — the workflow runtime invokes it to run the node.",
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 2,
+      });
+    }
+
     // Output contract — warn when a declared output is never referenced as a
     // string key in the source. Cheap: matches `"name"` or `'name'`. Misses
     // dynamic key construction, which is rare in code nodes.
