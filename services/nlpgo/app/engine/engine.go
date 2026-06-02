@@ -280,7 +280,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentCode:
 		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentHTTP:
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
 		return e.runSignature(ctx, req, node, inputs)
 	case dsl.ComponentPromptingTechnique:
@@ -358,17 +358,21 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	return res.Outputs, nil
 }
 
-func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.http == nil {
 		return nil, &NodeError{Type: "http_executor_unavailable", Message: "no http executor configured"}
 	}
+	// Resolve `{{ secrets.NAME }}` in the URL, headers, and auth at
+	// request-build time. BodyTemplate is deliberately left unresolved:
+	// it is rendered against inputs and surfaced in execution events, so
+	// substituting a secret there would leak the plaintext into logs.
 	req := httpblock.Request{
-		URL:          paramString(node.Data.Parameters, "url"),
+		URL:          resolveSecretRefs(paramString(node.Data.Parameters, "url"), secrets),
 		Method:       paramString(node.Data.Parameters, "method"),
 		BodyTemplate: paramString(node.Data.Parameters, "body_template"),
 		OutputPath:   paramString(node.Data.Parameters, "output_path"),
-		Headers:      paramStringMap(node.Data.Parameters, "headers"),
-		Auth:         paramAuth(node.Data.Parameters),
+		Headers:      resolveSecretsInMap(paramStringMap(node.Data.Parameters, "headers"), secrets),
+		Auth:         resolveAuthSecrets(paramAuth(node.Data.Parameters), secrets),
 		TimeoutMS:    paramInt(node.Data.Parameters, "timeout_ms"),
 		Inputs:       inputs,
 	}
@@ -753,7 +757,7 @@ func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
 	case "http":
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "code":
 		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "workflow":
