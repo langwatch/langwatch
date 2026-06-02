@@ -78,12 +78,12 @@ describe("experimentResultsCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "run_1" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(() => ({
+    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
       startRun: vi.fn(),
       getRunStatus: vi.fn(),
       getRunResults: mockGetRunResults,
       listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService);
+    }) as unknown as ExperimentsApiService; });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -161,7 +161,7 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { filter: "failed" },
         });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
         expect(printed).not.toContain("hello world");
@@ -175,11 +175,11 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { evaluator: "quality" },
         });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
         const headerLine = logSpy.mock.calls
-          .map((c) => String(c[0]))
-          .find((line) => line.includes("Target")) ?? "";
+          .map((c: unknown[]) => String(c[0]))
+          .find((line: string) => line.includes("Target")) ?? "";
         expect(headerLine).not.toContain("safety");
       });
     });
@@ -199,7 +199,7 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { limit: "5" },
         });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
     });
@@ -218,7 +218,7 @@ describe("experimentResultsCommand()", () => {
           },
         });
         await experimentResultsCommand({ experimentSlug: "doc-qa" });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Run status: running");
         expect(printed).toContain("partial results");
       });
@@ -239,7 +239,7 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { format: "json" },
         });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).not.toContain("Run status:");
       });
     });
@@ -263,7 +263,7 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { runId: "interrupted" },
         });
-        const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("interrupted");
         expect(printed).not.toContain("No rows matched the filter");
         expect(printed).not.toContain("still in progress");

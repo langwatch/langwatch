@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  uuid@<11.1.1: '>=11.1.1 <12'
+
 importers:
 
   .:
@@ -13,10 +16,10 @@ importers:
         version: 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/hono':
         specifier: ^6.20.2
-        version: 6.20.3(hono@4.12.14)
+        version: 6.20.3(hono@4.12.23)
       '@hono/node-server':
         specifier: ^2.0.0
-        version: 2.0.0(hono@4.12.14)
+        version: 2.0.0(hono@4.12.23)
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -24,8 +27,8 @@ importers:
         specifier: ^17.3.1
         version: 17.3.1
       hono:
-        specifier: ^4.12.14
-        version: 4.12.14
+        specifier: ^4.12.18
+        version: 4.12.23
       ioredis:
         specifier: ^5.9.3
         version: 5.9.3
@@ -137,8 +140,8 @@ packages:
   filelist@1.0.4:
     resolution: {integrity: sha512-w1cEuf3S+DrLCQL7ET6kz+gmlJdbq9J7yXCSjK/OZCPA+qEN1WyF4ZAf0YYJa4/shHJra2t/d/r8SV4Ji+x+8Q==}
 
-  hono@4.12.14:
-    resolution: {integrity: sha512-am5zfg3yu6sqn5yjKBNqhnTX7Cv+m00ox+7jbaKkrLMRJ4rAdldd1xPd/JzbBWspqaQv6RSTrgFN95EsfhC+7w==}
+  hono@4.12.23:
+    resolution: {integrity: sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA==}
     engines: {node: '>=16.9.0'}
 
   ioredis@5.9.3:
@@ -214,8 +217,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  uuid@11.1.0:
-    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
 
 snapshots:
@@ -225,20 +228,20 @@ snapshots:
       '@bull-board/ui': 6.20.3
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.20.3(hono@4.12.14)':
+  '@bull-board/hono@6.20.3(hono@4.12.23)':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/ui': 6.20.3
       ejs: 3.1.10
-      hono: 4.12.14
+      hono: 4.12.23
 
   '@bull-board/ui@6.20.3':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
 
-  '@hono/node-server@2.0.0(hono@4.12.14)':
+  '@hono/node-server@2.0.0(hono@4.12.23)':
     dependencies:
-      hono: 4.12.14
+      hono: 4.12.23
 
   '@ioredis/commands@1.5.0': {}
 
@@ -276,7 +279,7 @@ snapshots:
       node-abort-controller: 3.1.1
       semver: 7.7.4
       tslib: 2.8.1
-      uuid: 11.1.0
+      uuid: 11.1.1
     transitivePeerDependencies:
       - supports-color
 
@@ -305,7 +308,7 @@ snapshots:
     dependencies:
       minimatch: 5.1.9
 
-  hono@4.12.14: {}
+  hono@4.12.23: {}
 
   ioredis@5.9.3:
     dependencies:
@@ -384,4 +387,4 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  uuid@11.1.0: {}
+  uuid@11.1.1: {}

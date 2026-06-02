@@ -2,19 +2,21 @@
  * Integration coverage for the topic-clustering trace fetch against a real
  * ClickHouse.
  *
- * The pre-fix query read `ComputedInput` (a potentially large payload) for the
- * entire deduped 12-month trace set before `ORDER BY ... LIMIT 2000` trimmed
- * it, tipping busy tenants into MEMORY_LIMIT_EXCEEDED. The fix pages the 2000
- * most-recent trace keys first (lightweight columns only) and reads
- * `ComputedInput` for that bounded set alone.
+ * The query pages the 2000 most-recent trace keys first (lightweight columns
+ * only) and reads `ComputedInput` (a potentially large payload) for that
+ * bounded set alone. It also carries NO outer `ORDER BY`: an `ORDER BY ...
+ * LIMIT` makes ClickHouse buffer a top-N of full rows, retaining every row's
+ * `ComputedInput` at once, which tipped busy tenants into
+ * MEMORY_LIMIT_EXCEEDED. Ordering is reapplied in JS over the small result set
+ * instead, so these tests double as the regression guard that the JS ordering
+ * matches what the SQL sort used to produce.
  *
  * These tests exercise the real `fetchTracesFromClickHouse` and lock in the
  * behaviour that matters for correctness and pagination:
  *  - a full page returns the newest traces, newest first;
  *  - the cursor advances to strictly older, non-overlapping traces;
  *  - empty-input traces still occupy page slots so the cursor reaches older
- *    eligible traces instead of stalling (the heavy-column read stays bounded
- *    to the page either way — verified separately during development).
+ *    eligible traces instead of stalling.
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

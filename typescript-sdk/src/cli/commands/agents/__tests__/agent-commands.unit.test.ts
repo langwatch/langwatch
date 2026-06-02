@@ -60,13 +60,13 @@ describe("listAgentsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(() => ({
+    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
       list: mockList,
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as AgentsApiService);
+    }) as unknown as AgentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -132,13 +132,13 @@ describe("getAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(() => ({
+    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       get: mockGet,
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as AgentsApiService);
+    }) as unknown as AgentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -171,13 +171,13 @@ describe("createAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(() => ({
+    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       get: vi.fn(),
       create: mockCreate,
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as AgentsApiService);
+    }) as unknown as AgentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -227,13 +227,13 @@ describe("deleteAgentCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(AgentsApiService).mockImplementation(() => ({
+    vi.mocked(AgentsApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: mockDelete,
-    }) as unknown as AgentsApiService);
+    }) as unknown as AgentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

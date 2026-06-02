@@ -81,7 +81,7 @@ describe("listSuitesCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
       get: vi.fn(),
       create: vi.fn(),
@@ -89,7 +89,7 @@ describe("listSuitesCommand()", () => {
       duplicate: vi.fn(),
       run: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -146,7 +146,7 @@ describe("getSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       create: vi.fn(),
@@ -154,7 +154,7 @@ describe("getSuiteCommand()", () => {
       duplicate: vi.fn(),
       run: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -200,7 +200,7 @@ describe("createSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: mockCreate,
@@ -208,7 +208,7 @@ describe("createSuiteCommand()", () => {
       duplicate: vi.fn(),
       run: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -257,7 +257,7 @@ describe("deleteSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
@@ -265,7 +265,7 @@ describe("deleteSuiteCommand()", () => {
       duplicate: vi.fn(),
       run: vi.fn(),
       delete: mockDelete,
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -298,7 +298,7 @@ describe("duplicateSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDuplicate = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
@@ -306,7 +306,7 @@ describe("duplicateSuiteCommand()", () => {
       duplicate: mockDuplicate,
       run: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -342,7 +342,7 @@ describe("runSuiteCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRun = vi.fn();
-    vi.mocked(SuitesApiService).mockImplementation(() => ({
+    vi.mocked(SuitesApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
@@ -350,7 +350,7 @@ describe("runSuiteCommand()", () => {
       duplicate: vi.fn(),
       run: mockRun,
       delete: vi.fn(),
-    }) as unknown as SuitesApiService);
+    }) as unknown as SuitesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

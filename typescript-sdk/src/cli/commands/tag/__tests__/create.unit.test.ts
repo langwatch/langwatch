@@ -25,8 +25,7 @@ describe("tagCreateCommand", () => {
     vi.clearAllMocks();
     mockCreateTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(
-      () => ({ createTag: mockCreateTag }) as unknown as InstanceType<typeof PromptsApiService>,
-    );
+      function () { return ({ createTag: mockCreateTag }) as unknown as InstanceType<typeof PromptsApiService>; });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

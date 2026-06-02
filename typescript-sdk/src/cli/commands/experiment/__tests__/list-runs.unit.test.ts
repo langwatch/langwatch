@@ -53,11 +53,9 @@ describe("experimentListRunsCommand()", () => {
     vi.clearAllMocks();
     mockListRuns = vi.fn();
     vi.mocked(ExperimentsApiService).mockImplementation(
-      () =>
-        ({
+      function () { return ({
           listRuns: mockListRuns,
-        }) as unknown as ExperimentsApiService,
-    );
+        }) as unknown as ExperimentsApiService; });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

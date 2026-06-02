@@ -87,7 +87,12 @@ type Request struct {
 	Code            string
 	Inputs          map[string]any
 	DeclaredOutputs []string
-	Timeout         time.Duration
+	// Secrets are the project's decrypted secrets (from the workflow
+	// DSL's `secrets` map). When non-empty the runner exposes them to
+	// user code as a `secrets` namespace so `secrets.NAME` works —
+	// parity with the Python executor's build_secrets_preamble.
+	Secrets map[string]string
+	Timeout time.Duration
 }
 
 // Result is what the executor returns.
@@ -130,6 +135,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		"code":    req.Code,
 		"inputs":  req.Inputs,
 		"outputs": req.DeclaredOutputs,
+		"secrets": req.Secrets,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)

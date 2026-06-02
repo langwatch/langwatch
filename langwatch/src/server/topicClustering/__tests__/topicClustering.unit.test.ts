@@ -97,7 +97,7 @@ describe("clusterTopicsForProject", () => {
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
           Promise.resolve([
-            { total: "5", withInput: "3", recent: "5", assigned: "0" },
+            { total: "5", recent: "5", assigned: "0" },
           ]),
       });
 
@@ -127,7 +127,7 @@ describe("clusterTopicsForProject", () => {
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
           Promise.resolve([
-            { total: "100", withInput: "0", recent: "100", assigned: "0" },
+            { total: "100", recent: "100", assigned: "0" },
           ]),
       });
 
@@ -168,7 +168,7 @@ describe("clusterTopicsForProject", () => {
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
           Promise.resolve([
-            { total: "100", withInput: "80", recent: "100", assigned: "0" },
+            { total: "100", recent: "100", assigned: "0" },
           ]),
       });
 
@@ -217,7 +217,7 @@ describe("clusterTopicsForProject", () => {
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
           Promise.resolve([
-            { total: "100", withInput: "80", recent: "100", assigned: "0" },
+            { total: "100", recent: "100", assigned: "0" },
           ]),
       });
 
@@ -253,7 +253,7 @@ describe("clusterTopicsForProject", () => {
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
           Promise.resolve([
-            { total: "100", withInput: "80", recent: "100", assigned: "0" },
+            { total: "100", recent: "100", assigned: "0" },
           ]),
       });
 

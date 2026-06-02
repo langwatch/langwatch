@@ -27,12 +27,10 @@ describe("tagAssignCommand", () => {
     mockGet = vi.fn();
     mockAssignTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(
-      () =>
-        ({
+      function () { return ({
           get: mockGet,
           assignTag: mockAssignTag,
-        }) as unknown as InstanceType<typeof PromptsApiService>,
-    );
+        }) as unknown as InstanceType<typeof PromptsApiService>; });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

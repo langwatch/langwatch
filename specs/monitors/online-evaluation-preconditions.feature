@@ -75,13 +75,17 @@ Feature: Online Evaluation Preconditions Renewal
   # In-Memory Trace Matching
   # ────────────────────────────────────────────
 
-  @unit @unimplemented
-  Scenario: Origin "is" application matches only explicit application origin
+  @unit
+  Scenario: Origin "is" application treats missing origin as application (legacy default)
     Given a precondition: traces.origin is "application"
     When a trace arrives with langwatch.origin = "application"
     Then the precondition passes
+    # Legacy traces without an explicit origin attribute default to
+    # "application" via normalizePreconditionTraceData (deferred origin
+    # stamping). This keeps existing customer monitors firing on traces
+    # written before origin tagging shipped.
     When a trace arrives with no langwatch.origin attribute
-    Then the precondition fails
+    Then the precondition passes
     When a trace arrives with langwatch.origin = ""
     Then the precondition fails
     When a trace arrives with langwatch.origin = "evaluation"
@@ -155,7 +159,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with satisfaction_score -0.5
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: All preconditions must pass (AND logic)
     Given preconditions:
       | field         | rule     | value       |
@@ -163,8 +167,12 @@ Feature: Online Evaluation Preconditions Renewal
       | input         | contains | help        |
     When a trace arrives with origin "application" and input "I need help"
     Then the evaluation runs
+    # Legacy traces without an explicit origin default to "application"
+    # via normalizePreconditionTraceData (see "Origin 'is' application"
+    # scenario above), so a missing-origin + matching input passes both
+    # preconditions and the evaluation runs.
     When a trace arrives with no origin and input "I need help"
-    Then the evaluation is skipped
+    Then the evaluation runs
     When a trace arrives with origin "simulation" and input "I need help"
     Then the evaluation is skipped
 

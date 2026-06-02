@@ -11,6 +11,7 @@ import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
+import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
  * Root layout — wraps all routes.
@@ -52,31 +53,16 @@ function RootLayout() {
  * React Router's lazy keeps the OLD route visible while the new module loads,
  * eliminating the gray flash that React.lazy + Suspense causes.
  */
-// Minimum gap between self-triggered reloads. Short enough that a second
-// deploy mid-session still reloads; long enough to avoid a loop if the server
-// is genuinely returning broken chunks.
-const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
-
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
   lazy: () =>
-    importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      const isChunkError =
-        msg.includes("loading chunk") ||
-        msg.includes("dynamically imported module") ||
-        msg.includes("importing a module script failed");
-
-      if (!isChunkError) throw err;
-
-      const lastReloadAt = Number(
-        sessionStorage.getItem("chunk-reload-at") ?? "0"
-      );
-      if (Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS) {
-        sessionStorage.setItem("chunk-reload-at", String(Date.now()));
-        window.location.reload();
-      }
-      throw err;
-    }),
+    importFn()
+      .then((m) => ({ Component: m.default }))
+      .catch((err: unknown) => {
+        // Stale route chunk after a deploy → reload once to pick up the new
+        // hashes. Non-chunk errors fall through to the error boundary.
+        reloadOnChunkError(err);
+        throw err;
+      }),
 });
 
 const routes: RouteObject[] = [
