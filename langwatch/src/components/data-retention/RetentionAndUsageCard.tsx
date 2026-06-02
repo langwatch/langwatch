@@ -1,11 +1,4 @@
-import {
-  Card,
-  Heading,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   RETENTION_CATEGORIES,
   type RetentionCategory,

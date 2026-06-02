@@ -16,12 +16,15 @@ import { DatabaseBackup, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AddOverrideDrawer } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
-import { SCOPE_ICON, SCOPE_TIER_ORDER } from "~/components/data-retention/constants";
+import {
+  SCOPE_ICON,
+  SCOPE_TIER_ORDER,
+} from "~/components/data-retention/constants";
 import { formatDays } from "~/components/data-retention/format";
 import {
   groupRulesByScope,
-  renderPolicyValue,
   type RetentionScopeGroup,
+  renderPolicyValue,
 } from "~/components/data-retention/grouping";
 import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndUsageCard";
 import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
@@ -508,7 +511,10 @@ function DataRetentionPage({
                             category,
                           })
                           .then(
-                            (res) => ({ ok: true as const, applied: res.appliedRetentionDays }),
+                            (res) => ({
+                              ok: true as const,
+                              applied: res.appliedRetentionDays,
+                            }),
                             (error: Error) => ({
                               ok: false as const,
                               error,
@@ -522,9 +528,7 @@ function DataRetentionPage({
                         new Set(
                           triggerResults
                             .filter(
-                              (
-                                r,
-                              ): r is { ok: true; applied: number } => r.ok,
+                              (r): r is { ok: true; applied: number } => r.ok,
                             )
                             .map((r) => r.applied),
                         ),
