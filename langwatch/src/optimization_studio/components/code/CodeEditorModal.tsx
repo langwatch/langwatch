@@ -325,6 +325,9 @@ export function CodeEditor({
         // which swallows the keystroke whenever the suggest widget is open —
         // unusable for normal typing.
         acceptSuggestionOnCommitCharacter: false,
+        // Surface the quick-fix lightbulb whenever our code-action provider
+        // has fixes for the current line's diagnostics.
+        lightbulb: { enabled: "on" as any },
         padding: {
           top: 0,
         },

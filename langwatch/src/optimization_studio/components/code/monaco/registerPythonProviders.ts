@@ -105,6 +105,27 @@ const IMPORT_MODULE_PREFIX = /\b(?:import|from)\s+([\w.]*)$/;
 const ATTR_ACCESS = /(\b[A-Za-z_][\w.]*?)\.([\w]*)$/;
 
 /**
+ * Marker codes — used both to tag diagnostics from the validator and to
+ * match the same diagnostics in the code-action provider. Strings (vs
+ * numbers) so they show up readably in the Problems panel.
+ */
+const MISSING_CLASS_CODE = "langwatch.missing-class-code";
+const MISSING_CALL_CODE = "langwatch.missing-call-method";
+
+const CODE_SCAFFOLD_SNIPPET = [
+  "class Code:",
+  "    def __call__(self, input: str):",
+  '        return {"output": "Hello world!"}',
+  "",
+].join("\n");
+
+const CALL_METHOD_SNIPPET = [
+  "    def __call__(self, input: str):",
+  '        return {"output": "Hello world!"}',
+  "",
+].join("\n");
+
+/**
  * Track which stdlib modules have been imported (via `import X` or `from X
  * import …`) so attribute access on them resolves to real member lists.
  *
@@ -551,10 +572,12 @@ function registerValidator(
     // Required scaffold — the workflow runtime invokes `Code().__call__(input)`
     // so the user code must define a `Code` class with a `__call__` method.
     // Surface a real Error marker if either piece is missing so accidental
-    // deletion fails fast in-editor instead of at run time.
+    // deletion fails fast in-editor instead of at run time. The `code` field
+    // doubles as the quick-fix discriminator (see registerCodeActions below).
     if (!/\bclass\s+Code\b/.test(source)) {
       markers.push({
         severity: monaco.MarkerSeverity.Error,
+        code: MISSING_CLASS_CODE,
         message:
           "Missing `class Code:` declaration — the workflow runtime calls `Code().__call__(input)`. Add it back so the node can execute.",
         startLineNumber: 1,
@@ -565,6 +588,7 @@ function registerValidator(
     } else if (!/\bdef\s+__call__\s*\(/.test(source)) {
       markers.push({
         severity: monaco.MarkerSeverity.Error,
+        code: MISSING_CALL_CODE,
         message:
           "Missing `def __call__(self, input: str):` on `class Code` — the workflow runtime invokes it to run the node.",
         startLineNumber: 1,
@@ -622,6 +646,99 @@ function registerValidator(
 }
 
 /**
+ * Quick fixes for the scaffold-missing diagnostics. Monaco renders the
+ * lightbulb on lines that have a matching marker; clicking it offers the
+ * actions we return from here.
+ */
+function registerCodeActions(monaco: Monaco): IDisposable {
+  return monaco.languages.registerCodeActionProvider("python", {
+    provideCodeActions: (model, _range, context) => {
+      const actions: languages.CodeAction[] = [];
+      const matching = context.markers.filter(
+        (m) =>
+          m.code === MISSING_CLASS_CODE || m.code === MISSING_CALL_CODE,
+      );
+      if (matching.length === 0) {
+        return { actions: [], dispose: () => undefined };
+      }
+      const fullRange = model.getFullModelRange();
+      const source = model.getValue();
+      const hasTrailingNewline = source.length === 0 || source.endsWith("\n");
+
+      for (const marker of matching) {
+        if (marker.code === MISSING_CLASS_CODE) {
+          // Prepend the full class scaffold to the existing buffer so any
+          // helper imports the user has at the top are preserved.
+          const text = hasTrailingNewline
+            ? CODE_SCAFFOLD_SNIPPET
+            : "\n" + CODE_SCAFFOLD_SNIPPET;
+          actions.push({
+            title: "Insert `class Code` scaffold",
+            kind: "quickfix",
+            diagnostics: [marker],
+            isPreferred: true,
+            edit: {
+              edits: [
+                {
+                  resource: model.uri,
+                  versionId: model.getVersionId(),
+                  textEdit: {
+                    range: {
+                      startLineNumber: fullRange.endLineNumber,
+                      endLineNumber: fullRange.endLineNumber,
+                      startColumn: fullRange.endColumn,
+                      endColumn: fullRange.endColumn,
+                    },
+                    text,
+                  },
+                },
+              ],
+            },
+          });
+        } else if (marker.code === MISSING_CALL_CODE) {
+          // Insert the __call__ method on the line AFTER `class Code:`. If we
+          // can't locate the class line, fall back to appending at the end of
+          // the document.
+          const lineCount = model.getLineCount();
+          let insertLine = lineCount;
+          for (let i = 1; i <= lineCount; i++) {
+            if (/\bclass\s+Code\b/.test(model.getLineContent(i))) {
+              insertLine = i + 1;
+              break;
+            }
+          }
+          actions.push({
+            title: "Insert `__call__` method",
+            kind: "quickfix",
+            diagnostics: [marker],
+            isPreferred: true,
+            edit: {
+              edits: [
+                {
+                  resource: model.uri,
+                  versionId: model.getVersionId(),
+                  textEdit: {
+                    range: {
+                      startLineNumber: insertLine,
+                      endLineNumber: insertLine,
+                      startColumn: 1,
+                      endColumn: 1,
+                    },
+                    text: CALL_METHOD_SNIPPET,
+                  },
+                },
+              ],
+            },
+          });
+        }
+      }
+
+      return { actions, dispose: () => undefined };
+    },
+  });
+}
+
+/**
  * Register all Monaco providers used by the workflow Python editor. Returns
  * a single handle whose `dispose()` tears everything down — call it on
  * editor unmount to avoid leaking globally-registered providers across
@@ -636,6 +753,7 @@ export function registerPythonProviders({
   const hoverDisposer = registerHover(monaco);
   const formatterDisposer = registerFormatter(monaco);
   const validatorDisposer = registerValidator(monaco, contractRef);
+  const codeActionsDisposer = registerCodeActions(monaco);
 
   // Re-run validation when the contract changes so output-missing markers
   // update immediately rather than waiting for the next keystroke.
@@ -670,6 +788,7 @@ export function registerPythonProviders({
       hoverDisposer.dispose();
       formatterDisposer.dispose();
       validatorDisposer.dispose();
+      codeActionsDisposer.dispose();
     },
     setContract: (next) => {
       contractRef.current = next;
