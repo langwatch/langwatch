@@ -470,6 +470,19 @@ export const DashboardLayout = ({
     { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
+  // Resolve the Langy flag HERE, above the loading / not-found early returns
+  // below. A hook placed after those returns is skipped on the first
+  // (loading) render and runs once data resolves — a changing hook count
+  // across renders, which is React error #310 ("Rendered more hooks than
+  // during the previous render") and crashes the whole dashboard. The derived
+  // `showLangy` (which also needs `user` + route checks) stays lower; only the
+  // hook itself must be unconditional/top-level.
+  const { enabled: langyFlagEnabled } = useFeatureFlag("release_langy_enabled", {
+    projectId: project?.id,
+    organizationId: organization?.id,
+    enabled: !!project,
+  });
+
   usePostHogIdentify({
     session: session ?? null,
     organization,
@@ -595,14 +608,6 @@ export const DashboardLayout = ({
   const isProjectRoute =
     router.pathname === "/[project]" ||
     router.pathname.startsWith("/[project]/");
-  const { enabled: langyFlagEnabled } = useFeatureFlag(
-    "release_langy_enabled",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project,
-    },
-  );
   const showLangy =
     !publicPage &&
     userIsPartOfTeam &&
