@@ -62,11 +62,11 @@ describe("listWorkflowsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(() => ({
+    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
       get: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as WorkflowsApiService);
+    }) as unknown as WorkflowsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -123,11 +123,11 @@ describe("getWorkflowCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(() => ({
+    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       delete: vi.fn(),
-    }) as unknown as WorkflowsApiService);
+    }) as unknown as WorkflowsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -162,11 +162,11 @@ describe("deleteWorkflowCommand()", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockDelete = vi.fn();
-    vi.mocked(WorkflowsApiService).mockImplementation(() => ({
+    vi.mocked(WorkflowsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       delete: mockDelete,
-    }) as unknown as WorkflowsApiService);
+    }) as unknown as WorkflowsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

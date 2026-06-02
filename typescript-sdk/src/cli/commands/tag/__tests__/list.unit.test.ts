@@ -25,8 +25,7 @@ describe("tagListCommand", () => {
     vi.clearAllMocks();
     mockListTags = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(
-      () => ({ listTags: mockListTags }) as unknown as InstanceType<typeof PromptsApiService>,
-    );
+      function () { return ({ listTags: mockListTags }) as unknown as InstanceType<typeof PromptsApiService>; });
   });
 
   describe("when tags exist", () => {

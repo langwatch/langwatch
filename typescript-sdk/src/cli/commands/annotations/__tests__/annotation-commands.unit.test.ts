@@ -60,13 +60,13 @@ describe("listAnnotationsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(() => ({
+    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
       get: vi.fn(),
       getByTrace: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as AnnotationsApiService);
+    }) as unknown as AnnotationsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -112,13 +112,13 @@ describe("getAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(() => ({
+    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       getByTrace: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as AnnotationsApiService);
+    }) as unknown as AnnotationsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -151,13 +151,13 @@ describe("createAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(() => ({
+    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       getByTrace: vi.fn(),
       create: mockCreate,
       delete: vi.fn(),
-    }) as unknown as AnnotationsApiService);
+    }) as unknown as AnnotationsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -204,13 +204,13 @@ describe("deleteAnnotationCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(AnnotationsApiService).mockImplementation(() => ({
+    vi.mocked(AnnotationsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       getByTrace: vi.fn(),
       create: vi.fn(),
       delete: mockDelete,
-    }) as unknown as AnnotationsApiService);
+    }) as unknown as AnnotationsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

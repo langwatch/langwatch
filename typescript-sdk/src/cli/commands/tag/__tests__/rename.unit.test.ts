@@ -25,8 +25,7 @@ describe("tagRenameCommand", () => {
     vi.clearAllMocks();
     mockRenameTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(
-      () => ({ renameTag: mockRenameTag }) as unknown as InstanceType<typeof PromptsApiService>,
-    );
+      function () { return ({ renameTag: mockRenameTag }) as unknown as InstanceType<typeof PromptsApiService>; });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

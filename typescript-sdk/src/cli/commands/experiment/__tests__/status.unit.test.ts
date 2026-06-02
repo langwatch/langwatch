@@ -54,12 +54,12 @@ describe("experimentStatusCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "latest_run" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(() => ({
+    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
       startRun: vi.fn(),
       getRunStatus: mockGetRunStatus,
       getRunResults: mockGetRunResults,
       listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService);
+    }) as unknown as ExperimentsApiService; });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
