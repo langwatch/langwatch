@@ -235,6 +235,7 @@ export const start = async (
     topicClusteringWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     anomalyDetectionWorker?.on("closing", closingListener);
+    langyRetentionWorker?.on("closing", closingListener);
     if (maxRuntimeMs) {
       setTimeout(() => {
         logger.info("max runtime reached, closing worker");
@@ -245,12 +246,14 @@ export const start = async (
           topicClusteringWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           anomalyDetectionWorker?.off("closing", closingListener);
+          langyRetentionWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             usageStatsWorker?.close(),
             anomalyDetectionWorker?.close(),
+            langyRetentionWorker?.close(),
             scenarioProcessor?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),

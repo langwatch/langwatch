@@ -258,6 +258,11 @@ export class LangyConversationService {
       data.sharedAt = isShared ? new Date() : null;
       data.sharedById = isShared ? userId : null;
     }
+    // Nothing to change — skip the write (Prisma update with an empty payload
+    // throws) and return the unchanged conversation.
+    if (Object.keys(data).length === 0) {
+      return conv;
+    }
     await this.repository.update({ id, projectId, data });
     return await this.repository.findById({ id, projectId });
   }

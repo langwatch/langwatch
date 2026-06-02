@@ -35,6 +35,7 @@ import {
   DEFAULT_THINKING_VERBS,
   useCyclingVerb,
 } from "~/features/traces-v2/components/ai/useCyclingVerb";
+import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/useTypewriterPlaceholder";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -110,73 +111,6 @@ const thinkingShimmerStyles = {
   animation: `${langyThinkingShimmer} 4.5s linear infinite`,
 } as const;
 
-const TYPEWRITER_TYPING_MS = 70;
-const TYPEWRITER_ERASING_MS = 40;
-const TYPEWRITER_HOLD_MS = 2600;
-
-/**
- * Cycle through `examples`, typing each one, holding, then erasing — used
- * as the composer placeholder when idle. Returns to the first example
- * (no animation) under reduced-motion. Mirrors AiPromptInput's local
- * implementation; copied inline to avoid forcing an export from a file
- * that's otherwise unrelated to Langy.
- */
-function useTypewriterPlaceholder(
-  active: boolean,
-  examples: readonly string[],
-): string {
-  const reduceMotion = useReducedMotion();
-  const [text, setText] = useState(examples[0] ?? "");
-
-  useEffect(() => {
-    if (!active || reduceMotion) {
-      setText(examples[0] ?? "");
-      return;
-    }
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let index = 0;
-    let charIndex = (examples[0] ?? "").length;
-    let phase: "type" | "hold" | "erase" = "hold";
-
-    const tick = () => {
-      if (cancelled) return;
-      const word = examples[index] ?? "";
-      if (phase === "type") {
-        charIndex++;
-        setText(word.slice(0, charIndex));
-        if (charIndex >= word.length) {
-          phase = "hold";
-          timer = setTimeout(tick, TYPEWRITER_HOLD_MS);
-        } else {
-          timer = setTimeout(tick, TYPEWRITER_TYPING_MS);
-        }
-        return;
-      }
-      if (phase === "hold") {
-        phase = "erase";
-        timer = setTimeout(tick, TYPEWRITER_ERASING_MS);
-        return;
-      }
-      charIndex--;
-      setText(word.slice(0, Math.max(charIndex, 0)));
-      if (charIndex <= 0) {
-        index = (index + 1) % examples.length;
-        charIndex = 0;
-        phase = "type";
-      }
-      timer = setTimeout(tick, TYPEWRITER_ERASING_MS);
-    };
-
-    timer = setTimeout(tick, TYPEWRITER_HOLD_MS);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [active, reduceMotion, examples]);
-
-  return text;
-}
 
 /**
  * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Mirrors
