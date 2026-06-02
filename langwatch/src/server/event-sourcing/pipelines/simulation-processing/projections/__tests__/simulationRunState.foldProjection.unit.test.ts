@@ -285,6 +285,26 @@ describe("simulationRunStateFoldProjection", () => {
       expect(persisted).toContain("inline media");
     });
 
+    it("caps oversized multi-byte (UTF-8) Content (fast-path doesn't bypass on character count)", () => {
+      // A char-count fast-path (`value.length <= maxBytes`) would WRONGLY
+      // bypass this string: 30 KiB of chars = under the 64 KiB length, but
+      // each 4-byte UTF-8 emoji (😀) pushes the actual byte length to ~120 KiB.
+      // The safe fast-path uses `value.length * 3 <= maxBytes`, so this
+      // string falls through to the real Buffer.byteLength check and gets
+      // truncated.
+      const oversizedMultibyte = "😀".repeat(30 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: oversizedMultibyte }],
+        }),
+      ]);
+
+      const persisted = state.Messages[0]!.Content;
+      expect(persisted.length).toBeLessThan(oversizedMultibyte.length);
+      expect(persisted).toContain("[truncated:");
+    });
+
     it("preserves normal-sized Content unchanged (no false-positive truncation)", () => {
       // Below the cap — a long but reasonable assistant reply.
       const longButReasonable = "a sentence. ".repeat(2000); // ~24 KiB

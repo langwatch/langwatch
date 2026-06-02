@@ -55,16 +55,24 @@ const MAX_MESSAGE_REST_BYTES = 64 * 1024;
  * The returned marker has a stable prefix so monitoring + retroactive scans
  * can find affected rows.
  */
-function capOversizedString(
-  value: string,
-  maxBytes: number,
-  field: "Content" | "Rest",
-  ctx: { scenarioRunId: string; messageId?: string; messageRole?: string },
-): string {
-  // String length is char-count, not bytes; rough byte check via
-  // Buffer.byteLength gives an accurate UTF-8 size. Fast path: skip the
-  // Buffer allocation when length alone already proves the string is small.
-  if (value.length <= maxBytes) return value;
+function capOversizedString({
+  value,
+  maxBytes,
+  field,
+  ctx,
+}: {
+  value: string;
+  maxBytes: number;
+  field: "Content" | "Rest";
+  ctx: { scenarioRunId: string; messageId?: string; messageRole?: string };
+}): string {
+  // String length is char-count (UTF-16 code units); UTF-8 may use up to 3
+  // bytes per code unit (4 for surrogate pairs, but a pair occupies two code
+  // units so the per-code-unit ceiling is still 3). The only safe length-only
+  // short-circuit is the inverse bound: when length*3 <= maxBytes the UTF-8
+  // byte length is guaranteed to fit. Using length <= maxBytes as the bypass
+  // would let a multibyte string ~3× over the cap slip through.
+  if (value.length * 3 <= maxBytes) return value;
   const byteLength = Buffer.byteLength(value, "utf8");
   if (byteLength <= maxBytes) return value;
   projectionLogger.warn(
@@ -287,14 +295,30 @@ export class SimulationRunStateFoldProjection
 
         const messageId = typeof m.id === "string" ? m.id : "";
         const messageRole = typeof m.role === "string" ? m.role : "";
-        const ctx = { scenarioRunId: state.ScenarioRunId, messageId, messageRole };
+        // Snapshots can arrive BEFORE the run-started event (see
+        // `StartedAt: state.StartedAt ?? event.occurredAt` two lines up); on
+        // that path state.ScenarioRunId is still empty while the event already
+        // carries the id. Fall back so an oversized first snapshot's warn log
+        // is locatable instead of arriving id-less.
+        const scenarioRunId = state.ScenarioRunId || event.data.scenarioRunId;
+        const ctx = { scenarioRunId, messageId, messageRole };
 
         return {
           Id: messageId,
           Role: messageRole,
-          Content: capOversizedString(content, MAX_MESSAGE_CONTENT_BYTES, "Content", ctx),
+          Content: capOversizedString({
+            value: content,
+            maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+            field: "Content",
+            ctx,
+          }),
           TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
-          Rest: capOversizedString(buildMessageRestJson(m), MAX_MESSAGE_REST_BYTES, "Rest", ctx),
+          Rest: capOversizedString({
+            value: buildMessageRestJson(m),
+            maxBytes: MAX_MESSAGE_REST_BYTES,
+            field: "Rest",
+            ctx,
+          }),
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
@@ -347,22 +371,30 @@ export class SimulationRunStateFoldProjection
       (m) => m.Id === event.data.messageId,
     );
 
+    // TextMessageEnd can also fold before the started event (the handler
+    // appends/pads even without a prior START); fall back to the event's
+    // scenarioRunId so the warn log carries the run identifier.
     const ctx = {
-      scenarioRunId: state.ScenarioRunId,
+      scenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       messageId: event.data.messageId,
       messageRole: event.data.role,
     };
     const row: SimulationMessageRow = {
       Id: event.data.messageId,
       Role: event.data.role,
-      Content: capOversizedString(event.data.content, MAX_MESSAGE_CONTENT_BYTES, "Content", ctx),
-      TraceId: event.data.traceId ?? "",
-      Rest: capOversizedString(
-        buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
-        MAX_MESSAGE_REST_BYTES,
-        "Rest",
+      Content: capOversizedString({
+        value: event.data.content,
+        maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+        field: "Content",
         ctx,
-      ),
+      }),
+      TraceId: event.data.traceId ?? "",
+      Rest: capOversizedString({
+        value: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+        maxBytes: MAX_MESSAGE_REST_BYTES,
+        field: "Rest",
+        ctx,
+      }),
     };
 
     let updatedMessages: SimulationMessageRow[];
