@@ -126,6 +126,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // is the scope predicate, so tenancy is enforced one layer up.
   "VirtualKey",
   "CustomLLMModelCost",
+  "RetentionPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
   // organizationId is NULLABLE here (NULL = platform-published default), so a

@@ -14,6 +14,7 @@ export interface EventRecord {
   EventPayload: unknown;
   ProcessingTraceparent: string;
   IdempotencyKey: string;
+  _retention_days?: number;
 }
 
 /**

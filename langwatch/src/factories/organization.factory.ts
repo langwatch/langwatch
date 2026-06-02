@@ -3,9 +3,7 @@ import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
 export const organizationFactory = Factory.define<
-  Omit<Organization, "stripeCustomerId" | "currency"> & {
-    signupData: any;
-  }
+  Omit<Organization, "stripeCustomerId" | "currency" | "signupData">
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Organization ${sequence}`,
@@ -16,7 +14,6 @@ export const organizationFactory = Factory.define<
   usageSpendingMaxLimit: null,
   maxSessionDurationDays: 0,
   governanceLogContentMode: "full",
-  signupData: null,
   signedDPA: false,
   elasticsearchNodeUrl: null,
   elasticsearchApiKey: null,

@@ -63,10 +63,9 @@ describe("Feature: REST API resource limit enforcement parity", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

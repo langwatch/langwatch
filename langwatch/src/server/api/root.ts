@@ -41,6 +41,8 @@ import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
 import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
+import { pinnedTraceRouter } from "./routers/pinnedTrace";
+import { dataRetentionRouter } from "./routers/dataRetention";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
@@ -110,6 +112,8 @@ const coreRouters = {
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  pinnedTrace: pinnedTraceRouter,
+  dataRetention: dataRetentionRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,
