@@ -57,7 +57,7 @@ describe("<HomePageBanners />", () => {
     localStorage.clear();
   });
 
-  it("renders the traces-v2 banner when the coin flip lands < 0.5", () => {
+  it("renders the traces-v2 banner when the coin flip lands >= 0.5", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.9);
     renderWithProviders(<HomePageBanners />);
     expect(
@@ -72,7 +72,7 @@ describe("<HomePageBanners />", () => {
     ).toBeNull();
   });
 
-  it("renders the voice banner when the coin flip lands >= 0.5", () => {
+  it("renders the voice banner when the coin flip lands < 0.5", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.1);
     renderWithProviders(<HomePageBanners />);
     expect(
