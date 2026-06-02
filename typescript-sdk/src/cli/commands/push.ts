@@ -169,6 +169,8 @@ export const pushPrompts = async ({
           }
 
           if (conflictResolution === "remote" && syncResult.conflictInfo) {
+            const remoteParameters =
+              syncResult.conflictInfo.remoteParameters ?? {};
             const remotePrompt = {
               model: syncResult.conflictInfo.remoteConfigData.model,
               modelParameters: {
@@ -184,7 +186,12 @@ export const pushPrompts = async ({
                 },
                 ...(syncResult.conflictInfo.remoteConfigData.messages ?? []),
               ],
-              parameters: syncResult.conflictInfo.remoteParameters ?? {},
+              // Only write `parameters` when present, matching
+              // PromptConverter.fromMaterializedToYaml — avoids writing an
+              // empty `parameters: {}` into prompt files that have none.
+              ...(Object.keys(remoteParameters).length > 0
+                ? { parameters: remoteParameters }
+                : {}),
             };
 
             const yamlContent = yaml.dump(remotePrompt, {
