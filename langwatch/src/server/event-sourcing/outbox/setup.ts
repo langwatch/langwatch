@@ -52,8 +52,12 @@ export interface OutboxStack {
  *
  * Audit projection (PG `ReactorOutbox`) is written by the queue's
  * `auditAdapter` — onEnqueue / onLeased / onDispatched / onFailed /
- * onDead hooks fire as the queue moves jobs through their lifecycle,
- * but only for cadence-stage payloads (settle is ephemeral).
+ * onDead hooks fire as the queue moves jobs through their lifecycle.
+ * `PgOutboxAuditAdapter` handles BOTH settle and cadence stages: settle
+ * inserts a `queued` row keyed by the per-(trigger, trace) dedup key,
+ * the post-settle filter check either drops the row or transitions it
+ * to the cadence boundary. Operators see settle activity alongside
+ * cadence activity in the same table.
  *
  * Consumer loop only runs on `processRole === "worker"`. Web can
  * still `queue.send` (the send-side is producer-only) but never
@@ -86,7 +90,7 @@ export function setupOutbox({
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> = redis
     ? new RedisCachedFoldStore(
         new TraceSummaryStore(traceSummaryRepository),
-        redis,
+        redis as Redis,
         { keyPrefix: "trace_summaries" },
       )
     : new TraceSummaryStore(traceSummaryRepository);

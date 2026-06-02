@@ -49,6 +49,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import {
   auditDedupKey,
+  settleDedupId,
   TRIGGER_NOTIFY_REACTOR_NAME,
   type SettleStagePayload,
 } from "./outbox/payload";
@@ -272,8 +273,10 @@ export class PipelineRegistry {
           // default so historical triggers keep the same 30s behavior.
           await outbox.queue.send(payload, {
             deduplication: {
-              makeId: () =>
-                `${projectId}/${TRIGGER_NOTIFY_REACTOR_NAME}:${triggerId}:${traceId}`,
+              // Same shape as the queue's own settleDedupId resolver so any
+              // other producer that sends without an explicit override still
+              // dedups against these jobs.
+              makeId: () => settleDedupId({ projectId, triggerId, traceId }),
               ttlMs: traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
               extend: true,
               replace: true,

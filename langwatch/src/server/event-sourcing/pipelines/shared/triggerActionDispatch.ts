@@ -45,9 +45,18 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
 
 /**
  * Resolves when a matched trigger should dispatch. This is the contract the
- * outbox dispatch layer reads: persist actions and immediate-cadence notify
- * actions fire now; digest-cadence notify actions open a window that closes
- * `CADENCE_WINDOW_MS` later.
+ * outbox dispatch layer reads:
+ *
+ * - Persist actions and immediate-cadence notify actions fire now.
+ * - Digest-cadence notify actions snap to the **next wall-clock boundary**
+ *   for their window (e.g. for `5min_digest`, the next UTC multiple of
+ *   5 minutes since the epoch). All matches inside the same boundary share
+ *   one dispatch time, which is what lets the GroupQueue's `processBatch`
+ *   + `coalesceMaxBatch` collapse them into a single digest invocation.
+ *
+ * Snapping (not `now + window`) is load-bearing — `now + window` gives every
+ * match its own scheduled-for, so concurrent matches end up at slightly
+ * different times and never coalesce. See ADR-023.
  */
 export function computeScheduledFor({
   action,
@@ -60,7 +69,14 @@ export function computeScheduledFor({
 }): Date {
   if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;
   if (cadence === "immediate") return now;
-  return new Date(now.getTime() + CADENCE_WINDOW_MS[cadence]);
+  const windowMs = CADENCE_WINDOW_MS[cadence];
+  const nowMs = now.getTime();
+  // Next wall-clock boundary: ceil(nowMs / window) * window.
+  // If now is already exactly on a boundary, advance one full window so two
+  // matches at the same instant don't dispatch "now" on the boundary and
+  // skip the digest behavior the operator picked.
+  const nextBoundaryMs = (Math.floor(nowMs / windowMs) + 1) * windowMs;
+  return new Date(nextBoundaryMs);
 }
 
 /**

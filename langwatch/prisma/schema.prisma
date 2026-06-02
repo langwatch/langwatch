@@ -97,7 +97,6 @@ model User {
   roleBindings            RoleBinding[]
   apiKeys                 ApiKey[]
   gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
-  principalGatewayBudgets GatewayBudget[]          @relation("PrincipalScopedGatewayBudgets")
   principalVirtualKeys    VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
   personalTeams           Team[]                   @relation("PersonalTeamOwner")
   personalProjects        Project[]                @relation("PersonalProjectOwner")
@@ -167,9 +166,16 @@ model OrganizationUser {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
+  /// Cost-center assignment for spend attribution (the people lens).
+  /// Single-valued, org-scoped, accounting-only (never gates access).
+  /// Plain column ref (relationMode="prisma"); the service validates the
+  /// id belongs to this org. See cost-centers.feature.
+  costCenterId String?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+  @@index([costCenterId])
 }
 
 model Team {
@@ -183,7 +189,6 @@ model Team {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @default(now()) @updatedAt
   archivedAt     DateTime?
-  gatewayBudgets GatewayBudget[] @relation("TeamScopedGatewayBudgets")
 
   // Personal workspace per (org, user). Created on user's first
   // visit to an org. UI hides isPersonal=true teams from team
@@ -195,8 +200,13 @@ model Team {
   ingestionSources IngestionSource[]
   aiToolEntryTeams AiToolEntryTeam[]
 
+  /// Cost-center assignment inherited as the default for members and
+  /// projects that have none of their own. Accounting-only.
+  costCenterId String?
+
   @@index([organizationId])
   @@index([isPersonal])
+  @@index([costCenterId])
 }
 
 model Organization {
@@ -262,7 +272,6 @@ model Organization {
   license                String?                @db.Text
   licenseExpiresAt       DateTime?
   licenseLastValidatedAt DateTime?
-  gatewayBudgets         GatewayBudget[]        @relation("OrgScopedGatewayBudgets")
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
@@ -398,7 +407,6 @@ model Project {
   scenarios                Scenario[]
   suiteConfigurations      SimulationSuite[]
   savedViews               SavedView[]
-  gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
@@ -422,10 +430,31 @@ model Project {
   /// is meaningful only when `isPersonal=true`.
   personalFeatures Json @default("{}")
 
+  /// Cost-center assignment for spend attribution (the project / agent
+  /// lens, used when a trace has no principal user). Accounting-only.
+  costCenterId String?
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])
   @@index([teamId, kind])
+  @@index([costCenterId])
+}
+
+/// A cost center is a single-valued accounting dimension, separate from
+/// RBAC, for rolling up AI spend by org unit (Engineering, Marketing,
+/// ...). Assigned to OrganizationUser, Team, and Project via their
+/// `costCenterId` column. Pure accounting: never grants or restricts
+/// access. See specs/ai-gateway/governance/cost-centers.feature.
+model CostCenter {
+  id             String    @id @default(nanoid())
+  organizationId String
+  name           String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  archivedAt     DateTime?
+
+  @@index([organizationId])
 }
 
 enum INVITE_STATUS {
@@ -698,18 +727,18 @@ model Trigger {
   message       String?
   deleted       Boolean       @default(false)
   alertType     AlertType?
-  // Customer-authored Liquid notification templates (see ADR-026). NULL on any
+  // Customer-authored Liquid notification templates (see ADR-024). NULL on any
   // column means "render with the framework default", so existing triggers are
   // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
   slackTemplateType    String?
   slackTemplate        String?
   emailSubjectTemplate String?
   emailBodyTemplate    String?
-  // Per-trigger digest cadence; see ADR-025. Ignored for persist actions.
+  // Per-trigger digest cadence (ADR-023). Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
   notificationCadence  String        @default("immediate")
-  // Per-trigger trace-readiness debounce in milliseconds; see ADR-030. Notify-
-  // class triggers wait this long after the last span before filters re-evaluate
+  // Per-trigger trace-readiness debounce in ms (ADR-023). Notify-class
+  // triggers wait this long after the last span before filters re-evaluate
   // on the settled fold. Persist-class actions dispatch inline and ignore this.
   traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
@@ -829,8 +858,13 @@ model ModelProvider {
   updatedAt              DateTime @default(now()) @updatedAt
   scopes                 ModelProviderScope[]
 
+  // Single-organization tenancy anchor (ADR-021). Every scope of a given
+  // provider resolves to the same organization, so this column is that org.
+  organizationId         String
+
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
+  @@index([organizationId])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -902,6 +936,12 @@ model ModelDefaultConfig {
     createdAt DateTime                  @default(now())
     updatedAt DateTime                  @updatedAt
     scopes    ModelDefaultConfigScope[]
+
+    // Single-organization tenancy anchor (ADR-021). Every scope a config
+    // attaches to resolves to the same organization.
+    organizationId String
+
+    @@index([organizationId])
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
@@ -1069,18 +1109,36 @@ model PublicShare {
   @@index([userId])
 }
 
+enum CustomLLMModelCostScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A custom model-cost override. Single-scope-per-row (ADR-021): the row
+// applies at exactly one scope, identified inline by (scopeType, scopeId),
+// and is anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> the static llmModels.json default, so
+// an org admin can set a cost once and have it apply to every project that
+// has no closer override. The legacy projectId column is kept (nullable)
+// for one release of read compatibility; new writes target the scope.
 model CustomLLMModelCost {
-  id                        String   @id @default(nanoid())
-  projectId                 String
+  id                        String                      @id @default(nanoid())
+  organizationId            String
+  scopeType                 CustomLLMModelCostScopeType @default(PROJECT)
+  scopeId                   String
+  projectId                 String?
   model                     String
   regex                     String
   inputCostPerToken         Float?
   outputCostPerToken        Float?
   cacheReadCostPerToken     Float?
   cacheCreationCostPerToken Float?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @default(now()) @updatedAt
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @default(now()) @updatedAt
 
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
   @@index([projectId])
 }
 
@@ -1785,7 +1843,6 @@ model VirtualKey {
   lastUsedAt  DateTime?
 
   scopes        VirtualKeyScope[]
-  budgets       GatewayBudget[]       @relation("VirtualKeyScopedGatewayBudgets")
   ledgerEntries GatewayBudgetLedger[]
 
   // Optional RoutingPolicy reference. When set, gateway pulls
@@ -2056,19 +2113,6 @@ model IngestionSource {
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
-
-  /// Per-origin retention class applied to every span/log emitted by
-  /// this source's events when they land in the unified observability
-  /// store (recorded_spans / log_records). Drives the CH TTL policy.
-  /// Values:
-  ///   - "thirty_days": operational debugging window (default)
-  ///   - "one_year":    compliance baseline (SOC2 / ISO 27001 / EU AI Act)
-  ///   - "seven_years": long-form audit (regulated industry)
-  /// Org plan ceiling enforced at the composer / API layer.
-  /// Stored as string for extensibility — the canonical set lives in
-  /// code (governance retention policy registry).
-  /// Spec: specs/ai-gateway/governance/retention.feature
-  retentionClass String @default("thirty_days")
 
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
@@ -2476,27 +2520,13 @@ model UserIngestionBinding {
 model GatewayBudget {
   id             String                 @id @default(nanoid())
   organizationId String
-  // Scope is identified by (scopeType, scopeId). The typed relations below
-  // exist for RI when a matching target row is deleted; scopeId is the
-  // canonical discriminator the query layer uses.
+  // Single source of truth for the target (ADR-021): inline (scopeType,
+  // scopeId) within one organization. scopeId is a team / project / virtual
+  // key / user id depending on scopeType; the query layer reads it directly.
+  // No typed FK columns — scope-entity deletion cleanup is a service-layer
+  // concern, consistent with the no-foreign-key-constraints convention.
   scopeType      GatewayBudgetScopeType
   scopeId        String
-
-  // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
-  organizationScopedId String?
-  organizationScoped   Organization? @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
-
-  teamScopedId String?
-  teamScoped   Team?   @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
-
-  projectScopedId String?
-  projectScoped   Project? @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
-
-  virtualKeyScopedId String?
-  virtualKeyScoped   VirtualKey? @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
-
-  principalUserId String?
-  principalUser   User?   @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
@@ -2660,13 +2690,11 @@ model FeatureFlag {
     updatedAt    DateTime @default(now()) @updatedAt
 }
 
-// Durable outbox for stake-sensitive reactor dispatch.
-// See dev/docs/adr/021–024 for rationale. Reactors registered via
-// `.withOutbox` enqueue rows here instead of dispatching inline; a
-// drainer leases rows, calls the dispatch endpoint, and records the
-// outcome (dispatched / failed_retryable / dead). The unique
-// (reactorName, dedupKey) is the claim primitive that makes replays
-// safe — `createMany skipDuplicates` is a no-op on collision.
+// Durable outbox for stake-sensitive reactor dispatch (ADR-022). Reactors
+// registered via `.withOutbox` enqueue rows here; a queue-side audit
+// adapter projects every queue lifecycle event into the row's status.
+// The unique (reactorName, dedupKey) is the claim primitive that makes
+// replays safe — `createMany skipDuplicates` is a no-op on collision.
 enum ReactorOutboxStatus {
     queued
     dispatching
@@ -2683,17 +2711,15 @@ model ReactorOutbox {
     // the reactor's `name` in the pipeline builder.
     reactorName    String
     // Deduplication key scoped to (reactorName, ...). Typically encodes
-    // the match identity, e.g. `${triggerId}:${traceId}`. Collisions on
-    // (reactorName, dedupKey) are the claim primitive that makes
-    // replays safe.
+    // the match identity, e.g. `${projectId}/${triggerId}:trace:${traceId}`.
+    // Collisions on (reactorName, dedupKey) are the claim primitive that
+    // makes replays safe.
     dedupKey       String
-    // GroupQueue routing key for the wakeup payload. Drives per-group
-    // FIFO and fair scheduling across tenants. Typically the projectId
-    // or tenantId.
+    // GroupQueue routing key. Drives per-group FIFO and fair scheduling
+    // across tenants. Always `${projectId}/`-prefixed.
     groupKey       String
     // Reactor-defined dispatch payload (trigger config, target ids,
-    // rendered template inputs, etc). Variable-size data lives here so
-    // wakeup payloads stay constant-size.
+    // rendered template inputs, etc).
     payload        Json
     status         ReactorOutboxStatus @default(queued)
     attempts       Int                 @default(0)
@@ -2703,8 +2729,7 @@ model ReactorOutbox {
     // re-lease the row (assumed crashed worker).
     leasedUntil    DateTime?
     // Nullable: cleared (NULL) when a row is promoted to `dead`, since a
-    // terminal row no longer schedules a next attempt. Queued/retrying
-    // rows always carry a concrete timestamp (defaults to now()).
+    // terminal row no longer schedules a next attempt.
     nextAttemptAt  DateTime?           @default(now())
     lastError      String?
     lastErrorAt    DateTime?
@@ -2718,7 +2743,6 @@ model ReactorOutbox {
     @@index([projectId, reactorName, status, nextAttemptAt])
     // Operator surface: list stuck/dead dispatches per project.
     @@index([projectId, status, updatedAt])
-    // Crash recovery scan: find leased rows whose worker never came
-    // back.
+    // Crash recovery scan: find leased rows whose worker never came back.
     @@index([status, leasedUntil])
 }

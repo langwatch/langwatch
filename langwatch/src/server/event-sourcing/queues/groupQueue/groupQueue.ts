@@ -330,6 +330,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           groupKey: groupId,
           dedupKey: dedupId || undefined,
           scheduledAt: new Date(dispatchAfterMs),
+          // Mirror the queue's actual retry budget into the audit
+          // projection so `ReactorOutbox.maxAttempts` matches when the
+          // queue will stop retrying (otherwise the column defaults to
+          // 8 and an operator sees `attempts > maxAttempts` once the
+          // queue retries 9+ times).
+          maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
         }),
       );
     } else {
@@ -434,18 +440,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
     }
 
-    // Audit hooks (ADR-021 revision). The Lua's stageBatch returns a count,
+    // Audit hooks (ADR-022 revision). The Lua's stageBatch returns a count,
     // not a per-payload new/dedup map, so we fire onEnqueue for every
     // payload and let the adapter's idempotency (createMany skipDuplicates)
-    // absorb dedup-collapsed duplicates.
+    // absorb dedup-collapsed duplicates. Index alignment is by position —
+    // `jobsToStage[i]` corresponds to `payloads[i]`, so use the loop index
+    // rather than `indexOf(job)`: the latter is O(n²) and would mis-associate
+    // payloads if two jobs share an object reference.
     if (this.auditAdapter) {
-      for (const job of jobsToStage) {
+      for (let i = 0; i < jobsToStage.length; i++) {
+        const job = jobsToStage[i]!;
+        const payload = payloads[i]!;
         await this.runAudit(() =>
           this.auditAdapter?.onEnqueue({
-            payload: payloads[jobsToStage.indexOf(job)]!,
+            payload,
             groupKey: job.groupId,
             dedupKey: job.dedupId || undefined,
             scheduledAt: new Date(job.dispatchAfterMs),
+            maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
           }),
         );
       }
