@@ -39,6 +39,12 @@ export type CodeBlockEditorProps = {
    * and warned on when missing from the source.
    */
   outputs?: readonly CodeBlockField[];
+  /**
+   * Stable identifier (e.g. the node id) used as the localStorage key for
+   * persisting cursor/scroll/folding state across modal opens. Falls back to
+   * a per-instance random id if omitted, meaning state is not preserved.
+   */
+  viewStateKey?: string;
 };
 
 /**
@@ -59,6 +65,7 @@ export function CodeBlockEditor({
   onEditClick,
   inputs,
   outputs,
+  viewStateKey,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { colorMode } = useColorMode();
@@ -145,6 +152,7 @@ export function CodeBlockEditor({
           onClose={handleClose}
           inputs={inputs}
           outputs={outputs}
+          viewStateKey={viewStateKey}
         />
       )}
     </Box>

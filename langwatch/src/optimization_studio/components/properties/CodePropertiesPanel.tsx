@@ -158,6 +158,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
           identifier: o.identifier,
           type: o.type,
         }))}
+        viewStateKey={`code-node:${node.id}`}
       />
 
       {/* Inputs using VariablesSection */}

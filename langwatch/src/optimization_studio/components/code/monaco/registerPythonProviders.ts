@@ -111,6 +111,8 @@ const ATTR_ACCESS = /(\b[A-Za-z_][\w.]*?)\.([\w]*)$/;
  */
 const MISSING_CLASS_CODE = "langwatch.missing-class-code";
 const MISSING_CALL_CODE = "langwatch.missing-call-method";
+const MISSING_OUTPUT_KEY = "langwatch.missing-output-key";
+const MIXED_INDENT = "langwatch.mixed-indent";
 
 const CODE_SCAFFOLD_SNIPPET = [
   "class Code:",
@@ -327,7 +329,7 @@ function registerCompletion(
   });
 }
 
-function registerHover(monaco: Monaco): IDisposable {
+function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerHoverProvider("python", {
     provideHover: (model, position) => {
       const word = model.getWordAtPosition(position);
@@ -343,6 +345,22 @@ function registerHover(monaco: Monaco): IDisposable {
         const owner = attr[1];
         const name = attr[2];
         if (!owner || !name) return null;
+        // `secrets.NAME` — show the secret name, its runtime type, and a
+        // reminder of where it's managed.
+        if (owner === "secrets") {
+          const known = contractRef.current.secretNames.includes(name);
+          return {
+            contents: [
+              { value: `**secrets.${name}**` },
+              { value: "```python\n" + `secrets.${name}: str\n` + "```" },
+              {
+                value: known
+                  ? "Project secret. Injected at runtime as a string — managed in Settings → Secrets."
+                  : `⚠️ No secret named \`${name}\` is configured. Add it under Settings → Secrets, or fix the name.`,
+              },
+            ],
+          };
+        }
         const imports = scanImports(model.getValue());
         const mod = imports.get(owner);
         const member = mod?.members.find((m) => m.name === name);
@@ -359,6 +377,49 @@ function registerHover(monaco: Monaco): IDisposable {
           };
         }
       }
+      // Bare identifier — node input, output, or builtin (in that order).
+      const input = contractRef.current.inputs.find(
+        (f) => f.identifier === word.word,
+      );
+      if (input) {
+        return {
+          contents: [
+            { value: `**${input.identifier}** *(node input)*` },
+            { value: "```python\n" + `${input.identifier}: ${input.type}\n` + "```" },
+            { value: "Wired in the Inputs section of the properties panel." },
+          ],
+        };
+      }
+      const output = contractRef.current.outputs.find(
+        (f) => f.identifier === word.word,
+      );
+      if (output) {
+        return {
+          contents: [
+            { value: `**${output.identifier}** *(node output)*` },
+            {
+              value:
+                "```python\n" + `${output.identifier}: ${output.type}\n` + "```",
+            },
+            {
+              value:
+                "Declared in the Outputs section — return it as a key in the `__call__` dict.",
+            },
+          ],
+        };
+      }
+      if (word.word === "secrets") {
+        const count = contractRef.current.secretNames.length;
+        return {
+          contents: [
+            { value: "**secrets** *(project secrets namespace)*" },
+            { value: "```python\nsecrets: SimpleNamespace\n```" },
+            {
+              value: `Access with \`secrets.NAME\`. ${count} secret${count === 1 ? "" : "s"} available.`,
+            },
+          ],
+        };
+      }
       const builtin = PYTHON_BUILTIN_BY_NAME.get(word.word);
       if (builtin) {
         return {
@@ -373,6 +434,98 @@ function registerHover(monaco: Monaco): IDisposable {
         };
       }
       return null;
+    },
+  });
+}
+
+/**
+ * Pop the parameter-hint widget when the user opens a call expression. Resolves
+ * the callee against the same catalogue the hover provider uses (builtins
+ * + stdlib + imported modules). Re-triggers on commas so multi-arg calls keep
+ * the hint visible.
+ */
+function registerSignatureHelp(monaco: Monaco): IDisposable {
+  const CALLEE_BEFORE_PAREN = /([A-Za-z_][\w.]*)\s*\($/;
+  return monaco.languages.registerSignatureHelpProvider("python", {
+    signatureHelpTriggerCharacters: ["(", ","],
+    signatureHelpRetriggerCharacters: [","],
+    provideSignatureHelp: (model, position) => {
+      const lineBefore = model.getValueInRange({
+        startLineNumber: position.lineNumber,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      });
+      // Find the nearest unclosed `(` on the current line so we can resolve
+      // which call we're inside (handles `foo(bar(baz, |))` chains).
+      let depth = 0;
+      let openIdx = -1;
+      for (let i = lineBefore.length - 1; i >= 0; i--) {
+        const ch = lineBefore[i];
+        if (ch === ")") depth++;
+        else if (ch === "(") {
+          if (depth === 0) {
+            openIdx = i;
+            break;
+          }
+          depth--;
+        }
+      }
+      if (openIdx === -1) return null;
+
+      const beforeOpen = lineBefore.slice(0, openIdx + 1);
+      const calleeMatch = CALLEE_BEFORE_PAREN.exec(beforeOpen);
+      if (!calleeMatch) return null;
+      const callee = calleeMatch[1];
+      if (!callee) return null;
+
+      // Resolve callee → catalogue entry.
+      let entry: PyMember | undefined;
+      let label: string | undefined;
+      if (callee.includes(".")) {
+        const [owner, ...rest] = callee.split(".");
+        const memberName = rest.join(".");
+        if (owner === undefined) return null;
+        const imports = scanImports(model.getValue());
+        const mod = imports.get(owner);
+        if (mod) {
+          entry = mod.members.find((m) => m.name === memberName);
+          if (entry) label = `${mod.name}.${entry.name}`;
+        }
+      } else {
+        entry = PYTHON_BUILTIN_BY_NAME.get(callee);
+        if (entry) label = entry.name;
+      }
+      if (!entry || !entry.signature) return null;
+
+      const sigLabel = entry.signature ?? label ?? callee;
+      // Cheap parameter slice: anything between the first `(` and the matching `)`.
+      const paramListMatch = /\(([^)]*)\)/.exec(sigLabel);
+      const params = paramListMatch
+        ? paramListMatch[1]
+            .split(",")
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0)
+            .map((p) => ({ label: p }))
+        : [];
+      const activeArgIdx = lineBefore
+        .slice(openIdx + 1)
+        .split(",").length - 1;
+
+      return {
+        value: {
+          signatures: [
+            {
+              label: sigLabel,
+              documentation: entry.doc ?? "",
+              parameters: params,
+            },
+          ],
+          activeSignature: 0,
+          activeParameter: Math.min(activeArgIdx, Math.max(0, params.length - 1)),
+        },
+        dispose: () => undefined,
+      };
     },
   });
 }
@@ -538,6 +691,7 @@ function registerValidator(
       if (leading && /\t/.test(leading[1] ?? "") && / /.test(leading[1] ?? "")) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
+          code: MIXED_INDENT,
           message: "Mixed tabs and spaces in indentation",
           startLineNumber: lineIdx + 1,
           startColumn: 1,
@@ -609,6 +763,7 @@ function registerValidator(
         if (!keyRe.test(source)) {
           markers.push({
             severity: monaco.MarkerSeverity.Warning,
+            code: `${MISSING_OUTPUT_KEY}:${field.identifier}`,
             message: `Declared output "${field.identifier}" (${field.type}) is never set — make sure your return dict includes it.`,
             startLineNumber: 1,
             startColumn: 1,
@@ -650,14 +805,22 @@ function registerValidator(
  * lightbulb on lines that have a matching marker; clicking it offers the
  * actions we return from here.
  */
-function registerCodeActions(monaco: Monaco): IDisposable {
+function registerCodeActions(
+  monaco: Monaco,
+  contractRef: ContractRef,
+): IDisposable {
   return monaco.languages.registerCodeActionProvider("python", {
     provideCodeActions: (model, _range, context) => {
       const actions: languages.CodeAction[] = [];
-      const matching = context.markers.filter(
-        (m) =>
-          m.code === MISSING_CLASS_CODE || m.code === MISSING_CALL_CODE,
-      );
+      const matching = context.markers.filter((m) => {
+        const c = typeof m.code === "string" ? m.code : m.code?.value;
+        return (
+          c === MISSING_CLASS_CODE ||
+          c === MISSING_CALL_CODE ||
+          c === MIXED_INDENT ||
+          (typeof c === "string" && c.startsWith(MISSING_OUTPUT_KEY))
+        );
+      });
       if (matching.length === 0) {
         return { actions: [], dispose: () => undefined };
       }
@@ -666,7 +829,9 @@ function registerCodeActions(monaco: Monaco): IDisposable {
       const hasTrailingNewline = source.length === 0 || source.endsWith("\n");
 
       for (const marker of matching) {
-        if (marker.code === MISSING_CLASS_CODE) {
+        const markerCode =
+          typeof marker.code === "string" ? marker.code : marker.code?.value;
+        if (markerCode === MISSING_CLASS_CODE) {
           // Prepend the full class scaffold to the existing buffer so any
           // helper imports the user has at the top are preserved.
           const text = hasTrailingNewline
@@ -695,7 +860,7 @@ function registerCodeActions(monaco: Monaco): IDisposable {
               ],
             },
           });
-        } else if (marker.code === MISSING_CALL_CODE) {
+        } else if (markerCode === MISSING_CALL_CODE) {
           // Insert the __call__ method on the line AFTER `class Code:`. If we
           // can't locate the class line, fall back to appending at the end of
           // the document.
@@ -730,9 +895,87 @@ function registerCodeActions(monaco: Monaco): IDisposable {
               ],
             },
           });
+        } else if (
+          typeof markerCode === "string" &&
+          markerCode.startsWith(MISSING_OUTPUT_KEY + ":")
+        ) {
+          // Add `"name": None,` to the last `return { ... }` dict on the
+          // class. If we can't find one, no-op (the user can use the scaffold
+          // quick fix to land them in a known state first).
+          const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
+          const returnRe = /(return\s*\{)([^}]*)\}/g;
+          let lastMatch: RegExpExecArray | null = null;
+          let m: RegExpExecArray | null;
+          while ((m = returnRe.exec(source))) lastMatch = m;
+          if (lastMatch) {
+            const matchStart = lastMatch.index;
+            const dictBodyStart = matchStart + (lastMatch[1]?.length ?? 0);
+            const body = lastMatch[2] ?? "";
+            const insertOffset = dictBodyStart + body.length;
+            const startPos = model.getPositionAt(insertOffset);
+            const sep = body.trim().length > 0 && !body.trimEnd().endsWith(",")
+              ? ", "
+              : body.trim().length > 0
+                ? " "
+                : "";
+            actions.push({
+              title: `Add "${outputName}" key to return dict`,
+              kind: "quickfix",
+              diagnostics: [marker],
+              edit: {
+                edits: [
+                  {
+                    resource: model.uri,
+                    versionId: model.getVersionId(),
+                    textEdit: {
+                      range: {
+                        startLineNumber: startPos.lineNumber,
+                        endLineNumber: startPos.lineNumber,
+                        startColumn: startPos.column,
+                        endColumn: startPos.column,
+                      },
+                      text: `${sep}"${outputName}": None`,
+                    },
+                  },
+                ],
+              },
+            });
+          }
+        } else if (markerCode === MIXED_INDENT) {
+          // Use the formatter's detab logic inline: replace just this line's
+          // leading whitespace with 4-space columns.
+          const lineNo = marker.startLineNumber;
+          const line = model.getLineContent(lineNo);
+          const leading = /^([ \t]+)/.exec(line)?.[1] ?? "";
+          let indent = 0;
+          for (const ch of leading) {
+            indent += ch === "\t" ? 4 - (indent % 4) : 1;
+          }
+          actions.push({
+            title: "Normalize indentation to spaces",
+            kind: "quickfix",
+            diagnostics: [marker],
+            edit: {
+              edits: [
+                {
+                  resource: model.uri,
+                  versionId: model.getVersionId(),
+                  textEdit: {
+                    range: {
+                      startLineNumber: lineNo,
+                      endLineNumber: lineNo,
+                      startColumn: 1,
+                      endColumn: leading.length + 1,
+                    },
+                    text: " ".repeat(indent),
+                  },
+                },
+              ],
+            },
+          });
         }
       }
-
+      void contractRef; // referenced in case future quick-fixes need it
       return { actions, dispose: () => undefined };
     },
   });
@@ -750,10 +993,11 @@ export function registerPythonProviders({
 }: RegisterPythonProvidersOptions): PythonProviderHandle {
   const contractRef: ContractRef = { current: contract };
   const completionDisposer = registerCompletion(monaco, contractRef);
-  const hoverDisposer = registerHover(monaco);
+  const hoverDisposer = registerHover(monaco, contractRef);
   const formatterDisposer = registerFormatter(monaco);
   const validatorDisposer = registerValidator(monaco, contractRef);
-  const codeActionsDisposer = registerCodeActions(monaco);
+  const codeActionsDisposer = registerCodeActions(monaco, contractRef);
+  const signatureHelpDisposer = registerSignatureHelp(monaco);
 
   // Re-run validation when the contract changes so output-missing markers
   // update immediately rather than waiting for the next keystroke.
@@ -789,6 +1033,7 @@ export function registerPythonProviders({
       formatterDisposer.dispose();
       validatorDisposer.dispose();
       codeActionsDisposer.dispose();
+      signatureHelpDisposer.dispose();
     },
     setContract: (next) => {
       contractRef.current = next;

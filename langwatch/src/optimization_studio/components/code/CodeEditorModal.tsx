@@ -64,11 +64,14 @@ export function CodeEditorModal({
   onClose,
   inputs,
   outputs,
+  viewStateKey,
 }: {
   code: string;
   setCode: (code: string) => void;
   open: boolean;
   onClose: () => void;
+  /** Stable id used to persist cursor/scroll state across modal opens. */
+  viewStateKey?: string;
 } & ContractProps) {
   const { project } = useOrganizationTeamProject();
   const [localCode, setLocalCode] = useState(code);
@@ -156,6 +159,7 @@ export function CodeEditorModal({
               technologies={["python", "dspy"]}
               inputs={inputs}
               outputs={outputs}
+              viewStateKey={viewStateKey}
               onEditorMount={(ed) => {
                 editorRef.current = ed;
               }}
@@ -193,6 +197,7 @@ export function CodeEditor({
   technologies,
   inputs,
   outputs,
+  viewStateKey,
   onEditorMount,
 }: {
   code: string;
@@ -201,6 +206,7 @@ export function CodeEditor({
   onSave?: () => void;
   language: string;
   technologies: string[];
+  viewStateKey?: string;
   onEditorMount?: (editor: MonacoEditorInstance) => void;
 } & ContractProps) {
   const { project } = useOrganizationTeamProject();
@@ -252,6 +258,18 @@ export function CodeEditor({
       onChange={(code: any) => code && setCode(code)}
       theme={vscodeThemeName(colorMode)}
       onMount={(editor: any, monaco: Monaco) => {
+        // Restore previously-saved cursor/scroll/folding state so reopening
+        // the modal for the same node drops the user back where they were.
+        if (viewStateKey) {
+          try {
+            const raw = localStorage.getItem(
+              `langwatch.monaco.viewstate:${viewStateKey}`,
+            );
+            if (raw) editor.restoreViewState(JSON.parse(raw));
+          } catch {
+            // ignore corrupted state
+          }
+        }
         editor.focus();
         onEditorMount?.(editor);
 
@@ -291,6 +309,66 @@ export function CodeEditor({
           });
         }
 
+        // Drag-and-drop secret chips from SecretsIndicator. The chip puts the
+        // secret name on the dataTransfer; we translate the drop point into
+        // an editor position and insert `secrets.NAME` there.
+        if (editorRoot) {
+          const onDragOver = (e: DragEvent) => {
+            if (
+              e.dataTransfer?.types.includes("text/x-langwatch-secret")
+            ) {
+              e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+            }
+          };
+          const onDrop = (e: DragEvent) => {
+            const name = e.dataTransfer?.getData("text/x-langwatch-secret");
+            if (!name) return;
+            e.preventDefault();
+            const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
+            const pos = target?.position ?? editor.getPosition();
+            if (!pos) return;
+            editor.focus();
+            editor.executeEdits("secret-drop", [
+              {
+                range: {
+                  startLineNumber: pos.lineNumber,
+                  endLineNumber: pos.lineNumber,
+                  startColumn: pos.column,
+                  endColumn: pos.column,
+                },
+                text: `secrets.${name}`,
+                forceMoveMarkers: true,
+              },
+            ]);
+          };
+          editorRoot.addEventListener("dragover", onDragOver);
+          editorRoot.addEventListener("drop", onDrop);
+          editor.onDidDispose?.(() => {
+            editorRoot.removeEventListener("dragover", onDragOver);
+            editorRoot.removeEventListener("drop", onDrop);
+          });
+        }
+
+        // Persist view state on dispose. Doing it here (rather than on every
+        // edit) keeps writes cheap; the editor is short-lived inside a modal
+        // so dispose fires reliably on close.
+        if (viewStateKey) {
+          editor.onDidDispose?.(() => {
+            try {
+              const state = editor.saveViewState();
+              if (state) {
+                localStorage.setItem(
+                  `langwatch.monaco.viewstate:${viewStateKey}`,
+                  JSON.stringify(state),
+                );
+              }
+            } catch {
+              // localStorage quota / serialisation — silently skip
+            }
+          });
+        }
+
         editor.onKeyDown((e: any) => {
           if (e.code === "Escape") {
             onKeyDown.fn();
@@ -298,10 +376,12 @@ export function CodeEditor({
             e.stopPropagation();
             return;
           }
-          // The modal-level Cmd/Ctrl+S window listener is bypassed because we
-          // stopPropagation on the editor root above. Re-run save here so the
-          // shortcut still works while the user is typing.
-          if ((e.metaKey || e.ctrlKey) && e.code === "KeyS") {
+          // Cmd/Ctrl+S or Cmd/Ctrl+Enter both Save & Close. Mirrors VS Code's
+          // save shortcut + the Notebook "run cell" muscle memory.
+          if (
+            (e.metaKey || e.ctrlKey) &&
+            (e.code === "KeyS" || e.code === "Enter" || e.code === "NumpadEnter")
+          ) {
             e.preventDefault();
             e.stopPropagation();
             onSave.fn();
@@ -328,6 +408,27 @@ export function CodeEditor({
         // Surface the quick-fix lightbulb whenever our code-action provider
         // has fixes for the current line's diagnostics.
         lightbulb: { enabled: "on" as any },
+        // VS Code parity polish: coloured brackets, indent + bracket guides,
+        // sticky scroll so `class Code` / `def __call__` stay pinned at the
+        // top while reading deep into a method, and a 100-column ruler that
+        // matches the most common Python line-length convention.
+        bracketPairColorization: { enabled: true },
+        guides: {
+          indentation: true,
+          bracketPairs: true,
+          bracketPairsHorizontal: "active",
+        },
+        stickyScroll: { enabled: true },
+        rulers: [100],
+        smoothScrolling: true,
+        cursorBlinking: "smooth",
+        cursorSmoothCaretAnimation: "on",
+        renderLineHighlight: "all",
+        // Show the parameter hint widget on call open and re-trigger between
+        // arguments.
+        parameterHints: { enabled: true, cycle: true },
+        tabSize: 4,
+        insertSpaces: true,
         padding: {
           top: 0,
         },
