@@ -121,30 +121,19 @@ export class LangyCredentialService {
       return decrypt(existing.encryptedValue);
     }
 
-    const providerCredential =
-      await this.prisma.gatewayProviderCredential.findFirst({
-        where: { projectId },
-        orderBy: [
-          { fallbackPriorityGlobal: { sort: "asc", nulls: "last" } },
-          { createdAt: "asc" },
-        ],
-        select: { id: true },
-      });
-    if (!providerCredential) {
-      throw new LangyCredentialResolutionError(
-        `Project ${projectId} has no model provider credential configured. ` +
-          `Add one in Settings → Model Providers before using Langy.`,
-      );
-    }
-
+    // GatewayProviderCredential was removed in iter 110 — virtual keys are now
+    // scoped to a project and route through that project's ModelProviders, so
+    // there's no provider-credential row to look up or bind here. The /chat
+    // route already guards model availability via getVercelAIModel before we
+    // reach provisioning, so a project without a configured model fails there
+    // with a clear 409 rather than here.
     const created = await this.virtualKeyService.create({
-      projectId,
       organizationId,
       name: "Langy",
       description:
         "Auto-provisioned virtual key for the Langy in-product assistant.",
-      environment: "live",
-      providerCredentialIds: [providerCredential.id],
+      principalUserId: null,
+      scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
       actorUserId,
     });
 
