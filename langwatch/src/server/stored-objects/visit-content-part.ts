@@ -178,7 +178,14 @@ export function visitContentPart<R>(
   // `inputAudio` (preserves a playable shape downstream); other file payloads
   // go to `binary` (generic externalisation by mimeType).
   if (o["type"] === "file" && typeof o["mediaType"] === "string") {
-    const mimeType = o["mediaType"];
+    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+    // file part should route the same as `audio/wav`. Normalise the type
+    // discriminator for the `audio/` prefix check + format mapping, but keep
+    // the original-case mimeType on the dispatched part so downstream
+    // consumers that pattern-match the exact value (e.g. an explicit
+    // allowlist) don't silently see a different string than the wire shape.
+    const mimeTypeRaw = o["mediaType"];
+    const mimeType = mimeTypeRaw.toLowerCase();
     const data = typeof o["data"] === "string" ? o["data"] : undefined;
     const url = typeof o["url"] === "string" ? o["url"] : undefined;
     if (data || url) {
@@ -337,7 +344,14 @@ export async function visitContentPartAsync<R>(
   // `inputAudio` (preserves a playable shape downstream); other file payloads
   // go to `binary` (generic externalisation by mimeType).
   if (o["type"] === "file" && typeof o["mediaType"] === "string") {
-    const mimeType = o["mediaType"];
+    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+    // file part should route the same as `audio/wav`. Normalise the type
+    // discriminator for the `audio/` prefix check + format mapping, but keep
+    // the original-case mimeType on the dispatched part so downstream
+    // consumers that pattern-match the exact value (e.g. an explicit
+    // allowlist) don't silently see a different string than the wire shape.
+    const mimeTypeRaw = o["mediaType"];
+    const mimeType = mimeTypeRaw.toLowerCase();
     const data = typeof o["data"] === "string" ? o["data"] : undefined;
     const url = typeof o["url"] === "string" ? o["url"] : undefined;
     if (data || url) {
@@ -419,7 +433,9 @@ export async function visitContentPartAsync<R>(
  * still preserved on the dispatched part for downstream handling.
  */
 function mediaTypeToAudioFormat(mediaType: string): string | undefined {
-  switch (mediaType) {
+  // Case-insensitive (RFC 2045 §5.1). Callers in this file already lowercase
+  // before passing in, but normalise here too so any future caller is safe.
+  switch (mediaType.toLowerCase()) {
     case "audio/wav":
     case "audio/x-wav":
       return "wav";

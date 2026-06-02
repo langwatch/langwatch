@@ -443,7 +443,6 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK file+audio part (typescript scenario SDK shape)", () => {
-    /** @scenario "file parts with audio/* mediaType are externalized to a clean input_audio reference" */
     it("calls storeFromBytes with the audio mediaType and rewrites the part to {type:'input_audio', input_audio:{url, mimeType}}", async () => {
       const base64Payload = makeBase64Payload("PCM16_AUDIO_BYTES");
       const mimeType = "audio/pcm16";
@@ -506,8 +505,51 @@ describe("extractInlineMediaFromEvent", () => {
     });
   });
 
+  describe("when an event has an AI-SDK file+audio part with mixed-case mediaType", () => {
+    it("normalises the mediaType for the audio/* check and routes to input_audio (not binary)", async () => {
+      // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+      // file part should externalise via the audio path the same as
+      // `audio/wav`. Before normalisation this fell into the binary branch
+      // and produced a `type:"binary"` rewrite — silently wrong shape.
+      const base64Payload = makeBase64Payload("WAV_BYTES");
+      const storedId = "stored-mixedcase-audio-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "audio/wav",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          mediaType: "Audio/WAV",
+          data: base64Payload,
+        },
+      ]);
+
+      const { rewrittenEvent } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toEqual({
+        type: "input_audio",
+        input_audio: {
+          data: undefined,
+          url: `/api/files/${storedId}`,
+          mimeType: "audio/wav",
+        },
+      });
+    });
+  });
+
   describe("when an event has an AI-SDK file part with a non-audio mediaType", () => {
-    /** @scenario "non-audio file parts route through the binary handler — externalised the same way as native binary parts" */
     it("calls storeFromBytes and rewrites the part with id and url", async () => {
       const base64Payload = makeBase64Payload("PNG_BYTES");
       const mimeType = "image/png";
