@@ -29,6 +29,19 @@ describe("buildRetentionTTLExpression", () => {
         "IF(_retention_days > 0, toDateTime(EventOccurredAt / 1000) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
       );
     });
+
+    // Regression: ScheduledAt and StartedAt on evaluation_runs are both
+    // Nullable(DateTime64(3)), which CH rejects in TTL expressions with
+    // BAD_TTL_EXPRESSION (code 450). The anchor must be UpdatedAt — non-null
+    // and partition-aligned with `toYearWeek(UpdatedAt)`.
+    it("evaluation_runs anchors retention on the non-null partition key", () => {
+      const config = TABLE_TTL_CONFIG.find((c) => c.table === "evaluation_runs")!;
+      expect(config.retentionTTLColumn).toBe("UpdatedAt");
+      const expr = buildRetentionTTLExpression(config);
+      expect(expr).toBe(
+        "IF(_retention_days > 0, toDateTime(UpdatedAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
   });
 
   describe("when retentionTTLColumn is not set", () => {
