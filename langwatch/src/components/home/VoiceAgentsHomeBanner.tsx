@@ -192,7 +192,6 @@ export function VoiceAgentsHomeBanner({
 						textStyle="sm"
 						color="white/90"
 						lineHeight={1.5}
-						maxWidth={{ base: "full", md: "520px" }}
 					>
 						Test your voice agent end-to-end with real voices, real audio, and judge criteria you write in plain English. Works with ElevenLabs, OpenAI Realtime, Gemini Live, Vapi, LiveKit, Pipecat, and more.
 					</Text>
