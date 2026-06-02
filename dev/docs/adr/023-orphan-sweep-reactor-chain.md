@@ -69,7 +69,7 @@ worker.on("completed") listener  ───────────┘
 | Component | File | Owns |
 |---|---|---|
 | `createRetentionOrphanSweepReactor` | `data-retention/orphan-sweep/retentionOrphanSweep.reactor.ts` | Fires on every trace event. Seeds the chain only — does not sweep. Short-circuits on `INDEFINITE_RETENTION_DAYS` (nothing will TTL → nothing to sweep). |
-| `seedOrphanSweepChain(tenantId, { delayMs? })` | `background/queues/orphanSweepChainQueue.ts` | Adds a chain job with stable `jobId = orphan-sweep-chain:${tenantId}`. Dedup-by-jobId is the canonical 24h gate. |
+| `seedOrphanSweepChain(tenantId, { delayMs? })` | `background/queues/orphanSweepChainQueue.ts` | Adds a chain job with stable `jobId = orphan-sweep-chain-${tenantId}` (':'-free — BullMQ rejects ':' in custom job ids). Dedup-by-jobId is the canonical 24h gate. Best-effort: a failed enqueue is logged and dropped, never run inline (the queue is configured `fallbackToInline: false`). |
 | `runOrphanSweepChainJob` | `background/workers/orphanSweepChainWorker.ts` | One step: project lookup → archive/deleted check → `sweepProject`. Returns `{ stopChain }`. |
 | `handleChainStepCompleted` | same file | Self-perpetuates: on `stopChain=false`, re-seeds with `delay=24h`. Extracted from the worker listener for unit testability. |
 | `OrphanSweepService.sweepProject` | `data-retention/orphan-sweep/orphanSweep.service.ts` | Cursor-paginated candidate walk; per-tenant; bounded batches. |

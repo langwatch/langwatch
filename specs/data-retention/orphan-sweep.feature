@@ -20,7 +20,8 @@ Feature: PG orphan sweep for retention-deleted traces
     Given the tenant has no orphan-sweep chain step in the queue
     When a trace event is ingested
     Then the ingestion reactor enqueues a chain step for this tenant
-    And the chain step has a stable jobId of the form "orphan-sweep-chain:<tenantId>"
+    And the chain step has a stable jobId of the form "orphan-sweep-chain-<tenantId>"
+    And the jobId contains no ":" character, which BullMQ rejects in custom job ids
 
   Scenario: Concurrent ingest from the same tenant dedups to a single chain step
     Given a chain step is already queued for the tenant

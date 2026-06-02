@@ -35,11 +35,26 @@ export class QueueWithFallback<
 > {
   private worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>;
   private tracer = getLangWatchTracer("langwatch.queueWithFallback");
+  private fallbackToInline: boolean;
 
   constructor(
     name: string,
     worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>,
     opts?: QueueOptions,
+    behavior?: {
+      /**
+       * When the queue is unavailable (no Redis connection, enqueue error or
+       * timeout), run the worker synchronously inline on the caller's path.
+       * Defaults to `true` — the resilience behaviour latency-critical queues
+       * (collector, evaluations, …) rely on.
+       *
+       * Set `false` for heavy, non-latency-critical maintenance jobs that must
+       * never run inline: inline execution turns a queue failure (a bad jobId,
+       * a Redis blip) into a per-caller-event storm. With it off, `add` throws
+       * instead of running inline, so the caller can drop the work.
+       */
+      fallbackToInline?: boolean;
+    },
   ) {
     // Add BullMQ OTel instrumentation for automatic trace context propagation
     const optsWithTelemetry: QueueOptions = {
@@ -48,6 +63,7 @@ export class QueueWithFallback<
     } as QueueOptions;
     super(name, optsWithTelemetry, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;
+    this.fallbackToInline = behavior?.fallbackToInline ?? true;
   }
 
   async add(
@@ -76,6 +92,11 @@ export class QueueWithFallback<
         } as JobDataWithContext<DataType>;
 
         if (!connection) {
+          if (!this.fallbackToInline) {
+            throw new Error(
+              `Queue ${this.name} has no Redis connection and inline fallback is disabled`,
+            );
+          }
           await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
           // Restore context when executing fallback worker
           const requestContext = createContextFromJobData(contextMetadata);
@@ -119,6 +140,19 @@ export class QueueWithFallback<
 
           return job as Job<DataType, ResultType, NameType>;
         } catch (error) {
+          if (!this.fallbackToInline) {
+            logger.warn(
+              {
+                error,
+                jobId: opts?.jobId,
+                queueName: this.name,
+                projectId: contextMetadata.projectId,
+              },
+              `failed sending to redis ${this.name}; inline fallback disabled, rethrowing`,
+            );
+            throw error;
+          }
+
           logger.warn(
             { error, projectId: contextMetadata.projectId },
             `failed sending to redis ${this.name} inserting trace directly, attempting to process job synchronously`,
