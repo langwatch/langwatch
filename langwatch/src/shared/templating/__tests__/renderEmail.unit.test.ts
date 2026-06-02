@@ -87,6 +87,7 @@ describe("renderTriggerEmail", () => {
             id: "t",
             name: "x".repeat(300),
             alertType: null,
+            editUrl: "https://app.langwatch.test/automations",
           },
         }),
       });
