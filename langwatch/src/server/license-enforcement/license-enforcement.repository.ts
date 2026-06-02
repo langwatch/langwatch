@@ -376,6 +376,7 @@ export class LicenseEnforcementRepository
     return this.prisma.experiment.count({
       where: {
         projectId: { in: projectIds },
+        archivedAt: null,
         NOT: {
           workbenchState: {
             path: ["task"],

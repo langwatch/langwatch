@@ -39,6 +39,7 @@ import {
 } from "~/server/experiments-v3/execution/orchestrator";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   executionRequestSchema,
   type EvaluationV3Event,
@@ -340,12 +341,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   }
   const { project, markUsed } = authResult;
 
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: project.id,
-      slug,
-      type: ExperimentType.EVALUATIONS_V3,
-    },
+  const experiment = await ExperimentService.create(prisma).findBySlugAndType({
+    projectId: project.id,
+    slug,
+    type: ExperimentType.EVALUATIONS_V3,
   });
 
   if (!experiment) {
@@ -592,6 +591,20 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
     return c.json({ error: "Run not found" }, { status: 404 });
   }
 
+  // Same archive guard as /runs/:runId/results: a run whose owning
+  // experiment was archived must not keep serving status from the Redis
+  // cache for the rest of the 24h TTL. Without this, archive visibility
+  // silently depends on run age.
+  if (runState.experimentId) {
+    const stillLive = await ExperimentService.create(prisma).isActive({
+      projectId: project.id,
+      id: runState.experimentId,
+    });
+    if (!stillLive) {
+      return c.json({ error: "Run not found" }, { status: 404 });
+    }
+  }
+
   logger.debug({ runId, status: runState.status }, "Run status queried");
   markUsed();
 
@@ -675,13 +688,25 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
 
   const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
   let experimentId = experimentIdFromState;
+  const experiments = ExperimentService.create(prisma);
 
   if (!experimentId && experimentSlug) {
-    const experiment = await prisma.experiment.findFirst({
-      where: { projectId: project.id, slug: experimentSlug },
-      select: { id: true },
+    const experiment = await experiments.findIdBySlug({
+      projectId: project.id,
+      slug: experimentSlug,
     });
     experimentId = experiment?.id;
+  } else if (experimentId) {
+    // Independent of how we resolved the id, refuse to return results once
+    // the owning experiment is archived. Without this check the Redis-state
+    // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
+    // after archive while the slug-based fallback already returns 404, so
+    // archive visibility would silently depend on run age.
+    const stillLive = await experiments.isActive({
+      projectId: project.id,
+      id: experimentId,
+    });
+    if (!stillLive) experimentId = undefined;
   }
 
   if (!experimentId) {

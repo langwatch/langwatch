@@ -9,6 +9,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
@@ -165,10 +166,12 @@ export const findOrCreateExperiment = async ({
   workflowId?: string;
 }) => {
   let experiment: Experiment | null = null;
+  const experiments = ExperimentService.create(prisma);
 
   if (experiment_id) {
-    experiment = await prisma.experiment.findUnique({
-      where: { projectId: project.id, id: experiment_id },
+    experiment = await experiments.findById({
+      projectId: project.id,
+      id: experiment_id,
     });
     if (!experiment) {
       throw new Error("Experiment not found");
@@ -178,8 +181,13 @@ export const findOrCreateExperiment = async ({
   let slug_ = null;
   if (experiment_slug) {
     slug_ = slugify(experiment_slug);
-    experiment = await prisma.experiment.findUnique({
-      where: { projectId_slug: { projectId: project.id, slug: slug_ } },
+    // findBySlug filters archivedAt at the service layer. Archived rows
+    // also have a `-archived-<nanoid>` slug, so they would not collide
+    // even on a raw findUnique - we still go through the service so the
+    // archive rule stays one source of truth.
+    experiment = await experiments.findBySlug({
+      projectId: project.id,
+      slug: slug_,
     });
   }
 
