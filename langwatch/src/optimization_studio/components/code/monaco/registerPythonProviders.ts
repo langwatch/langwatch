@@ -518,13 +518,17 @@ function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
     provideHover: (model, position) => {
       const word = model.getWordAtPosition(position);
       if (!word) return null;
-      const lineBefore = model.getValueInRange({
+      // Include the *full* hovered word — not just the prefix up to the cursor
+      // — so `secrets.YEA_BOI` resolves correctly when the cursor is mid-word.
+      // Naïvely concatenating `lineBefore + word.word` double-counted the
+      // partial typed prefix and produced bogus attribute paths.
+      const lineUpToWordEnd = model.getValueInRange({
         startLineNumber: position.lineNumber,
         startColumn: 1,
         endLineNumber: position.lineNumber,
-        endColumn: position.column,
+        endColumn: word.endColumn,
       });
-      const attr = ATTR_ACCESS.exec(`${lineBefore}${word.word}`);
+      const attr = ATTR_ACCESS.exec(lineUpToWordEnd);
       if (attr) {
         const owner = attr[1];
         const name = attr[2];
