@@ -2,7 +2,7 @@ import type { AlertType } from "@prisma/client";
 
 /**
  * The single variable contract every trigger-notification template renders
- * against, for both immediate and digest dispatch (see ADR-026).
+ * against, for both immediate and digest dispatch (see ADR-024).
  *
  * Templates always iterate `matches`: an immediate dispatch sets
  * `matches.length === 1`, a digest sets it to N. The same template handles
@@ -13,13 +13,15 @@ export interface TemplateContext {
   project: TemplateProjectVars;
   digest: TemplateDigestVars;
   /**
-   * The single matched trace for immediate-cadence dispatches. This is the
-   * variable surface authors write against today (ADR-028); a digest cadence
-   * (ADR-025, future) will expose `matches[]` for iteration. Both reference
-   * the same underlying records — `match === matches[0] ?? null`.
+   * Convenience handle for the first matched trace, equivalent to
+   * `matches[0] ?? null`. Useful in `{{ match.* }}` style references when the
+   * author knows they're handling a single immediate dispatch and doesn't want
+   * the iteration syntax. The canonical variable surface is `matches[]` —
+   * templates iterating `{% for m in matches %}` work identically for an
+   * immediate dispatch (length 1) and a digest (length N). See ADR-024.
    */
   match: TemplateMatchVars | null;
-  /** Internal: kept on the context so the renderer can iterate when needed. */
+  /** Iterable matches for both immediate and digest dispatch. ADR-024 + ADR-023. */
   matches: TemplateMatchVars[];
 }
 

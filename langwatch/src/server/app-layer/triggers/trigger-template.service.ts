@@ -90,6 +90,21 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
       `Invalid Slack template type "${draft.slackTemplateType}". Allowed: ${SLACK_TEMPLATE_TYPES.join(", ")}.`,
     );
   }
+  // ADR-024 makes the Slack type discriminator explicit so a Block Kit JSON
+  // template can't silently dispatch as plain text. Reject a Slack source
+  // without a type instead of falling back to "string", which is the kind of
+  // silent mis-send the discriminator exists to prevent.
+  const slackSource = draft.slackTemplate;
+  if (
+    typeof slackSource === "string" &&
+    slackSource.trim() !== "" &&
+    draft.slackTemplateType == null
+  ) {
+    throw new TemplateValidationError(
+      "slackTemplateType",
+      `slackTemplate is set but slackTemplateType is missing. Pick "string" or "block_kit".`,
+    );
+  }
   for (const column of LIQUID_TEMPLATE_COLUMNS) {
     const source = draft[column];
     if (typeof source === "string" && source.trim() !== "") {

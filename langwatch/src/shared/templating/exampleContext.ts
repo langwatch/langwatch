@@ -2,7 +2,7 @@ import type { TemplateMatchInput } from "./templateContext";
 
 /**
  * A single representative example trace that the editor preview, the test
- * fire, and the editor autocomplete all agree on (see ADR-028). Only one
+ * fire, and the editor autocomplete all agree on (see ADR-024). Only one
  * match is exposed today — the variable surface is `match.*`, singular —
  * because the only live cadence is immediate. A digest cadence will later
  * expose `matches[]` as well.
@@ -30,10 +30,12 @@ export const EXAMPLE_MATCHES: TemplateMatchInput[] = [EXAMPLE_MATCH];
  * autocomplete (`detail` + `documentation`), the unknown-variable detector
  * (roots = `path.split(".")[0]`), and the Variable Reference panel.
  *
- * Variables intentionally use the singular `match.*` rather than
- * `{% for m in matches %}` — immediate cadence has exactly one match, and a
- * `matches[]` iteration only makes sense once the digest cadence (ADR-025)
- * ships.
+ * Both `match.*` (singular handle for immediate dispatches) and `matches[]`
+ * (iterable for both immediate and digest) are surfaced in the variable
+ * panel. ADR-024 picks the digest-friendly default — authors writing
+ * `{% for m in matches %}` get correct behavior in both modes from one
+ * template, while `{{ match.field }}` stays a convenient shortcut for
+ * single-match cases.
  */
 export interface VariableInfo {
   /** Dotted path the template author writes, e.g. `match.trace.input`. */

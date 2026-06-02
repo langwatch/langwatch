@@ -2,7 +2,7 @@
  * Test-fire banner. When a notification is dispatched via the "Test fire" UI
  * button (not a real match), the backend injects a non-suppressible marker so
  * recipients can't mistake it for a real alert. The banner is backend-injected
- * and NOT template-controllable (see ADR-026).
+ * and NOT template-controllable (see ADR-024).
  */
 
 export const TEST_FIRE_NOTICE =

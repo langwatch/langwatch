@@ -1,7 +1,7 @@
 import { DomainError } from "~/server/app-layer/domain-error";
 
 /**
- * Domain errors raised by the automation authoring path (ADR-028). Each is a
+ * Domain errors raised by the automation authoring path (ADR-026). Each is a
  * concrete `DomainError` subclass so the existing tRPC `errorFormatter`
  * serialises it onto the wire as `error.data.domainError` with the `kind`
  * discriminator plus structured `meta`. The client matches on `kind` and
