@@ -62,13 +62,13 @@ describe("listScenariosCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(() => ({
+    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
       get: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as ScenariosApiService);
+    }) as unknown as ScenariosApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -112,13 +112,13 @@ describe("getScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(() => ({
+    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as ScenariosApiService);
+    }) as unknown as ScenariosApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -151,13 +151,13 @@ describe("createScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(() => ({
+    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: mockCreate,
       update: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as ScenariosApiService);
+    }) as unknown as ScenariosApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -218,13 +218,13 @@ describe("updateScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdate = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(() => ({
+    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
       update: mockUpdate,
       delete: vi.fn(),
-    }) as unknown as ScenariosApiService);
+    }) as unknown as ScenariosApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -273,13 +273,13 @@ describe("deleteScenarioCommand()", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockDelete = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(() => ({
+    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       create: vi.fn(),
       update: vi.fn(),
       delete: mockDelete,
-    }) as unknown as ScenariosApiService);
+    }) as unknown as ScenariosApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

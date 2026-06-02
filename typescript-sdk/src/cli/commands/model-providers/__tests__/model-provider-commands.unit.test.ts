@@ -48,10 +48,10 @@ describe("listModelProvidersCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(() => ({
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
       list: mockList,
       set: vi.fn(),
-    }) as unknown as ModelProvidersApiService);
+    }) as unknown as ModelProvidersApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -110,10 +110,10 @@ describe("setModelProviderCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSet = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(() => ({
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       set: mockSet,
-    }) as unknown as ModelProvidersApiService);
+    }) as unknown as ModelProvidersApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

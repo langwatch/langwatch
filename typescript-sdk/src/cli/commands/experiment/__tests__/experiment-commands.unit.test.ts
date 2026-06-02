@@ -52,10 +52,10 @@ describe("runExperimentCommand()", () => {
     vi.clearAllMocks();
     mockStartRun = vi.fn();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(() => ({
+    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
       startRun: mockStartRun,
       getRunStatus: mockGetRunStatus,
-    }) as unknown as ExperimentsApiService);
+    }) as unknown as ExperimentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -111,7 +111,7 @@ describe("experimentStatusCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(() => ({
+    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
       startRun: vi.fn(),
       getRunStatus: mockGetRunStatus,
       getRunResults: vi
@@ -120,7 +120,7 @@ describe("experimentStatusCommand()", () => {
           new ExperimentsApiServiceError("Run not found", "get run results"),
         ),
       listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
-    }) as unknown as ExperimentsApiService);
+    }) as unknown as ExperimentsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

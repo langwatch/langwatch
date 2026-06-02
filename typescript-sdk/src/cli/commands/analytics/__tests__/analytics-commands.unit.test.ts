@@ -47,9 +47,9 @@ describe("queryAnalyticsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTimeseries = vi.fn();
-    vi.mocked(AnalyticsApiService).mockImplementation(() => ({
+    vi.mocked(AnalyticsApiService).mockImplementation(function () { return ({
       timeseries: mockTimeseries,
-    }) as unknown as AnalyticsApiService);
+    }) as unknown as AnalyticsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
