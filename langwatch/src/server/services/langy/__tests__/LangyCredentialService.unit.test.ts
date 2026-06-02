@@ -25,10 +25,6 @@ function makePrisma(overrides: any = {}) {
       create: vi.fn().mockResolvedValue({}),
       ...overrides.projectSecret,
     },
-    gatewayProviderCredential: {
-      findFirst: vi.fn().mockResolvedValue({ id: "gpc-1" }),
-      ...overrides.gatewayProviderCredential,
-    },
   } as any;
 }
 
@@ -75,9 +71,9 @@ describe("LangyCredentialService", () => {
     });
   });
 
-  describe("given no stored secret + a configured provider credential", () => {
+  describe("given no stored secret", () => {
     describe("when getOrProvision is called", () => {
-      it("provisions a new VK, stores the encrypted secret, returns the plaintext", async () => {
+      it("provisions a project-scoped VK, stores the encrypted secret, returns the plaintext", async () => {
         const prisma = makePrisma();
         const vk = makeVkService();
         const svc = new LangyCredentialService(prisma, vk);
@@ -90,10 +86,10 @@ describe("LangyCredentialService", () => {
         expect(creds.llmVirtualKey).toBe("lw_vk_live_provisioned");
         expect(vk.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            projectId: "p1",
             organizationId: "org-1",
-            environment: "live",
-            providerCredentialIds: ["gpc-1"],
+            name: "Langy",
+            principalUserId: null,
+            scopes: [{ scopeType: "PROJECT", scopeId: "p1" }],
             actorUserId: "u1",
           }),
         );
@@ -106,28 +102,6 @@ describe("LangyCredentialService", () => {
             updatedById: "u1",
           }),
         });
-      });
-    });
-  });
-
-  describe("given no provider credential configured for the project", () => {
-    describe("when getOrProvision is called", () => {
-      it("throws LangyCredentialResolutionError with an actionable message", async () => {
-        const prisma = makePrisma({
-          gatewayProviderCredential: {
-            findFirst: vi.fn().mockResolvedValue(null),
-          },
-        });
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
-
-        await expect(
-          svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
-        ).rejects.toThrow(LangyCredentialResolutionError);
-        await expect(
-          svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
-        ).rejects.toThrow(/Settings → Model Providers/);
-        expect(vk.create).not.toHaveBeenCalled();
       });
     });
   });
