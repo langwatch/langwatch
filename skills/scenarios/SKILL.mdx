@@ -476,6 +476,58 @@ describe("Voice agent — angry billing", () => {
 });
 ```
 
+### Run them with pytest / vitest — do NOT write a runner script
+
+Scenarios ARE tests. Each `scenario.run(...)` call lives inside an `it(...)` (TypeScript) or an `async def test_*` (Python). You run them with `pytest` / `vitest` like any other test in the project. Concretely:
+
+```bash
+# Python
+pytest -s tests/test_voice_agent.py
+
+# TypeScript
+pnpm vitest run tests/voice/billing.test.ts
+```
+
+Do NOT generate a `main.py` / `run_scenarios.py` / `runner.ts` that loops over scenarios and calls `scenario.run(...)` itself. The test runner already gives you: per-test isolation, parallelism (within a process, via worker threads), reruns of just the failing case (`pytest --lf`, `vitest --reporter=verbose -t ...`), CI integration, watch mode, snapshots, and per-test timeouts. A custom runner re-implements all of that and ships with none of it wired up.
+
+Voice scenarios in particular are slow — each `scenario.run` takes 30–120s of wall-clock. Run a fleet in parallel by letting the test runner do it, **but cap the concurrency** at ~3 to stay under ElevenLabs's starter-tier TTS limit (and OpenAI Realtime / Gemini Live per-account WS caps):
+
+```python
+# Python: pytest-asyncio-concurrent groups same-file async tests into a thread pool.
+# pyproject.toml:
+#   [tool.pytest.ini_options]
+#   asyncio_mode = "strict"
+#   asyncio_default_concurrent_group = "self"
+#
+# Then on each test, group ≤3 into a batch and split the file into batches:
+@pytest.mark.asyncio_concurrent(group="voice-batch-1")
+async def test_billing_inquiry(): ...
+
+@pytest.mark.asyncio_concurrent(group="voice-batch-1")
+async def test_account_lockout(): ...
+
+@pytest.mark.asyncio_concurrent(group="voice-batch-1")
+async def test_refund_flow(): ...
+
+@pytest.mark.asyncio_concurrent(group="voice-batch-2")  # next 3 here…
+async def test_noisy_handoff(): ...
+```
+
+```typescript
+// TypeScript: vitest concurrent + `maxConcurrency` cap in the config.
+// vitest.config.ts:
+//   test: { maxConcurrency: 3 }
+//
+// Then mark scenarios as concurrent inside the same file:
+describe.concurrent("voice agent", () => {
+  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
+  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
+  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+});
+```
+
+If the user is on a paid tier with higher TTS limits, bump the group/maxConcurrency to match what their plan allows. The point isn't the magic number "3" — it's "let the test runner schedule it, set the cap to match the rate limit, don't hand-roll a worker pool."
+
 ### Voice-specific gotchas
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
@@ -513,6 +565,8 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 ### Code Approach
 - Do NOT create your own testing framework — `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
+- Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`) — run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
+- Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses — always use `JudgeAgent` natural-language criteria
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
