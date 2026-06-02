@@ -28,10 +28,17 @@ describe("orphanSweepChainJobId", () => {
     expect(orphanSweepChainJobId("abc123")).toContain("abc123");
   });
 
-  // Regression: ':' made BullMQ reject the add ("Custom Ids cannot contain :"),
+  // Regression: ':' made BullMQ reject the add ("Custom Id cannot contain :"),
   // which fell back to running the sweep inline per ingestion event.
   it("contains no ':' character", () => {
     expect(orphanSweepChainJobId("tenant-1")).not.toContain(":");
+  });
+
+  // TenantIdSchema only trims + requires non-empty; it does NOT forbid ':'.
+  // A tenantId that ever contained ':' would otherwise reintroduce the rejected
+  // add. The jobId must stay ':'-free regardless of the tenantId's contents.
+  it("stays ':'-free even when the tenant id contains ':'", () => {
+    expect(orphanSweepChainJobId("ten:ant:1")).not.toContain(":");
   });
 });
 

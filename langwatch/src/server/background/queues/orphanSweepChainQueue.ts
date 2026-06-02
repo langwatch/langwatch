@@ -21,13 +21,20 @@ export const ORPHAN_SWEEP_CHAIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** Stable jobId per tenant. As long as a chain step exists for a tenant in
  *  any state (waiting/delayed/active), seed attempts dedup to that one job.
  *
- *  Must stay ':'-free: BullMQ rejects custom job ids containing ':'
- *  ("Custom Ids cannot contain :"). When the add was rejected,
- *  QueueWithFallback used to fall back to running the (heavy) sweep inline on
- *  the ingestion path — a per-trace-event read storm that took down prod. The
- *  in-memory dev/test queue allows ':', so this only ever fails on BullMQ. */
+ *  Must stay ':'-free: BullMQ rejects custom job ids that contain ':' unless
+ *  they split into exactly 3 segments ("Custom Id cannot contain :"). When the
+ *  add was rejected, QueueWithFallback used to fall back to running the (heavy)
+ *  sweep inline on the ingestion path — a per-trace-event read storm that took
+ *  down prod. The in-memory dev/test queue allows ':', so this only ever fails
+ *  on BullMQ.
+ *
+ *  `tenantId` is encoded because `TenantIdSchema` only trims + requires
+ *  non-empty — it does NOT forbid ':'. encodeURIComponent maps ':' → '%3A'
+ *  while leaving the alphanumeric/`-`/`_` project ids we actually issue
+ *  untouched, so the dedup key is unchanged in practice but can never
+ *  reintroduce the rejected-add failure mode for a pathological tenantId. */
 export function orphanSweepChainJobId(tenantId: string): string {
-  return `orphan-sweep-chain-${tenantId}`;
+  return `orphan-sweep-chain-${encodeURIComponent(tenantId)}`;
 }
 
 export const orphanSweepChainQueue = new QueueWithFallback<
