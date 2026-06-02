@@ -30,14 +30,14 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     type: plan.type,
     name: plan.name,
     maxMembers: plan.maxMembers,
-    maxProjects: plan.maxProjects,
     maxMessagesPerMonth: plan.maxMessagesPerMonth,
-    maxWorkflows: plan.maxWorkflows,
     canPublish: plan.canPublish,
 
     // Apply defaults to optional fields
     maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
     maxTeams: plan.maxTeams ?? DEFAULT_LIMIT,
+    maxProjects: plan.maxProjects ?? DEFAULT_LIMIT,
+    maxWorkflows: plan.maxWorkflows ?? DEFAULT_LIMIT,
     maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
     maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
     maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,

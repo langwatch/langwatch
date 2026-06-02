@@ -17,13 +17,7 @@ describe("mapToPlanInfo", () => {
       type: "PRO",
       name: "Pro",
       maxMembers: 10,
-      maxProjects: 99,
       maxMessagesPerMonth: 100_000,
-      evaluationsCredit: 100,
-      maxWorkflows: 50,
-      maxPrompts: 50,
-      maxEvaluators: 50,
-      maxScenarios: 50,
       canPublish: true,
       ...planOverrides,
     },
@@ -47,11 +41,6 @@ describe("mapToPlanInfo", () => {
       maxMembers: 5,
       maxMembersLite: 10,
       maxMessagesPerMonth: 50000,
-      evaluationsCredit: 100,
-      maxWorkflows: 25,
-      maxPrompts: 30,
-      maxEvaluators: 35,
-      maxScenarios: 40,
     });
 
     const result = mapToPlanInfo(licenseData);
@@ -136,10 +125,7 @@ describe("mapToPlanInfo", () => {
         type: "PRO",
         name: "Pro",
         maxMembers: 10,
-        maxProjects: 99,
         maxMessagesPerMonth: 100_000,
-        evaluationsCredit: 100,
-        maxWorkflows: 50,
         canPublish: true,
         // Note: maxMembersLite is NOT provided
       },
@@ -170,10 +156,7 @@ describe("mapToPlanInfo", () => {
         type: "PRO",
         name: "Pro",
         maxMembers: 10,
-        maxProjects: 99,
         maxMessagesPerMonth: 100_000,
-        evaluationsCredit: 100,
-        maxWorkflows: 50,
         canPublish: true,
       },
     };
