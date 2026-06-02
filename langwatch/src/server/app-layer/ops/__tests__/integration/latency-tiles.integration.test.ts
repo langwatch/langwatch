@@ -38,6 +38,10 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     queues.length = 0;
     // Scoped cleanup: only delete keys this suite created. FLUSHALL would
     // wipe state owned by other integration tests sharing the same Redis.
+    // Global collector keys (ops:known-pipelines, ops:metrics:state) are
+    // intentionally left alone — they are best-effort caches; the only stale
+    // state that survives is `peakLatencyP*`, and our assertion is
+    // `peak >= current`, which a stale-larger peak still satisfies.
     for (const name of queueNames) {
       let cursor = "0";
       do {
@@ -52,9 +56,6 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         cursor = next;
       } while (cursor !== "0");
     }
-    // Collector-owned state keys this suite touches (KNOWN_PIPELINES_KEY +
-    // REDIS_STATE_KEY in metrics-collector.ts).
-    await redis.unlink("ops:known-pipelines", "ops:metrics:state");
     queueNames.length = 0;
   });
 
