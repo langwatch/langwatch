@@ -11,17 +11,17 @@ import {
 import { MeshGradient } from "@paper-design/shaders-react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuSparkles, LuX } from "react-icons/lu";
-import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
-import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
+import { LuArrowRight, LuMic, LuX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useColorModeValue } from "../ui/color-mode";
+import { Tooltip } from "../ui/tooltip";
 
 const SNOOZE_DAYS = 7;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
-const STORAGE_PREFIX = "langwatch:tracesV2-home-banner-dismissed:v2:try:";
+const STORAGE_PREFIX =
+	"langwatch:voice-agents-home-banner-dismissed:v1:";
+const TARGET_URL = "https://langwatch.ai/scenario/voice/getting-started";
 
 const storageKey = (projectId: string) => `${STORAGE_PREFIX}${projectId}`;
 
@@ -50,27 +50,18 @@ function snooze(projectId: string) {
 	}
 }
 
-/**
- * Exposed so the home page can decide whether to show this banner or fall
- * back to the next-in-line announcement (e.g. {@link VoiceAgentsHomeBanner}).
- */
-export function isTracesV2BannerSnoozed(projectId: string): boolean {
-	return isSnoozed(projectId);
-}
+// Teal → cyan → indigo palette, so this banner visually rhymes with
+// `TracesV2HomeBanner` (same MeshGradient + glass-card shape) without looking
+// like a duplicate when the home page rotates between the two announcements.
+const MESH_COLORS_LIGHT = ["#0f766e", "#06b6d4", "#6366f1", "#ecfeff"];
+const MESH_COLORS_DARK = ["#134e4a", "#0e7490", "#312e81", "#0a1424"];
 
-// Colours mirror the in-app NewTracesPromo banner so the two surfaces feel
-// like the same announcement. Resolved hex values are required because the
-// MeshGradient WebGL shader cannot read CSS variables.
-const MESH_COLORS_LIGHT = ["#6b21a8", "#a855f7", "#ec4899", "#fdf2f8"];
-const MESH_COLORS_DARK = ["#581c87", "#9333ea", "#db2777", "#1f0a2e"];
-
-export function TracesV2HomeBanner() {
+export function VoiceAgentsHomeBanner() {
 	const { project } = useOrganizationTeamProject({
 		redirectToOnboarding: false,
 		redirectToProjectOnboarding: false,
 	});
 	const projectId = project?.id;
-	const projectSlug = project?.slug;
 	const reduceMotion = useReducedMotion();
 	const meshColors = useColorModeValue(MESH_COLORS_LIGHT, MESH_COLORS_DARK);
 
@@ -85,7 +76,7 @@ export function TracesV2HomeBanner() {
 		if (projectId) setDismissed(isSnoozed(projectId));
 	}, [projectId]);
 
-	if (!hasMounted || !projectSlug || dismissed) {
+	if (!hasMounted || !projectId || dismissed) {
 		return null;
 	}
 
@@ -94,21 +85,13 @@ export function TracesV2HomeBanner() {
 		setDismissed(true);
 	};
 
-	// Flip the per-device preference so `useTraceDetailsDrawer` opens
-	// the v2 drawer everywhere else in the app after the user clicks
-	// through the home banner — without this, opening a trace from the
-	// messages table would still land on v1 even though they just opted
-	// in here.
-	const handleTryV2 = () => {
-		setTracesV2Preferred(true);
-		posthog.capture("traces_v2_opt_in", {
+	const handleClick = () => {
+		posthog.capture("voice_agents_banner_click", {
 			surface: "home_banner",
 			projectId,
 		});
 		if (projectId) snooze(projectId);
 	};
-
-	const v2Href = `/${projectSlug}/traces`;
 
 	return (
 		<Box
@@ -159,7 +142,7 @@ export function TracesV2HomeBanner() {
 					bg="white/20"
 					boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
 				>
-					<Icon as={LuSparkles} boxSize={5} color="white" />
+					<Icon as={LuMic} boxSize={5} color="white" />
 				</Box>
 
 				<VStack align="start" gap={1.5} flex={1} minWidth={0}>
@@ -171,7 +154,7 @@ export function TracesV2HomeBanner() {
 							letterSpacing="-0.01em"
 							lineHeight={1.2}
 						>
-							The new Trace Explorer is here
+							Voice agent simulations are here
 						</Heading>
 						<Box
 							paddingX={2}
@@ -188,7 +171,7 @@ export function TracesV2HomeBanner() {
 								textTransform="uppercase"
 								lineHeight={1.2}
 							>
-								Beta
+								New
 							</Text>
 						</Box>
 					</HStack>
@@ -198,18 +181,26 @@ export function TracesV2HomeBanner() {
 						lineHeight={1.5}
 						maxWidth={{ base: "full", md: "520px" }}
 					>
-						A faster, friendlier tracing experience, built on everything we learned from v1. Take it for a spin and tell us what you think.
+						Test your voice agent end-to-end with real voices, real audio, and judge criteria you write in plain English. Works with ElevenLabs, OpenAI Realtime, Gemini Live, Vapi, LiveKit, Pipecat, and more.
 					</Text>
 					<HStack gap={2} marginTop={1.5}>
-						<Link
-							href={v2Href}
-							onClick={handleTryV2}
-							aria-label="Open new Trace Explorer"
+						{/*
+						 * Plain <a> + target=_blank — this points to the public docs
+						 * site, not an internal route, so the in-app `<Link>` (which
+						 * resolves project-scoped paths) is the wrong primitive.
+						 */}
+						<a
+							href={TARGET_URL}
+							target="_blank"
+							rel="noopener noreferrer"
+							onClick={handleClick}
+							aria-label="Open Voice Agents getting started guide in a new tab"
+							style={{ textDecoration: "none" }}
 						>
 							<Button
 								size="sm"
 								bg="white"
-								color="purple.700"
+								color="teal.700"
 								fontWeight="600"
 								paddingX={4}
 								boxShadow="0 1px 2px rgba(0,0,0,0.12)"
@@ -217,10 +208,10 @@ export function TracesV2HomeBanner() {
 								_active={{ bg: "white/80", transform: "translateY(0)" }}
 								transition="background-color 0.12s ease, transform 0.12s ease"
 							>
-								Try the new Trace Explorer
+								Try voice agent testing
 								<Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
 							</Button>
-						</Link>
+						</a>
 					</HStack>
 				</VStack>
 			</HStack>
@@ -247,4 +238,14 @@ export function TracesV2HomeBanner() {
 			</Tooltip>
 		</Box>
 	);
+}
+
+/**
+ * Helper for callers that want to gate the voice banner on the prior
+ * traces-v2 banner being dismissed/snoozed already. Exposed so the
+ * `HomePage` orchestrator can pick one banner at a time without leaking
+ * storage-key knowledge.
+ */
+export function isVoiceAgentsBannerSnoozed(projectId: string): boolean {
+	return isSnoozed(projectId);
 }
