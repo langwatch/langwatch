@@ -14,7 +14,12 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createOutboxDispatcher } from "./dispatcher";
-import type { CadenceStagePayload, OutboxJob, SettleStagePayload } from "./payload";
+import {
+  settleDedupId,
+  type CadenceStagePayload,
+  type OutboxJob,
+  type SettleStagePayload,
+} from "./payload";
 import { PgOutboxAuditAdapter } from "./pgAuditAdapter";
 
 export type EnqueueSettleParams = Omit<SettleStagePayload, "stage" | "reactorName" | "auditDedupKey" | "foldSnapshotAtEnqueue"> & {
@@ -146,10 +151,23 @@ export function buildOutboxRuntime({
       await queueHolder.current.send(
         payload as unknown as Record<string, unknown>,
         {
-          // Caller-supplied per-trigger ttl drives the Debounce Mode TTL.
-          // makeId / extend / replace come from the queue's stage-aware
-          // dedup config (see eventSourcing.ts's createGlobalQueue).
-          deduplication: { ttlMs },
+          // Per-send override for the per-trigger Debounce Mode TTL
+          // (`Trigger.traceDebounceMs`). `makeId` is duplicated here
+          // because `DeduplicationConfig` requires it on every config
+          // object — the function returns the same id the queue's own
+          // stage-aware resolver would, so the dedup window is consistent
+          // whether the producer overrides the TTL or not.
+          deduplication: {
+            makeId: () =>
+              settleDedupId({
+                projectId: payload.projectId,
+                triggerId: payload.triggerId,
+                traceId: payload.traceId,
+              }),
+            ttlMs,
+            extend: true,
+            replace: true,
+          },
         },
       );
     },
