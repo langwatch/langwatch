@@ -27,6 +27,15 @@ import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
+import {
+  cadenceGroupKey,
+  isCadence,
+  isSettle,
+  settleDedupId,
+  settleGroupKey,
+  type OutboxJob,
+} from "./outbox/payload";
+import type { OutboxRuntime } from "./outbox/setup";
 import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
@@ -49,6 +58,12 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
+  /** Optional outbox runtime (ADR-022 revision 3). When provided, the
+   *  global queue routes settle/cadence payloads to its dispatcher and
+   *  wires its audit adapter onto every lifecycle event. Non-outbox
+   *  payloads flow through the normal registry — the runtime piggy-backs
+   *  on the existing queue instead of standing up its own. */
+  outbox?: OutboxRuntime;
 }
 
 /**
@@ -104,12 +119,14 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
+  private readonly _outbox?: OutboxRuntime;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
+    this._outbox = options.outbox;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -430,25 +447,54 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
+    // ADR-022 revision 3: outbox payloads (settle/cadence) ride this same
+    // queue. Each callback peels off the outbox case first; everything else
+    // falls through to the existing registry-based dispatch. The audit
+    // adapter from the outbox runtime is wired below — it gates internally
+    // on `isSettle || isCadence`, so non-outbox queue events no-op cheaply.
+    const outbox = this._outbox;
+    const isOutboxPayload = (payload: Record<string, unknown>): payload is OutboxJob =>
+      isSettle(payload as Record<string, unknown> & { stage?: unknown }) ||
+      isCadence(payload as Record<string, unknown> & { stage?: unknown });
+
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
+        if (isOutboxPayload(payload)) {
+          return isSettle(payload) ? settleGroupKey(payload) : cadenceGroupKey(payload);
+        }
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";
         return result.entry.groupKeyFn(result.clean);
       },
       score: (payload: Record<string, unknown>) => {
+        // Outbox jobs participate in the same per-tenant fairness budget
+        // as projection / reactor work — a baseline score of 0 keeps them
+        // in the default lane unless a future revision wants to weight
+        // them explicitly.
+        if (isOutboxPayload(payload)) return 0;
         const result = this.lookupEntry(payload);
         if (!result) return 0;
         return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {
+        if (isOutboxPayload(payload)) {
+          return { "outbox.stage": payload.stage };
+        }
         const result = this.lookupEntry(payload);
         if (!result) return {};
         if (!result.entry.spanAttributes) return {};
         return result.entry.spanAttributes(result.clean);
       },
       process: async (payload: Record<string, unknown>) => {
+        if (isOutboxPayload(payload)) {
+          if (!outbox) {
+            logger.warn({ stage: payload.stage }, "Outbox payload on a queue without a wired outbox runtime; skipping");
+            return;
+          }
+          await outbox.dispatcher.process(payload);
+          return;
+        }
         const result = this.lookupEntry(payload);
         if (!result) {
           logger.warn({ payload }, "Skipping unknown job in global queue");
@@ -457,11 +503,32 @@ export class EventSourcing {
         await result.entry.process(result.clean);
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
+        if (isOutboxPayload(payload)) {
+          // Settle is per-(trigger, trace) so coalescing makes no sense
+          // — its dedup mode is already the collapsing primitive.
+          // Cadence digest batches up to 100 same-window jobs into one
+          // render+dispatch.
+          return isSettle(payload) ? 1 : 100;
+        }
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
       },
       processBatch: async (payloads: Record<string, unknown>[]) => {
         if (payloads.length === 0) return;
+        // Outbox batch: the queue only coalesces same-group jobs, so a
+        // homogeneous outbox batch goes through the dispatcher's
+        // processBatch directly.
+        if (isOutboxPayload(payloads[0]!)) {
+          if (!outbox) {
+            logger.warn(
+              { stage: (payloads[0] as { stage: string }).stage, count: payloads.length },
+              "Outbox batch on a queue without a wired outbox runtime; skipping",
+            );
+            return;
+          }
+          await outbox.dispatcher.processBatch(payloads as OutboxJob[]);
+          return;
+        }
         // A coalesced batch is always one group → one registry entry. Resolve
         // every payload and guard against a mixed/unknown batch (should never
         // happen — the GroupQueue only coalesces same-group jobs — but a stray
@@ -480,6 +547,22 @@ export class EventSourcing {
         }
         await first.entry.processBatch!(resolved.map((r) => r!.clean));
       },
+      // Stage-aware dedup for outbox payloads: settle is Debounce Mode
+      // (collapse + reset TTL on every overwrite), cadence is per-job so
+      // digest members don't collide. Caller (enqueueSettle) overrides
+      // `ttlMs` per-trigger with `Trigger.traceDebounceMs`.
+      deduplication: {
+        makeId: (payload: Record<string, unknown>) =>
+          isSettle(payload)
+            ? settleDedupId(payload as Record<string, unknown> & { projectId: string; triggerId: string; traceId: string })
+            : isCadence(payload)
+              ? `${(payload as { projectId: string }).projectId}/cadence/${(payload as { auditDedupKey: string }).auditDedupKey}`
+              : undefined,
+        ttlMs: 30_000,
+        extend: true,
+        replace: true,
+      },
+      auditAdapter: outbox?.auditAdapter,
     };
 
     const effectiveRedis = this._redis;
@@ -490,6 +573,12 @@ export class EventSourcing {
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
     }
+
+    // The outbox runtime needs a back-reference to the queue so its
+    // public `enqueueSettle` (and the dispatcher's internal
+    // `enqueueCadence` re-enqueue) can send onto it. The cycle is
+    // intentional and resolved by attaching after construction.
+    outbox?.attachQueue(this._globalQueue);
   }
 
   private logDisabledWarning(context: {

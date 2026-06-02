@@ -25,11 +25,11 @@ Beyond the substrate itself, three sub-decisions sit inside this one design and 
 
 ## Decision
 
-Introduce a **transactional outbox** as the durable substrate for stake-sensitive reactor dispatch — implemented as a **dedicated GroupQueue (the source of truth for scheduling and execution) plus a PG audit projection (the source of truth for history and operator visibility)**.
+Introduce a **transactional outbox** as the durable substrate for stake-sensitive reactor dispatch — implemented as **a stage-discriminated payload rider on the main event-sourcing GroupQueue (the source of truth for scheduling and execution) plus a PG audit projection (the source of truth for history and operator visibility)**.
 
 ### The substrate
 
-- A dedicated `outboxDispatchQueue` (a `GroupQueueProcessor`, separate from the main event-sourcing queue, named `langwatch:outbox`) owns dispatch **execution**: dedup, per-trigger FIFO via `groupKey`, delayed dispatch for cadence windows (`delay` + `processBatch` for coalescing), per-tenant fairness, lease/heartbeat, retry-with-backoff. The queue's `process` callback **is** the dispatcher. Reactors registered via `.withOutbox` use this path going forward.
+- Settle and cadence dispatch execution rides the **main event-sourcing queue** (`event-sourcing/jobs`). Outbox payloads carry a `stage` discriminator (`"settle" | "cadence"`); the queue's callbacks (`groupKey`, `process`, `processBatch`, `coalesceMaxBatch`, `deduplication`) peel the outbox case off first and delegate to the outbox dispatcher, falling through to the existing registry-based event-sourcing dispatch for everything else. Per-trigger FIFO via `groupKey`, delayed dispatch for cadence windows (`delay` + `processBatch` for coalescing), per-tenant fairness, lease/heartbeat, and retry-with-backoff all come from the queue. Reactors registered via `.withOutbox` use this path going forward.
 - A PG table `ReactorOutbox` holds one row per dispatch, **maintained by a queue-side audit adapter** (`PgOutboxAuditAdapter`). The adapter receives every queue lifecycle event (`onEnqueue`, `onLeased`, `onDispatched`, `onFailed`, `onDead`) and writes the corresponding row state. Operators query PG for activity feeds, stuck-state alerts, retry buttons — never Redis.
 - The **match** half of the reactor runs in-band on the main event-sourcing queue (inheriting `_originGuardedReactor`'s loop-prevention guards) and calls `outboxQueue.send(payload, …)` per match. The queue's dedup config absorbs replay.
 - The **dispatch** half runs in the outbox queue's `process` callback. Failures throw `DispatchError` (ADR-025); the queue's retry semantics handle backoff, and the adapter mirrors each transition to PG.
@@ -59,16 +59,16 @@ Outbox **queue enqueue** is **gated on `TriggerSent` claim succeeding**: the rea
 
 ### GroupQueue as the dispatch substrate
 
-The outbox queue is a single `GroupQueueProcessor` instance (`langwatch:outbox`) — separate from the main event-sourcing queue, registered globally under `src/server/event-sourcing/outbox/setup.ts`.
+Outbox dispatch rides the existing main event-sourcing `GroupQueueProcessor` instance (`event-sourcing/jobs`). The runtime (`src/server/event-sourcing/outbox/setup.ts`) constructs the dispatcher + audit adapter and exposes them to `EventSourcing`'s queue-construction step, which adds a payload-discriminator branch to each of the queue's callbacks. There is no `langwatch:outbox` queue.
 
-The queue carries **two stages as a discriminated payload union**, not two queues:
+The queue carries **two outbox stages as a discriminated payload union**:
 
 - `SettleStagePayload { stage: "settle", projectId, triggerId, traceId, … }` — per-(trigger, trace) Debounce Mode entry. The trace-readiness debounce from ADR-023 lives here. New events on the same (trigger, trace) collapse onto the existing pending job and reset the TTL. When the TTL elapses, the dispatcher re-reads the now-settled fold, runs filters, claims `TriggerSent`, and on match re-enqueues as `cadence`.
 - `CadenceStagePayload { stage: "cadence", projectId, triggerId, match, … }` — per-trigger group, windowed delay snapped to the next wall-clock cadence boundary. The queue's `processBatch` + `coalesceMaxBatch` fold every cadence job for the same trigger landing in the same boundary into one digest invocation.
 
 Per-stage queue behavior (dedup mode, delay, group key, coalescing) is driven by the payload's `stage` discriminator so one queue serves both timing primitives without merging them — the operator's `traceDebounceMs` and `notificationCadence` knobs (ADR-023) stay independently tunable.
 
-**Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: the outbox queue is a free-standing global queue, not a pipeline command/projection, so `queueManager`'s automatic `${tenantId}/` wrapping does not apply — the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
+**Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: outbox payloads bypass `queueManager`'s automatic `${tenantId}/` wrapping (`queueManager` resolves prefixes through the registered job entry, and outbox payloads don't go through that registry), so the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
 
 **Cadence windows** are handled natively by setting `delay = scheduledFor - now()` on send. The queue dispatches the job when the delay elapses; no polling needed.
 
@@ -136,6 +136,20 @@ The framework wrapper invoked by `.withOutbox` is responsible for:
 The queue's `PgOutboxAuditAdapter` writes the `ReactorOutbox` row via its `onEnqueue` hook. There is **no** separate `createMany skipDuplicates` step in the wrapper — the queue's dedup config is the replay-safety mechanism, and the adapter mirrors the resulting transition to PG.
 
 The reactor author writes `match` and `dispatch`; everything else is provided.
+
+### Revision (2026-06-02) — outbox rides the main event-sourcing queue
+
+The 2026-06-01 revision collapsed two outbox queues into one (settle + cadence on a stage-discriminated payload). 2026-06-02 took the next step: collapse that one outbox queue onto the **main event-sourcing queue** (`event-sourcing/jobs`) instead of standing up a sibling `langwatch:outbox` instance.
+
+Outbox payloads are still stage-discriminated (`stage: "settle" | "cadence"`); the runtime composition just looks different. `buildOutboxRuntime(...)` returns `{ dispatcher, auditAdapter, enqueueSettle, attachQueue }` — no `queue` field. `EventSourcing`'s `createGlobalQueue()` reads the outbox runtime off its options, adds a "is this payload settle or cadence?" branch to each of the queue's callbacks (`groupKey`, `process`, `processBatch`, `coalesceMaxBatch`, `deduplication`), and wires the runtime's audit adapter onto the queue's `auditAdapter` slot. The adapter already gates internally on `isSettle || isCadence`, so non-outbox queue events no-op cheaply at the adapter level.
+
+Wins:
+- One Redis prefix, one set of Grafana panels, one crash-recovery story. The second queue's operational tooling (metrics, alarms, deploy gates) goes away.
+- No second queue to keep wired through the composition root — `EventSourcing` is the only thing that knows how to make a `GroupQueueProcessor`.
+- The audit adapter's existing payload gating did the conceptual work already; the change is structural, not semantic.
+
+Trade-off (captured here so the next person feels it):
+- Trigger dispatches and span projections now share the per-tenant fairness budget. A notification storm can nibble at the projection slot budget for the same tenant, and vice versa. Bounded by `TenantRateTracker` so neither side starves catastrophically, but it's a regression in isolation guarantees vs the two-queue split. If we ever want to scale them independently (different Redis instances, dedicated worker pools), we lose the ability to do that cheaply.
 
 ### Revision (2026-06-01) — what changed from the original draft
 
