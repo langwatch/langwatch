@@ -132,7 +132,11 @@ function registerCompletion(
   contractRef: ContractRef,
 ): IDisposable {
   return monaco.languages.registerCompletionItemProvider("python", {
-    triggerCharacters: [".", " "],
+    // Only trigger on `.` for attribute access. Triggering on space pops the
+    // suggest widget on every whitespace and (in some browsers) intercepts the
+    // space keystroke entirely. Users can still invoke explicitly with
+    // Ctrl+Space / Cmd+I.
+    triggerCharacters: ["."],
     provideCompletionItems: (model, position) => {
       const lineBefore = model.getValueInRange({
         startLineNumber: position.lineNumber,

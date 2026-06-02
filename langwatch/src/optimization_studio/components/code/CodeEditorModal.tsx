@@ -27,7 +27,14 @@ import {
   type PythonField,
   type PythonProviderHandle,
 } from "./monaco/registerPythonProviders";
-import { defineLangwatchThemes, themeNameForColorMode } from "./monaco/themes";
+
+/**
+ * Use Monaco's bundled VS Code themes verbatim — `vs` for light, `vs-dark`
+ * for dark. Matches what users get in VS Code out of the box.
+ */
+function vscodeThemeName(colorMode: "light" | "dark"): string {
+  return colorMode === "dark" ? "vs-dark" : "vs";
+}
 
 /** Minimal type for the Monaco editor instance (from @monaco-editor/react onMount) */
 type MonacoEditorInstance = {
@@ -231,10 +238,7 @@ export function CodeEditor({
       defaultLanguage={language}
       defaultValue={code}
       onChange={(code: any) => code && setCode(code)}
-      theme={themeNameForColorMode(colorMode)}
-      beforeMount={(monaco: Monaco) => {
-        defineLangwatchThemes(monaco);
-      }}
+      theme={vscodeThemeName(colorMode)}
       onMount={(editor: any, monaco: Monaco) => {
         editor.focus();
         onEditorMount?.(editor);

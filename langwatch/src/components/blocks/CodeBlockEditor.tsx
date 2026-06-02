@@ -1,6 +1,8 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
+import { themes as prismThemes } from "prism-react-renderer";
 import { useState } from "react";
+import { useColorMode } from "~/components/ui/color-mode";
 import { CodeEditorModal } from "../../optimization_studio/components/code/CodeEditorModal";
 import { RenderCode } from "../code/RenderCode";
 
@@ -59,6 +61,13 @@ export function CodeBlockEditor({
   outputs,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { colorMode } = useColorMode();
+  // Match the editor: VS Code's vsLight / vsDark prism themes pair best with
+  // Monaco's bundled `vs` / `vs-dark`.
+  const previewTheme =
+    colorMode === "dark" ? prismThemes.vsDark : prismThemes.vsLight;
+  const previewBg = colorMode === "dark" ? "#1E1E1E" : "#FFFFFF";
+  const previewBorder = colorMode === "dark" ? "#2D2D2D" : "#E5E5E5";
 
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -112,14 +121,18 @@ export function CodeBlockEditor({
       <RenderCode
         code={code}
         language={language}
+        theme={previewTheme}
         style={{
           width: "100%",
           fontSize: "12px",
           padding: "12px",
           borderRadius: "8px",
-          backgroundColor: "rgb(39, 40, 34)",
+          backgroundColor: previewBg,
+          border: `1px solid ${previewBorder}`,
           maxHeight: "200px",
           overflowY: "hidden",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
         }}
       />
 
