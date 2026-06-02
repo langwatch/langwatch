@@ -57,11 +57,9 @@ describe("<HomePageBanners />", () => {
     localStorage.clear();
   });
 
-  it("renders the traces-v2 banner by default when nothing is snoozed", () => {
+  it("renders the traces-v2 banner when the coin flip lands < 0.5", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.9);
     renderWithProviders(<HomePageBanners />);
-    // Positive marker first — without this assertion the test would pass
-    // even if HomePageBanners rendered null. Negative marker second to
-    // pin that ONLY traces-v2 is in the slot.
     expect(
       screen.getByRole("heading", {
         name: "The new Trace Explorer is here",
@@ -74,8 +72,24 @@ describe("<HomePageBanners />", () => {
     ).toBeNull();
   });
 
-  it("switches to the voice banner once traces-v2 is snoozed", () => {
+  it("renders the voice banner when the coin flip lands >= 0.5", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.1);
+    renderWithProviders(<HomePageBanners />);
+    expect(
+      screen.getByRole("heading", {
+        name: "Voice agent simulations are here",
+      }),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("heading", {
+        name: "The new Trace Explorer is here",
+      }),
+    ).toBeNull();
+  });
+
+  it("forces the voice banner when only traces-v2 is snoozed (no coin flip)", () => {
     localStorage.setItem(TRACES_KEY, String(Date.now() + 60_000));
+    vi.spyOn(Math, "random").mockReturnValue(0.9); // would pick traces if eligible
     renderWithProviders(<HomePageBanners />);
     expect(
       screen.getByRole("heading", {
@@ -84,13 +98,29 @@ describe("<HomePageBanners />", () => {
     ).toBeDefined();
   });
 
-  it("renders neither banner when both are snoozed (voice owns the slot but is itself snoozed)", () => {
+  it("forces the traces-v2 banner when only voice-agents is snoozed (no coin flip)", () => {
+    localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
+    vi.spyOn(Math, "random").mockReturnValue(0.1); // would pick voice if eligible
+    renderWithProviders(<HomePageBanners />);
+    expect(
+      screen.getByRole("heading", {
+        name: "The new Trace Explorer is here",
+      }),
+    ).toBeDefined();
+  });
+
+  it("renders neither banner when both are snoozed", () => {
     localStorage.setItem(TRACES_KEY, String(Date.now() + 60_000));
     localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
     expect(
       screen.queryByRole("heading", {
         name: "Voice agent simulations are here",
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("heading", {
+        name: "The new Trace Explorer is here",
       }),
     ).toBeNull();
   });

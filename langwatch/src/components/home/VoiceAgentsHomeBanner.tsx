@@ -56,7 +56,14 @@ function snooze(projectId: string) {
 const MESH_COLORS_LIGHT = ["#0f766e", "#06b6d4", "#6366f1", "#ecfeff"];
 const MESH_COLORS_DARK = ["#134e4a", "#0e7490", "#312e81", "#0a1424"];
 
-export function VoiceAgentsHomeBanner() {
+/**
+ * @param onDismissed Fired when the user dismisses the banner (via the x
+ *   or by clicking the CTA, which snoozes too). {@link HomePageBanners}
+ *   uses this to swap in the other banner in the same tab.
+ */
+export function VoiceAgentsHomeBanner({
+	onDismissed,
+}: { onDismissed?: () => void } = {}) {
 	const { project } = useOrganizationTeamProject({
 		redirectToOnboarding: false,
 		redirectToProjectOnboarding: false,
@@ -83,6 +90,7 @@ export function VoiceAgentsHomeBanner() {
 	const handleDismiss = () => {
 		if (projectId) snooze(projectId);
 		setDismissed(true);
+		onDismissed?.();
 	};
 
 	const handleClick = () => {
@@ -95,6 +103,7 @@ export function VoiceAgentsHomeBanner() {
 		// flipping `dismissed` here the banner would linger in the current
 		// tab until reload even though the snooze key has already been set.
 		setDismissed(true);
+		onDismissed?.();
 	};
 
 	return (

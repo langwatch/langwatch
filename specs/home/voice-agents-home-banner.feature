@@ -1,21 +1,23 @@
 Feature: Voice agents home banner
 
   The home page surfaces project-level launch announcements through a
-  single rotating banner slot. Once the traces-v2 banner is dismissed,
-  the voice agents banner takes over the same slot until it too is
-  dismissed. Each banner owns its own per-project snooze so dismissing
-  one does not resurrect the other.
+  single banner slot that holds exactly ONE banner at a time. While both
+  the traces-v2 and voice agents launches are still un-dismissed, the
+  slot picks between them at random (50/50, per mount). Once one of the
+  two is snoozed, the other takes the slot deterministically. Each
+  banner owns its own per-project snooze so dismissing one does not
+  resurrect the other.
 
   Background:
     Given a logged-in user with a selected project
 
-  Scenario: Voice banner is hidden by default while traces-v2 is still showing
-    Given the traces-v2 home banner has never been dismissed for this project
+  Scenario: Random pick between traces-v2 and voice when neither is snoozed
+    Given neither the traces-v2 nor the voice agents banner has been dismissed for this project
     When the home page loads
-    Then the traces-v2 banner is visible
-    And the voice agents banner is not visible
+    Then exactly one of the two banners is visible
+    And the choice is stable for the lifetime of that mount
 
-  Scenario: Voice banner takes over once traces-v2 is snoozed
+  Scenario: Voice banner is forced when only traces-v2 is snoozed
     Given the traces-v2 home banner is currently snoozed for this project
     And the voice agents banner has never been dismissed for this project
     When the home page loads
@@ -24,6 +26,18 @@ Feature: Voice agents home banner
     And the banner shows the heading "Voice agent simulations are here"
     And the banner shows a "New" pill
     And the banner shows a "Try voice agent testing" call to action
+
+  Scenario: Traces-v2 banner is forced when only voice agents is snoozed
+    Given the voice agents banner is currently snoozed for this project
+    And the traces-v2 banner has never been dismissed for this project
+    When the home page loads
+    Then the traces-v2 banner is visible
+    And the voice agents banner is not visible
+
+  Scenario: Neither banner renders when both are snoozed
+    Given both the traces-v2 and voice agents banners are currently snoozed for this project
+    When the home page loads
+    Then no announcement banner is visible
 
   Scenario: CTA opens the public docs in a new tab
     Given the voice agents banner is visible
@@ -49,3 +63,9 @@ Feature: Voice agents home banner
     When the home page renders on the server
     Then neither the voice agents banner nor the traces-v2 banner appears in the SSR output
     And both banners only mount after client-side hydration
+
+  Scenario: Dismissing the currently-shown banner hands the slot to the other in the same tab
+    Given both banners are eligible and the random pick rendered the voice agents banner
+    When the user clicks the dismiss "x"
+    Then the voice agents banner is hidden immediately
+    And the traces-v2 banner takes the slot without a page reload
