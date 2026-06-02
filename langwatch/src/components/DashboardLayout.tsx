@@ -40,7 +40,6 @@ import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/Globa
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
