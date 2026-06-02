@@ -17,15 +17,9 @@ import { createOutboxDispatcher } from "./dispatcher";
 import {
   settleDedupId,
   type CadenceStagePayload,
-  type OutboxJob,
   type SettleStagePayload,
 } from "./payload";
 import { PgOutboxAuditAdapter } from "./pgAuditAdapter";
-
-export type EnqueueSettleParams = Omit<SettleStagePayload, "stage" | "reactorName" | "auditDedupKey" | "foldSnapshotAtEnqueue"> & {
-  payload: SettleStagePayload;
-  deduplicationTtlMs: number;
-};
 
 /**
  * Outbox runtime — dispatcher + audit adapter + an attachQueue/enqueueSettle
@@ -130,7 +124,7 @@ export function buildOutboxRuntime({
           "Outbox runtime queue not attached — enqueueCadence called before attachQueue",
         );
       }
-      await queueHolder.current.send(payload as unknown as Record<string, unknown>, {
+      await queueHolder.current.send(payload, {
         delay: delayMs > 0 ? delayMs : undefined,
       });
     },
@@ -148,37 +142,21 @@ export function buildOutboxRuntime({
           "Outbox runtime queue not attached — enqueueSettle called before attachQueue",
         );
       }
-      await queueHolder.current.send(
-        payload as unknown as Record<string, unknown>,
-        {
-          // Per-send override for the per-trigger Debounce Mode TTL
-          // (`Trigger.traceDebounceMs`). `makeId` is duplicated here
-          // because `DeduplicationConfig` requires it on every config
-          // object — the function returns the same id the queue's own
-          // stage-aware resolver would, so the dedup window is consistent
-          // whether the producer overrides the TTL or not.
-          deduplication: {
-            makeId: () =>
-              settleDedupId({
-                projectId: payload.projectId,
-                triggerId: payload.triggerId,
-                traceId: payload.traceId,
-              }),
-            ttlMs,
-            extend: true,
-            replace: true,
-          },
+      // Per-trigger Debounce Mode TTL override (`Trigger.traceDebounceMs`).
+      // `extend` / `replace` default to true on DeduplicationConfig, so
+      // only `makeId` and `ttlMs` need to be set here.
+      await queueHolder.current.send(payload, {
+        deduplication: {
+          makeId: () =>
+            settleDedupId({
+              projectId: payload.projectId,
+              triggerId: payload.triggerId,
+              traceId: payload.traceId,
+            }),
+          ttlMs,
         },
-      );
+      });
     },
   };
 }
 
-/**
- * Back-compat alias for callers that still import the old name. The
- * `OutboxStack` shape used to include a `queue` field — that field is
- * gone now that the runtime shares the main event-sourcing queue.
- *
- * @deprecated use `OutboxRuntime` instead.
- */
-export type OutboxStack = OutboxRuntime;
