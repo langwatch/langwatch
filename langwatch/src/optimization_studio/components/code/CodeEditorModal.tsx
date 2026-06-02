@@ -275,6 +275,11 @@ export function CodeEditor({
         automaticLayout: true,
         formatOnPaste: true,
         formatOnType: false,
+        // Only Tab/Enter accept a highlighted suggestion. Without this, the
+        // default `true` makes punctuation (including space) auto-accept,
+        // which swallows the keystroke whenever the suggest widget is open —
+        // unusable for normal typing.
+        acceptSuggestionOnCommitCharacter: false,
         padding: {
           top: 0,
         },
