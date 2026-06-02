@@ -151,6 +151,7 @@ export function CodeEditorModal({
               code={localCode}
               setCode={setLocalCode}
               onClose={onClose_}
+              onSave={handleSave}
               language="python"
               technologies={["python", "dspy"]}
               inputs={inputs}
@@ -176,12 +177,18 @@ const onKeyDown = {
   fn: () => {},
 };
 
+const onSave = {
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: same pattern as onKeyDown — a mutable handler stub that the latest CodeEditor mount keeps in sync.
+  fn: () => {},
+};
+
 const EMPTY_FIELDS: readonly PythonField[] = [];
 
 export function CodeEditor({
   code,
   setCode,
   onClose,
+  onSave: onSaveProp,
   language,
   technologies,
   inputs,
@@ -191,6 +198,7 @@ export function CodeEditor({
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
+  onSave?: () => void;
   language: string;
   technologies: string[];
   onEditorMount?: (editor: MonacoEditorInstance) => void;
@@ -216,6 +224,10 @@ export function CodeEditor({
   useEffect(() => {
     onKeyDown.fn = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    onSave.fn = onSaveProp ?? (() => {});
+  }, [onSaveProp]);
 
   useEffect(() => {
     providersRef.current?.setContract({
@@ -255,11 +267,46 @@ export function CodeEditor({
           });
         }
 
+        // React Flow registers a document-level keydown handler that
+        // preventDefaults `Space` (it's the pan-activation key). The
+        // optimization studio mounts the canvas behind this dialog, so any
+        // keystroke that escapes the editor reaches that handler — which is
+        // why typing a space inside the editor silently dropped the keystroke.
+        // Containing key events at the editor root keeps Monaco fully
+        // functional (its own listeners sit deeper, on `.native-edit-context`)
+        // while shielding the canvas from clobbering normal typing.
+        const editorRoot = editor.getDomNode?.();
+        const stopAncestorHandlers = (e: KeyboardEvent) => {
+          e.stopPropagation();
+        };
+        if (editorRoot) {
+          editorRoot.addEventListener("keydown", stopAncestorHandlers);
+          editorRoot.addEventListener("keypress", stopAncestorHandlers);
+          editorRoot.addEventListener("keyup", stopAncestorHandlers);
+          // Auto-remove via dispose. The editor disposes its DOM on unmount,
+          // but listeners on a not-yet-collected node would still fire if
+          // anything else holds a reference; explicit cleanup keeps it clean.
+          editor.onDidDispose?.(() => {
+            editorRoot.removeEventListener("keydown", stopAncestorHandlers);
+            editorRoot.removeEventListener("keypress", stopAncestorHandlers);
+            editorRoot.removeEventListener("keyup", stopAncestorHandlers);
+          });
+        }
+
         editor.onKeyDown((e: any) => {
           if (e.code === "Escape") {
             onKeyDown.fn();
             e.preventDefault();
             e.stopPropagation();
+            return;
+          }
+          // The modal-level Cmd/Ctrl+S window listener is bypassed because we
+          // stopPropagation on the editor root above. Re-run save here so the
+          // shortcut still works while the user is typing.
+          if ((e.metaKey || e.ctrlKey) && e.code === "KeyS") {
+            e.preventDefault();
+            e.stopPropagation();
+            onSave.fn();
           }
         });
         registerCompletion(monaco, editor, {
