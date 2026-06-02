@@ -14,18 +14,33 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <div style={{ padding: "0 16px" }}>Loading editor...</div>,
 });
 
+import type { Monaco } from "@monaco-editor/react";
 import { registerCompletion } from "monacopilot";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useColorMode } from "~/components/ui/color-mode";
+import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import {
+  registerPythonProviders,
+  type PythonProviderHandle,
+} from "./monaco/registerPythonProviders";
+import { defineLangwatchThemes, themeNameForColorMode } from "./monaco/themes";
 
 /** Minimal type for the Monaco editor instance (from @monaco-editor/react onMount) */
 type MonacoEditorInstance = {
   focus: () => void;
   trigger: (source: string, handlerId: string, payload: unknown) => void;
-  onKeyDown: (handler: (e: { code: string; preventDefault: () => void; stopPropagation: () => void }) => void) => void;
+  onKeyDown: (
+    handler: (e: {
+      code: string;
+      preventDefault: () => void;
+      stopPropagation: () => void;
+    }) => void,
+  ) => void;
+  getAction: (id: string) => { run: () => void } | null;
 };
-import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import monokaiTheme from "./Monokai.json";
 
 export function CodeEditorModal({
   code,
@@ -90,12 +105,11 @@ export function CodeEditorModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
-      <Dialog.Content bg="bg"
+      <Dialog.Content
+        bg="bg"
         margin="64px"
         minWidth="calc(100vw - 128px)"
         height="calc(100vh - 128px)"
-        background="#272822"
-        color="white"
         positionerProps={{
           zIndex: 1502,
         }}
@@ -110,13 +124,7 @@ export function CodeEditorModal({
                   onInsertSecret={handleInsertSecret}
                 />
               )}
-              <Dialog.CloseTrigger
-                position="relative"
-                top="unset"
-                right="unset"
-                color="white"
-                _hover={{ color: "black" }}
-              />
+              <Dialog.CloseTrigger position="relative" top="unset" right="unset" />
             </HStack>
           </HStack>
         </Dialog.Header>
@@ -135,14 +143,7 @@ export function CodeEditorModal({
           )}
         </Dialog.Body>
         <Dialog.Footer>
-          <Button
-            onClick={handleSave}
-            variant="outline"
-            color="white"
-            colorPalette="white"
-            size="lg"
-            _hover={{ color: "black" }}
-          >
+          <Button onClick={handleSave} variant="outline" size="lg">
             Save
           </Button>
         </Dialog.Footer>
@@ -172,10 +173,34 @@ export function CodeEditor({
   onEditorMount?: (editor: MonacoEditorInstance) => void;
 }) {
   const { project } = useOrganizationTeamProject();
+  const { colorMode } = useColorMode();
+  const providersRef = useRef<PythonProviderHandle | null>(null);
+
+  // Live-fetched secret names; passed into the completion provider so
+  // `secrets.<Tab>` suggests names the moment they appear in Settings.
+  const secretsQuery = api.secrets.list.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const secretNames = useMemo(
+    () => (secretsQuery.data ?? []).map((s) => s.name),
+    [secretsQuery.data],
+  );
 
   useEffect(() => {
     onKeyDown.fn = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    providersRef.current?.setSecrets(secretNames);
+  }, [secretNames]);
+
+  useEffect(() => {
+    return () => {
+      providersRef.current?.dispose();
+      providersRef.current = null;
+    };
+  }, []);
 
   return (
     <MonacoEditor
@@ -183,13 +208,22 @@ export function CodeEditor({
       defaultLanguage={language}
       defaultValue={code}
       onChange={(code: any) => code && setCode(code)}
-      theme="monokai"
-      beforeMount={(monaco: any) => {
-        monaco.editor.defineTheme("monokai", monokaiTheme as any);
+      theme={themeNameForColorMode(colorMode)}
+      beforeMount={(monaco: Monaco) => {
+        defineLangwatchThemes(monaco);
       }}
-      onMount={(editor: any, monaco: any) => {
+      onMount={(editor: any, monaco: Monaco) => {
         editor.focus();
         onEditorMount?.(editor);
+
+        if (language === "python") {
+          providersRef.current?.dispose();
+          providersRef.current = registerPythonProviders({
+            monaco,
+            secretNames,
+          });
+        }
+
         editor.onKeyDown((e: any) => {
           if (e.code === "Escape") {
             onKeyDown.fn();
@@ -208,6 +242,8 @@ export function CodeEditor({
         fontSize: 14,
         wordWrap: "on",
         automaticLayout: true,
+        formatOnPaste: true,
+        formatOnType: false,
         padding: {
           top: 0,
         },
