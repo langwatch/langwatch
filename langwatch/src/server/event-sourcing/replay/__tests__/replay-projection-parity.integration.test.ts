@@ -157,6 +157,9 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
           },
         ],
         format: "JSONEachRow",
+        // Synchronous insert: the SELECT below reads this row back immediately;
+        // async insert under CI load raced and returned 0 rows (flake).
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 1 },
       });
 
       // Phase 2: load the same events from event_log and apply leanForProjection.
