@@ -6,6 +6,29 @@ sidebarTitle: Track your Claude Code usage
 
 This is the version of LangWatch for one person tracking one Claude Code seat. No org rollout, no IT admin, no Routing Policy. Pick the path that matches how you pay Anthropic and follow it end to end.
 
+## TL;DR: `langwatch claude`
+
+If you have already run `langwatch login --device`, the one-liner unified wrapper does everything below in a single command:
+
+```bash
+langwatch claude
+```
+
+The wrapper auto-mints a personal ingestion token, injects both the gateway env vars (Path B) and the OTLP env vars (Path A), and execs `claude` so you get the same UX you would running it directly. First-run state is cached at `~/.langwatch/config.json`, no rotation per invocation.
+
+Same shape works for the other supported assistants:
+
+| Command | What it routes | Telemetry today |
+|---|---|---|
+| `langwatch claude` | Anthropic API via gateway + Claude Code OTel | Active |
+| `langwatch gemini` | Google GenAI API via gateway + Gemini CLI OTel | Active |
+| `langwatch codex` | OpenAI API via gateway + OTel | Active once `~/.codex/config.toml` has `[otel]` enabled (codex 0.x requires the toml flag in addition to env vars) |
+| `langwatch opencode` | OpenAI + Anthropic via gateway + OTel | Wiring shipped; opencode 1.14.22 does not yet read `OTEL_*_EXPORTER` natively, so the OTel half is forward-looking |
+| `langwatch cursor` | OpenAI + Anthropic via gateway | No OTel (Cursor is a GUI app; terminal-launch envs never reach the agent panel) |
+
+The rest of this guide explains the underlying env-var paths in case you need to wire the integration without the wrapper (custom shells, CI, devcontainers).
+
+
 When you finish you will have:
 
 - A LangWatch project (SaaS or local) bound to your account.
