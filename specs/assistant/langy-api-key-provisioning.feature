@@ -52,6 +52,9 @@ Feature: Dedicated Langy API key provisioning
   # Lifecycle
   # ---------------------------------------------------------------------------
 
+  # Not yet implemented — no Langy-key revoke flow exists yet; flagged so the
+  # feature-parity check tolerates it until the revoke behaviour is built.
+  @unimplemented
   @integration
   Scenario: An admin can revoke the Langy key
     Given my project has a Langy key
