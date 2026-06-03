@@ -26,13 +26,22 @@ Feature: AI Tools Portal — model-provider tile → VK bridge
     And alice gets a personal VK bound to "policy-dev" (the org default)
 
   @bdd @phase-7 @vk-bridge @no-default-policy
-  Scenario: model-provider tile + no default policy + no suggestedRoutingPolicyId → 409
+  Scenario: model-provider tile + no default policy + at least one accessible MP → 200 with null routing policy
     Given the org has NO RoutingPolicy with isDefault=true
+    And at least one ModelProvider is scoped so it is accessible from alice's personal team
     And a catalog entry exists with type="model_provider", config has NO suggestedRoutingPolicyId
     When alice clicks the tile and submits a label
-    Then the UI calls `personalVirtualKeys.issuePersonal` and receives 409 with `error: "no_default_routing_policy"`
+    Then `personalVirtualKeys.issuePersonal` returns 200 with `routingPolicyId: null`
+    And the gateway will route the resulting VK by fallbackPriorityGlobal ordering over all scope-eligible providers
+
+  @bdd @phase-7 @vk-bridge @no-eligible-providers
+  Scenario: model-provider tile + no default policy + no accessible MPs → 409
+    Given the org has NO RoutingPolicy with isDefault=true
+    And NO ModelProvider is reachable from alice's personal team via scope cascade
+    When alice clicks the tile and submits a label
+    Then the UI calls `personalVirtualKeys.issuePersonal` and receives 409 with `error: "no_eligible_providers"`
     And NO personal VK is created
-    And the UI surfaces the actionable message ("Ask your admin to publish a default routing policy")
+    And the UI surfaces the actionable message ("Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers.")
 
   @bdd @phase-7 @vk-bridge @cross-org-guard
   Scenario: catalog entry's suggestedRoutingPolicyId from a different org is rejected

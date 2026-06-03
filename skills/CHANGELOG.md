@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/langwatch/langwatch/compare/skills@v0.5.0...skills@v0.6.0) (2026-06-03)
+
+
+### Features
+
+* **skills/scenarios:** nudge against custom runners and JSON-DSL abstractions ([#4510](https://github.com/langwatch/langwatch/issues/4510)) ([3b15cc4](https://github.com/langwatch/langwatch/commit/3b15cc4a8e3eaa4b88fdb24c0ea10cf10e786a56))
+
+
+### Bug Fixes
+
+* **skills/scenarios:** clarify per-adapter "how does this connect to my agent?" ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
+* **skills/scenarios:** clarify per-adapter how to connect the user's agent (voice section) ([#4505](https://github.com/langwatch/langwatch/issues/4505)) ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/skills@v0.4.1...skills@v0.5.0) (2026-06-02)
 
 

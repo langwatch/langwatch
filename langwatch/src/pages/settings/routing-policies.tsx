@@ -376,14 +376,17 @@ function RoutingPoliciesPage() {
                     : "Publish a default policy to unblock end-user keys"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Without an applicable default, {`'langwatch login'`} (and
-                  every personal-key issue path) returns 409{" "}
+                  When at least one model provider is reachable from a
+                  user's personal team, personal keys still mint
+                  without a default and the gateway picks providers in {" "}
                   <Text as="span" fontFamily="mono">
-                    no_default_routing_policy
-                  </Text>
-                  . Start with an Organization default that points at
-                  whichever model providers your team should use, then
-                  override per-team or per-project as needed.
+                    fallbackPriorityGlobal
+                  </Text>{" "}
+                  order. Orgs with zero accessible providers still hit
+                  a 409 at issue time; configure a model provider first.
+                  Publish an explicit default to pin a deterministic
+                  chain at the organization level, then override
+                  per-team or per-project as needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
                   <Button
@@ -527,7 +530,7 @@ function RoutingPoliciesPage() {
         }
         message={
           policyToDelete?.isDefault
-            ? "This is the default policy at this scope. Personal-key issue paths and 'langwatch login' will return 409 no_default_routing_policy until another default is published. Virtual keys that resolved through this policy will fail closed at the next request."
+            ? "This is the default policy at this scope. NEW personal-key issuance falls back to fallbackPriorityGlobal ordering across scope-eligible providers until another default is published. Existing VKs that already reference this policy keep the persisted routingPolicyId and will fail closed on the next request until you re-bind them to another policy."
             : "Virtual keys that explicitly reference this policy will lose the reference and fail closed at the next request. Re-publish or pick another policy on the affected VKs to restore routing."
         }
         confirmLabel="Delete policy"

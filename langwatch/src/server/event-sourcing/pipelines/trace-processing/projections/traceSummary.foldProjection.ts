@@ -300,6 +300,17 @@ export class TraceSummaryFoldProjection
     event: LogRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Standalone OTLP logs (e.g. Claude Code's OTEL_LOGS_EXPORTER without a
+    // traces exporter) carry no trace context. The wire-level fix accepts
+    // them and the map projection persists them to stored_log_records, but
+    // folding them here would aggregate every context-less log per tenant
+    // under the same empty aggregateId — surfacing a single nameless
+    // "trace" in the messages list that grows unboundedly. Skip the fold;
+    // the log row still lands in CH and remains queryable directly.
+    if (!event.data.traceId || !event.data.spanId) {
+      return state;
+    }
+
     const mergedAttributes = { ...state.attributes };
     const logCount = parseInt(
       mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
@@ -364,6 +375,15 @@ export class TraceSummaryFoldProjection
     event: MetricRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Standalone OTLP metrics (gauges/sums without exemplar trace context)
+    // are common from Claude Code's OTEL_METRICS_EXPORTER. The map
+    // projection persists them to stored_metric_records; skip the fold to
+    // avoid folding every context-less data point into an empty-id ghost
+    // summary. Mirrors handleTraceLogRecordReceived.
+    if (!event.data.traceId || !event.data.spanId) {
+      return state;
+    }
+
     let timeToFirstTokenMs = state.timeToFirstTokenMs;
     if (event.data.metricName === "gen_ai.server.time_to_first_token") {
       const ttftMs = event.data.value * 1000;

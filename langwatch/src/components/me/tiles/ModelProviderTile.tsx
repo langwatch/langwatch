@@ -48,9 +48,6 @@ function articleFor(word: string): "a" | "an" {
   return VOWEL_SOUNDS.includes(first) ? "an" : "a";
 }
 
-const NO_DEFAULT_POLICY_HINT =
-  "no default routing policy"; // matches `NoDefaultRoutingPolicyError.message` (lowercased compare)
-
 interface Props {
   displayName: string;
   config: ModelProviderConfig;
@@ -290,21 +287,6 @@ export function ModelProviderTile({
               <Text fontSize="xs" color="red.700">
                 {errorMessage}
               </Text>
-              {errorMessage.toLowerCase().includes(NO_DEFAULT_POLICY_HINT) && (
-                <Text fontSize="xs" color="red.700" marginTop={1}>
-                  <Link
-                    href="/settings/routing-policies"
-                    color="red.700"
-                    fontWeight="medium"
-                  >
-                    Configure routing policy →
-                  </Link>{" "}
-                  <Text as="span" color="fg.muted">
-                    (admin only — non-admins should ask their organization
-                    admin to publish a default)
-                  </Text>
-                </Text>
-              )}
             </Box>
           )}
         </VStack>

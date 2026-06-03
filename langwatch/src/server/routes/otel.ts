@@ -19,6 +19,7 @@ import {
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { BINDING_TOKEN_PREFIX } from "@ee/governance/services/userIngestionBindingToken.utils";
 import {
   collectAuthDiagnostics,
   enforceApiKeyCeiling,
@@ -62,10 +63,19 @@ type RouteContext = {
  * Classifies a token by prefix without exposing the value. Mirrors the
  * `tokenType` field emitted by the unified auth middleware so on-call can
  * filter CloudWatch by SDK shape.
+ *
+ * `ingestion_key` covers UserIngestionBinding tokens (`ik-lw-`) — the
+ * shape Claude Code's OTEL exporter sends from the personal-portal
+ * onboarding tile. Without this branch a stale ingestion key surfaces
+ * as `unknown`, which is indistinguishable from a malformed bearer and
+ * gives on-call no way to attribute the 401 to a specific user flow.
  */
-export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
+export function classifyTokenType(
+  token: string,
+): "pat" | "legacy" | "ingestion_key" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
   if (token.startsWith("sk-lw-")) return "legacy";
+  if (token.startsWith(BINDING_TOKEN_PREFIX)) return "ingestion_key";
   return "unknown";
 }
 
@@ -109,15 +119,24 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
   }
 
   if (!resolved) {
+    const tokenType = classifyTokenType(credentials.token);
     logger.warn(
       {
         ...diag,
-        tokenType: classifyTokenType(credentials.token),
+        tokenType,
         hasProjectId: !!credentials.projectId,
       },
       "Authentication failed: invalid credentials",
     );
-    return { error: "Invalid auth token.", status: 401 as const };
+    // An ik-lw- 401 most often means the binding was rotated (reinstall
+    // mints a fresh hash on the same row) and the caller is still using
+    // the old token. The generic body gives them nowhere to look — name
+    // the surface that re-issues the token.
+    const error =
+      tokenType === "ingestion_key"
+        ? "Ingestion key not recognized. Re-mint the binding at /me and update your OTLP exporter."
+        : "Invalid auth token.";
+    return { error, status: 401 as const };
   }
 
   // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
