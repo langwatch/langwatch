@@ -24,8 +24,8 @@ import {
   LuMessagesSquare,
   LuMinus,
   LuNetwork,
+  LuPanelBottomOpen,
   LuPanelRightOpen,
-  LuPanelTopOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -564,7 +564,7 @@ export function VizPlaceholder({
                   as={
                     paneLayout === "horizontal"
                       ? LuPanelRightOpen
-                      : LuPanelTopOpen
+                      : LuPanelBottomOpen
                   }
                   boxSize={3.5}
                 />
