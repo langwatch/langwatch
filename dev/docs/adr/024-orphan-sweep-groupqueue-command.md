@@ -107,6 +107,15 @@ an actively-ingesting tenant keeps retrying (re-seed resets the breaker); the
 breaker only ends a *dead* loop for a tenant that has stopped ingesting. The
 next ingest re-seeds a fresh loop.
 
+Caveat (groupQueue dedup is staging-scoped): the reseed only *overwrites* the
+pending self-dispatch while that job is still **staged**. The self-dispatch is
+delayed 6h; in the brief window after a worker pops it (active/dispatched) the
+dedup key is stale, so a concurrent reseed stages a *fresh* `cf:0` loop
+alongside the in-flight one — momentarily two loops for one tenant. This is
+self-healing (the `cf:0` loop wins long-term) and harmless (re-sweeping
+already-clean traces via the persisted cursor is idempotent); we accept it
+rather than add cross-dispatch locking.
+
 **`:` can never break dispatch again.** The groupQueue sanitizes `:`→`.` in
 dedup ids (and the command type / dedup key are tenant-scoped). There is no
 inline-fallback path on the groupQueue, so an enqueue problem can never run the

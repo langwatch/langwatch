@@ -39,10 +39,14 @@ export function createRetentionOrphanSweepReactor(
   return {
     name: "retentionOrphanSweep",
     options: {
+      // ':' is safe here — this id rides the event-sourcing groupQueue, which
+      // sanitizes ':' in dedup ids (unlike BullMQ, where a ':' jobId was the
+      // 2026-06-02 incident landmine; see ADR-024).
       makeJobId: (payload) =>
         `retention-orphan-sweep-seed:${payload.event.tenantId}`,
-      // Short window so a flurry of trace events from one tenant doesn't
-      // spam seed attempts; the chain's jobId is the real dedup.
+      // Short window so a flurry of trace events from one tenant doesn't spam
+      // dispatch attempts; the canonical sweep cadence is the orphan-sweep
+      // pipeline's tenant-scoped dedup, not this reactor.
       ttl: 60_000,
       delay: 5_000,
     },
