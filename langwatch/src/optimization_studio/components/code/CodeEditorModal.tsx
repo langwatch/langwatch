@@ -1,6 +1,8 @@
-import { Button, HStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { LuFileCode, LuX } from "react-icons/lu";
 import { Prism } from "prism-react-renderer";
 import { Dialog } from "../../../components/ui/dialog";
+import { EditorStatusBar } from "./EditorStatusBar";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 // Dynamic import — must happen after Prism is set on globalThis (ESM imports hoist above runtime code)
@@ -70,6 +72,12 @@ export function CodeEditorModal({
   const { project } = useOrganizationTeamProject();
   const [localCode, setLocalCode] = useState(code);
   const editorRef = useRef<MonacoEditorInstance | null>(null);
+  // Kept in component state (not just refs) so the status bar re-renders when
+  // the editor mounts. The status bar subscribes to the editor + monaco events
+  // for cursor / marker updates itself, so we only need the initial bind here.
+  const [editorInstance, setEditorInstance] =
+    useState<MonacoEditorInstance | null>(null);
+  const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
 
   useEffect(() => {
     setLocalCode(code);
@@ -121,28 +129,74 @@ export function CodeEditorModal({
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
       <Dialog.Content
         bg="bg"
-        margin="64px"
-        minWidth="calc(100vw - 128px)"
-        height="calc(100vh - 128px)"
-        positionerProps={{
-          zIndex: 1502,
-        }}
+        margin="32px"
+        minWidth="calc(100vw - 64px)"
+        height="calc(100vh - 64px)"
+        display="flex"
+        flexDirection="column"
+        overflow="hidden"
+        positionerProps={{ zIndex: 1502 }}
       >
-        <Dialog.Header>
-          <HStack justify="space-between" width="full">
-            <Dialog.Title>Edit Code</Dialog.Title>
-            <HStack gap={1}>
-              {project?.id && (
-                <SecretsIndicator
-                  projectId={project.id}
-                  onInsertSecret={handleInsertSecret}
-                />
-              )}
-              <Dialog.CloseTrigger position="relative" top="unset" right="unset" />
-            </HStack>
+        {/* File-tab strip — mimics a single VS Code editor tab so the modal
+            reads as "you're editing one file" rather than a generic dialog. */}
+        <HStack
+          bg="bg.muted"
+          borderBottomWidth="1px"
+          borderColor="border"
+          paddingLeft={0}
+          paddingRight={2}
+          height="36px"
+          gap={0}
+          flexShrink={0}
+        >
+          <HStack
+            bg="bg"
+            paddingX={3}
+            paddingY={1.5}
+            gap={2}
+            height="full"
+            borderRightWidth="1px"
+            borderColor="border"
+            position="relative"
+            _after={{
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "2px",
+              bg: "blue.400",
+            }}
+          >
+            <LuFileCode size={14} />
+            <Text fontSize="13px" fontFamily="mono">
+              Code.py
+            </Text>
           </HStack>
-        </Dialog.Header>
-        <Dialog.Body padding="0">
+          <Box flex={1} />
+          {project?.id && (
+            <SecretsIndicator
+              projectId={project.id}
+              onInsertSecret={handleInsertSecret}
+            />
+          )}
+          <HStack
+            as="button"
+            onClick={onClose_}
+            aria-label="Close editor"
+            padding={1.5}
+            borderRadius="sm"
+            color="fg.muted"
+            _hover={{ bg: "bg.subtle", color: "fg" }}
+            data-testid="code-editor-close"
+            cursor="pointer"
+          >
+            <LuX size={16} />
+          </HStack>
+        </HStack>
+
+        {/* Editor fills the body edge-to-edge — no Dialog.Body padding chrome. */}
+        <Box flex={1} minHeight={0}>
           {open && (
             <CodeEditor
               code={localCode}
@@ -154,17 +208,24 @@ export function CodeEditorModal({
               inputs={inputs}
               outputs={outputs}
               viewStateKey={viewStateKey}
-              onEditorMount={(ed) => {
+              onEditorMount={(ed, monaco) => {
                 editorRef.current = ed;
+                setEditorInstance(ed);
+                setMonacoInstance(monaco);
               }}
             />
           )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button onClick={handleSave} variant="outline" size="lg">
-            Save
-          </Button>
-        </Dialog.Footer>
+        </Box>
+
+        {/* VS Code-style bottom status strip — language, cursor, problem count,
+            indentation, encoding, plus the primary Save & Close action. The
+            status bar subscribes to editor + marker events directly. */}
+        <EditorStatusBar
+          editor={editorInstance}
+          monaco={monacoInstance}
+          language="python"
+          onSave={handleSave}
+        />
       </Dialog.Content>
     </Dialog.Root>
   );
@@ -201,7 +262,7 @@ export function CodeEditor({
   language: string;
   technologies: string[];
   viewStateKey?: string;
-  onEditorMount?: (editor: MonacoEditorInstance) => void;
+  onEditorMount?: (editor: MonacoEditorInstance, monaco: Monaco) => void;
 } & ContractProps) {
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
@@ -269,7 +330,7 @@ export function CodeEditor({
           }
         }
         editor.focus();
-        onEditorMount?.(editor);
+        onEditorMount?.(editor, monaco);
 
         if (language === "python") {
           providersRef.current?.dispose();
