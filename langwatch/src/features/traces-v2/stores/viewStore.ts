@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import type { RowKind } from "../components/TraceTable/registry";
+import {
+  LENS_CAPABILITIES,
+  reconcileColumns,
+  reconcileSort,
+} from "../lens/capabilities";
 import { getCurrentFilterText, useFilterStore } from "./filterStore";
 
 export type GroupingMode =
@@ -265,6 +270,29 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
+    // Low-density alternative to the All lens: input / output split into
+    // their own columns instead of smashed into the composite
+    // `trace (summary)` cell + the `io-preview` second-row addon. Built
+    // for non-engineering users who want to scan messages without the
+    // engineering chrome.
+    //
+    // Deliberately does NOT include the `io-preview` addon. The whole
+    // point of this lens is that I/O lives in regular table columns, not
+    // a wrap-prone second row beneath every trace. Engineers who want the
+    // dense composite view stay on the All lens.
+    //
+    // Named "Simplified" rather than "Basic" — "Basic" reads as
+    // diminished/insufficient; "Simplified" reads as a deliberate choice.
+    id: "simplified",
+    name: "Simplified",
+    isBuiltIn: true,
+    columns: ["time", "trace-name", "input", "output", "duration"],
+    addons: [],
+    grouping: "flat",
+    sort: DEFAULT_SORT,
+    filterText: "",
+  },
+  {
     id: "conversations",
     name: "Conversations",
     isBuiltIn: true,
@@ -320,55 +348,10 @@ const builtInLenses: LensConfig[] = [
     sort: { columnId: "duration", direction: "desc" },
     filterText: "",
   },
-  {
-    id: "quality-review",
-    name: "Quality review",
-    isBuiltIn: true,
-    columns: ["time", "trace", "input", "output", "evaluations", "events"],
-    addons: ["io-preview"],
-    grouping: "flat",
-    sort: DEFAULT_SORT,
-    filterText: "",
-  },
-  {
-    // "Fields" lens: the PM-friendly column shape — each piece of trace
-    // metadata in its own column, including separate Input and Output.
-    // Engineers tend to prefer the dense "trace" composite cell; product
-    // people prefer scannable per-field columns. Both are now lens-level
-    // choices instead of being conflated with display density.
-    id: "by-field",
-    name: "By Field",
-    isBuiltIn: true,
-    columns: [
-      "time",
-      "trace-name",
-      "root-span-name",
-      "root-span-type",
-      "input",
-      "output",
-      "service",
-      "duration",
-      "cost",
-      "tokens",
-      "model",
-      "evaluations",
-      "events",
-    ],
-    addons: ["expanded-peek"],
-    grouping: "flat",
-    sort: DEFAULT_SORT,
-    filterText: "",
-  },
-  {
-    id: "by-model",
-    name: "By Model",
-    isBuiltIn: true,
-    columns: ["group", "count", "duration", "cost", "tokens", "errors"],
-    addons: ["group-traces"],
-    grouping: "by-model",
-    sort: { columnId: "count", direction: "desc" },
-    filterText: "",
-  },
+  // The built-in lens shelf used to ship Quality review, By Field, and By
+  // Model alongside the above. Removed in the bug-bash so the tab strip
+  // stays scannable — users who want them can create a custom lens with
+  // the same shape via the New lens flow.
 ];
 
 const defaultColumnOrder: string[] = [
@@ -486,10 +469,32 @@ export const useViewStore = create<ViewState>((set, get) => ({
     })),
 
   setGrouping: (mode) =>
-    set((s) => ({
-      grouping: mode,
-      draftState: setDraft(s.draftState, s.activeLensId, { grouping: mode }),
-    })),
+    set((s) => {
+      // Each grouping mode renders a different RowKind with its own column
+      // registry — e.g. flat knows `time/trace/service`, group knows
+      // `group/count/duration`. Without reconciling, the old columnOrder
+      // is carried over and the renderer silently drops every id the new
+      // registry doesn't recognise, leaving the user with a table missing
+      // its group-label column (or any meaningful headers at all).
+      //
+      // reconcileColumns drops invalid ids, retains pinned columns, and
+      // falls back to the capability's defaults when nothing survives —
+      // matching what LensConfigDialog does when the user picks a new
+      // grouping in the rich editor.
+      const capability = LENS_CAPABILITIES[mode];
+      const columns = reconcileColumns(s.columnOrder, capability);
+      const sort = reconcileSort(s.sort, capability);
+      return {
+        grouping: mode,
+        columnOrder: columns,
+        sort,
+        draftState: setDraft(s.draftState, s.activeLensId, {
+          grouping: mode,
+          columns,
+          sort,
+        }),
+      };
+    }),
 
   toggleColumn: (columnId) =>
     set((s) => {
