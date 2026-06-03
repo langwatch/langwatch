@@ -11789,18 +11789,6 @@ Claude Code supports OpenTelemetry (OTel) traces for monitoring and observabilit
 
 ## Quick Start
 
-### Option 1: `langwatch claude` (recommended)
-
-If you have the LangWatch CLI installed and have run `langwatch login --device`, the wrapper auto-mints a personal ingestion token, exports the correct env block, and execs Claude Code in one step:
-
-```bash
-langwatch claude
-```
-
-The same shape works for other supported assistants: `langwatch codex`, `langwatch gemini`, `langwatch opencode`, `langwatch cursor`. See [Track your Claude Code usage](/ai-governance/track-your-claude-code-usage) for the active-emit status table per tool.
-
-### Option 2: env-var setup (manual)
-
 Configure Claude Code to send traces to LangWatch using environment variables:
 
 ```bash
