@@ -59,17 +59,23 @@ describe("rcPath", () => {
 });
 
 describe("buildExportBlock", () => {
-  it("zsh emits export lines for gateway pair + per-tool OTEL with dedup", () => {
+  it("zsh emits the union'd gateway env pairs across all 5 wrapped tools with key dedup", () => {
     const block = buildExportBlock(cfg, "zsh");
     expect(block).toMatch(/^export ANTHROPIC_BASE_URL=http:\/\/gw/m);
     expect(block).toMatch(/^export ANTHROPIC_AUTH_TOKEN=vk-lw-test/m);
-    expect(block).toMatch(/^export OTEL_TRACES_EXPORTER=otlp/m);
     expect(block).toMatch(/^export OPENAI_BASE_URL=/m);
     expect(block).toMatch(/^export OPENAI_API_KEY=/m);
+    expect(block).toMatch(/^export GOOGLE_GENAI_API_BASE=/m);
+    expect(block).toMatch(/^export GEMINI_API_KEY=/m);
     // duplicates collapsed: only one ANTHROPIC_BASE_URL despite many
     // tools sharing it (claude / cursor / opencode all need it).
     const matches = block.match(/ANTHROPIC_BASE_URL/g) ?? [];
     expect(matches.length).toBe(1);
+    // No OTEL_*_EXPORTER injection — the wrapper is gateway-only.
+    // The gateway captures full I/O server-side, so injecting OTEL
+    // would double-trace. Path A install (OTLP) is a separate flow.
+    expect(block).not.toMatch(/OTEL_TRACES_EXPORTER/);
+    expect(block).not.toMatch(/CLAUDE_CODE_ENABLE_TELEMETRY/);
   });
 
   it("fish emits set -gx lines", () => {
