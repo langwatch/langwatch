@@ -56,12 +56,12 @@ export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
 
 /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
 function utf8Preview(value: string, maxBytes: number): string {
-  const buf = Buffer.from(value, "utf-8");
+  const buf = Buffer.from(value, "utf8");
   if (buf.byteLength <= maxBytes) return value;
   let end = maxBytes;
   // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
   while (end > 0 && (buf[end]! & 0xc0) === 0x80) end--;
-  return buf.subarray(0, end).toString("utf-8") + "…";
+  return buf.subarray(0, end).toString("utf8") + "…";
 }
 
 /**
@@ -127,7 +127,7 @@ function leanSpanReceivedEvent(event: Event): Event {
     if (
       IO_ATTR_KEYS.has(attr.key) &&
       typeof attr.value.stringValue === "string" &&
-      Buffer.byteLength(attr.value.stringValue, "utf-8") > IO_PREVIEW_BYTES
+      Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
     ) {
       hasLargeIoAttr = true;
       break;
@@ -160,7 +160,7 @@ function leanSpanReceivedEvent(event: Event): Event {
       if (
         IO_ATTR_KEYS.has(attr.key) &&
         typeof attr.value.stringValue === "string" &&
-        Buffer.byteLength(attr.value.stringValue, "utf-8") > IO_PREVIEW_BYTES
+        Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
       ) {
         const preview = utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
         ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
@@ -205,7 +205,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
 
   if (
     typeof data.body !== "string" ||
-    Buffer.byteLength(data.body, "utf-8") <= IO_PREVIEW_BYTES
+    Buffer.byteLength(data.body, "utf8") <= IO_PREVIEW_BYTES
   ) {
     return event;
   }

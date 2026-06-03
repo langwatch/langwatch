@@ -63,8 +63,10 @@ const spanAttributeSchema = z.object({
  * Parsed EventPayload structure (ADR-022: full event as stored by the command worker).
  *
  * EventPayload IS event.data (stored as `event.data ?? {}` by eventToRecord).
- * The real write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`.
- * Span is at the TOP level — there is NO outer `data` wrapper.
+ * The span write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`
+ * with the span at the TOP level — there is NO outer `data` wrapper. Log-record events
+ * instead carry the (full) log body at the top-level `body`, which `leanForProjection`
+ * tags with an eventref whose field is `"body"` (resolved by `getFromEventLog`).
  */
 const eventPayloadSchema = z.object({
   span: z
@@ -72,7 +74,35 @@ const eventPayloadSchema = z.object({
       attributes: z.array(spanAttributeSchema),
     })
     .optional(),
+  body: z.string().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Transient spool S3 key shape (single source of truth)
+// ---------------------------------------------------------------------------
+
+/** Prefix for all transient spool object keys. */
+const SPOOL_KEY_PREFIX = "trace-blobs/spool";
+/** Leading "/"-segment count of SPOOL_KEY_PREFIX, so the decode index tracks the prefix. */
+const SPOOL_PREFIX_SEGMENTS = SPOOL_KEY_PREFIX.split("/").length;
+
+/** Builds a transient spool object key. The ONLY place the key shape is encoded. */
+function buildSpoolKey(
+  projectId: string,
+  traceId: string,
+  spanId: string,
+): string {
+  return `${SPOOL_KEY_PREFIX}/${projectId}/${traceId}/${spanId}`;
+}
+
+/**
+ * Extracts the projectId from a spool key produced by {@link buildSpoolKey}.
+ * Indexes off SPOOL_PREFIX_SEGMENTS so a change to the prefix can't silently
+ * desync the encode (`putSpool`) and decode (`getSpool`/`deleteSpool`) paths.
+ */
+function projectIdFromSpoolKey(spoolRef: string): string {
+  return spoolRef.split("/")[SPOOL_PREFIX_SEGMENTS] ?? "";
+}
 
 /**
  * Provides transient S3 spool operations (ADR-022 write path) and event_log
@@ -169,19 +199,30 @@ export class BlobStore {
       );
     }
 
-    // Extract span attribute by field name from the parsed EventPayload.
-    // ADR-022: EventPayload IS event.data (span at top level, no outer `data` wrapper).
+    // ADR-022: EventPayload IS event.data (span/body at top level, no outer `data` wrapper).
     const payloadParse = eventPayloadSchema.safeParse(parsedPayload);
-    const spanAttributes = payloadParse.success
-      ? payloadParse.data.span?.attributes
-      : undefined;
+    if (!payloadParse.success) {
+      throw new BlobFieldNotFoundError(eventId, field);
+    }
 
+    // Log-record bodies: leanForProjection tags the log body with the eventref
+    // field "body", and the full body lives at the top level of EventPayload
+    // (not inside span.attributes). Resolve it directly.
+    if (field === "body") {
+      const body = payloadParse.data.body;
+      if (typeof body !== "string") {
+        throw new BlobFieldNotFoundError(eventId, field);
+      }
+      return body;
+    }
+
+    // Span attributes: extract by field name (the attribute key).
+    const spanAttributes = payloadParse.data.span?.attributes;
     if (!spanAttributes || spanAttributes.length === 0) {
       throw new BlobFieldNotFoundError(eventId, field);
     }
 
     const attr = spanAttributes.find((a) => a.key === field);
-
     if (!attr) {
       throw new BlobFieldNotFoundError(eventId, field);
     }
@@ -193,24 +234,28 @@ export class BlobStore {
    * Fetches the full span body from a transient S3 spool object.
    * Called by the command worker when a command carries a `spoolRef`.
    *
-   * The spool key is the raw S3 object key (no bucket prefix). The S3 bucket
-   * is resolved via the spool key's project segment. For the transient spool shape
-   * (`trace-blobs/spool/{projectId}/{traceId}/{spanId}`), the projectId is at
-   * index 2 of the key split by "/".
+   * The spool key is the raw S3 object key (no bucket prefix). The S3 bucket is
+   * resolved via the key's projectId segment (decoded by `projectIdFromSpoolKey`).
    *
    * @param spoolRef - The spool reference string (S3 key) returned by `putSpool`.
    * @returns The raw body buffer as stored by `putSpool`.
+   * @throws {Error} If S3 returns a response with no body — surfaced here so the
+   *   failure is legible rather than an opaque downstream parse error on an empty buffer.
    * @throws The underlying S3 error if the object does not exist or access fails.
    */
   async getSpool(spoolRef: string): Promise<Buffer> {
-    // Extract projectId from the spool key: trace-blobs/spool/{projectId}/...
-    const projectId = spoolRef.split("/")[2] ?? "";
+    const projectId = projectIdFromSpoolKey(spoolRef);
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
     );
     const bytes = await Body?.transformToByteArray();
-    return Buffer.from(bytes ?? []);
+    if (bytes == null) {
+      throw new Error(
+        `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
+      );
+    }
+    return Buffer.from(bytes);
   }
 
   /**
@@ -232,7 +277,7 @@ export class BlobStore {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
-    const key = `trace-blobs/spool/${projectId}/${traceId}/${spanId}`;
+    const key = buildSpoolKey(projectId, traceId, spanId);
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     await s3Client.send(
       new PutObjectCommand({
@@ -255,7 +300,7 @@ export class BlobStore {
    */
   async deleteSpool(spoolRef: string): Promise<void> {
     try {
-      const projectId = spoolRef.split("/")[2] ?? "";
+      const projectId = projectIdFromSpoolKey(spoolRef);
       const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
       await s3Client.send(
         new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),

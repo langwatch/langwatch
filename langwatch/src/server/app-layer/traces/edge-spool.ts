@@ -37,7 +37,7 @@ export async function maybeSpool({
   logger: SpoolLogger;
 }): Promise<RecordSpanCommandData> {
   const serialized = JSON.stringify(data);
-  const byteLength = Buffer.byteLength(serialized, "utf-8");
+  const byteLength = Buffer.byteLength(serialized, "utf8");
 
   if (byteLength <= COMMAND_INLINE_THRESHOLD) {
     // Payload fits inline — no S3 PUT needed
@@ -50,7 +50,7 @@ export async function maybeSpool({
   const { tenantId: projectId, span } = data;
   const traceId = span.traceId as string;
   const spanId = span.spanId as string;
-  const spoolBody = Buffer.from(serialized, "utf-8");
+  const spoolBody = Buffer.from(serialized, "utf8");
 
   try {
     const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body: spoolBody });

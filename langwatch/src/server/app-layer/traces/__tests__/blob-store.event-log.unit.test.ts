@@ -285,6 +285,76 @@ describe("given a transient spool ref", () => {
 });
 
 // ---------------------------------------------------------------------------
+// getFromEventLog — log-record body resolution (eventref field "body")  [GtVrA]
+// ---------------------------------------------------------------------------
+
+describe("given an event_log row whose EventPayload is a log record (full body at top level, no span)", () => {
+  describe("when getFromEventLog is called with field 'body'", () => {
+    it("resolves the log body from EventPayload.body, not span.attributes", async () => {
+      const logBody = "y".repeat(80 * 1024);
+      const eventPayload = JSON.stringify({ body: logBody });
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      const result = await blobStore.getFromEventLog({
+        eventId: EVENT_ID,
+        field: "body",
+        tenantId: TENANT_A,
+        aggregateType: "log",
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(result).toBe(logBody);
+    });
+
+    it("throws BlobFieldNotFoundError when field is 'body' but the EventPayload has no body", async () => {
+      const eventPayload = JSON.stringify({ span: { attributes: [] } });
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      await expect(
+        blobStore.getFromEventLog({
+          eventId: EVENT_ID,
+          field: "body",
+          tenantId: TENANT_A,
+          aggregateType: "log",
+          aggregateId: AGGREGATE_ID,
+        }),
+      ).rejects.toBeInstanceOf(BlobFieldNotFoundError);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSpool — explicit error on empty S3 body  [GtVrH]
+// ---------------------------------------------------------------------------
+
+describe("given an S3 GetObject that returns a response with no Body", () => {
+  describe("when getSpool is called", () => {
+    it("throws an explicit 'no body' error rather than returning an empty buffer", async () => {
+      const sendMock = vi.fn().mockResolvedValue({ Body: undefined });
+      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
+
+      await expect(
+        blobStore.getSpool("trace-blobs/spool/proj/trace-001/span-001"),
+      ).rejects.toThrow(/no body/i);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getFromEventLog — read-vs-write contract regression (issue #4215)
 // ---------------------------------------------------------------------------
 

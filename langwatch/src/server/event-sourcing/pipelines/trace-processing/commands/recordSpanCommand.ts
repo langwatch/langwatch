@@ -217,6 +217,12 @@ export class RecordSpanCommand implements CommandHandler<
         // carries a spoolRef, the full content has already bypassed the Redis
         // pressure point and MUST be written to event_log in its entirety.
         // The cap's purpose is Redis safety, not event_log correctness.
+        //
+        // SAFETY DEPENDENCY: this skip is only safe because `leanForProjection`
+        // runs UNCONDITIONALLY in eventSourcingService.ts (between storeEvents and
+        // dispatch) to lean the projection state. If that lean step is ever made
+        // conditional, spool-reconstituted (full-content) spans would re-introduce
+        // the Redis fold-state clog this cap otherwise guards against.
         if (!commandData.spoolRef) {
           const cappedAttributeCount = capOversizedAttributes(
             spanToProcess,
