@@ -138,10 +138,21 @@ export const ColumnsDropdown: React.FC = () => {
                   size="2xs"
                   variant="ghost"
                   disabled={index === 0}
-                  onClick={() => reorderColumns(
-                    columnOrder.indexOf(column.id),
-                    columnOrder.indexOf(column.id) - 1,
-                  )}
+                  // Resolve the neighbour from the VISIBLE-order strip
+                  // and only then translate back into the full
+                  // `columnOrder` index space. Using `columnOrder ± 1`
+                  // directly would target whatever the next unfiltered
+                  // index happens to be — typically a pinned column
+                  // sitting between two reorderable ones — and the move
+                  // would silently no-op against the pinned slot.
+                  onClick={() => {
+                    const previous = orderedVisibleColumns[index - 1];
+                    if (!previous) return;
+                    reorderColumns(
+                      columnOrder.indexOf(column.id),
+                      columnOrder.indexOf(previous.id),
+                    );
+                  }}
                 >
                   <ArrowUp size={11} />
                 </IconButton>
@@ -150,10 +161,14 @@ export const ColumnsDropdown: React.FC = () => {
                   size="2xs"
                   variant="ghost"
                   disabled={index === orderedVisibleColumns.length - 1}
-                  onClick={() => reorderColumns(
-                    columnOrder.indexOf(column.id),
-                    columnOrder.indexOf(column.id) + 1,
-                  )}
+                  onClick={() => {
+                    const next = orderedVisibleColumns[index + 1];
+                    if (!next) return;
+                    reorderColumns(
+                      columnOrder.indexOf(column.id),
+                      columnOrder.indexOf(next.id),
+                    );
+                  }}
                 >
                   <ArrowDown size={11} />
                 </IconButton>
