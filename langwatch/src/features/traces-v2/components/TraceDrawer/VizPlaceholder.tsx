@@ -20,9 +20,7 @@ import {
   LuChartGantt,
   LuChevronDown,
   LuChevronUp,
-  LuFlame,
   LuGripHorizontal,
-  LuList,
   LuMessagesSquare,
   LuMinus,
   LuNetwork,
@@ -34,7 +32,11 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { OverflowMenu } from "../shared/OverflowMenu";
-import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+// PeerCursorOverlay used to wrap just the viz pane (scoped to the
+// active viz tab). It was lifted to the drawer level (TraceDrawerShell)
+// so cursors render anywhere a peer's cursor lands in the drawer — the
+// previous scope hid peers as soon as they hovered out of the
+// viz pane.
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
   selectPeersMatching,
@@ -46,11 +48,9 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
-import { FlameView } from "./flameView";
 import { NewSpanFlash } from "./NewSpanFlash";
 import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
 import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
-import { SpanListView } from "./spanListView";
 import { WaterfallView } from "./waterfallView";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
@@ -152,6 +152,15 @@ function VizTabContent({
   );
 }
 
+// The viz strip used to ship five tabs. Flame and Span List were retired
+// during the trace-view redesign: Flame's depth-first view duplicated
+// what the Waterfall already showed (the tree panel renders depth +
+// parent/child + per-span durations); Span List added filter chrome but
+// no fundamentally new data, and "a flatter waterfall" wasn't the use
+// case anyone reached for in practice. Waterfall (default), Topology,
+// and Sequence remain — Topology + Sequence cover specialised flows
+// that the waterfall can't render natively. Shortcut numbers stay in
+// the original order so muscle memory for waterfall=1 is preserved.
 const TABS: VizTabDef[] = [
   {
     value: "waterfall",
@@ -163,28 +172,10 @@ const TABS: VizTabDef[] = [
       "Spans laid out by start time with parent/child indentation — best for tracing causality top-down.",
   },
   {
-    value: "flame",
-    label: "Flame",
-    icon: LuFlame,
-    shortcut: "2",
-    palette: "orange",
-    description:
-      "Stacked depth-first view showing where time is spent — best for spotting hotspots and deep call stacks.",
-  },
-  {
-    value: "spanlist",
-    label: "Span List",
-    icon: LuList,
-    shortcut: "3",
-    palette: "cyan",
-    description:
-      "Flat, sortable list of every span with type, duration, and tokens — best for searching and filtering.",
-  },
-  {
     value: "topology",
     label: "Topology",
     icon: LuNetwork,
-    shortcut: "4",
+    shortcut: "2",
     palette: "purple",
     description:
       "Service/agent graph showing what calls what — best for understanding system structure at a glance.",
@@ -193,7 +184,7 @@ const TABS: VizTabDef[] = [
     value: "sequence",
     label: "Sequence",
     icon: LuMessagesSquare,
-    shortcut: "5",
+    shortcut: "3",
     palette: "teal",
     description:
       "Chat-style turn order between actors — best for replaying multi-agent conversations.",
@@ -296,24 +287,24 @@ export function VizPlaceholder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasData, fillParent]);
 
-  // Handle cross-view navigation: waterfall group → span list
+  // `handleSwitchToSpanList` used to switch the viz tab to "spanlist"
+  // and forward filter state when the user expanded a waterfall group
+  // and asked to drill in. Span list was retired during the redesign —
+  // the no-op shim below keeps existing call sites (TreeRow / GroupRow)
+  // compiling without each having to feature-flag the prop. The user is
+  // already inside the waterfall, so the prop is a no-op rather than
+  // attempting some other reasonable fallback.
   const handleSwitchToSpanList = useCallback(
-    (nameFilter: string, typeFilter: string) => {
-      setSpanListSearch(nameFilter);
-      setSpanListTypeFilter(typeFilter);
-      onVizTabChange("spanlist");
-      onSwitchToSpanList?.(nameFilter, typeFilter);
+    (_nameFilter: string, _typeFilter: string) => {
+      // intentional no-op — see comment above
     },
-    [onVizTabChange, onSwitchToSpanList],
+    [],
   );
 
-  // Clear span list filters when switching away from span list
   const handleVizTabChange = useCallback(
     (tab: VizTab) => {
-      if (tab !== "spanlist") {
-        setSpanListSearch("");
-        setSpanListTypeFilter(undefined);
-      }
+      // Span list filter state had its own scoped reset here. With the
+      // tab removed there's nothing to reset; just forward.
       onVizTabChange(tab);
     },
     [onVizTabChange],
@@ -606,56 +597,39 @@ export function VizPlaceholder({
               spanCount={spans.length}
               resetKey={trace?.traceId ?? null}
             />
-            <PeerCursorOverlay
-              anchor={trace ? `trace:${trace.traceId}:panel:${vizTab}` : null}
-              enabled={!!trace && !isCollapsed}
-            >
-              {isLoading && spans.length === 0 ? (
-                <VizSkeleton vizTab={vizTab} />
-              ) : spans.length === 0 ? (
-                <Flex align="center" justify="center" height="full">
-                  <Text textStyle="xs" color="fg.subtle">
-                    No span data available for this trace
-                  </Text>
-                </Flex>
-              ) : isCollapsed ? (
-                <CollapsedOverview spans={spans} />
-              ) : vizTab === "waterfall" ? (
-                <WaterfallView
+            {isLoading && spans.length === 0 ? (
+              <VizSkeleton vizTab={vizTab} />
+            ) : spans.length === 0 ? (
+              <Flex align="center" justify="center" height="full">
+                <Text textStyle="xs" color="fg.subtle">
+                  No span data available for this trace
+                </Text>
+              </Flex>
+            ) : isCollapsed ? (
+              <CollapsedOverview spans={spans} />
+            ) : vizTab === "topology" || vizTab === "sequence" ? (
+              <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
+                <SequenceView
                   spans={spans}
                   selectedSpanId={selectedSpanId}
                   onSelectSpan={onSelectSpan}
                   onClearSpan={onClearSpan}
-                  onSwitchToSpanList={handleSwitchToSpanList}
+                  subMode={vizTab}
                 />
-              ) : vizTab === "flame" ? (
-                <FlameView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                />
-              ) : vizTab === "topology" || vizTab === "sequence" ? (
-                <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
-                  <SequenceView
-                    spans={spans}
-                    selectedSpanId={selectedSpanId}
-                    onSelectSpan={onSelectSpan}
-                    onClearSpan={onClearSpan}
-                    subMode={vizTab}
-                  />
-                </Suspense>
-              ) : (
-                <SpanListView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                  initialSearch={spanListSearch}
-                  initialTypeFilter={spanListTypeFilter}
-                />
-              )}
-            </PeerCursorOverlay>
+              </Suspense>
+            ) : (
+              // Default — waterfall. Any unrecognised vizTab (e.g. a
+              // stale URL pointing at the retired "flame" or "spanlist"
+              // tab) falls through here too, so the user gets a usable
+              // view rather than a blank pane.
+              <WaterfallView
+                spans={spans}
+                selectedSpanId={selectedSpanId}
+                onSelectSpan={onSelectSpan}
+                onClearSpan={onClearSpan}
+                onSwitchToSpanList={handleSwitchToSpanList}
+              />
+            )}
             {/*
               The "Click to interact" scrim used to sit here. With the
               pane layout giving each viz its own scroll container, the
@@ -701,8 +675,6 @@ export function VizPlaceholder({
  * flame strips at flame depths, span list as a table.
  */
 function VizSkeleton({ vizTab }: { vizTab?: VizTab }) {
-  if (vizTab === "flame") return <FlameSkeleton />;
-  if (vizTab === "spanlist") return <SpanListSkeleton />;
   if (vizTab === "topology") return <TopologySkeleton />;
   if (vizTab === "sequence") return <SequenceSkeleton />;
   return <WaterfallSkeleton />;
@@ -753,64 +725,6 @@ function WaterfallSkeleton() {
         ))}
       </VStack>
     </Flex>
-  );
-}
-
-const FLAME_STRIPS = [
-  [{ left: 0, width: 100 }],
-  [
-    { left: 0, width: 38 },
-    { left: 40, width: 24 },
-    { left: 66, width: 32 },
-  ],
-  [
-    { left: 2, width: 16 },
-    { left: 22, width: 14 },
-    { left: 42, width: 20 },
-    { left: 68, width: 28 },
-  ],
-  [
-    { left: 4, width: 10 },
-    { left: 46, width: 12 },
-    { left: 70, width: 8 },
-    { left: 82, width: 12 },
-  ],
-] as const;
-
-function FlameSkeleton() {
-  return (
-    <VStack align="stretch" gap="2px" paddingX={3} paddingY={3} height="full">
-      {FLAME_STRIPS.map((strip, depth) => (
-        <Box key={depth} position="relative" height="22px">
-          {strip.map((seg, i) => (
-            <Skeleton
-              key={i}
-              position="absolute"
-              top={0}
-              left={`${seg.left}%`}
-              width={`${seg.width}%`}
-              height="full"
-              borderRadius="sm"
-            />
-          ))}
-        </Box>
-      ))}
-    </VStack>
-  );
-}
-
-function SpanListSkeleton() {
-  // Minimal: one horizontal bar per row, consistent rhythm. Chakra's
-  // <Skeleton> handles the shimmer.
-  const ROW_WIDTHS = [86, 64, 78, 52, 70, 90, 60, 74, 48, 82];
-  return (
-    <VStack align="stretch" gap={0} height="full" paddingY={2}>
-      {ROW_WIDTHS.map((w, i) => (
-        <Flex key={i} paddingX={4} paddingY={1.5}>
-          <Skeleton height="12px" width={`${w}%`} borderRadius="sm" />
-        </Flex>
-      ))}
-    </VStack>
   );
 }
 
