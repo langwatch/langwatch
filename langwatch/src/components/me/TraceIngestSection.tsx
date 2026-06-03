@@ -24,11 +24,6 @@ import { api } from "~/utils/api";
 /**
  * /me Trace Ingest section — tile-grid for IngestionTemplate v1 catalog.
  *
- * Per `specs/ai-gateway/governance/ingestion-templates-catalog.feature`:
- *   exactly 4 visible tiles v1 — claude_code / cursor / claude_cowork
- *   (otlp_token install) + raw_otlp_advanced (visually distinct fallback
- *   discovery card pointing at /me/configure#otlp).
- *
  * Tile metadata comes from `api.ingestionTemplates.list` (server is the
  * source of truth — admin can disable / org-author / archive). v1
  * platform-published rows are seeded by Sergey's seeders. Per-template
@@ -45,6 +40,12 @@ import { api } from "~/utils/api";
  * IngestionTemplate row, no install). It deep-links to
  * /me/configure#otlp — the BYO-OTLP fallback discovery card.
  *
+ * Claude Code is intentionally excluded from this grid (filtered by
+ * slug below). The unified entry point for Claude Code lives on the
+ * AiToolsPortal "$ langwatch claude" tile — the CLI auto-mints the
+ * ingestion token and wires both the gateway and OTLP paths in one
+ * step, so a separate "Connect" tile here would be a duplicate UX.
+ *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
  * /me/index.tsx.
@@ -53,10 +54,6 @@ const TILE_META: Record<
   string,
   { icon: ReactNode; subtitle: string }
 > = {
-  claude_code: {
-    icon: <Bot size={20} />,
-    subtitle: "Anthropic Claude Code CLI",
-  },
   cursor: {
     icon: <MousePointer2 size={20} />,
     subtitle: "Cursor IDE telemetry",
@@ -66,6 +63,8 @@ const TILE_META: Record<
     subtitle: "Multi-agent Claude sessions",
   },
 };
+
+const UNIFIED_VIA_CLI_SLUGS = new Set(["claude_code"]);
 
 const FALLBACK_ICON = <Bot size={20} />;
 
@@ -119,7 +118,9 @@ export function TraceIngestSection() {
     Record<string, IngestionBindingResult | null>
   >({});
 
-  const templates = templatesQuery.data ?? [];
+  const templates = (templatesQuery.data ?? []).filter(
+    (t) => !UNIFIED_VIA_CLI_SLUGS.has(t.slug),
+  );
   const bindings = bindingsQuery.data ?? [];
 
   const bindingByTemplateId = new Map(bindings.map((b) => [b.templateId, b]));

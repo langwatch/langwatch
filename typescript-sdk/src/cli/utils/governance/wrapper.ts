@@ -27,13 +27,48 @@ export interface ToolEnv {
 }
 
 /**
+ * Standard OTEL_*_EXPORTER + endpoint + headers triple for Claude
+ * Code's telemetry. Claude Code reads these envs at startup, sets
+ * up an OTLP exporter, and emits logs/metrics/spans alongside the
+ * normal API traffic. The gateway routes the API calls (via the VK
+ * env above), AND we also get the in-process OTLP signal — both
+ * data shapes, one CLI command.
+ *
+ * Resource attrs go via OTEL_RESOURCE_ATTRIBUTES (comma-separated
+ * key=value); we tag service.name=claude-code so the recorded
+ * traces surface under a human-readable name in /messages.
+ */
+function envForClaudeOtel(
+  controlPlaneBase: string,
+  ingestionToken: string,
+): Record<string, string> {
+  const cp = controlPlaneBase.replace(/\/+$/, "");
+  return {
+    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+    OTEL_TRACES_EXPORTER: "otlp",
+    OTEL_LOGS_EXPORTER: "otlp",
+    OTEL_METRICS_EXPORTER: "otlp",
+    OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+    OTEL_EXPORTER_OTLP_ENDPOINT: `${cp}/api/otel`,
+    OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${ingestionToken}`,
+    OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
+  };
+}
+
+/**
  * Mirror of the Go CLI's env-injection map. The wrapped tools
  * read these standard env vars (Anthropic, OpenAI, Google) and
  * route through the gateway with the user's personal VK as bearer.
+ *
+ * For `claude`, when `cfg.default_personal_ingestion_token` is
+ * present, we ALSO inject the OTEL_* triple so Claude Code emits
+ * OTLP telemetry to `<control_plane>/api/otel`. Both paths in one
+ * invocation, no admin toggle.
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   const gw = cfg.gateway_url.replace(/\/+$/, "");
   const auth = cfg.default_personal_vk?.secret;
+  const ik = cfg.default_personal_ingestion_token?.secret;
   if (!auth) return { vars: {} };
   switch (tool) {
     case "claude":
@@ -41,6 +76,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         vars: {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
+          ...(ik ? envForClaudeOtel(cfg.control_plane_url, ik) : {}),
         },
       };
     case "codex":

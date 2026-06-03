@@ -27,6 +27,24 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
+   * Personal ingestion key (the ik-lw-<base32> shape minted by
+   * `/api/governance/user-ingestion-bindings`). When present, the
+   * `langwatch claude` wrapper additionally injects the standard
+   * OTEL_*_EXPORTER env vars pointing at `<control_plane>/api/otel`
+   * with this key as the Authorization bearer, so Claude Code emits
+   * its OTLP logs/metrics/spans alongside the gateway-routed calls.
+   *
+   * Unset until the first run of the bootstrap mint flow (next
+   * commits). When unset, the wrapper falls back to the
+   * gateway-only env shape (existing behavior, no regression).
+   */
+  default_personal_ingestion_token?: {
+    id?: string;
+    secret?: string;
+    prefix?: string;
+  };
+
+  /**
    * Most-recent signed `request_increase_url` returned by the
    * gateway in a 402 budget_exceeded payload — cached so
    * `langwatch request-increase` opens the exact URL the gateway

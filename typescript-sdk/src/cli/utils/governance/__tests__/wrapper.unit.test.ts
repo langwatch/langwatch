@@ -75,6 +75,61 @@ describe("envForTool", () => {
     expect(env).toEqual({});
   });
 
+  describe("when a personal ingestion token is also present", () => {
+    const cfgWithIk: GovernanceConfig = {
+      ...cfg,
+      default_personal_ingestion_token: {
+        id: "ik_x",
+        secret: "ik-lw-abc123",
+        prefix: "ik-lw-",
+      },
+    };
+
+    it("claude → adds the OTEL_*_EXPORTER triple alongside the gateway pair", () => {
+      const env = envForTool(cfgWithIk, "claude").vars;
+      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
+      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(env.OTEL_LOGS_EXPORTER).toBe("otlp");
+      expect(env.OTEL_METRICS_EXPORTER).toBe("otlp");
+      expect(env.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/json");
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+        "Authorization=Bearer ik-lw-abc123",
+      );
+      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=claude-code");
+    });
+
+    it("OTEL_EXPORTER_OTLP_ENDPOINT strips a trailing slash from control_plane_url", () => {
+      const trailing: GovernanceConfig = {
+        ...cfgWithIk,
+        control_plane_url: "http://app.example.com/",
+      };
+      const env = envForTool(trailing, "claude").vars;
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+    });
+
+    it("codex → no OTEL vars (claude-only telemetry envs)", () => {
+      const env = envForTool(cfgWithIk, "codex").vars;
+      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
+      expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+    });
+  });
+
+  it("claude without ingestion token → only the gateway pair (existing behavior, no regression)", () => {
+    const env = envForTool(cfg, "claude").vars;
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+    expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
+    expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+  });
+
   it("strips trailing slash from gateway_url", () => {
     const trailing: GovernanceConfig = { ...cfg, gateway_url: "http://gw.example.com/" };
     const env = envForTool(trailing, "claude").vars;
