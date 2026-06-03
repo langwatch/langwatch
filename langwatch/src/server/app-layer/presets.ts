@@ -128,8 +128,8 @@ import {
   InMemoryOrphanCursorStore,
   RedisOrphanCursorStore,
 } from "../data-retention/orphan-sweep/orphanSweepCursor.store";
-import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
 import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
+import { ORPHAN_SWEEP_PROCESSING_PIPELINE_NAME } from "../event-sourcing/pipelines/orphan-sweep-processing/pipeline";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
@@ -396,11 +396,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     clickhouseEnabled ? resolveClickHouseClient : null,
     orphanCursorStore,
   );
-  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
-    retentionPolicyCache,
-    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
-  });
-
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
@@ -421,6 +416,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     isSaas: config.isSaas,
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
+  });
+
+  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
+    retentionPolicyCache,
+    dispatchSweep: (params) =>
+      es
+        .getPipeline(ORPHAN_SWEEP_PROCESSING_PIPELINE_NAME)
+        .commands.sweepOrphansForTenant.send({
+          tenantId: params.tenantId,
+          occurredAt: Date.now(),
+          consecutiveFailures: 0,
+        }),
   });
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
@@ -493,6 +500,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     governanceKpisSync,
     governanceOcsfEventsSync,
     retentionOrphanSweepReactor,
+    orphanSweep: orphanSweepService,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;

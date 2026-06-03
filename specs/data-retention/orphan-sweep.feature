@@ -8,86 +8,95 @@ Feature: PG orphan sweep for retention-deleted traces
     And trace "old-trace" was ingested 35 days ago and has been deleted by retention TTL
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Self-perpetuating chain (BullMQ event chain — NOT a scheduled cron).
-  # The reactor seeds it on first ingest; each chain step re-enqueues itself
-  # with a 24h delay via the worker's `completed` listener. Stable per-tenant
-  # jobId means bursty ingest folds into a single seed, and the canonical
-  # 1-per-tenant-per-24h cadence is enforced by the jobId being held while a
-  # chain step is in the queue.
+  # Self-perpetuating sweep (event-sourcing groupQueue command — NOT a cron).
+  # The ingestion reactor dispatches a per-tenant sweep command on first ingest;
+  # each increment self-dispatches the next one after the steady cadence. No
+  # scheduler, no cron endpoint, no BullMQ. One sweep loop per tenant is
+  # guaranteed by tenant-scoped deduplication, so bursty ingest folds into a
+  # single loop. (ADR-024 supersedes the BullMQ chain of ADR-023.)
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: Ingestion seeds the per-tenant orphan-sweep chain
-    Given the tenant has no orphan-sweep chain step in the queue
+  Scenario: Ingestion seeds the per-tenant orphan sweep
+    Given the tenant has no orphan-sweep loop running
     When a trace event is ingested
-    Then the ingestion reactor enqueues a chain step for this tenant
-    And the chain step has a stable jobId of the form "orphan-sweep-chain:<tenantId>"
+    Then the ingestion reactor dispatches an orphan-sweep command for this tenant
 
-  Scenario: Concurrent ingest from the same tenant dedups to a single chain step
-    Given a chain step is already queued for the tenant
+  Scenario: Concurrent ingest from the same tenant folds into a single sweep loop
+    Given an orphan-sweep loop is already running for the tenant
     When multiple trace events from the same tenant are ingested in rapid succession
-    Then no additional chain steps are created — the stable jobId dedups the adds
-    And the existing chain step proceeds without interference
+    Then no additional sweep loop is started — tenant-scoped dedup folds them into one
+    And the existing loop proceeds without interference
 
-  Scenario: Chain step sweeps and re-enqueues itself for the next day
-    Given a chain step has just completed for an active tenant
-    When the worker's `completed` listener fires
-    Then a follow-up chain step is enqueued with a 24h delay
-    And the follow-up step uses the same per-tenant jobId
+  Scenario: A sweep increment is bounded and resumes from its saved cursor
+    When an orphan-sweep increment runs for a tenant
+    Then it processes at most a bounded page budget of candidate trace ids
+    And it persists a cursor so the next increment resumes where this one stopped
 
-  Scenario: Chain stops when the project is archived
+  Scenario: A sweep increment self-perpetuates the next one after the steady cadence
+    Given an orphan-sweep increment has just completed for an active tenant
+    Then the next increment is scheduled to run after the steady cadence
+    And no scheduler, cron, or repeat job is involved — it is an event continuation
+
+  Scenario: The sweep loop stops when the project is archived
     Given the project's `archivedAt` is set
-    When the next chain step runs
+    When the next sweep increment runs
     Then no sweep is performed
-    And the worker returns `stopChain: true` so no follow-up step is enqueued
-    And the chain for this tenant ends until ingestion seeds a new one
+    And no follow-up increment is scheduled — the loop ends until ingestion restarts it
 
-  Scenario: Chain stops when the project has been hard-deleted
+  Scenario: The sweep loop stops when the project has been hard-deleted
     Given the project row no longer exists in PostgreSQL
-    When the next chain step runs
+    When the next sweep increment runs
     Then no sweep is performed
-    And the worker returns `stopChain: true` so no follow-up step is enqueued
+    And no follow-up increment is scheduled
 
-  Scenario: Transient sweep failure does NOT break the chain
+  Scenario: A transient sweep failure does NOT stop the loop
     Given the project is active
     And the sweep throws a transient PG error
-    When the chain step completes
-    Then the worker returns `stopChain: false`
-    And the follow-up chain step is enqueued for 24h later
-    And the next step gets another shot at the same tenant's orphans
+    When the increment completes
+    Then the next increment is still scheduled
+    And the next increment gets another shot at the same tenant's orphans
+
+  Scenario: Repeated failures stop the loop and surface the error
+    Given the project is active
+    And the sweep has failed on several consecutive increments
+    When the failure count reaches the circuit-breaker threshold
+    Then no further increment is scheduled
+    And the condition is surfaced for investigation
+    And the next ingest re-seeds a fresh loop
 
   # ─────────────────────────────────────────────────────────────────────────
   # Per-step orphan cleanup behavior (what the sweep itself does).
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: Chain step cleans orphaned annotations
+  Scenario: Sweep increment cleans orphaned annotations
     Given an Annotation exists for trace "old-trace"
-    When the orphan-sweep chain step runs for the project
+    When the orphan-sweep increment runs for the project
     Then the orphaned Annotation is deleted from PostgreSQL
 
-  Scenario: Chain step cleans orphaned annotation queue items
+  Scenario: Sweep increment cleans orphaned annotation queue items
     Given an AnnotationQueueItem exists for trace "old-trace"
-    When the orphan-sweep chain step runs for the project
+    When the orphan-sweep increment runs for the project
     Then the orphaned AnnotationQueueItem is deleted from PostgreSQL
 
-  Scenario: Chain step nullifies TriggerSent trace reference
+  Scenario: Sweep increment nullifies TriggerSent trace reference
     Given a TriggerSent record references trace "old-trace"
-    When the orphan-sweep chain step runs for the project
+    When the orphan-sweep increment runs for the project
     Then the TriggerSent record's traceId is set to NULL to preserve alert history
 
-  Scenario: Chain step removes orphaned PublicShare
+  Scenario: Sweep increment removes orphaned PublicShare
     Given a PublicShare exists for trace "old-trace"
-    When the orphan-sweep chain step runs for the project
+    When the orphan-sweep increment runs for the project
     Then the orphaned PublicShare is deleted from PostgreSQL
 
-  # The chain is the sole orphan-cleanup mechanism. There is no read-time
+  # The sweep is the sole orphan-cleanup mechanism. There is no read-time
   # lazy cleanup wired into annotation lists, public shares, trigger history
-  # or queue items today — between chain steps, stale rows can briefly
+  # or queue items today — between increments, stale rows can briefly
   # surface, and that's the accepted trade-off for the single, predictable
-  # 24h cadence. Reintroducing a read-time path would require touching every
+  # cadence. Reintroducing a read-time path would require touching every
   # consumer; if it ever returns it gets its own feature file.
 
-  Scenario: Chain step processes orphans in bounded batches scoped to the tenant
-    When the orphan-sweep chain step runs for a tenant
+  Scenario: Sweep increment processes orphans in bounded batches scoped to the tenant
+    When the orphan-sweep increment runs for a tenant
     Then it processes candidate trace ids in pages of 1000
     And every query is filtered by the tenant's projectId
     And cross-tenant queries never appear in the sweep

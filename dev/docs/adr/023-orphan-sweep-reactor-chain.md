@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-01
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-024](./024-orphan-sweep-groupqueue-command.md) (queue mechanism only — the sweep semantics below are unchanged). The reactor-seeded BullMQ chain described here was replaced by a self-dispatching groupQueue command after the 2026-06-02 retention incident (a `:` in the chain jobId triggered an inline-sweep storm); see ADR-024 for the why.
 
 ## Context
 

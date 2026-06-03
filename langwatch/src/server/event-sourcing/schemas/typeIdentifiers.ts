@@ -16,6 +16,9 @@ import {
   BILLING_REPORTING_COMMAND_TYPES,
 } from "../pipelines/billing-reporting/schemas/constants";
 import {
+  ORPHAN_SWEEP_PROCESSING_COMMAND_TYPES,
+} from "../pipelines/orphan-sweep-processing/schemas/constants";
+import {
   SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   SIMULATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/simulation-processing/schemas/constants";
@@ -56,6 +59,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
+  ...ORPHAN_SWEEP_PROCESSING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -77,6 +81,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "simulation_set",
   "suite_run",
   "billing_report",
+  "orphan_sweep",
   "global",
   TEST_AGGREGATE_TYPE,
 ] as const;

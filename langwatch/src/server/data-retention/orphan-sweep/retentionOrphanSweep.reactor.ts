@@ -10,26 +10,28 @@ const logger = createLogger("langwatch:data-retention:orphan-reactor");
 interface RetentionOrphanSweepReactorDeps {
   retentionPolicyCache: RetentionPolicyCache;
   /**
-   * Seeds the per-tenant orphan-sweep chain for `tenantId`. The chain owns
-   * the sweep + the 24h-cadence self-perpetuation — this reactor only
-   * ensures the chain *exists* for any tenant that ingests. Injected so
-   * tests don't have to wire BullMQ.
+   * Dispatches the orphan-sweep command for `tenantId` onto the
+   * event-sourcing groupQueue. The pipeline owns the 6h-cadence
+   * self-perpetuation — this reactor only ensures the command is seeded
+   * for any tenant that ingests. Injected so tests don't have to wire
+   * the event-sourcing runtime.
    */
-  seedChain: (params: { tenantId: string }) => Promise<void>;
+  dispatchSweep: (params: { tenantId: string }) => Promise<void>;
 }
 
 /**
- * Reactor that seeds a per-tenant orphan-sweep chain on the first ingest.
+ * Reactor that dispatches the per-tenant orphan-sweep command on first ingest.
  *
- * Why a chain (not a tick): tenants stop ingesting, but their CH trace rows
- * keep being deleted by retention TTL. A cron-style sweep over all projects
- * is heavy and wakes inactive tenants needlessly. A per-tenant chain only
- * costs work for tenants that ever ingest; once seeded, it self-perpetuates
- * via the worker's `completed` listener (delay = 24h).
+ * Why a self-perpetuating command (not a cron): tenants stop ingesting, but
+ * their CH trace rows keep being deleted by retention TTL. A cron-style sweep
+ * over all projects is heavy and wakes inactive tenants needlessly. A
+ * per-tenant command only costs work for tenants that ever ingest; once
+ * dispatched, it self-perpetuates via selfDispatch (delay = 6h) on the
+ * event-sourcing groupQueue.
  *
  * The reactor's own dedup window is intentionally short: bursty ingest from
- * one tenant should fold into one chain step, but the canonical "1 sweep
- * per tenant per 24h" cadence lives in the chain's stable jobId, not here.
+ * one tenant should fold into one dispatch attempt, but the canonical sweep
+ * cadence lives in the pipeline's deduplication TTL, not here.
  */
 export function createRetentionOrphanSweepReactor(
   deps: RetentionOrphanSweepReactorDeps,
@@ -56,11 +58,11 @@ export function createRetentionOrphanSweepReactor(
       if (retentionDays === INDEFINITE_RETENTION_DAYS) return;
 
       try {
-        await deps.seedChain({ tenantId });
+        await deps.dispatchSweep({ tenantId });
       } catch (error) {
         logger.error(
           { tenantId, error },
-          "failed to seed orphan sweep chain — next ingest will retry",
+          "failed to dispatch orphan sweep command — next ingest will retry",
         );
       }
     },
