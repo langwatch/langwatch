@@ -77,21 +77,24 @@ export class LogRequestCollectionService {
                   continue;
                 }
 
+                // OTLP `LogRecord.trace_id` and `LogRecord.span_id` are
+                // OPTIONAL per opentelemetry-proto v1.0.0 logs.proto — a
+                // LogRecord emitted outside an active span has neither.
+                // Dropping in that case silently eats every standalone log
+                // (Claude Code's OTEL_LOGS_EXPORTER without a traces
+                // exporter is the canonical caller). Store an empty
+                // string instead; downstream join-to-span queries simply
+                // find no correlation, which is the correct semantics.
                 const traceId = logRecord.traceId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.traceId as string | Uint8Array,
-                    )
-                  : null;
+                    ) ?? ""
+                  : "";
                 const spanId = logRecord.spanId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.spanId as string | Uint8Array,
-                    )
-                  : null;
-
-                if (!traceId || !spanId) {
-                  droppedCount++;
-                  continue;
-                }
+                    ) ?? ""
+                  : "";
 
                 const timeUnixMs = logRecord.timeUnixNano
                   ? TraceRequestUtils.convertUnixNanoToUnixMs(
