@@ -1,36 +1,27 @@
 /**
  * Request context propagation module.
  *
- * This module provides AsyncLocalStorage-based context propagation for
- * correlating logs and traces across async boundaries.
+ * AsyncLocalStorage-based context propagation for correlating logs and
+ * traces across async boundaries.
  *
- * Architecture:
- * - core.ts: Core types and functions (RequestContext, getCurrentContext, runWithContext)
- * - adapters/: Framework-specific context creation (Hono, tRPC, Next.js, BullMQ)
+ * - core.ts: Core types + functions + generic job-payload context helpers
+ * - adapters/: Framework-specific context creation (Hono, tRPC)
  * - logging.ts: Logger integration (getLogContext)
- * - contextProvider.ts: Decoupled registry for logger mixin
  *
  * @module asyncContext
  */
 
-// Re-export core types and functions
-export {
-  type RequestContext,
-  type JobContextMetadata,
-  getCurrentContext,
-  runWithContext,
-  updateCurrentContext,
-} from "./core";
-
-// Re-export adapters
 export { createContextFromHono } from "./adapters/hono";
 export { createContextFromTRPC } from "./adapters/trpc";
 export {
   createContextFromJobData,
+  getCurrentContext,
   getJobContextMetadata,
-  withJobContext,
+  type JobContextMetadata,
   type JobDataWithContext,
-} from "./adapters/bullmq";
+  type RequestContext,
+  runWithContext,
+  updateCurrentContext,
+} from "./core";
 
-// Re-export logging utilities
 export { getLogContext } from "./logging";
