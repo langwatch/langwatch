@@ -23,11 +23,11 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import {
-  registerPythonProviders,
-  type PythonField,
-  type PythonProviderHandle,
-} from "./monaco/registerPythonProviders";
+import { registerPythonProviders } from "./monaco/registerPythonProviders";
+import type {
+  PythonField,
+  PythonProviderHandle,
+} from "./monaco/python/shared";
 
 /**
  * Use Monaco's bundled VS Code themes verbatim — `vs` for light, `vs-dark`
