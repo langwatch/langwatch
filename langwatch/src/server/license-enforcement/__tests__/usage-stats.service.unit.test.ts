@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  UsageStatsService,
-  type IUsageUnitResolver,
-  type ITraceUsageService,
-} from "../usage-stats.service";
-import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
+import {
+  type ITraceUsageService,
+  type IUsageUnitResolver,
+  UsageStatsService,
+} from "../usage-stats.service";
 
 const TEST_PLAN: PlanInfo = {
   ...FREE_PLAN,

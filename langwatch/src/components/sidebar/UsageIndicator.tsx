@@ -2,9 +2,9 @@ import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
-import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { api } from "../../utils/api";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
@@ -94,9 +94,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
   }
 
   const percentage = Math.min(
-    (currentCount /
-      usage.data.activePlan.maxMessagesPerMonth) *
-      100,
+    (currentCount / usage.data.activePlan.maxMessagesPerMonth) * 100,
     100,
   );
 
@@ -133,7 +131,10 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                 </Text>
               </HStack>
               <Progress.Root
-                value={Math.min(currentCount, usage.data.activePlan.maxMessagesPerMonth)}
+                value={Math.min(
+                  currentCount,
+                  usage.data.activePlan.maxMessagesPerMonth,
+                )}
                 max={usage.data.activePlan.maxMessagesPerMonth}
                 colorPalette="orange"
                 width="full"
