@@ -1341,16 +1341,19 @@ function SecretModal({
   const usesWebhookUrl = details?.sourceType === "workato";
   const isClaudeCode = details?.sourceType === "claude_code";
 
-  // Claude Code's monitoring-usage doc requires both
-  // CLAUDE_CODE_ENABLE_TELEMETRY=1 and the standard OTEL_*_EXPORTER
-  // env vars before any signals are emitted. Pre-build the shell
-  // export block so admins paste once instead of stitching six lines
-  // off the docs page. SDK suffixes /v1/logs + /v1/metrics off the
-  // base endpoint.
+  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
+  // plus the standard OTEL_*_EXPORTER env vars. We recommend
+  // OTEL_TRACES_EXPORTER=otlp so spans claude-code instruments propagate to
+  // LangWatch and logs/metrics emitted inside those spans get correlated;
+  // the session.id resource attribute is then mapped to gen_ai.conversation.id
+  // by the OpenInference extractor so the UI groups the session as one thread.
+  // Pre-build the shell export block so admins paste once instead of stitching
+  // seven lines off the docs page.
   const claudeCodeEnvBlock = useMemo(() => {
     if (!isClaudeCode || !details) return "";
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,

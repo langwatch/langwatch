@@ -629,16 +629,21 @@ function SecretRevealModal({
   const usesWebhookUrl = sourceType === "workato";
   const isClaudeCode = sourceType === "claude_code";
 
-  // Claude Code's monitoring-usage doc requires both
-  // CLAUDE_CODE_ENABLE_TELEMETRY=1 and the standard OTEL_*_EXPORTER
-  // env vars before any signals are emitted. Pre-build the shell
-  // export block so admins paste once instead of stitching six lines
-  // off the docs page. SDK suffixes /v1/logs + /v1/metrics off the
-  // base endpoint (Ariana's 2026-05-06 capture confirmed the
-  // SDK-side suffixing — admins paste the bare base).
+  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
+  // plus the standard OTEL_*_EXPORTER env vars before any signals are emitted.
+  // We also recommend OTEL_TRACES_EXPORTER=otlp so any spans Claude Code does
+  // instrument propagate to LangWatch and any logs/metrics emitted INSIDE a
+  // span get correlated. Standalone records still arrive without trace context
+  // (logs emitted outside spans always will, per OTLP proto v1.0.0 where
+  // trace_id/span_id are optional on LogRecord), but the receiver synthesizes
+  // a stable trace id from service.name + service.instance.id so each session
+  // surfaces as one named trace in the listing. Pre-build the shell export
+  // block so admins paste once instead of stitching seven lines off the docs
+  // page.
   const claudeCodeEnvBlock = isClaudeCode
     ? [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+        `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
         `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
