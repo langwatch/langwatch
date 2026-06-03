@@ -223,6 +223,17 @@ describe("classifyTokenType", () => {
     });
   });
 
+  describe("when given an ingestion-key prefix", () => {
+    it("classifies ik-lw-… tokens as ingestion_key", () => {
+      // Real-shape token from a UserIngestionBinding: ik-lw- + 48-char body.
+      expect(
+        classifyTokenType(
+          "ik-lw-WgdPxNGmczBPUunjT350X9ywK9EKyO9MEYcFBdmKxnoLGUdz",
+        ),
+      ).toBe("ingestion_key");
+    });
+  });
+
   describe("when given anything else", () => {
     it("returns unknown for an arbitrary string", () => {
       expect(classifyTokenType("abc123")).toBe("unknown");
