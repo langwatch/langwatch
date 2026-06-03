@@ -2,12 +2,15 @@ import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import {
   LuChevronDown,
   LuChevronRight,
+  LuPin,
+  LuPinOff,
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import {
   abbreviateModel,
+  formatCost,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../../utils/formatters";
@@ -28,12 +31,14 @@ export function TreeRow({
   rootDuration,
   isSelected,
   isHovered,
+  isPinned,
   isCollapsed,
   hasChildren,
   isDimmed,
   signals,
   onToggleCollapse,
   onSelect,
+  onTogglePin,
   onHoverStart,
   onHoverEnd,
 }: {
@@ -42,12 +47,16 @@ export function TreeRow({
   rootDuration: number;
   isSelected: boolean;
   isHovered: boolean;
+  /** Whether this span is currently pinned in the SpanTabBar. */
+  isPinned: boolean;
   isCollapsed: boolean;
   hasChildren: boolean;
   isDimmed: boolean;
   signals: readonly LangwatchSignalBucket[];
   onToggleCollapse: () => void;
   onSelect: () => void;
+  /** Toggle pin state for this span — fired by the hover-revealed icon. */
+  onTogglePin: () => void;
   onHoverStart: () => void;
   onHoverEnd: () => void;
 }) {
@@ -199,7 +208,14 @@ export function TreeRow({
           </Flex>
 
           {/* Type icon — rendered inside a colored chip so the span type
-              reads at a glance even before the row text. */}
+              reads at a glance even before the row text. Uses
+              `colorPalette` (a Chakra v3 token-resolution scope) instead
+              of interpolating the palette into the token string —
+              `${palette}.subtle` would resolve OK in light mode but the
+              dark-mode variant for some palettes (esp. blue/purple at
+              `.subtle`) gave near-invisible icon-on-bg contrast. The
+              `colorPalette.subtle` / `colorPalette.fg` aliases pick the
+              right pair for the active colour mode automatically. */}
           <Flex
             width="18px"
             height="18px"
@@ -208,8 +224,9 @@ export function TreeRow({
             flexShrink={0}
             marginRight={1.5}
             borderRadius="sm"
-            bg={isError ? "red.subtle" : `${palette}.subtle`}
-            color={isError ? "red.fg" : `${palette}.fg`}
+            colorPalette={isError ? "red" : palette}
+            bg="colorPalette.subtle"
+            color="colorPalette.fg"
           >
             <Icon as={TypeIcon} boxSize={3} />
           </Flex>
@@ -268,12 +285,67 @@ export function TreeRow({
             />
           )}
 
+          {/* Pin toggle — hover-revealed on the row (or always shown when
+              the span is already pinned, so the affordance for unpinning
+              is discoverable without having to hover the right span).
+              Click toggles `pinSpan`/`unpinSpan` on the drawer store
+              without selecting the row, so the user can build up a set
+              of tabs without flipping the span detail every time. */}
+          <Tooltip
+            content={isPinned ? "Unpin span tab" : "Pin span tab"}
+            positioning={{ placement: "top" }}
+            openDelay={400}
+          >
+            <Flex
+              as="button"
+              width="20px"
+              height="20px"
+              align="center"
+              justify="center"
+              flexShrink={0}
+              marginLeft={1}
+              borderRadius="xs"
+              color={isPinned ? "fg" : "fg.subtle"}
+              opacity={isPinned || isHovered ? 1 : 0}
+              _hover={{ bg: "bg.emphasized", color: "fg" }}
+              transition="opacity 0.1s ease, color 0.1s ease"
+              cursor="pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin();
+              }}
+              aria-label={isPinned ? "Unpin span tab" : "Pin span tab"}
+              aria-pressed={isPinned}
+            >
+              <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3} />
+            </Flex>
+          </Tooltip>
+
+          {/* Cost — only shown for spans that actually carry one
+              (LLM spans with a measured `gen_ai.usage.cost`). Sits to
+              the left of the duration so the cost line lines up
+              vertically with the model line on LLM rows. Muted tone
+              keeps it a secondary read; clicks fall through to the
+              row's select handler. */}
+          {span.cost != null && span.cost > 0 && (
+            <Text
+              textStyle="xs"
+              color="fg.muted"
+              flexShrink={0}
+              marginLeft={2}
+              whiteSpace="nowrap"
+              fontVariantNumeric="tabular-nums"
+            >
+              {formatCost(span.cost)}
+            </Text>
+          )}
+
           {/* Duration */}
           <Text
             textStyle="xs"
             color="fg.muted"
             flexShrink={0}
-            marginLeft={1}
+            marginLeft={2}
             whiteSpace="nowrap"
           >
             {isZeroDuration ? "<1ms" : formatDuration(duration)}
