@@ -44,6 +44,7 @@ describe("UsageStatsService", () => {
 
     mockTraceUsage = {
       getCurrentMonthCount: vi.fn().mockResolvedValue(500),
+      getCurrentMonthCountForDisplay: vi.fn().mockResolvedValue(500),
     } as unknown as ITraceUsageService;
 
     mockPlanProvider = {

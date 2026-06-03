@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PricingModel } from "@prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
 import type { PlanResolver } from "../../subscription/plan-provider";
 import type { OrganizationService } from "../../organizations/organization.service";
 import { UsageService } from "../usage.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
 const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
@@ -23,6 +25,17 @@ const PAID_TIERED_PLAN: PlanInfo = {
   name: "Team",
   free: false,
   maxMessagesPerMonth: 10_000,
+};
+
+// Seat-based plan (GROWTH_SEAT_*): events are metered/billed via Stripe with no
+// monthly cap, so maxMessagesPerMonth is the UNLIMITED_MESSAGES sentinel.
+const SEAT_UNLIMITED_PLAN: PlanInfo = {
+  ...FREE_PLAN,
+  planSource: "subscription",
+  type: "GROWTH_SEAT_EUR_MONTHLY",
+  name: "Growth",
+  free: false,
+  maxMessagesPerMonth: UNLIMITED_MESSAGES,
 };
 
 const { mockRedisStore } = vi.hoisted(() => {
@@ -575,6 +588,54 @@ describe("UsageService", () => {
         expect(
           mockTraceUsageService.getCountByProjects,
         ).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Display count vs enforcement count for seat-based (metered) plans
+  // ==========================================================================
+
+  describe("getCurrentMonthCountForDisplay", () => {
+    describe("given a seat-based plan with no message cap (metered events)", () => {
+      beforeEach(() => {
+        mockOrgRepo.getPricingModel.mockResolvedValue(PricingModel.SEAT_EVENT);
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...SEAT_UNLIMITED_PLAN,
+        });
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
+          "proj-1",
+          "proj-2",
+        ]);
+        mockEventUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 30_000 },
+          { projectId: "proj-2", count: 7_924 },
+        ]);
+      });
+
+      it("short-circuits getCurrentMonthCount to 'unlimited' without querying (enforcement)", async () => {
+        const result = await service.getCurrentMonthCount({
+          organizationId: "org-123",
+        });
+
+        expect(result).toBe("unlimited");
+        expect(
+          mockEventUsageService.getCountByProjects,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("returns the real metered event total from getCurrentMonthCountForDisplay", async () => {
+        const result = await service.getCurrentMonthCountForDisplay({
+          organizationId: "org-123",
+        });
+
+        expect(result).toBe(37_924);
+        expect(
+          mockEventUsageService.getCountByProjects,
+        ).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
+        });
       });
     });
   });

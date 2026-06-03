@@ -1,6 +1,7 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -79,9 +80,18 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
   });
   if (!display.visible) return null;
 
-  // When currentMonthMessagesCount is null (unlimited plan), don't show the usage bar
+  // Unlimited plans have no cap to draw a progress bar against, so hide the
+  // sidebar bar (the actual usage volume is still surfaced on /settings/usage).
+  // currentMonthMessagesCount is null for legacy/unlimited responses; the
+  // maxMessagesPerMonth check also covers metered plans that now return a real
+  // count.
   const currentCount = usage.data.currentMonthMessagesCount;
-  if (currentCount === null) return null;
+  if (
+    currentCount === null ||
+    usage.data.activePlan.maxMessagesPerMonth >= UNLIMITED_MESSAGES
+  ) {
+    return null;
+  }
 
   const percentage = Math.min(
     (currentCount /

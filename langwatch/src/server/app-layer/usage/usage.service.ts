@@ -169,13 +169,41 @@ export class UsageService {
     organizationId: string;
   }): Promise<number | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
-    // The count would never exceed the limit, so querying is wasted work.
-    // Returns "unlimited" so callers can distinguish from actual 0 usage.
+    // The count would never exceed the limit, so querying is wasted work for
+    // ENFORCEMENT. Returns "unlimited" so callers can distinguish from actual 0
+    // usage. Display callers that need the real volume regardless of the cap use
+    // getCurrentMonthCountForDisplay instead.
     const plan = await this.planResolver(organizationId);
     if (plan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
       return "unlimited";
     }
 
+    return this.computeCurrentMonthCount({ organizationId });
+  }
+
+  /**
+   * Always computes the real current-month usage count (events or traces per
+   * the resolved meter), regardless of whether the plan caps usage.
+   *
+   * Seat-based / metered plans (GROWTH_SEAT_*) have no monthly message cap but
+   * still accrue billable events that are metered and billed via Stripe. The
+   * usage page must surface that volume, so it cannot use getCurrentMonthCount
+   * (which short-circuits unlimited plans to "unlimited" for enforcement and
+   * would otherwise render as "0").
+   */
+  async getCurrentMonthCountForDisplay({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    return this.computeCurrentMonthCount({ organizationId });
+  }
+
+  private async computeCurrentMonthCount({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
     const decision = await this.getCachedMeterDecision(organizationId);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 

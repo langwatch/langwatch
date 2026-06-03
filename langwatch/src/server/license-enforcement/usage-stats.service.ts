@@ -80,6 +80,11 @@ export function buildMessageLimitInfo(
  */
 export interface ITraceUsageService {
   getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
+  /**
+   * Real current-month usage count for display, computed even for unlimited
+   * (seat-based / metered) plans where getCurrentMonthCount returns "unlimited".
+   */
+  getCurrentMonthCountForDisplay(params: { organizationId: string }): Promise<number>;
 }
 
 /**
@@ -173,7 +178,7 @@ export class UsageStatsService {
       usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
-      this.traceUsageService.getCurrentMonthCount({ organizationId }),
+      this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
@@ -189,10 +194,12 @@ export class UsageStatsService {
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
-    const resolvedCount = currentMonthMessagesCount === "unlimited" ? null : currentMonthMessagesCount;
+    // Real metered/trace volume for the month — surfaced even for unlimited
+    // (seat-based) plans so the usage page shows actual billable events.
+    const resolvedCount = currentMonthMessagesCount;
 
     const messageLimitInfo = buildMessageLimitInfo(
-      resolvedCount ?? 0,
+      resolvedCount,
       activePlan.maxMessagesPerMonth,
     );
 

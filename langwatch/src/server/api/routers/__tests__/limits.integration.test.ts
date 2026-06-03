@@ -38,7 +38,10 @@ describe("Limits Router Integration", () => {
 
     // Wire App singleton so UsageStatsService.create() can call getApp().usage
     globalForApp.__langwatch_app = createTestApp({
-      usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+      usage: {
+        getCurrentMonthCount: mockGetCurrentMonthCount,
+        getCurrentMonthCountForDisplay: mockGetCurrentMonthCount,
+      } as any,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -117,7 +120,10 @@ describe("Limits Router Integration", () => {
       });
       await resetApp();
       globalForApp.__langwatch_app = createTestApp({
-        usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+        usage: {
+        getCurrentMonthCount: mockGetCurrentMonthCount,
+        getCurrentMonthCountForDisplay: mockGetCurrentMonthCount,
+      } as any,
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan,
         }),
