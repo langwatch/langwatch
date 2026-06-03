@@ -4,7 +4,7 @@ import {
   googleDLPClearPII,
   type PIICheckOptions,
   PRESIDIO_STRICT_ENTITIES,
-} from "~/server/background/workers/collector/piiCheck";
+} from "~/server/tracer/collector/piiCheck";
 import type {
   PiiLevel,
   ResolvedDataPrivacy,

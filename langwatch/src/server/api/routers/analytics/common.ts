@@ -1,8 +1,8 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
 import { addDays, differenceInCalendarDays } from "date-fns";
+
+type QueryDslBoolQuery = Record<string, unknown>;
+type QueryDslQueryContainer = Record<string, unknown>;
+
 import type { z } from "zod";
 import type { FilterParam } from "../../../../hooks/useFilterParams";
 import { createLogger } from "../../../../utils/logger/server";
@@ -57,7 +57,8 @@ export const generateTracesPivotQueryConditions = ({
   const endDate_ =
     endDate < now && now - endDate < 1000 * 60 * 60 * 2 ? now : endDate;
 
-  const { filterConditions, hasUnknownFilter } = generateFilterConditions(filters);
+  const { filterConditions, hasUnknownFilter } =
+    generateFilterConditions(filters);
 
   return {
     pivotIndexConditions: {
@@ -97,7 +98,10 @@ export const generateTracesPivotQueryConditions = ({
 
 export const generateFilterConditions = (
   filters: Partial<Record<FilterField, FilterParam>>,
-): { filterConditions: QueryDslQueryContainer[]; hasUnknownFilter: boolean } => {
+): {
+  filterConditions: QueryDslQueryContainer[];
+  hasUnknownFilter: boolean;
+} => {
   let filterConditions: QueryDslQueryContainer[] = [];
   let hasUnknownFilter = false;
   for (const [field, params] of Object.entries(filters)) {

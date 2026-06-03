@@ -15,81 +15,75 @@
  * - src/pages/api/trigger/slack.ts
  * - src/pages/api/webhooks/stripe.ts
  */
-import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
+
+import { createHash, randomUUID } from "node:crypto";
+import { generate } from "@langwatch/ksuid";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import type { Project } from "@prisma/client";
-import { OpenAI } from "openai";
-import { nanoid } from "nanoid";
-import { randomUUID } from "node:crypto";
+import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { nanoid } from "nanoid";
+import { OpenAI } from "openai";
+import type Stripe from "stripe";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
-import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
+import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { start } from "~/server/background/worker";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
-import { prisma } from "~/server/db";
-import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import {
-  dSPyStepRESTParamsSchema,
-  type DSPyLLMCall,
-  type DSPyStepRESTParams,
-} from "~/server/experiments/types";
-import { filterFieldsEnum } from "~/server/filters/types";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
-import {
-  getLLMModelCosts,
-  type MaybeStoredLLMModelCost,
-} from "~/server/modelProviders/llmModelCost";
-import { getPayloadSizeHistogram } from "~/server/metrics";
-import { getPostHogInstance } from "~/server/posthog";
-import { getServerAuthSession } from "~/server/auth";
-import { connection as redis } from "~/server/redis";
-import {
-  generateTrackedEventId,
-  predefinedEventTypes,
-  predefinedEventsSchemas,
-  recordTrackedEventSpan,
-} from "~/server/app-layer/events/track-event.service";
-import {
-  trackEventRESTParamsValidatorSchema,
-  type TrackEventRESTParamsValidator,
-} from "~/server/tracer/types";
-import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
-import type Stripe from "stripe";
-import { encrypt } from "~/utils/encryption";
-import { slugify } from "~/utils/slugify";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { createLogger } from "~/utils/logger/server";
-import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import {
-  createUnifiedAuthMiddleware,
-  requireApiKeyPermission,
-  type UnifiedAuthVariables,
-} from "~/server/api-key/auth-middleware";
 import {
   createServiceApp,
   handlerManagedAuth,
   internalSecret,
   publicEndpoint,
 } from "~/server/api/security";
+import {
+  createUnifiedAuthMiddleware,
+  requireApiKeyPermission,
+  type UnifiedAuthVariables,
+} from "~/server/api-key/auth-middleware";
+import { getApp } from "~/server/app-layer/app";
+import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
+import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
+import type {
+  DSPyLLMCall,
+  DSPyStepRESTParams,
+} from "~/server/experiments/types";
+import { dSPyStepRESTParamsSchema } from "~/server/experiments/types.generated";
+import { filterFieldsEnum } from "~/server/filters/types";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
+import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
+import { getPayloadSizeHistogram } from "~/server/metrics";
+import {
+  getLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "~/server/modelProviders/llmModelCost";
+import { getPostHogInstance } from "~/server/posthog";
+import { connection as redis } from "~/server/redis";
+import {
+  estimateCost,
+  matchModelCostWithFallbacks,
+} from "~/server/tracer/collector/cost";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
+import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
+import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
+import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { encrypt } from "~/utils/encryption";
+import { createLogger } from "~/utils/logger/server";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { slugify } from "~/utils/slugify";
+import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -137,41 +131,43 @@ const internalAuth = internalSecret(
 // =============================================
 // POST /api/analytics
 // =============================================
-secured.access(inRouteAuth).post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
-  const project = c.get("project");
+secured
+  .access(inRouteAuth)
+  .post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
+    const project = c.get("project");
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  const input = body;
-  input.projectId = project.id;
-
-  let params: TimeseriesInputType;
-  try {
-    params = sharedFiltersInputSchema
-      .extend(timeseriesSeriesInput.shape)
-      .parse(input);
-  } catch (error) {
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  try {
-    const analyticsService = getAnalyticsService();
-    const timeseriesResult = await analyticsService.getTimeseries(params);
-    return c.json(timeseriesResult);
-  } catch (e) {
-    if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
-      return c.json({ code: e.code, message: e.message }, 400);
-    } else {
-      throw e;
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
     }
-  }
-});
+
+    const input = body;
+    input.projectId = project.id;
+
+    let params: TimeseriesInputType;
+    try {
+      params = sharedFiltersInputSchema
+        .extend(timeseriesSeriesInput.shape)
+        .parse(input);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
+    }
+
+    try {
+      const analyticsService = getAnalyticsService();
+      const timeseriesResult = await analyticsService.getTimeseries(params);
+      return c.json(timeseriesResult);
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
+        return c.json({ code: e.code, message: e.message }, 400);
+      } else {
+        throw e;
+      }
+    }
+  });
 
 // =============================================
 // POST /api/demo/hotel_bot
@@ -203,177 +199,183 @@ const RAG_SYSTEM_PROMPT =
 // which performs full API-key/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
-secured.access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler")).post("/demo/hotel_bot", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
-
-  const randomNumberTry = Math.floor(Math.random() * 10);
-  if (randomNumberTry % 2 === 0) {
-    return c.json({ message: "Not this time" }, 401);
-  }
-
-  const randomNumber = Math.floor(Math.random() * 10);
-
-  if (randomNumber % 2 === 0) {
-    try {
-      const ragResponse = await ragMessage(authToken as string);
-      return c.json({ message: "Sent to LangWatch", ragResponse });
-    } catch (error: any) {
-      return c.json({ message: "Error", error }, 500);
+secured
+  .access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler"))
+  .post("/demo/hotel_bot", async (c) => {
+    const authToken = c.req.header("x-auth-token");
+    if (!authToken) {
+      return c.json({ message: "X-Auth-Token header is required." }, 401);
     }
-  } else {
-    try {
-      const threadId = `thread_${nanoid()}`;
-      const userId = `user_${nanoid()}`;
-      const userInput = (await getInitialMessage()) ?? "";
 
-      const assistantResponse = await firstChatMessage(
-        userInput,
-        threadId,
-        userId,
-        authToken as string,
-      );
-      const expectedUserResponse = await userResponse(
-        userInput,
-        assistantResponse ?? "",
-      );
-      await secondChatMessage(
-        userInput,
-        assistantResponse ?? "",
-        expectedUserResponse ?? "",
-        threadId,
-        userId,
-        authToken as string,
-      );
-
-      return c.json({ message: "Sent to LangWatch" });
-    } catch (error: any) {
-      return c.json({ message: "Error", error }, 500);
+    const randomNumberTry = Math.floor(Math.random() * 10);
+    if (randomNumberTry % 2 === 0) {
+      return c.json({ message: "Not this time" }, 401);
     }
-  }
-});
+
+    const randomNumber = Math.floor(Math.random() * 10);
+
+    if (randomNumber % 2 === 0) {
+      try {
+        const ragResponse = await ragMessage(authToken as string);
+        return c.json({ message: "Sent to LangWatch", ragResponse });
+      } catch (error: any) {
+        return c.json({ message: "Error", error }, 500);
+      }
+    } else {
+      try {
+        const threadId = `thread_${nanoid()}`;
+        const userId = `user_${nanoid()}`;
+        const userInput = (await getInitialMessage()) ?? "";
+
+        const assistantResponse = await firstChatMessage(
+          userInput,
+          threadId,
+          userId,
+          authToken as string,
+        );
+        const expectedUserResponse = await userResponse(
+          userInput,
+          assistantResponse ?? "",
+        );
+        await secondChatMessage(
+          userInput,
+          assistantResponse ?? "",
+          expectedUserResponse ?? "",
+          threadId,
+          userId,
+          authToken as string,
+        );
+
+        return c.json({ message: "Sent to LangWatch" });
+      } catch (error: any) {
+        return c.json({ message: "Error", error }, 500);
+      }
+    }
+  });
 
 // =============================================
 // POST /api/dspy/log_steps
 // =============================================
-secured.access(inRouteAuth).post(
-  "/dspy/log_steps",
-  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
-  authMiddleware,
-  requireExperimentsManage,
-  async (c) => {
-    const project = c.get("project");
+secured
+  .access(inRouteAuth)
+  .post(
+    "/dspy/log_steps",
+    bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+    authMiddleware,
+    requireExperimentsManage,
+    async (c) => {
+      const project = c.get("project");
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ message: "Bad request" }, 400);
+      }
 
-    const payloadSize = JSON.stringify(body).length;
-    const payloadSizeMB = payloadSize / (1024 * 1024);
-    getPayloadSizeHistogram("log_steps").observe(payloadSize);
+      const payloadSize = JSON.stringify(body).length;
+      const payloadSizeMB = payloadSize / (1024 * 1024);
+      getPayloadSizeHistogram("log_steps").observe(payloadSize);
 
-    logger.info(
-      {
-        payloadSize,
-        payloadSizeMB: payloadSizeMB.toFixed(2),
-        projectId: project.id,
-      },
-      "DSPy log_steps request received",
-    );
-
-    let params: DSPyStepRESTParams[];
-    try {
-      params = z.array(dSPyStepRESTParamsSchema).parse(body);
-    } catch (error) {
-      logger.error(
+      logger.info(
         {
-          error,
           payloadSize,
           payloadSizeMB: payloadSizeMB.toFixed(2),
           projectId: project.id,
         },
-        "invalid log_steps data received",
+        "DSPy log_steps request received",
       );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
 
-    for (const param of params) {
-      if (
-        param.timestamps.created_at &&
-        param.timestamps.created_at.toString().length === 10
-      ) {
-        logger.error(
-          { param, projectId: project.id },
-          "timestamps not in milliseconds for step",
-        );
-        return c.json(
-          {
-            error:
-              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-          },
-          400,
-        );
-      }
-    }
-
-    logger.info(
-      { stepCount: params.length, projectId: project.id },
-      "Processing DSPy steps",
-    );
-
-    for (const param of params) {
+      let params: DSPyStepRESTParams[];
       try {
-        await processDSPyStep(project, param);
+        params = z.array(dSPyStepRESTParamsSchema).parse(body);
       } catch (error) {
-        if (error instanceof z.ZodError) {
+        logger.error(
+          {
+            error,
+            payloadSize,
+            payloadSizeMB: payloadSizeMB.toFixed(2),
+            projectId: project.id,
+          },
+          "invalid log_steps data received",
+        );
+        captureException(error, { extra: { projectId: project.id } });
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+
+      for (const param of params) {
+        if (
+          param.timestamps.created_at &&
+          param.timestamps.created_at.toString().length === 10
+        ) {
           logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "failed to validate data for DSPy step",
+            { param, projectId: project.id },
+            "timestamps not in milliseconds for step",
           );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
-          const validationError = fromZodError(error);
-          return c.json({ error: validationError.message }, 400);
-        } else {
-          logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "internal server error processing DSPy step",
-          );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
           return c.json(
             {
               error:
-                error instanceof Error ? error.message : "Internal server error",
+                "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
             },
-            500,
+            400,
           );
         }
       }
-    }
 
-    return c.json({ message: "ok" });
-  },
-);
+      logger.info(
+        { stepCount: params.length, projectId: project.id },
+        "Processing DSPy steps",
+      );
+
+      for (const param of params) {
+        try {
+          await processDSPyStep(project, param);
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            logger.error(
+              {
+                error,
+                stepId: param.index,
+                runId: param.run_id,
+                projectId: project.id,
+              },
+              "failed to validate data for DSPy step",
+            );
+            captureException(error, {
+              extra: { projectId: project.id, param },
+            });
+            const validationError = fromZodError(error);
+            return c.json({ error: validationError.message }, 400);
+          } else {
+            logger.error(
+              {
+                error,
+                stepId: param.index,
+                runId: param.run_id,
+                projectId: project.id,
+              },
+              "internal server error processing DSPy step",
+            );
+            captureException(error, {
+              extra: { projectId: project.id, param },
+            });
+            return c.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Internal server error",
+              },
+              500,
+            );
+          }
+        }
+      }
+
+      return c.json({ message: "ok" });
+    },
+  );
 
 // =============================================
 // POST /api/experiment/init
@@ -395,82 +397,82 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-secured.access(inRouteAuth).post(
-  "/experiment/init",
-  authMiddleware,
-  requireExperimentsManage,
-  async (c) => {
-  const project = c.get("project");
+secured
+  .access(inRouteAuth)
+  .post(
+    "/experiment/init",
+    authMiddleware,
+    requireExperimentsManage,
+    async (c) => {
+      const project = c.get("project");
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  let params: z.infer<typeof dspyInitParamsSchema>;
-  try {
-    params = dspyInitParamsSchema.parse(body);
-  } catch (error) {
-    logger.error(
-      { error, body, projectId: project.id },
-      "invalid init data received",
-    );
-    captureException(toError(error), { extra: { projectId: project.id } });
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  let experiment;
-  try {
-    experiment = await findOrCreateExperiment({
-      project,
-      experiment_slug: params.experiment_slug,
-      experiment_type: params.experiment_type as ExperimentType,
-      experiment_name: params.experiment_name,
-      workflowId: params.workflowId,
-    });
-  } catch (error) {
-    if (error instanceof LimitExceededError) {
-      let message = error.message;
+      let body: Record<string, any>;
       try {
-        const organizationId = await resolveOrganizationId(
-          project.teamId,
-        );
-        if (organizationId) {
-          message = await buildResourceLimitMessage({
-            organizationId,
-            limitType: error.limitType,
-            max: error.max,
-          });
-        }
+        body = await c.req.json();
       } catch {
-        logger.warn(
-          { projectId: project.id },
-          "Failed to build resource limit message",
-        );
+        return c.json({ message: "Bad request" }, 400);
       }
-      return c.json(
-        {
-          error: error.kind,
-          message,
-          limitType: error.limitType,
-          current: error.current,
-          max: error.max,
-        },
-        403,
-      );
-    }
-    throw error;
-  }
 
-  return c.json({
-    path: `/${project.slug}/experiments/${experiment.slug}`,
-    slug: experiment.slug,
-  });
-  },
-);
+      let params: z.infer<typeof dspyInitParamsSchema>;
+      try {
+        params = dspyInitParamsSchema.parse(body);
+      } catch (error) {
+        logger.error(
+          { error, body, projectId: project.id },
+          "invalid init data received",
+        );
+        captureException(error, { extra: { projectId: project.id } });
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+
+      let experiment;
+      try {
+        experiment = await findOrCreateExperiment({
+          project,
+          experiment_slug: params.experiment_slug,
+          experiment_type: params.experiment_type as ExperimentType,
+          experiment_name: params.experiment_name,
+          workflowId: params.workflowId,
+        });
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          let message = error.message;
+          try {
+            const organizationId = await resolveOrganizationId(project.teamId);
+            if (organizationId) {
+              message = await buildResourceLimitMessage({
+                organizationId,
+                limitType: error.limitType,
+                max: error.max,
+              });
+            }
+          } catch {
+            logger.warn(
+              { projectId: project.id },
+              "Failed to build resource limit message",
+            );
+          }
+          return c.json(
+            {
+              error: error.kind,
+              message,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            },
+            403,
+          );
+        }
+        throw error;
+      }
+
+      return c.json({
+        path: `/${project.slug}/experiments/${experiment.slug}`,
+        slug: experiment.slug,
+      });
+    },
+  );
 
 // =============================================
 // POST /api/mcp/authorize
@@ -478,308 +480,338 @@ secured.access(inRouteAuth).post(
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
 
-secured.access(handlerManagedAuth("user session validated in-handler via getServerAuthSession")).post("/mcp/authorize", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
-  if (!session?.user?.id) {
-    return c.json({ error: "Not authenticated" }, 401);
-  }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid body" }, 400);
-  }
-
-  const {
-    projectId,
-    redirect_uri,
-    state,
-    code_challenge,
-    code_challenge_method,
-    client_id,
-  } = body;
-
-  if (!projectId || !redirect_uri) {
-    return c.json(
-      { error: "projectId and redirect_uri are required" },
-      400,
-    );
-  }
-
-  try {
-    const redirectUrl = new URL(redirect_uri);
-    if (
-      redirectUrl.protocol === "javascript:" ||
-      redirectUrl.protocol === "data:" ||
-      redirectUrl.protocol === "vbscript:"
-    ) {
-      return c.json(
-        { error: "redirect_uri uses a disallowed scheme" },
-        400,
-      );
+secured
+  .access(
+    handlerManagedAuth(
+      "user session validated in-handler via getServerAuthSession",
+    ),
+  )
+  .post("/mcp/authorize", async (c) => {
+    const session = await getServerAuthSession({ req: c.req.raw as any });
+    if (!session?.user?.id) {
+      return c.json({ error: "Not authenticated" }, 401);
     }
-  } catch {
-    return c.json({ error: "Invalid redirect_uri" }, 400);
-  }
-
-  if (!code_challenge) {
-    return c.json(
-      { error: "code_challenge is required (PKCE S256)" },
-      400,
-    );
-  }
-
-  // The demo project is a globally-readable showcase: isDemoProject grants
-  // `project:view` to ANY caller, so it must never reach the RoleBinding check
-  // below — otherwise any authenticated user could mint an MCP auth code
-  // embedding the demo project's API key. (The old `team.members.some` check
-  // happened to block this; the RoleBinding-aware check does not.)
-  if (isDemoProject(projectId, "project:view")) {
-    return c.json(
-      { error: "Project not found or you don't have access" },
-      403,
-    );
-  }
-
-  // Authorize against RoleBindings (the authoritative source since migration
-  // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
-  // TeamUser relation. A user added to the team after that migration has no
-  // TeamUser row, so the old `team.members.some` check rejected them with a
-  // false 403. `project:view` is the baseline grant every team role (incl.
-  // VIEWER) has, and hasProjectPermission also honors org-level access.
-  // ProjectService is constructed directly (not via getApp()) so this handler
-  // stays unit-testable without booting the app container — the same pattern
-  // used in presets.ts and the project-service middleware.
-  const projectService = new ProjectService(new PrismaProjectRepository(prisma));
-  const project = await projectService.getById(projectId);
-
-  if (
-    !project ||
-    project.archivedAt !== null ||
-    !(await hasProjectPermission({ prisma, session }, projectId, "project:view"))
-  ) {
-    // Single 403 whether the project is missing, archived, or simply
-    // inaccessible — never disclose existence of a project the caller can't reach.
-    return c.json(
-      { error: "Project not found or you don't have access" },
-      403,
-    );
-  }
-
-  const code = randomUUID();
-
-  if (!redis) {
-    return c.json({ error: "Redis is not available" }, 500);
-  }
-
-  const authCodeEntry = JSON.stringify({
-    projectId: project.id,
-    encryptedApiKey: encrypt(project.apiKey),
-    // Captured here so MCP tools that need a caller identity (e.g.,
-    // governance install/uninstall/rotate) can attribute audit rows to
-    // the actual OAuth-flowing user instead of falling back to a project-
-    // wide identity. Read in handler.ts at the token-exchange step.
-    userId: session.user.id,
-    codeChallenge: code_challenge,
-    codeChallengeMethod: code_challenge_method ?? "S256",
-    clientId: client_id ?? "",
-    expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
-  });
-
-  await redis.set(
-    `${REDIS_AUTH_CODE_PREFIX}${code}`,
-    authCodeEntry,
-    "EX",
-    AUTH_CODE_TTL_SECONDS,
-  );
-
-  const redirectUrl = new URL(redirect_uri);
-  redirectUrl.searchParams.set("code", code);
-  if (state) {
-    redirectUrl.searchParams.set("state", state);
-  }
-
-  return c.json({ redirect: redirectUrl.toString() });
-});
-
-// =============================================
-// POST /api/optimization/:workflowId/:versionId  (deprecated)
-// =============================================
-secured.access(inRouteAuth).post(
-  "/optimization/:workflowId/:versionId",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    const workflowId = c.req.param("workflowId");
-    const versionId = c.req.param("versionId");
-
-    const contentType = c.req.header("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      return c.json({ message: "Invalid body, expecting json" }, 400);
-    }
-
-    const project = c.get("project");
 
     let body: Record<string, any>;
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ message: "Invalid body" }, 400);
+      return c.json({ error: "Invalid body" }, 400);
+    }
+
+    const {
+      projectId,
+      redirect_uri,
+      state,
+      code_challenge,
+      code_challenge_method,
+      client_id,
+    } = body;
+
+    if (!projectId || !redirect_uri) {
+      return c.json({ error: "projectId and redirect_uri are required" }, 400);
     }
 
     try {
-      const result = await runWorkflowFn(
-        workflowId,
-        project.id,
-        body,
-        versionId,
-      );
-      return c.json(result);
-    } catch (error) {
-      return c.json({ message: (error as Error).message }, 500);
+      const redirectUrl = new URL(redirect_uri);
+      if (
+        redirectUrl.protocol === "javascript:" ||
+        redirectUrl.protocol === "data:" ||
+        redirectUrl.protocol === "vbscript:"
+      ) {
+        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
+      }
+    } catch {
+      return c.json({ error: "Invalid redirect_uri" }, 400);
     }
-  },
-);
 
-// =============================================
-// GET /api/rerun_checks
-// =============================================
-const rerunChecksHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const checkId = c.req.query("checkId") as string;
-    const projectId = c.req.query("projectId") as string;
+    if (!code_challenge) {
+      return c.json({ error: "code_challenge is required (PKCE S256)" }, 400);
+    }
 
-    const { default: rerunChecks } = await import("~/tasks/rerunChecks");
-    await rerunChecks(checkId, projectId);
-
-    return c.json({ message: "Checks rescheduled" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        archivedAt: null,
+        team: {
+          members: {
+            some: { user: { id: session.user.id } },
+          },
+        },
       },
-      500,
+    });
+
+    if (!project) {
+      return c.json(
+        { error: "Project not found or you don't have access" },
+        403,
+      );
+    }
+
+    const code = randomUUID();
+
+    if (!redis) {
+      return c.json({ error: "Redis is not available" }, 500);
+    }
+
+    const authCodeEntry = JSON.stringify({
+      projectId: project.id,
+      encryptedApiKey: encrypt(project.apiKey),
+      // Captured here so MCP tools that need a caller identity (e.g.,
+      // governance install/uninstall/rotate) can attribute audit rows to
+      // the actual OAuth-flowing user instead of falling back to a project-
+      // wide identity. Read in handler.ts at the token-exchange step.
+      userId: session.user.id,
+      codeChallenge: code_challenge,
+      codeChallengeMethod: code_challenge_method ?? "S256",
+      clientId: client_id ?? "",
+      expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
+    });
+
+    await redis.set(
+      `${REDIS_AUTH_CODE_PREFIX}${code}`,
+      authCodeEntry,
+      "EX",
+      AUTH_CODE_TTL_SECONDS,
     );
-  }
-};
-secured.access(internalAuth).get("/rerun_checks", rerunChecksHandler);
-secured.access(internalAuth).post("/rerun_checks", rerunChecksHandler);
+
+    const redirectUrl = new URL(redirect_uri);
+    redirectUrl.searchParams.set("code", code);
+    if (state) {
+      redirectUrl.searchParams.set("state", state);
+    }
+
+    return c.json({ redirect: redirectUrl.toString() });
+  });
 
 // =============================================
-// GET /api/start_workers
+// POST /api/optimization/:workflowId/:versionId  (deprecated)
 // =============================================
-const MAX_WORKER_DURATION = 300;
+secured
+  .access(inRouteAuth)
+  .post(
+    "/optimization/:workflowId/:versionId",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      const workflowId = c.req.param("workflowId");
+      const versionId = c.req.param("versionId");
 
-const startWorkersHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const maxRuntimeMs = (MAX_WORKER_DURATION - 60) * 1000;
-    await start(undefined, maxRuntimeMs);
-    return c.json({ message: "Worker done" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured.access(internalAuth).get("/start_workers", startWorkersHandler);
-secured.access(internalAuth).post("/start_workers", startWorkersHandler);
+      const contentType = c.req.header("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        return c.json({ message: "Invalid body, expecting json" }, 400);
+      }
+
+      const project = c.get("project");
+
+      let body: Record<string, any>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ message: "Invalid body" }, 400);
+      }
+
+      try {
+        const result = await runWorkflowFn(
+          workflowId,
+          project.id,
+          body,
+          versionId,
+        );
+        return c.json(result);
+      } catch (error) {
+        return c.json({ message: (error as Error).message }, 500);
+      }
+    },
+  );
 
 // =============================================
 // POST /api/track_event
 // =============================================
-//
-// Legacy URL kept for backwards compatibility. The canonical endpoint is
-// `POST /api/events/track` (src/app/api/events/[[...route]]/app.ts). Both
-// routes share `recordTrackedEventSpan` so behaviour stays identical.
+const thumbsUpDownSchema = z.object({
+  trace_id: z.string(),
+  event_type: z.literal("thumbs_up_down"),
+  metrics: z.object({ vote: z.number().min(-1).max(1) }),
+  event_details: z.object({ feedback: z.string().nullish() }).optional(),
+});
 
-secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
-  const project = c.get("project");
+const selectedTextSchema = z.object({
+  trace_id: z.string(),
+  event_type: z.literal("selected_text"),
+  metrics: z.object({ text_length: z.number().positive() }),
+  event_details: z.object({ selected_text: z.string().optional() }).optional(),
+});
 
-  let rawBody: Record<string, any>;
-  try {
-    rawBody = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+const waitedToFinishSchema = z.object({
+  trace_id: z.string(),
+  event_type: z.literal("waited_to_finish"),
+  metrics: z.object({ finished: z.number().min(0).max(1) }),
+  event_details: z.object({}).optional(),
+});
 
-  let body: TrackEventRESTParamsValidator;
-  try {
-    body = trackEventRESTParamsValidatorSchema.parse(rawBody);
-  } catch (error) {
-    logger.error(
-      { error, body: rawBody, projectId: project.id },
-      "invalid event received",
-    );
-    captureException(toError(error));
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
+export const predefinedEventsSchemas = z.union([
+  thumbsUpDownSchema,
+  selectedTextSchema,
+  waitedToFinishSchema,
+]);
 
-  if (predefinedEventTypes.includes(rawBody.event_type)) {
+const predefinedEventTypes = predefinedEventsSchemas.options.map(
+  (schema) => schema.shape.event_type.value,
+);
+
+secured
+  .access(inRouteAuth)
+  .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
+    const project = c.get("project");
+
+    let rawBody: Record<string, any>;
     try {
-      predefinedEventsSchemas.parse(rawBody);
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    let body: TrackEventRESTParamsValidator;
+    try {
+      body = trackEventRESTParamsValidatorSchema.parse(rawBody);
     } catch (error) {
       logger.error(
         { error, body: rawBody, projectId: project.id },
         "invalid event received",
       );
-      captureException(toError(error));
+      captureException(error);
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
-  }
 
-  const eventId = body.event_id ?? generateTrackedEventId();
+    if (predefinedEventTypes.includes(rawBody.event_type)) {
+      try {
+        predefinedEventsSchemas.parse(rawBody);
+      } catch (error) {
+        logger.error(
+          { error, body: rawBody, projectId: project.id },
+          "invalid event received",
+        );
+        captureException(error);
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+    }
 
-  try {
-    await recordTrackedEventSpan({ project, body, eventId });
-  } catch (error) {
-    logger.error({ error }, "unable to dispatch tracked event span");
-  }
+    const eventId =
+      body.event_id ?? generate(KSUID_RESOURCES.TRACKED_EVENT).toString();
 
-  return c.json({ message: "Event tracked" });
-});
+    try {
+      const timestampMs = body.timestamp ?? Date.now();
+      const timestampNano = String(timestampMs * 1_000_000);
+      const spanId = createHash("sha256")
+        .update(`${body.trace_id}:${eventId}`)
+        .digest("hex")
+        .slice(0, 16);
+
+      const attributes: {
+        key: string;
+        value: { stringValue?: string; doubleValue?: number };
+      }[] = [
+        { key: "event.type", value: { stringValue: body.event_type } },
+        { key: "event.id", value: { stringValue: eventId } },
+      ];
+
+      for (const [key, value] of Object.entries(body.metrics)) {
+        attributes.push({
+          key: `event.metrics.${key}`,
+          value: { doubleValue: value },
+        });
+      }
+
+      if (body.event_details) {
+        for (const [key, value] of Object.entries(body.event_details)) {
+          if (typeof value === "string") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: value },
+            });
+          } else if (typeof value === "number") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { doubleValue: value },
+            });
+          } else if (value != null) {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: String(value) },
+            });
+          }
+        }
+      }
+
+      await getApp().traces.recordSpan({
+        tenantId: project.id,
+        span: {
+          traceId: body.trace_id,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: TRACK_EVENT_SPAN_NAME,
+          kind: ESpanKind.SPAN_KIND_INTERNAL,
+          startTimeUnixNano: timestampNano,
+          endTimeUnixNano: timestampNano,
+          attributes,
+          events: [
+            {
+              name: body.event_type,
+              timeUnixNano: timestampNano,
+              attributes,
+            },
+          ],
+          links: [],
+          status: { code: SpanStatusCode.OK as 1 },
+          droppedAttributesCount: null,
+          droppedEventsCount: null,
+          droppedLinksCount: null,
+        },
+        resource: { attributes: [] },
+        instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: Date.now(),
+      });
+    } catch (error) {
+      logger.error({ error }, "unable to dispatch tracked event span");
+    }
+
+    return c.json({ message: "Event tracked" });
+  });
 
 // =============================================
 // POST /api/track_usage
 // =============================================
-secured.access(publicEndpoint("anonymous product telemetry, no credential")).post("/track_usage", async (c) => {
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  const { event, instance_id, ...properties } = body;
-
-  const posthog = getPostHogInstance();
-  if (posthog) {
+secured
+  .access(publicEndpoint("anonymous product telemetry, no credential"))
+  .post("/track_usage", async (c) => {
+    let body: Record<string, any>;
     try {
-      posthog.capture({
-        distinctId: instance_id,
-        event,
-        properties,
-      });
-    } catch (error) {
-      captureException(toError(error));
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
     }
-  }
 
-  return c.json({ message: "Event captured" });
-});
+    const { event, instance_id, ...properties } = body;
+
+    const posthog = getPostHogInstance();
+    if (posthog) {
+      try {
+        posthog.capture({
+          distinctId: instance_id,
+          event,
+          properties,
+        });
+      } catch (error) {
+        captureException(error);
+      }
+    }
+
+    return c.json({ message: "Event captured" });
+  });
 
 // =============================================
 // POST /api/trigger/slack
@@ -795,11 +827,9 @@ const filterSchema = z
   )
   .default({});
 
-secured.access(inRouteAuth).post(
-  "/trigger/slack",
-  authMiddleware,
-  requireTriggersManage,
-  async (c) => {
+secured
+  .access(inRouteAuth)
+  .post("/trigger/slack", authMiddleware, requireTriggersManage, async (c) => {
     const project = c.get("project");
 
     let body: Record<string, any>;
@@ -844,34 +874,37 @@ secured.access(inRouteAuth).post(
       logger.error({ error }, "Error creating trigger");
       return c.json({ message: "Error creating trigger" }, 500);
     }
-  },
-);
+  });
 
 // =============================================
 // POST /api/workflows/:workflowId/run
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
-secured.access(inRouteAuth).post(
-  "/workflows/:workflowId/run",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
-  },
-);
+secured
+  .access(inRouteAuth)
+  .post(
+    "/workflows/:workflowId/run",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
+    },
+  );
 
-secured.access(inRouteAuth).post(
-  "/workflows/:workflowId/:versionId/run",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(
-      c,
-      c.req.param("workflowId"),
-      c.req.param("versionId"),
-    );
-  },
-);
+secured
+  .access(inRouteAuth)
+  .post(
+    "/workflows/:workflowId/:versionId/run",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      return handleWorkflowRun(
+        c,
+        c.req.param("workflowId"),
+        c.req.param("versionId"),
+      );
+    },
+  );
 
 async function handleWorkflowRun(
   c: any,
@@ -893,12 +926,7 @@ async function handleWorkflowRun(
   }
 
   try {
-    const result = await runWorkflowFn(
-      workflowId,
-      project.id,
-      body,
-      versionId,
-    );
+    const result = await runWorkflowFn(workflowId, project.id, body, versionId);
     return c.json(result);
   } catch (error) {
     return c.json({ message: (error as Error).message }, 500);
@@ -908,48 +936,48 @@ async function handleWorkflowRun(
 // =============================================
 // POST /api/webhooks/stripe
 // =============================================
-secured.access(internalSecret("Stripe webhook signature verified in-handler")).post("/webhooks/stripe", async (c) => {
-  const { webhookService, stripeClient } = getApp();
-  if (!env.IS_SAAS || !webhookService || !stripeClient) {
-    return c.json({ error: "Not Found" }, 404);
-  }
+secured
+  .access(internalSecret("Stripe webhook signature verified in-handler"))
+  .post("/webhooks/stripe", async (c) => {
+    const { webhookService, stripeClient } = getApp();
+    if (!env.IS_SAAS || !webhookService || !stripeClient) {
+      return c.json({ error: "Not Found" }, 404);
+    }
 
-  const sig = c.req.header("stripe-signature");
-  const secret = env.STRIPE_WEBHOOK_SECRET;
-  if (!sig || !secret) {
-    logger.error(
-      { sig: !!sig, secret: !!secret },
-      "[stripeWebhook] Missing signature or secret",
-    );
-    return c.text("Webhook Error: Missing signature or secret", 400);
-  }
+    const sig = c.req.header("stripe-signature");
+    const secret = env.STRIPE_WEBHOOK_SECRET;
+    if (!sig || !secret) {
+      logger.error(
+        { sig: !!sig, secret: !!secret },
+        "[stripeWebhook] Missing signature or secret",
+      );
+      return c.text("Webhook Error: Missing signature or secret", 400);
+    }
 
-  let event: Stripe.Event;
-  try {
-    const rawBody = Buffer.from(await c.req.arrayBuffer());
-    event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
-  } catch (error) {
-    logger.error(
-      { error: (error as Error).message },
-      "[stripeWebhook] Failed to construct event",
-    );
-    return c.text("Webhook Error: Invalid payload or signature", 400);
-  }
+    let event: Stripe.Event;
+    try {
+      const rawBody = Buffer.from(await c.req.arrayBuffer());
+      event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
+    } catch (error) {
+      logger.error(
+        { error: (error as Error).message },
+        "[stripeWebhook] Failed to construct event",
+      );
+      return c.text("Webhook Error: Invalid payload or signature", 400);
+    }
 
-  const result = await webhookService.handleEvent(event);
-  if (result.status === "error") {
-    return c.text(result.message, result.httpStatus);
-  }
-  return c.json({ received: true });
-});
+    const result = await webhookService.handleEvent(event);
+    if (result.status === "error") {
+      return c.text(result.message, result.httpStatus);
+    }
+    return c.json({ received: true });
+  });
 
 // =============================================
 // Helpers
 // =============================================
 
-async function resolveOrganizationId(
-  teamId: string,
-): Promise<string | null> {
+async function resolveOrganizationId(teamId: string): Promise<string | null> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: { organizationId: true },
@@ -992,10 +1020,7 @@ const extractLLMCallInfo =
     return call;
   };
 
-const processDSPyStep = async (
-  project: Project,
-  param: DSPyStepRESTParams,
-) => {
+const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, index, experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
@@ -1155,10 +1180,7 @@ const langwatchAPI = async (
   }
 };
 
-const userResponse = async (
-  userInput: string,
-  chatResponse: string,
-) => {
+const userResponse = async (userInput: string, chatResponse: string) => {
   const completion = await hotelBotOpenai.chat.completions.create({
     messages: [
       { role: "system", content: HOTEL_SYSTEM_PROMPT },
@@ -1205,19 +1227,17 @@ const ragMessage = async (authToken: string) => {
 
   const completions = (
     await Promise.all(
-      Array.from(
-        { length: 2 + Math.floor(Math.random() * 5) },
-        () =>
-          hotelBotOpenai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Invent a restaurant name and a short google maps review of it",
-              },
-            ],
-          }),
+      Array.from({ length: 2 + Math.floor(Math.random() * 5) }, () =>
+        hotelBotOpenai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Invent a restaurant name and a short google maps review of it",
+            },
+          ],
+        }),
       ),
     )
   ).map((c) => c.choices[0]!.message.content ?? "");
@@ -1247,13 +1267,7 @@ const firstChatMessage = async (
     ],
     model: "gpt-3.5-turbo",
   });
-  await langwatchAPI(
-    completion,
-    userInput ?? "",
-    authToken,
-    threadId,
-    userId,
-  );
+  await langwatchAPI(completion, userInput ?? "", authToken, threadId, userId);
   return completion.choices[0]!.message.content;
 };
 
@@ -1287,38 +1301,40 @@ const secondChatMessage = async (
 // =============================================
 // GET /image-proxy — SSRF-safe image proxy
 // =============================================
-secured.access(publicEndpoint("SSRF-guarded image proxy, no credential")).get("/image-proxy", async (c) => {
-  const url = c.req.query("url");
-  if (!url) {
-    return c.json({ error: "Missing url" }, 400);
-  }
-
-  try {
-    const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
-    const response = await ssrfSafeFetch(url);
-
-    if (!response.ok) {
-      return c.json(
-        { error: `Failed to fetch image: ${response.statusText}` },
-        response.status as any
-      );
+secured
+  .access(publicEndpoint("SSRF-guarded image proxy, no credential"))
+  .get("/image-proxy", async (c) => {
+    const url = c.req.query("url");
+    if (!url) {
+      return c.json({ error: "Missing url" }, 400);
     }
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.startsWith("image/")) {
-      return c.json({ error: "URL does not point to an image" }, 400);
-    }
+    try {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const response = await ssrfSafeFetch(url);
 
-    const imageBuffer = await response.arrayBuffer();
-    return new Response(imageBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=31536000",
-      },
-    });
-  } catch {
-    return c.json({ error: "Failed to fetch image" }, 500);
-  }
-});
+      if (!response.ok) {
+        return c.json(
+          { error: `Failed to fetch image: ${response.statusText}` },
+          response.status as any,
+        );
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType?.startsWith("image/")) {
+        return c.json({ error: "URL does not point to an image" }, 400);
+      }
+
+      const imageBuffer = await response.arrayBuffer();
+      return new Response(imageBuffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=31536000",
+        },
+      });
+    } catch {
+      return c.json({ error: "Failed to fetch image" }, 500);
+    }
+  });
 
 export const app = secured.hono;

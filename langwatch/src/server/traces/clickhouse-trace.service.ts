@@ -7,7 +7,6 @@ import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
 import {
   type ClickHouseEvaluationRunRow,
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
@@ -21,6 +20,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {

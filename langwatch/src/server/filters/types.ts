@@ -1,8 +1,7 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+
+type AggregationsAggregationContainer = Record<string, unknown>;
+type QueryDslQueryContainer = Record<string, unknown>;
 
 export const filterFieldsEnum = z.enum([
   "topics.topics",
@@ -52,7 +51,10 @@ export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
 export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 
 // Schema for validating trigger filter JSON structure — rejects unknown fields
-export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+export const triggerFiltersSchema = z.record(
+  filterFieldsEnum,
+  filterValueSchema,
+);
 
 /** Validates filter value structure without restricting field names. */
 export const triggerFiltersPermissiveSchema = z.record(

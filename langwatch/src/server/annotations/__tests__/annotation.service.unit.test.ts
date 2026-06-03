@@ -1,18 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationRepository } from "../annotation.repository";
-import type { AnnotationEsSync } from "../annotationEsSync";
 import { AnnotationService } from "../annotation.service";
 
-vi.mock("~/utils/logger/server", () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  }),
-}));
 vi.mock("../annotation.repository");
-vi.mock("../annotationEsSync");
 
 function createMockRepository(overrides?: {
   createResult?: Record<string, unknown>;
@@ -33,26 +23,16 @@ function createMockRepository(overrides?: {
   };
 
   return {
-    create: vi.fn().mockResolvedValue(overrides?.createResult ?? defaultAnnotation),
-    update: vi.fn().mockResolvedValue(overrides?.updateResult ?? defaultAnnotation),
-    delete: vi.fn().mockResolvedValue(overrides?.deleteResult ?? defaultAnnotation),
+    create: vi
+      .fn()
+      .mockResolvedValue(overrides?.createResult ?? defaultAnnotation),
+    update: vi
+      .fn()
+      .mockResolvedValue(overrides?.updateResult ?? defaultAnnotation),
+    delete: vi
+      .fn()
+      .mockResolvedValue(overrides?.deleteResult ?? defaultAnnotation),
   } as unknown as AnnotationRepository;
-}
-
-function createMockEsSync(): AnnotationEsSync {
-  return {
-    syncAfterCreate: vi.fn().mockResolvedValue(undefined),
-    syncAfterDelete: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AnnotationEsSync;
-}
-
-function createMockLogger() {
-  return {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  } as any;
 }
 
 const defaultCreateInput = {
@@ -82,132 +62,48 @@ const defaultDeleteInput = {
 };
 
 describe("AnnotationService", () => {
-  let logger: ReturnType<typeof createMockLogger>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    logger = createMockLogger();
   });
 
   describe("create()", () => {
-    describe("when ES sync is enabled", () => {
-      it("creates annotation and syncs to ES", async () => {
-        const repository = createMockRepository();
-        const esSync = createMockEsSync();
-        const service = new AnnotationService(repository, esSync, logger);
+    it("delegates to the repository", async () => {
+      const repository = createMockRepository();
+      const service = new AnnotationService(repository);
 
-        const result = await service.create(defaultCreateInput);
+      const result = await service.create(defaultCreateInput);
 
-        expect(result).toMatchObject({ id: "ann-1", projectId: "proj-1" });
-        expect(repository.create).toHaveBeenCalledWith(defaultCreateInput);
-        expect(esSync.syncAfterCreate).toHaveBeenCalledWith("trace-1", "proj-1");
-      });
-    });
-
-    describe("when ES sync is null (ES disabled)", () => {
-      it("creates annotation without calling ES", async () => {
-        const repository = createMockRepository();
-        const service = new AnnotationService(repository, null, logger);
-
-        const result = await service.create(defaultCreateInput);
-
-        expect(result).toMatchObject({ id: "ann-1" });
-        expect(repository.create).toHaveBeenCalledOnce();
-      });
-    });
-
-    describe("when ES sync throws", () => {
-      it("still returns the created annotation", async () => {
-        const repository = createMockRepository();
-        const esSync = createMockEsSync();
-        vi.mocked(esSync.syncAfterCreate).mockRejectedValue(
-          new Error("ES unavailable"),
-        );
-        const service = new AnnotationService(repository, esSync, logger);
-
-        const result = await service.create(defaultCreateInput);
-
-        expect(result).toMatchObject({ id: "ann-1", projectId: "proj-1" });
-        expect(repository.create).toHaveBeenCalledOnce();
-        expect(logger.error).toHaveBeenCalledWith(
-          expect.objectContaining({
-            traceId: "trace-1",
-            projectId: "proj-1",
-          }),
-          "Failed to update Elasticsearch after annotation creation",
-        );
-      });
+      expect(result).toMatchObject({ id: "ann-1", projectId: "proj-1" });
+      expect(repository.create).toHaveBeenCalledWith(defaultCreateInput);
     });
   });
 
   describe("update()", () => {
-    it("delegates to repository without ES sync", async () => {
+    it("delegates to the repository", async () => {
       const repository = createMockRepository();
-      const esSync = createMockEsSync();
-      const service = new AnnotationService(repository, esSync, logger);
+      const service = new AnnotationService(repository);
 
       const result = await service.update(defaultUpdateInput);
 
       expect(result).toMatchObject({ id: "ann-1" });
       expect(repository.update).toHaveBeenCalledWith(defaultUpdateInput);
-      expect(esSync.syncAfterCreate).not.toHaveBeenCalled();
-      expect(esSync.syncAfterDelete).not.toHaveBeenCalled();
     });
   });
 
   describe("delete()", () => {
-    describe("when ES sync is enabled", () => {
-      it("deletes annotation and syncs to ES", async () => {
-        const repository = createMockRepository();
-        const esSync = createMockEsSync();
-        const service = new AnnotationService(repository, esSync, logger);
+    it("delegates to the repository", async () => {
+      const repository = createMockRepository();
+      const service = new AnnotationService(repository);
 
-        const result = await service.delete(defaultDeleteInput);
+      const result = await service.delete(defaultDeleteInput);
 
-        expect(result).toMatchObject({ id: "ann-1" });
-        expect(repository.delete).toHaveBeenCalledWith(defaultDeleteInput);
-        expect(esSync.syncAfterDelete).toHaveBeenCalledWith("trace-1", "proj-1");
-      });
-    });
-
-    describe("when ES sync is null (ES disabled)", () => {
-      it("deletes annotation without calling ES", async () => {
-        const repository = createMockRepository();
-        const service = new AnnotationService(repository, null, logger);
-
-        const result = await service.delete(defaultDeleteInput);
-
-        expect(result).toMatchObject({ id: "ann-1" });
-        expect(repository.delete).toHaveBeenCalledOnce();
-      });
-    });
-
-    describe("when ES sync throws", () => {
-      it("still returns the deleted annotation", async () => {
-        const repository = createMockRepository();
-        const esSync = createMockEsSync();
-        vi.mocked(esSync.syncAfterDelete).mockRejectedValue(
-          new Error("ES unavailable"),
-        );
-        const service = new AnnotationService(repository, esSync, logger);
-
-        const result = await service.delete(defaultDeleteInput);
-
-        expect(result).toMatchObject({ id: "ann-1" });
-        expect(repository.delete).toHaveBeenCalledOnce();
-        expect(logger.error).toHaveBeenCalledWith(
-          expect.objectContaining({
-            traceId: "trace-1",
-            projectId: "proj-1",
-          }),
-          "Failed to update Elasticsearch after annotation deletion",
-        );
-      });
+      expect(result).toMatchObject({ id: "ann-1" });
+      expect(repository.delete).toHaveBeenCalledWith(defaultDeleteInput);
     });
   });
 
   describe("static create() factory", () => {
-    it("returns a working service with esSync set to null", async () => {
+    it("returns a working service", async () => {
       const mockPrisma = {} as any;
       const service = await AnnotationService.create({
         prisma: mockPrisma,

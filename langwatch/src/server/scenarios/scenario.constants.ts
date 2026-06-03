@@ -4,7 +4,7 @@
  * All magic values extracted to named constants for clarity and maintainability.
  */
 
-import { makeQueueName } from "../background/queues/makeQueueName";
+import { makeQueueName } from "../redis";
 
 /** Queue configuration */
 export const SCENARIO_QUEUE = {

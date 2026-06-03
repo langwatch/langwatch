@@ -39,48 +39,45 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
-import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import { extractChunkTextualContent } from "~/server/background/workers/collector/rag";
-import {
-  type DataForEvaluation,
-  runEvaluation,
-} from "~/server/background/workers/evaluationsWorker";
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-  evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
+import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type DataForEvaluation,
+  runEvaluation,
+} from "~/server/evaluations/runEvaluation";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import {
-  CODE_EVALUATOR_CHECK_PREFIX,
-  codeEvaluatorConfigSchema,
-} from "~/server/evaluators/codeEvaluator";
 import { ExperimentService } from "~/server/experiments/experiment.service";
+import type {
+  ESBatchEvaluation,
+  ESBatchEvaluationRESTParams,
+  ESBatchEvaluationTarget,
+  ESBatchEvaluationTargetType,
+} from "~/server/experiments/types";
 import {
-  type ESBatchEvaluation,
-  type ESBatchEvaluationRESTParams,
-  type ESBatchEvaluationTarget,
-  type ESBatchEvaluationTargetType,
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types";
+} from "~/server/experiments/types.generated";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import { rAGChunkSchema } from "~/server/tracer/types";
-import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
+import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
+import { rAGChunkSchema } from "~/server/tracer/types.generated";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:evaluations-legacy");
@@ -185,7 +182,7 @@ secured
       const { project, markUsed } = auth;
 
       const contentType = c.req.header("content-type");
-      if (!contentType?.includes("application/json")) {
+      if (!contentType || !contentType.includes("application/json")) {
         logger.warn(
           {
             contentType,
@@ -214,7 +211,7 @@ secured
           { error, body, projectId: project.id },
           "invalid log_results data received",
         );
-        captureException(toError(error), { extra: { projectId: project.id } });
+        captureException(error, { extra: { projectId: project.id } });
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -251,7 +248,7 @@ secured
             { error, body: params, projectId: project.id },
             "failed to validate data for batch evaluation",
           );
-          captureException(toError(error), {
+          captureException(error, {
             extra: { projectId: project.id, param: params },
           });
           const validationError = fromZodError(error);
@@ -270,7 +267,7 @@ secured
             { error, body: params, projectId: project.id },
             "internal server error processing batch evaluation",
           );
-          captureException(toError(error), {
+          captureException(error, {
             extra: { projectId: project.id, param: params },
           });
           return c.json(
@@ -359,7 +356,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation params received",
       );
-      captureException(toError(error), { extra: { projectId: project.id } });
+      captureException(error, { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -411,7 +408,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation data received",
       );
-      captureException(toError(error), { extra: { projectId: project.id } });
+      captureException(error, { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -506,19 +503,14 @@ const batchEvaluationInputSchema = z.object({
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
-const coercedString = z.preprocess(
-  coerceEvaluatorScalar,
-  z.string().optional().nullable(),
-);
-
 const defaultEvaluatorInputSchema = z.object({
-  input: coercedString,
-  output: coercedString,
+  input: z.string().optional().nullable(),
+  output: z.string().optional().nullable(),
   contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
     .nullable(),
-  expected_output: coercedString,
+  expected_output: z.string().optional().nullable(),
   expected_contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
@@ -526,8 +518,8 @@ const defaultEvaluatorInputSchema = z.object({
   conversation: z
     .array(
       z.object({
-        input: coercedString,
-        output: coercedString,
+        input: z.string().optional().nullable(),
+        output: z.string().optional().nullable(),
       }),
     )
     .optional()
@@ -551,10 +543,7 @@ export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
 ): DataForEvaluation => {
-  if (
-    checkType.startsWith("custom/") ||
-    checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)
-  ) {
+  if (checkType.startsWith("custom/")) {
     return { type: "custom", data: params };
   }
 
@@ -718,21 +707,6 @@ async function handleEvaluatorCall(
           name: savedEvaluator.name,
           requiredFields: entryOutputs.map((o) => o.identifier),
         };
-      } else if (savedEvaluator.type === "code") {
-        checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
-        const parsedConfig = codeEvaluatorConfigSchema.safeParse(
-          savedEvaluator.config,
-        );
-        if (!parsedConfig.success) {
-          return c.json(
-            { error: `Code evaluator has an invalid config: ${slugOrId}` },
-            400,
-          );
-        }
-        workflowEvaluatorDef = {
-          name: savedEvaluator.name,
-          requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
-        };
       } else {
         checkType = config?.evaluatorType ?? evaluatorSlug;
       }
@@ -800,7 +774,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation params received",
     );
-    captureException(toError(error), {
+    captureException(error, {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -851,7 +825,7 @@ async function handleEvaluatorCall(
       },
       "invalid settings received for the evaluator",
     );
-    captureException(toError(error), {
+    captureException(error, {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json(
@@ -885,7 +859,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(toError(error), {
+    captureException(error, {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -970,7 +944,7 @@ async function handleEvaluatorCall(
       costId = cost.id;
     }
   } catch (error) {
-    captureException(toError(error), { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
     logger.error(
       { err: error, projectId: project.id },
       "error running evaluation",
@@ -1012,7 +986,7 @@ async function handleEvaluatorCall(
             : undefined,
       })
       .catch((eventError: unknown) => {
-        captureException(toError(eventError), {
+        captureException(eventError, {
           extra: {
             projectId: project.id,
             evaluationId,

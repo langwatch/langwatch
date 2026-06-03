@@ -1,5 +1,12 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+
+/**
+ * Opaque shape for aggregation query fragments emitted by analytics metric/group
+ * definitions. Historically these were Elasticsearch DSL containers; the registry
+ * functions remain in the codebase but are no longer dispatched to any backend.
+ */
+type AggregationsAggregationContainer = Record<string, unknown>;
+
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import { type FilterField, filterFieldsEnum } from "../filters/types";
@@ -192,7 +199,9 @@ export interface FeedbacksResult {
  * Analytics backend interface for dependency injection
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: import("./registry").TimeseriesInputType): Promise<TimeseriesResult>;
+  getTimeseries(
+    input: import("./registry").TimeseriesInputType,
+  ): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,

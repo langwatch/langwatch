@@ -6,6 +6,7 @@ import {
   Outlet,
   type RouteObject,
   redirect,
+  type RouteObject,
   useLocation,
   useNavigation,
 } from "react-router";
@@ -181,10 +182,6 @@ const routes: RouteObject[] = [
   {
     path: "/settings/teams/:team",
     ...page(() => import("./pages/settings/teams/[team]")),
-  },
-  {
-    path: "/settings/topic-clustering",
-    ...page(() => import("./pages/settings/topic-clustering")),
   },
   {
     path: "/settings/usage",

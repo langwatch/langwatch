@@ -5,9 +5,11 @@
  * When a user tests an HTTP agent, this module creates a trace capturing
  * request/response details while redacting sensitive auth credentials.
  */
-import crypto from "node:crypto";
-import type { Span, CustomMetadata } from "../../tracer/types";
-import { scheduleTraceCollectionWithFallback } from "../../background/workers/collectorWorker";
+
+import { getApp } from "../../app-layer/app";
+import { prisma } from "../../db";
+import type { CustomMetadata, Span } from "../../tracer/types";
+import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
 
 type AuthInput = {
   type: "none" | "bearer" | "api_key" | "basic";
@@ -207,26 +209,28 @@ export async function createAgentTestTrace({
     },
   };
 
-  await scheduleTraceCollectionWithFallback(
-    {
-      projectId,
-      traceId,
-      spans: [span],
-      evaluations: undefined,
-      reservedTraceMetadata: {
-        user_id: userId,
-      },
-      customMetadata,
-      expectedOutput: null,
-      existingTrace: undefined,
-      paramsMD5: crypto
-        .createHash("md5")
-        .update(JSON.stringify({ traceId, span, customMetadata }))
-        .digest("hex"),
-      collectedAt: now,
-    },
-    false,
-  );
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, piiRedactionLevel: true },
+  });
+  if (!project) {
+    throw new Error(`Project ${projectId} not found`);
+  }
+
+  const resource = CollectorSpanUtils.buildResource({
+    reservedTraceMetadata: { user_id: userId },
+    customMetadata,
+    expectedOutput: null,
+  });
+
+  await getApp().traces.recordSpan({
+    tenantId: project.id,
+    span: CollectorSpanUtils.convertSpanToOtlp(span),
+    resource,
+    instrumentationScope: { name: "langwatch.agent_test" },
+    piiRedactionLevel: project.piiRedactionLevel,
+    occurredAt: now,
+  });
 
   return { traceId };
 }
