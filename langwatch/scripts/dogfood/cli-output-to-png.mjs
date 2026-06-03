@@ -42,7 +42,16 @@ const TITLE_GAP = 12;
 const FONT_FAMILY =
   "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace";
 
+/**
+ * @typedef {{ width: number, bg: string, fg: string, input?: string, out?: string, title?: string }} Opts
+ */
+
+/**
+ * @param {string[]} argv
+ * @returns {Opts}
+ */
 function parseArgs(argv) {
+  /** @type {Opts} */
   const out = { width: 1280, bg: "#0d1117", fg: "#e6edf3" };
   for (let i = 2; i < argv.length; i++) {
     const flag = argv[i];
@@ -67,11 +76,11 @@ function parseArgs(argv) {
         i++;
         break;
       case "--bg":
-        out.bg = val;
+        if (val) out.bg = val;
         i++;
         break;
       case "--fg":
-        out.fg = val;
+        if (val) out.fg = val;
         i++;
         break;
       case "--help":
@@ -85,11 +94,13 @@ function parseArgs(argv) {
   return out;
 }
 
+/** @param {Opts} opts */
 function readInput(opts) {
   if (opts.input) return readFileSync(opts.input, "utf8");
   return readFileSync(0, "utf8");
 }
 
+/** @param {string} s */
 function xmlEscape(s) {
   return s
     .replace(/&/g, "&amp;")
@@ -98,12 +109,17 @@ function xmlEscape(s) {
     .replace(/"/g, "&quot;");
 }
 
+/** @param {string} s */
 function stripAnsi(s) {
   // Remove CSI / OSC / SGR sequences so they don't render literally.
   // eslint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
 }
 
+/**
+ * @param {string} text
+ * @param {Opts} opts
+ */
 function buildSvg(text, opts) {
   const lines = stripAnsi(text).split("\n");
   const titleH = opts.title ? TITLE_PX + TITLE_GAP : 0;
@@ -112,7 +128,7 @@ function buildSvg(text, opts) {
   const w = opts.width;
 
   const rows = lines
-    .map((line, i) => {
+    .map((/** @type {string} */ line, /** @type {number} */ i) => {
       const y = PAD_Y + (i + 0.85) * LINE_PX;
       return `<text x="${PAD_X}" y="${y}" fill="${opts.fg}" font-family="${FONT_FAMILY}" font-size="${FONT_PX}" xml:space="preserve">${xmlEscape(line || " ")}</text>`;
     })
@@ -131,6 +147,10 @@ function buildSvg(text, opts) {
 `;
 }
 
+/**
+ * @param {string} svg
+ * @param {string} outPath
+ */
 function svgToPng(svg, outPath) {
   const res = spawnSync(
     "rsvg-convert",
