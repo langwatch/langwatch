@@ -122,14 +122,6 @@ import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.rep
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
-import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
-import {
-  InMemoryOrphanCursorStore,
-  RedisOrphanCursorStore,
-} from "../data-retention/orphan-sweep/orphanSweepCursor.store";
-import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
-import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
@@ -384,29 +376,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const storageMeterService = new StorageMeterService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const orphanSweepRepo = new OrphanSweepRepository(prisma);
-  // Persist sweep cursors in Redis when available; fall back to the in-memory
-  // store otherwise. The cursor lets the sweep resume across runs instead of
-  // restarting at page 0 every hour and starving the tail.
-  const orphanCursorStore = redis
-    ? new RedisOrphanCursorStore(redis)
-    : new InMemoryOrphanCursorStore();
-  const orphanSweepService = new OrphanSweepService(
-    orphanSweepRepo,
-    clickhouseEnabled ? resolveClickHouseClient : null,
-    orphanCursorStore,
-  );
-  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
-    retentionPolicyCache,
-    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
-  });
-
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
     retroactive: retroactiveUpdateService,
     metering: storageMeterService,
-    orphanSweep: orphanSweepService,
   };
 
   const share = traced(
@@ -492,7 +466,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     gatewayBudgetSync,
     governanceKpisSync,
     governanceOcsfEventsSync,
-    retentionOrphanSweepReactor,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -787,7 +760,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
-      orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

@@ -13,7 +13,7 @@ export const RETENTION_WEEK_DAYS = 7;
 
 /**
  * The minimum retention any override may set: 7 weeks. Below this, ClickHouse
- * TTL churn and the orphan sweep stop being worth the storage saved.
+ * TTL churn stops being worth the storage saved.
  */
 export const MIN_RETENTION_DAYS = 49;
 
