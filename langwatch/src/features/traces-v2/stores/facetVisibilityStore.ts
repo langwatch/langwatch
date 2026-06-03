@@ -98,6 +98,17 @@ function emptyPrefs() {
   return { explicitlyShown: [], explicitlyHidden: [] };
 }
 
+/**
+ * Stable empty reference for the selector — Zustand bails out of
+ * re-renders when the selected slice is referentially equal, so we
+ * must hand the same object back on every unhydrated read. A fresh
+ * `emptyPrefs()` would force a re-render on each subscription tick.
+ */
+const STABLE_EMPTY_PREFS: {
+  explicitlyShown: string[];
+  explicitlyHidden: string[];
+} = { explicitlyShown: [], explicitlyHidden: [] };
+
 export const useFacetVisibilityStore = create<FacetVisibilityState>(
   (set, get) => ({
     byProject: {},
@@ -152,14 +163,17 @@ export const useFacetVisibilityStore = create<FacetVisibilityState>(
 );
 
 /**
- * Convenience selector — returns the prefs for a project, hydrating
- * from localStorage on first read so consumers don't need to call
- * `hydrateFromStorage` themselves.
+ * Convenience selector — returns the prefs for a project. A pure
+ * projection on store state, so it keeps Zustand's ref-equality bailout
+ * intact: consumers see the same object reference on every read until
+ * `byProject[projectId]` actually changes. Hydration is a side-effect
+ * the caller schedules separately (`hydrateFromStorage` in a mount
+ * effect); pre-hydrate reads land on `STABLE_EMPTY_PREFS`.
  */
 export function selectVisibilityFor(
   state: FacetVisibilityState,
   projectId: string | null | undefined,
 ): { explicitlyShown: string[]; explicitlyHidden: string[] } {
-  if (!projectId) return emptyPrefs();
-  return state.byProject[projectId] ?? readFromStorage(projectId);
+  if (!projectId) return STABLE_EMPTY_PREFS;
+  return state.byProject[projectId] ?? STABLE_EMPTY_PREFS;
 }
