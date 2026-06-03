@@ -83,7 +83,15 @@ export function CodeEditorModal({
     setLocalCode(code);
   }, [code, open]);
 
+  // Save = persist the buffer back to the parent and keep the modal open so
+  // the user can keep editing. Mirrors a file editor's "save" — never closes.
   const handleSave = useCallback(() => {
+    setCode(localCode);
+  }, [localCode, setCode]);
+
+  // Save & Close = save then dismiss. The deliberate stronger gesture
+  // (Cmd+Enter, not Cmd+S) so muscle-memory ⌘S doesn't accidentally close.
+  const handleSaveAndClose = useCallback(() => {
     setCode(localCode);
     onClose();
   }, [localCode, setCode, onClose]);
@@ -99,9 +107,16 @@ export function CodeEditorModal({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+S → Save (don't close)
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
+        return;
+      }
+      // Cmd/Ctrl+Enter → Save & Close
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        handleSaveAndClose();
       }
     };
 
@@ -109,7 +124,7 @@ export function CodeEditorModal({
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  }, [handleSave, open, localCode]);
+  }, [handleSave, handleSaveAndClose, open, localCode]);
 
   const insertAtCursor = useCallback((text: string) => {
     const ed = editorRef.current;
@@ -126,7 +141,17 @@ export function CodeEditorModal({
   );
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => !open && onClose_()}
+      // Escape inside Monaco needs to stay with Monaco — it dismisses the
+      // suggest widget, hover, parameter hint, multi-cursor, etc. If we
+      // let Ark UI's Dialog handler also close the modal on the same
+      // keypress, users lose work-in-progress every time they tab through
+      // completions. Closing the modal goes through the explicit X
+      // button / Save & Close instead.
+      closeOnEscape={false}
+    >
       <Dialog.Content
         bg="bg"
         margin="32px"
@@ -203,6 +228,7 @@ export function CodeEditorModal({
               setCode={setLocalCode}
               onClose={onClose_}
               onSave={handleSave}
+              onSaveAndClose={handleSaveAndClose}
               language="python"
               technologies={["python", "dspy"]}
               inputs={inputs}
@@ -218,13 +244,14 @@ export function CodeEditorModal({
         </Box>
 
         {/* VS Code-style bottom status strip — language, cursor, problem count,
-            indentation, encoding, plus the primary Save & Close action. The
+            indentation, encoding, plus both save actions side by side. The
             status bar subscribes to editor + marker events directly. */}
         <EditorStatusBar
           editor={editorInstance}
           monaco={monacoInstance}
           language="python"
           onSave={handleSave}
+          onSaveAndClose={handleSaveAndClose}
         />
       </Dialog.Content>
     </Dialog.Root>
@@ -241,6 +268,11 @@ const onSave = {
   fn: () => {},
 };
 
+const onSaveAndClose = {
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: same pattern — mutable handler stub kept in sync with the latest CodeEditor mount.
+  fn: () => {},
+};
+
 const EMPTY_FIELDS: readonly PythonField[] = [];
 
 export function CodeEditor({
@@ -248,6 +280,7 @@ export function CodeEditor({
   setCode,
   onClose,
   onSave: onSaveProp,
+  onSaveAndClose: onSaveAndCloseProp,
   language,
   technologies,
   inputs,
@@ -258,7 +291,10 @@ export function CodeEditor({
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
+  /** Persist the buffer without dismissing the editor (⌘S muscle memory). */
   onSave?: () => void;
+  /** Persist + dismiss (⌘↵). */
+  onSaveAndClose?: () => void;
   language: string;
   technologies: string[];
   viewStateKey?: string;
@@ -289,6 +325,10 @@ export function CodeEditor({
   useEffect(() => {
     onSave.fn = onSaveProp ?? (() => {});
   }, [onSaveProp]);
+
+  useEffect(() => {
+    onSaveAndClose.fn = onSaveAndCloseProp ?? (() => {});
+  }, [onSaveAndCloseProp]);
 
   useEffect(() => {
     providersRef.current?.setContract({
@@ -429,21 +469,35 @@ export function CodeEditor({
         }
 
         editor.onKeyDown((e) => {
-          if (e.code === "Escape") {
-            onKeyDown.fn();
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-          // Cmd/Ctrl+S or Cmd/Ctrl+Enter both Save & Close. Mirrors VS Code's
-          // save shortcut + the Notebook "run cell" muscle memory.
+          // Escape is INTENTIONALLY not handled here — Monaco itself uses it
+          // to dismiss the suggest widget, hover, parameter-hint, etc. If
+          // none of those are open, Monaco won't stop propagation and the
+          // surrounding Dialog will close on its own. That gives Escape the
+          // expected contextual feel: first press closes the open widget,
+          // a *second* press dismisses the modal.
+
+          // Cmd/Ctrl+S → Save (keep modal open). Bound here too so the
+          // shortcut works even when Monaco has the keystroke captured
+          // before it reaches the window-level listener.
           if (
             (e.metaKey || e.ctrlKey) &&
-            (e.code === "KeyS" || e.code === "Enter" || e.code === "NumpadEnter")
+            !e.shiftKey &&
+            e.code === "KeyS"
           ) {
             e.preventDefault();
             e.stopPropagation();
             onSave.fn();
+            return;
+          }
+          // Cmd/Ctrl+Enter → Save & Close. Mirrors the Notebook "run cell"
+          // muscle memory.
+          if (
+            (e.metaKey || e.ctrlKey) &&
+            (e.code === "Enter" || e.code === "NumpadEnter")
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            onSaveAndClose.fn();
           }
         });
         registerCompletion(monaco, editor, {

@@ -1,11 +1,14 @@
-import { Button, HStack, Kbd, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useEffect, useState } from "react";
 
 /**
  * Thin status bar that mirrors VS Code's bottom strip — cursor position,
- * problem counts, indentation, language, and a primary Save action.
+ * problem counts, indentation, language, plus two distinct save actions:
+ *  - Save (⌘S)         — persists, modal stays open
+ *  - Save & Close (⌘↵) — persists, then dismisses
+ *
  * Subscribes directly to the editor's cursor + marker events so it stays in
  * sync without prop drilling.
  */
@@ -14,14 +17,17 @@ export function EditorStatusBar({
   monaco,
   language,
   onSave,
-  saveLabel = "Save & Close",
+  onSaveAndClose,
 }: {
   editor: editor.IStandaloneCodeEditor | null;
   monaco: Monaco | null;
   language: string;
+  /** ⌘S — persist without dismissing. */
   onSave?: () => void;
-  saveLabel?: string;
+  /** ⌘↵ — persist then close. */
+  onSaveAndClose?: () => void;
 }) {
+  const modKey = useModifierKeyLabel();
   const [line, setLine] = useState(1);
   const [column, setColumn] = useState(1);
   const [selection, setSelection] = useState(0);
@@ -115,20 +121,57 @@ export function EditorStatusBar({
         <Separator />
         <Text>UTF-8</Text>
         <Separator />
-        <HStack gap={1} color="fg.muted">
-          <Kbd size="sm">⌘S</Kbd>
-        </HStack>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onSave}
+          data-testid="code-editor-save"
+        >
+          Save
+          <ShortcutHint>{modKey}S</ShortcutHint>
+        </Button>
         <Button
           size="xs"
           colorPalette="blue"
           variant="solid"
-          onClick={onSave}
-          data-testid="code-editor-save"
+          onClick={onSaveAndClose}
+          data-testid="code-editor-save-and-close"
         >
-          {saveLabel}
+          Save & Close
+          <ShortcutHint>{modKey}↵</ShortcutHint>
         </Button>
       </HStack>
     </HStack>
+  );
+}
+
+/**
+ * Render `⌘` on macOS, `Ctrl` everywhere else, so the visible shortcut
+ * matches what the keyboard listener actually fires on.
+ */
+function useModifierKeyLabel(): string {
+  if (typeof navigator === "undefined") return "Ctrl+";
+  return /Mac|iPhone|iPod|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+}
+
+/**
+ * Tiny dimmed shortcut hint next to a button label. Avoids Chakra's `Kbd`
+ * (too chunky at small button sizes — thick border, shadow, big padding).
+ * Inherits the button's own text colour so it adapts to both outline and
+ * solid backgrounds without colour drift.
+ */
+function ShortcutHint({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      as="span"
+      ml={1.5}
+      fontFamily="mono"
+      fontSize="10px"
+      letterSpacing="tight"
+      opacity={0.6}
+    >
+      {children}
+    </Box>
   );
 }
 
