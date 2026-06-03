@@ -162,27 +162,7 @@ export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
   }
 }
 
-/**
- * Wraps a queue name in a Redis Cluster hash tag.
- *
- * BullMQ + the in-house GroupQueue both create multiple Redis keys per
- * queue (`bull:<name>:wait`, `bull:<name>:active`, ...). Redis Cluster
- * distributes keys across slots by hashing the key name; without a hash
- * tag, those keys land on different slots and Lua scripts that touch
- * them atomically fail with CROSSSLOT.
- *
- * Wrapping the name in {braces} forces Redis to hash only the braced
- * portion, guaranteeing all keys for a queue land on the same slot.
- *
- * @example
- *   makeQueueName("collector")        // → "{collector}"
- *   makeQueueName("pipeline/handler") // → "{pipeline/handler}"
- */
-export function makeQueueName(name: string): string {
-  if (name.startsWith("{") && name.endsWith("}")) {
-    throw new Error(
-      `Queue name "${name}" is already wrapped in hash tags. Do not call makeQueueName twice.`,
-    );
-  }
-  return `{${name}}`;
-}
+// makeQueueName lives in its own tiny module — see queues/makeQueueName.ts —
+// so callers that need it (e.g. scenario.constants pulled in by SimulationsPage)
+// don't drag ioredis into the client bundle.
+export { makeQueueName } from "./queues/makeQueueName";
