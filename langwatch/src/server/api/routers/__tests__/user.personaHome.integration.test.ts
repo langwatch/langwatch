@@ -168,32 +168,10 @@ describe("user.persona-home customization integration", () => {
     await stopTestContainers();
   }, 60_000);
 
-  describe("user.userProjects", () => {
-    it("returns the user's application projects sorted by updatedAt DESC", async () => {
-      const rows = await caller.user.userProjects({ organizationId: ORG_ID });
-      expect(rows.map((r) => r.id)).toEqual([
-        appProjectBetaId,
-        appProjectAlphaId,
-      ]);
-      expect(rows[0]?.name).toBe("Beta Pipeline");
-      expect(rows[0]?.teamName).toBe("PHome Team");
-    });
-
-    it("excludes hidden internal_governance projects from the response", async () => {
-      const rows = await caller.user.userProjects({ organizationId: ORG_ID });
-      expect(rows).toHaveLength(2);
-      expect(rows.find((r) => r.slug.startsWith("hidden-"))).toBeUndefined();
-    });
-
-    it("respects the limit parameter", async () => {
-      const rows = await caller.user.userProjects({
-        organizationId: ORG_ID,
-        limit: 1,
-      });
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.id).toBe(appProjectBetaId);
-    });
-  });
+  // user.userProjects + MyProjectsCard were dropped — the top-bar
+  // workspace switcher already surfaces the user's projects with
+  // richer scope info (org > team > project). See /me page diff in
+  // the same commit.
 
   describe("user.setLastHomePath + homePagePickerState round-trip", () => {
     it("starts with no pin (auto-detection)", async () => {
