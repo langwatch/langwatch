@@ -27,9 +27,22 @@ import {
 } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
 
-/** Templates we auto-mint a personal ingestion binding for, per wrapped tool. */
+/**
+ * Templates we auto-mint a personal ingestion binding for, per
+ * wrapped tool. Cursor is intentionally absent — it's a GUI app and
+ * the terminal-launch envs never reach the agent panel, so the
+ * mint + cache would be wasted work.
+ *
+ * If the template row does not exist on the server (older self-hosted
+ * builds before the codex/gemini/opencode seeds shipped), the mint
+ * step silently no-ops and the wrapper falls back to gateway-only
+ * env injection.
+ */
 const TOOL_INGESTION_TEMPLATE_SLUG: Record<string, string> = {
   claude: "claude_code",
+  codex: "codex",
+  gemini: "gemini",
+  opencode: "opencode",
 };
 
 export interface ToolEnv {
