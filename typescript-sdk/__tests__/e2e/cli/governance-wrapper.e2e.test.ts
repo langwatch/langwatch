@@ -735,13 +735,23 @@ describe("governance CLI wrappers — e2e", () => {
     describe.each(["codex", "cursor", "gemini", "opencode"])(
       "when the user runs `langwatch %s` with extra args",
       (tool) => {
-        it("forwards every arg verbatim to the wrapped tool's child process", async () => {
+        it("forwards every user arg to the wrapped tool's child process (codex also gets the gateway `--profile` flag prepended)", async () => {
           writeLoggedInConfig();
           writeToolStub(tool, "echo-argv");
           const res = await runCli([tool, "--foo", "bar baz"]);
           expect(res.status).toBe(0);
           const parsed = parseArgv(res.stdout ?? "");
-          expect(parsed.argv).toEqual(["--foo", "bar baz"]);
+          // codex Path A gateway routing requires a `--profile
+          // langwatch-gateway` prepend so codex 0.134+ honors the
+          // [model_providers.langwatch] block we wrote to
+          // ~/.codex/config.toml. Other tools forward args verbatim.
+          if (tool === "codex") {
+            expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
+            expect(parsed.argv).toContain("--profile");
+            expect(parsed.argv).toContain("langwatch-gateway");
+          } else {
+            expect(parsed.argv).toEqual(["--foo", "bar baz"]);
+          }
         });
       },
     );
