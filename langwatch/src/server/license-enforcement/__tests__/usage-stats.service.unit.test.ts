@@ -42,8 +42,11 @@ describe("UsageStatsService", () => {
       getExperimentCount: vi.fn().mockResolvedValue(0),
     } as unknown as ILicenseEnforcementRepository;
 
+    // Distinct values so the suite fails if getUsageStats regresses to the
+    // enforcement counter: display drives the surfaced count, enforcement must
+    // not be called.
     mockTraceUsage = {
-      getCurrentMonthCount: vi.fn().mockResolvedValue(500),
+      getCurrentMonthCount: vi.fn().mockResolvedValue(123),
       getCurrentMonthCountForDisplay: vi.fn().mockResolvedValue(500),
     } as unknown as ITraceUsageService;
 
@@ -97,6 +100,15 @@ describe("UsageStatsService", () => {
       expect(stats.currentMonthMessagesCount).toBe(500);
       expect(stats.usageUnit).toBe("traces");
       expect(stats.messageLimitInfo).toBeDefined();
+    });
+
+    it("surfaces the display count and never the enforcement counter", async () => {
+      await service.getUsageStats("org-123", testUser);
+
+      expect(
+        mockTraceUsage.getCurrentMonthCountForDisplay,
+      ).toHaveBeenCalledWith({ organizationId: "org-123" });
+      expect(mockTraceUsage.getCurrentMonthCount).not.toHaveBeenCalled();
     });
   });
 });
