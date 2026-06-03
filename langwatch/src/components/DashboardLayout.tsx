@@ -978,6 +978,25 @@ export const DashboardLayout = ({
             <GlobalTraceV2DrawerMount />
 
             {userIsPartOfTeam ? (
+              // Page body absorbs leftover vertical space inside the
+              // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
+              // pages that use `height="full"` interpret it as "100%
+              // of the VStack" — which includes banner height — so
+              // showing a banner pushed the bottom of the page off
+              // the viewport. Wrapping the body in a flex-1 box makes
+              // banners take their natural height above and leaves
+              // the page with `containerHeight − bannerStackHeight`,
+              // which is what `height="full"` should mean. Banners
+              // already render with their intrinsic heights because
+              // VStack defaults to `align-items: stretch` and Alert
+              // boxes don't shrink below content.
+              <Box
+                flex="1"
+                minHeight={0}
+                width="full"
+                display="flex"
+                flexDirection="column"
+              >
               <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
                 {showSavedViews ? (
                   <SavedViewsProvider>
@@ -990,6 +1009,7 @@ export const DashboardLayout = ({
                   children
                 )}
               </ErrorBoundary>
+              </Box>
             ) : (
               <Alert.Root
                 status="warning"

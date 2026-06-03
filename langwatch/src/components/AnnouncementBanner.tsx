@@ -40,10 +40,11 @@ function AnnouncementItem({ announcement }: { announcement: Announcement }) {
       width="full"
       border="1px solid"
       borderColor="colorPalette.muted"
-      marginX={4}
-      marginTop={3}
-      borderRadius="lg"
-      maxWidth="calc(100% - 22px)"
+      // Top-left only — matches the inner page chrome's rounded
+      // top-left corner (`borderTopLeftRadius="xl"`) so the banner's
+      // curve continues from the chrome. All other corners flush.
+      borderRadius={0}
+      borderTopLeftRadius="xl"
     >
       <Alert.Indicator />
       <Alert.Content>
