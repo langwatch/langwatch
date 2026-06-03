@@ -207,15 +207,6 @@ export function truncateId(id: string, chars = 8): string {
   return id.slice(0, chars);
 }
 
-export const SPAN_TYPE_BADGE_STYLES: Readonly<
-  Record<string, { bg: string; color: string }>
-> = {
-  llm: { bg: "blue.subtle", color: "blue.emphasized" },
-  agent: { bg: "purple.subtle", color: "purple.emphasized" },
-  workflow: { bg: "teal.subtle", color: "teal.emphasized" },
-  span: { bg: "gray.subtle", color: "gray.emphasized" },
-};
-
 export const SPAN_TYPE_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
   llm: "blue.solid",
   tool: "green.solid",
