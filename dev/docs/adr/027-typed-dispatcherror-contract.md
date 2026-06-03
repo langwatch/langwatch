@@ -1,4 +1,4 @@
-# ADR-025: Typed `DispatchError` contract for dispatch endpoints
+# ADR-027: Typed `DispatchError` contract for dispatch endpoints
 
 **Date:** 2026-05-28
 
@@ -8,7 +8,7 @@
 
 Today's `sendSlackWebhook` (`src/server/triggers/sendSlackWebhook.ts`) wraps `webhook.send(...)` in `try { ... } catch (err) { captureException(err); }` and **never rethrows**. Errors are logged and surfaced to PostHog, but the calling reactor sees no signal — control flow continues as if dispatch succeeded.
 
-This is fine for today's in-line reactor model (we accept silent failures as the operational baseline). It becomes broken when [ADR-022](./022-transactional-outbox-for-stake-sensitive-dispatch.md)'s outbox worker enters the picture, because the worker decides what to do with a row based on **whether dispatch threw**:
+This is fine for today's in-line reactor model (we accept silent failures as the operational baseline). It becomes broken when [ADR-025](./022-transactional-outbox-for-stake-sensitive-dispatch.md)'s outbox worker enters the picture, because the worker decides what to do with a row based on **whether dispatch threw**:
 
 - Throw → some retry/dead categorization.
 - Return cleanly → row transitions to `dispatched`.
@@ -79,7 +79,7 @@ Email dispatches set a deterministic `X-Idempotency-Key` header on the outbound 
 - **Digest cadences:** `${triggerId}:${scheduledForBucketUnix}` — stable across retries of the same digest window.
 - **Immediate dispatches:** `${outboxRowId}` — stable across retries of the same row.
 
-Both SES (via `Message.Headers` on `SendEmail`) and SendGrid (via `headers` in the request body) accept arbitrary custom headers, and surface them on bounce/delivery webhooks — so operators can detect a true double-send in the provider dashboard after the fact. Neither provider enforces idempotency server-side, so this header is for **operator observability**, not provider-enforced dedup. Actual protection against double-send comes from the outbox state machine (ADR-022).
+Both SES (via `Message.Headers` on `SendEmail`) and SendGrid (via `headers` in the request body) accept arbitrary custom headers, and surface them on bounce/delivery webhooks — so operators can detect a true double-send in the provider dashboard after the fact. Neither provider enforces idempotency server-side, so this header is for **operator observability**, not provider-enforced dedup. Actual protection against double-send comes from the outbox state machine (ADR-025).
 
 ## Rationale
 
@@ -120,6 +120,6 @@ In all cases the **enforcement** lives in the outbox state machine, not the prov
 
 ## References
 
-- [ADR-022](./022-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox worker that consumes this contract; `dispatch` handler signature
+- [ADR-025](./022-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox worker that consumes this contract; `dispatch` handler signature
 - `src/server/triggers/sendSlackWebhook.ts` — endpoint to refactor first
 - `src/server/mailer/triggerEmail.ts` — endpoint to refactor second

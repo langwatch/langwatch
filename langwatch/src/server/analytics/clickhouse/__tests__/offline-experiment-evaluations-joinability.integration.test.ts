@@ -122,6 +122,9 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             TopicId: null,
             SubTopicId: null,
             HasAnnotation: null,
+            // Backdated fixture (June 2025). Pin to the never-expire sentinel
+            // so the retention TTL doesn't immediately delete the seed rows.
+            _retention_days: 0,
           },
           {
             ProjectionId: `proj-ts-3900-1`,
@@ -158,6 +161,9 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             TopicId: null,
             SubTopicId: null,
             HasAnnotation: null,
+            // Backdated fixture (June 2025). Pin to the never-expire sentinel
+            // so the retention TTL doesn't immediately delete the seed rows.
+            _retention_days: 0,
           },
         ],
         format: "JSONEachRow",
@@ -184,6 +190,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             Label: null,
             LastProcessedEventId: "evt-offline-3900-fixed-num-0",
             UpdatedAt: new Date("2025-06-01T10:00:00Z").toISOString(),
+            _retention_days: 0,
           },
           // Numeric evaluator, cell 1: score 0.25
           {
@@ -200,6 +207,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             Label: null,
             LastProcessedEventId: "evt-offline-3900-fixed-num-1",
             UpdatedAt: new Date("2025-06-01T10:00:01Z").toISOString(),
+            _retention_days: 0,
           },
           // Boolean evaluator, cell 0: passed
           {
@@ -216,6 +224,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             Label: null,
             LastProcessedEventId: "evt-offline-3900-fixed-bool-0",
             UpdatedAt: new Date("2025-06-01T10:00:02Z").toISOString(),
+            _retention_days: 0,
           },
           // Boolean evaluator, cell 1: failed
           {
@@ -232,6 +241,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
             Label: null,
             LastProcessedEventId: "evt-offline-3900-fixed-bool-1",
             UpdatedAt: new Date("2025-06-01T10:00:03Z").toISOString(),
+            _retention_days: 0,
           },
         ],
         format: "JSONEachRow",

@@ -1,4 +1,4 @@
--- Per-trigger trace-readiness debounce (ADR-030). Notify-class triggers route
+-- Per-trigger trace-readiness debounce (ADR-026). Notify-class triggers route
 -- through the outbox settle stage; this column is the TTL of the dedup window
 -- that holds the trace before filters re-evaluate. A higher value absorbs more
 -- late spans on slow agentic traces; a lower value reduces notification latency

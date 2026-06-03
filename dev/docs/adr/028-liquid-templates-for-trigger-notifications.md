@@ -1,4 +1,4 @@
-# ADR-024: Liquid templates for user-customizable trigger notifications
+# ADR-028: Liquid templates for user-customizable trigger notifications
 
 **Date:** 2026-05-28
 

@@ -1,12 +1,15 @@
 -- ReactorOutbox: durable dispatch queue for stake-sensitive reactors.
 --
--- See dev/docs/adr/021-transactional-outbox-for-stake-sensitive-dispatch.md
--- and ADRs 022-024 for the full rationale. In short: reactors registered
+-- See dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md
+-- and ADRs 023, 025 for the full rationale. In short: reactors registered
 -- via `.withOutbox` enqueue rows here instead of dispatching inline. A
 -- drainer leases rows (status → "dispatching"), calls the dispatch
--- endpoint, and records the outcome. The unique (reactorName, dedupKey)
--- is the claim primitive that makes pipeline replays safe — a second
--- enqueue is a no-op via `createMany skipDuplicates`.
+-- endpoint, and records the outcome. The unique (projectId, reactorName,
+-- dedupKey) is the claim primitive that makes pipeline replays safe — a
+-- second enqueue is a no-op via `createMany skipDuplicates`. projectId
+-- is part of the uniqueness contract so a caller that forgets to
+-- project-scope `dedupKey` cannot silently suppress another tenant's
+-- row for the same (reactorName, dedupKey) pair.
 
 -- CreateEnum
 CREATE TYPE "ReactorOutboxStatus" AS ENUM ('queued', 'dispatching', 'dispatched', 'failed_retryable', 'dead');
@@ -35,14 +38,21 @@ CREATE TABLE "ReactorOutbox" (
     CONSTRAINT "ReactorOutbox_pkey" PRIMARY KEY ("id")
 );
 
--- Claim primitive: a second enqueue for the same (reactorName, dedupKey)
--- is a no-op under `createMany skipDuplicates`. This is what makes
--- pipeline replays and retries safe.
-CREATE UNIQUE INDEX "ReactorOutbox_reactorName_dedupKey_key" ON "ReactorOutbox"("reactorName", "dedupKey");
+-- Claim primitive: a second enqueue for the same
+-- (projectId, reactorName, dedupKey) is a no-op under
+-- `createMany skipDuplicates`. This is what makes pipeline replays and
+-- retries safe. projectId is part of the uniqueness contract so a
+-- caller that forgets to project-scope `dedupKey` cannot silently
+-- suppress another tenant's row.
+CREATE UNIQUE INDEX "ReactorOutbox_projectId_reactorName_dedupKey_key" ON "ReactorOutbox"("projectId", "reactorName", "dedupKey");
 
 -- Drainer hot path: pick the next claimable row for a (project, reactor)
 -- whose backoff has elapsed.
 CREATE INDEX "ReactorOutbox_projectId_reactorName_status_nextAttemptAt_idx" ON "ReactorOutbox"("projectId", "reactorName", "status", "nextAttemptAt");
+
+-- Wakeup-driven lease scopes by (projectId, reactorName, groupKey) so
+-- one group's wakeup can't drain another group's ready rows.
+CREATE INDEX "ReactorOutbox_projectId_reactorName_groupKey_status_nextAttemptAt_idx" ON "ReactorOutbox"("projectId", "reactorName", "groupKey", "status", "nextAttemptAt");
 
 -- Operator surface: list stuck/dead dispatches per project.
 CREATE INDEX "ReactorOutbox_projectId_status_updatedAt_idx" ON "ReactorOutbox"("projectId", "status", "updatedAt");

@@ -12,6 +12,15 @@ export interface OutboxInsertRow {
 export interface OutboxLeaseQuery {
   projectId: string;
   reactorName: string;
+  /**
+   * When set, only rows whose `groupKey` equals this value are leased.
+   * A wakeup is scoped to one `groupKey` (the producer-derived
+   * `${projectId}/...` routing key); leasing without it would let one
+   * group's wakeup drain another group's ready rows, breaking the
+   * per-group ordering / backoff boundary the wakeup channel exists
+   * to preserve.
+   */
+  groupKey?: string;
   leasedUntil: Date;
   now: Date;
 }
@@ -52,7 +61,7 @@ export interface OutboxRepository {
    * Insert a row if one does not already exist for (reactorName,
    * dedupKey). Returns true when a row was inserted, false when a
    * pre-existing row deduplicated the call. This is the claim
-   * primitive — see ADR-022.
+   * primitive — see ADR-025.
    */
   insertIfAbsent(row: OutboxInsertRow): Promise<boolean>;
 
@@ -60,7 +69,7 @@ export interface OutboxRepository {
    * Atomically lease the next claimable row for (projectId,
    * reactorName) whose nextAttemptAt has elapsed. Updates status to
    * "dispatching", sets leasedUntil, increments attempts. Returns
-   * null when no row is claimable. See ADR-023 for why the lease
+   * null when no row is claimable. See ADR-026 for why the lease
    * lives in PG (not Redis).
    */
   leaseNext(query: OutboxLeaseQuery): Promise<OutboxRow | null>;

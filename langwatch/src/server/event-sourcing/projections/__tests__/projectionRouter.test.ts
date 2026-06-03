@@ -839,6 +839,36 @@ describe("ProjectionRouter", () => {
 
         expect(seen).toEqual(["first", "second", "third"]);
       });
+
+      /** @scenario Batched fold projections use the tenant retention policy */
+      it("stores the folded state with the tenant retention policy", async () => {
+        const retentionPolicy = { traces: 30, scenarios: 60, experiments: 90 };
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          createMockQueueManager(),
+          undefined,
+          undefined,
+          undefined,
+          { resolve: vi.fn().mockResolvedValue(retentionPolicy) },
+        );
+        const store = createMockFoldProjectionStore();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        const fold = batchFold(store);
+        router.registerFoldProjection(fold);
+
+        await (router as any).processFoldProjectionBatch(
+          "my-fold",
+          fold,
+          [makeBatchEvent("e1", 1000), makeBatchEvent("e2", 2000)],
+          { tenantId },
+        );
+
+        expect(store.store).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ retentionPolicy }),
+        );
+      });
     });
   });
 });

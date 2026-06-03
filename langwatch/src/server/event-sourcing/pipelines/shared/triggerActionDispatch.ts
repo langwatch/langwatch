@@ -22,7 +22,7 @@ const logger = createLogger("langwatch:trigger-action-dispatch");
 
 /**
  * Trigger actions split into two classes that dispatch on different schedules.
- * See dev/docs/adr/025-notify-persistent-action-classification.md.
+ * See dev/docs/adr/026-per-trigger-dispatch-timing.md.
  *
  * - Notify actions land in front of a human; they may be batched into a digest
  *   window to avoid notification storms.
@@ -56,7 +56,7 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
  *
  * Snapping (not `now + window`) is load-bearing — `now + window` gives every
  * match its own scheduled-for, so concurrent matches end up at slightly
- * different times and never coalesce. See ADR-023.
+ * different times and never coalesce. See ADR-026.
  */
 export function computeScheduledFor({
   action,
@@ -93,7 +93,7 @@ export type EnqueueSettle = (params: {
   triggerId: string;
   traceId: string;
   foldState: TraceSummaryData;
-  /** Per-trigger settle-window TTL (ADR-030). When omitted, the registry
+  /** Per-trigger settle-window TTL (ADR-026). When omitted, the registry
    *  falls back to `DEFAULT_TRACE_DEBOUNCE_MS`. */
   traceDebounceMs?: number;
 }) => Promise<void>;

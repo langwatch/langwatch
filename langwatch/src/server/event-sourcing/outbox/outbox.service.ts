@@ -72,12 +72,12 @@ export class OutboxService {
    *
    * Claim-once: when a row already exists, the second call's
    * `payload` / `groupKey` / `maxAttempts` are DISCARDED — the
-   * original row is the source of truth (ADR-022 row-per-match). A
+   * original row is the source of truth (ADR-025 row-per-match). A
    * caller that mutates the payload shape and replays will still
    * dispatch the original payload, by design.
    *
    * Validates that `groupKey` starts with `${projectId}/` so the
-   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-023). A
+   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-026). A
    * misformatted key would silently land in the wrong tenant bucket
    * for fair-scheduling purposes — failing here at enqueue is much
    * cheaper to debug than a starvation bug in production.
@@ -86,7 +86,21 @@ export class OutboxService {
     const required = `${params.projectId}/`;
     if (!params.groupKey.startsWith(required)) {
       throw new Error(
-        `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-023.`,
+        `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-026.`,
+      );
+    }
+    // The PG unique constraint is (projectId, reactorName, dedupKey),
+    // so a key that doesn't carry the project at all CAN still pass —
+    // but it makes operator log lines and debugging much worse, since
+    // the dedupKey value loses tenant identity. Match the groupKey
+    // convention: every `dedupKey` produced by an outbox reactor must
+    // begin with `${projectId}/`. A caller that forgets is more
+    // likely to also collide on (reactorName, dedupKey) across tenants
+    // before the schema's project-scoped uniqueness was added, so this
+    // check stays in place as a defence in depth.
+    if (!params.dedupKey.startsWith(required)) {
+      throw new Error(
+        `OutboxService.enqueue: dedupKey must start with "${required}" (got "${params.dedupKey}"). See ADR-025.`,
       );
     }
     const enqueued = await this.repository.insertIfAbsent({
@@ -111,6 +125,7 @@ export class OutboxService {
     return this.repository.leaseNext({
       projectId: params.projectId,
       reactorName: params.reactorName,
+      groupKey: params.groupKey,
       leasedUntil,
       now,
     });

@@ -1,11 +1,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
+  type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -479,6 +480,7 @@ interface ClickHouseSpanRecord {
   DroppedLinksCount: 0;
   CreatedAt: number;
   UpdatedAt: number;
+  _retention_days: number;
 }
 
 interface FullSpanRow {
@@ -1524,6 +1526,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedLinksCount: 0,
       CreatedAt: new Date(),
       UpdatedAt: new Date(),
+      _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     } satisfies ClickHouseSpanWriteRecord;
   }
 }

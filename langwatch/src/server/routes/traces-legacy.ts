@@ -12,8 +12,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { createShare } from "~/server/api/routers/share";
-import { unshareItem } from "~/server/api/routers/share";
+import { getApp } from "~/server/app-layer/app";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { prisma } from "~/server/db";
 import { generateAsciiTree } from "~/server/traces/trace-formatting";
@@ -164,7 +163,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (
 
   const traceId = c.req.param("id");
 
-  const share = await createShare({
+  const share = await getApp().share.createShare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
@@ -184,7 +183,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/unshare", async
 
   const traceId = c.req.param("id");
 
-  await unshareItem({
+  await getApp().share.unshare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,

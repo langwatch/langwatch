@@ -10,7 +10,7 @@ Feature: DispatchError contract for dispatch endpoints
   outbox worker can choose between scheduling a backoff retry and surfacing
   the row to an operator as dead.
 
-  See dev/docs/adr/025-typed-dispatcherror-contract.md.
+  See dev/docs/adr/027-typed-dispatcherror-contract.md.
 
   # Classification policy (shared across all dispatch endpoints)
 

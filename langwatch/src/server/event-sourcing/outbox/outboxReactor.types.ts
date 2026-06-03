@@ -1,5 +1,6 @@
 import type { Event } from "../domain/types";
 import type { ReactorContext, ReactorOptions } from "../reactors/reactor.types";
+import type { OutboxPayload } from "./outbox.types";
 
 /**
  * A single dispatch decision returned by an outbox reactor. The
@@ -10,7 +11,7 @@ import type { ReactorContext, ReactorOptions } from "../reactors/reactor.types";
 export interface OutboxEnqueueRequest {
   /**
    * Stable identity of the match. (reactorName, dedupKey) is the
-   * claim primitive — collisions deduplicate. See ADR-022.
+   * claim primitive — collisions deduplicate. See ADR-025.
    *
    * Convention (mirrors `groupKey` shape with a `${projectId}/`
    * prefix so dedup/group identifiers stay self-describing for
@@ -21,7 +22,7 @@ export interface OutboxEnqueueRequest {
    */
   dedupKey: string;
   /**
-   * GroupQueue routing key for the wakeup — see ADR-023. MUST begin
+   * GroupQueue routing key for the wakeup — see ADR-026. MUST begin
    * with `${projectId}/` because the outbox queue is free-standing
    * and bypasses `queueManager`'s automatic `${tenantId}/` wrapping;
    * the producer is responsible for the prefix so
@@ -36,9 +37,11 @@ export interface OutboxEnqueueRequest {
   groupKey: string;
   /**
    * Variable-size dispatch payload. Stays in PG; never carried in
-   * wakeup payloads.
+   * wakeup payloads. Typed as `OutboxPayload` (Prisma JSON-compatible)
+   * so non-serialisable values fail at compile time instead of when
+   * the row is persisted.
    */
-  payload: unknown;
+  payload: OutboxPayload;
   /**
    * Per-row override for the retry budget. Defaults to the
    * outbox-wide setting (8 attempts).
@@ -54,7 +57,7 @@ export interface OutboxEnqueueRequest {
  * Use `.withOutbox(projection, name, definition)` instead of
  * `.withReactor(...)` when the side effect MUST not be silently
  * swallowed (customer emails, Slack messages, dataset writes). See
- * ADR-024 for the criteria.
+ * ADR-025 for the criteria.
  *
  * Unlike a `ReactorDefinition`, an outbox reactor does not perform
  * the side effect inline. It only decides — by returning enqueue

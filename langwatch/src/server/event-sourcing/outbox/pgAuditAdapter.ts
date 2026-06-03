@@ -9,7 +9,7 @@ const SETTLE_NO_MATCH_REASON = "settle: no match";
 
 /**
  * Projects every outbox queue lifecycle event into a `ReactorOutbox`
- * row (ADR-021 revision).
+ * row (ADR-025 revision).
  *
  * One row per (trigger, trace) — both settle and cadence stages
  * target the same row via the shared `auditDedupKey` on the payload.
@@ -120,9 +120,18 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     }
   }
 
-  async onLeased(event: { payload: OutboxJob }): Promise<void> {
+  async onLeased(event: {
+    payload: OutboxJob;
+    attempt: number;
+    leasedUntil?: Date;
+  }): Promise<void> {
     const p = event.payload;
     if (!isSettle(p) && !isCadence(p)) return;
+    // Set `attempts` to the queue's authoritative attempt counter
+    // instead of incrementing — the queue's `attempt` is the source of
+    // truth, and incrementing on every onLeased can drift if a hook
+    // fires twice (sibling onLeased for coalesced batches replays the
+    // same row).
     await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
         where: {
@@ -130,7 +139,11 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
           reactorName: p.reactorName,
           dedupKey: p.auditDedupKey,
         },
-        data: { status: "dispatching", attempts: { increment: 1 } },
+        data: {
+          status: "dispatching",
+          attempts: event.attempt,
+          ...(event.leasedUntil ? { leasedUntil: event.leasedUntil } : {}),
+        },
       }),
     );
   }
@@ -138,13 +151,17 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
   async onDispatched(event: {
     payload: OutboxJob;
     at: Date;
+    attempt: number;
   }): Promise<void> {
     const p = event.payload;
     if (isSettle(p)) {
       // Conditional CAS: only mark dispatched if the row is still in
-      // "dispatching". If cadence already re-enqueued (settle matched
-      // + claimed), status is back to "queued" and the WHERE doesn't
-      // match — this becomes a no-op, which is correct.
+      // "dispatching" with the same `attempts` we leased. If cadence
+      // already re-enqueued (settle matched + claimed), status is back
+      // to "queued" and the WHERE doesn't match — this becomes a
+      // no-op, which is correct. The `attempts` CAS additionally
+      // protects against a stale settle attempt overwriting a row
+      // that's been re-leased after a stuck sweep.
       await this.write(() =>
         this.prisma.reactorOutbox.updateMany({
           where: {
@@ -152,28 +169,36 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
             reactorName: p.reactorName,
             dedupKey: p.auditDedupKey,
             status: "dispatching",
+            attempts: event.attempt,
           },
           data: {
             status: "dispatched",
             dispatchedAt: event.at,
             lastError: SETTLE_NO_MATCH_REASON,
+            leasedUntil: null,
           },
         }),
       );
       return;
     }
     if (isCadence(p)) {
+      // Cadence's terminal transitions CAS on (status='dispatching',
+      // attempts=event.attempt) so a late event from a stale lease can't
+      // overwrite a row that a stuck sweep re-leased to a new attempt.
       await this.write(() =>
         this.prisma.reactorOutbox.updateMany({
           where: {
             projectId: p.projectId,
             reactorName: p.reactorName,
             dedupKey: p.auditDedupKey,
+            status: "dispatching",
+            attempts: event.attempt,
           },
           data: {
             status: "dispatched",
             dispatchedAt: event.at,
             lastError: null,
+            leasedUntil: null,
           },
         }),
       );
@@ -185,26 +210,28 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     error: string;
     willRetry: boolean;
     nextAttemptAt?: Date;
+    attempt: number;
   }): Promise<void> {
     const p = event.payload;
     if (!isSettle(p) && !isCadence(p)) return;
-    const baseWhere = {
-      projectId: p.projectId,
-      reactorName: p.reactorName,
-      dedupKey: p.auditDedupKey,
-    };
-    // Settle's onFailed is conditional (only update if still leased).
-    // Cadence's onFailed is unconditional (it owns the row at that point).
-    const where = isSettle(p)
-      ? { ...baseWhere, status: "dispatching" as const }
-      : baseWhere;
+    // CAS on (status='dispatching', attempts=event.attempt) for BOTH
+    // stages. The previous code only CAS-protected settle; cadence
+    // would overwrite a re-leased row's newer state if a stale attempt
+    // reported back after the lease expired.
     await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
-        where,
+        where: {
+          projectId: p.projectId,
+          reactorName: p.reactorName,
+          dedupKey: p.auditDedupKey,
+          status: "dispatching",
+          attempts: event.attempt,
+        },
         data: {
           status: event.willRetry ? "failed_retryable" : "dead",
           lastError: event.error,
           lastErrorAt: new Date(),
+          leasedUntil: null,
           ...(event.willRetry && event.nextAttemptAt
             ? { nextAttemptAt: event.nextAttemptAt }
             : { nextAttemptAt: null }),
@@ -216,25 +243,25 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
   async onDead(event: {
     payload: OutboxJob;
     lastError: string;
+    attempt: number;
   }): Promise<void> {
     const p = event.payload;
     if (!isSettle(p) && !isCadence(p)) return;
-    const baseWhere = {
-      projectId: p.projectId,
-      reactorName: p.reactorName,
-      dedupKey: p.auditDedupKey,
-    };
-    const where = isSettle(p)
-      ? { ...baseWhere, status: "dispatching" as const }
-      : baseWhere;
     await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
-        where,
+        where: {
+          projectId: p.projectId,
+          reactorName: p.reactorName,
+          dedupKey: p.auditDedupKey,
+          status: "dispatching",
+          attempts: event.attempt,
+        },
         data: {
           status: "dead",
           lastError: event.lastError,
           lastErrorAt: new Date(),
           nextAttemptAt: null,
+          leasedUntil: null,
         },
       }),
     );

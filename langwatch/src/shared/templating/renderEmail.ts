@@ -59,10 +59,16 @@ export async function renderTriggerEmail({
     context: ctx,
   });
 
-  const clipped = clipSubject(subjectRender.output);
-  const subject = testFire
-    ? `${TEST_FIRE_EMAIL_SUBJECT_PREFIX}${clipped}`
-    : clipped;
+  // Clip AFTER the test-fire prefix is prepended so the final subject
+  // respects EMAIL_SUBJECT_MAX_LENGTH end-to-end. Clipping the rendered
+  // subject first and then prepending the prefix means a near-max
+  // template + prefix exceeds the cap a downstream mailer might bounce
+  // on, and any test-fire-mode mail client display also runs over.
+  const subject = clipSubject(
+    testFire
+      ? `${TEST_FIRE_EMAIL_SUBJECT_PREFIX}${subjectRender.output}`
+      : subjectRender.output,
+  );
 
   const html = wrapEmailHtml({
     bodyHtml: markdownToEmailHtml(bodyRender.output),

@@ -7,6 +7,13 @@ import sanitizeHtml from "sanitize-html";
  * styles, links forced to open in a new tab with `rel="noopener noreferrer"`.
  * Customer-authored content flows through here, so the allowlist is the trust
  * boundary.
+ *
+ * `<img>` is deliberately NOT on the allowlist: a customer-authored template
+ * could otherwise embed a third-party tracking pixel, and every recipient's
+ * email client would fetch it — leaking recipient metadata (read time, IP,
+ * client hints) to whoever the template author chose. Inline images via
+ * markdown are not a hard requirement for trigger emails, so the allowlist
+ * is closed.
  */
 const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
@@ -29,7 +36,6 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     "del",
     "hr",
     "br",
-    "img",
     "table",
     "thead",
     "tbody",
@@ -39,7 +45,6 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   ],
   allowedAttributes: {
     a: ["href", "title", "target", "rel"],
-    img: ["src", "alt", "title", "width", "height"],
   },
   allowedSchemes: ["http", "https", "mailto"],
   transformTags: {
