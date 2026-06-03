@@ -41,12 +41,16 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "codex") {
     // Codex 0.130+ links the opentelemetry-otlp Rust SDK and reads the
     // standard OTEL_EXPORTER_OTLP_* env vars, but the actual exporter
-    // is gated on a config.toml entry — "No OTEL exporter enabled in
-    // settings." is the no-op path. Users must add an [otel] block to
-    // ~/.codex/config.toml to activate emission; once active, these
-    // env vars route spans here. The wrapper env injection is a
-    // forward-looking placeholder until codex ships an env-var enable.
+    // is gated on a config.toml entry. Users must add an [otel] block
+    // to ~/.codex/config.toml to activate emission; once active, these
+    // env vars route spans here. The toml step is surfaced inline so a
+    // user pasting only the env block into their shell doesn't end up
+    // with a silent no-op.
     return [
+      `# Codex requires one-time activation in ~/.codex/config.toml:`,
+      `#   [otel]`,
+      `#   exporter = { kind = "otlp_http" }`,
+      `# Without that block, codex links the OTel SDK but emits nothing.`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
       base,
