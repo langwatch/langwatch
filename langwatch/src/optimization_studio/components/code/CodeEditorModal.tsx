@@ -249,7 +249,7 @@ export function CodeEditor({
       height="100%"
       defaultLanguage={language}
       defaultValue={code}
-      onChange={(value) => {
+      onChange={(value: string | undefined) => {
         // Monaco hands us `string | undefined`; treat undefined as empty so
         // deleting everything still propagates state.
         setCode(value ?? "");

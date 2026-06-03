@@ -689,13 +689,12 @@ function registerSignatureHelp(monaco: Monaco): IDisposable {
       const sigLabel = entry.signature ?? label ?? callee;
       // Cheap parameter slice: anything between the first `(` and the matching `)`.
       const paramListMatch = /\(([^)]*)\)/.exec(sigLabel);
-      const params = paramListMatch
-        ? paramListMatch[1]
-            .split(",")
-            .map((p) => p.trim())
-            .filter((p) => p.length > 0)
-            .map((p) => ({ label: p }))
-        : [];
+      const paramListInner = paramListMatch?.[1] ?? "";
+      const params = paramListInner
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0)
+        .map((p) => ({ label: p }));
       const activeArgIdx = lineBefore
         .slice(openIdx + 1)
         .split(",").length - 1;
@@ -785,10 +784,14 @@ function registerFormatter(monaco: Monaco): IDisposable {
  * full Python parser; it catches the structural mistakes users hit most
  * without a server round-trip.
  */
+interface ValidatorHandle extends IDisposable {
+  revalidate: () => void;
+}
+
 function registerValidator(
   monaco: Monaco,
   contractRef: ContractRef,
-): IDisposable {
+): ValidatorHandle {
   const owner = "langwatch-python-lint";
 
   const validate = (model: editor.ITextModel): void => {
