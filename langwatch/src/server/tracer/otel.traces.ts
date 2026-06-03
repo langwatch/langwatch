@@ -189,6 +189,12 @@ const openTelemetryTraceRequestToTraceForCollection = (
             const value = attribute?.value?.stringValue;
             if (
               attribute.key in openTelemetryToLangWatchMetadataMapping &&
+              // telemetry.sdk.* are standard SDK-provenance resource attributes
+              // present on every OTLP trace, which LangWatch has always
+              // surfaced as custom metadata. Leave them there to preserve that
+              // behaviour and keep this change scoped to the trace-identity
+              // keys Langy relies on (tag.tags, langwatch.thread.id, ...).
+              !attribute.key.startsWith("telemetry.sdk.") &&
               value != null
             ) {
               resourceReservedSource[attribute.key] = value;
