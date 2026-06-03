@@ -53,34 +53,56 @@ const FONT_FAMILY =
 function parseArgs(argv) {
   /** @type {Opts} */
   const out = { width: 1280, bg: "#0d1117", fg: "#e6edf3" };
+  const valueFlags = new Set([
+    "--input",
+    "-i",
+    "--out",
+    "-o",
+    "--title",
+    "--width",
+    "--bg",
+    "--fg",
+  ]);
+  /**
+   * @param {string} flag
+   * @param {string | undefined} val
+   * @returns {string}
+   */
+  const requireVal = (flag, val) => {
+    if (val === undefined || valueFlags.has(val) || val === "--help" || val === "-h") {
+      process.stderr.write(`Missing value for ${flag}\n`);
+      process.exit(1);
+    }
+    return val;
+  };
   for (let i = 2; i < argv.length; i++) {
     const flag = argv[i];
     const val = argv[i + 1];
     switch (flag) {
       case "--input":
       case "-i":
-        out.input = val;
+        out.input = requireVal(flag, val);
         i++;
         break;
       case "--out":
       case "-o":
-        out.out = val;
+        out.out = requireVal(flag, val);
         i++;
         break;
       case "--title":
-        out.title = val;
+        out.title = requireVal(flag, val);
         i++;
         break;
       case "--width":
-        out.width = Number(val) || out.width;
+        out.width = Number(requireVal(flag, val)) || out.width;
         i++;
         break;
       case "--bg":
-        if (val) out.bg = val;
+        out.bg = requireVal(flag, val);
         i++;
         break;
       case "--fg":
-        if (val) out.fg = val;
+        out.fg = requireVal(flag, val);
         i++;
         break;
       case "--help":
@@ -112,8 +134,13 @@ function xmlEscape(s) {
 /** @param {string} s */
 function stripAnsi(s) {
   // Remove CSI / OSC / SGR sequences so they don't render literally.
+  // CSI:   ESC `[` <params> <final-byte> — color codes, cursor moves.
+  // OSC:   ESC `]` <payload> (BEL | ESC `\`) — terminal hyperlinks, titles.
   // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
+  return s
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+    .replace(/\r/g, "");
 }
 
 /**
