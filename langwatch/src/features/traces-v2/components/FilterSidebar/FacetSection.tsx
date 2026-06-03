@@ -221,16 +221,24 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
-                const value = searchQuery.trim();
-                if (!value) return;
-                // Apply the typed value as a filter even when no
-                // discovered facet matches — needed for rare values
+                const typed = searchQuery.trim();
+                if (!typed) return;
+                // Prefer an exact match against a known FacetItem so
+                // facets where label !== value (friendly topic names,
+                // etc.) submit `value` rather than the typed `label`.
+                // Fall back to the raw typed value for rare values
                 // (a one-off `metadata.tenant`, a long error string
                 // copy-pasted from a log) that don't surface in the
                 // top-50 facet response. Toggle is symmetric: typing
                 // the same value again removes the filter.
+                const lowered = typed.toLowerCase();
+                const matched = items.find(
+                  (i) =>
+                    i.value.toLowerCase() === lowered ||
+                    i.label.toLowerCase() === lowered,
+                );
                 e.preventDefault();
-                handleToggle(value);
+                handleToggle(matched?.value ?? typed);
                 setSearchQuery("");
               }}
               textStyle="xs"
@@ -261,7 +269,14 @@ function filterAndSortItems({
   const sorted = [...items].sort((a, b) => b.count - a.count);
   if (!searchQuery) return sorted;
   const q = searchQuery.toLowerCase();
-  return sorted.filter((i) => i.label.toLowerCase().includes(q));
+  // Match both label and value: for facets where label !== value
+  // (friendly topic names, IDs displayed with a label), typing
+  // either should reveal the row.
+  return sorted.filter(
+    (i) =>
+      i.label.toLowerCase().includes(q) ||
+      i.value.toLowerCase().includes(q),
+  );
 }
 
 interface FacetWindow {
