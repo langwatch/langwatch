@@ -15,7 +15,8 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest
 // Mock the Redis module so startScenarioProcessor uses the test Redis connection.
 // The getter is wired in beforeAll after testContainers starts.
 let _testRedis: any = null;
-vi.mock("~/server/redis", () => ({
+vi.mock("~/server/redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/redis")>()),
   get connection() { return _testRedis; },
 }));
 import {

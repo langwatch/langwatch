@@ -343,16 +343,16 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // clickhouse-experiment-run.service.ts: entire file (@regression #3158)
+  // experiment-run.service.ts: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
-  describe("ClickHouseExperimentRunService (entire file)", () => {
+  describe("ExperimentRunService (entire file)", () => {
     const experimentRunServicePath = path.resolve(
       __dirname,
       "..",
       "..",
       "experiments-v3",
       "services",
-      "clickhouse-experiment-run.service.ts",
+      "experiment-run.service.ts",
     );
     const experimentRunServiceSource = fs.readFileSync(
       experimentRunServicePath,
