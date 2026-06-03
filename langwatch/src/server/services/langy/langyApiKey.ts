@@ -68,10 +68,14 @@ export async function getLangyApiKeyToken(
   prisma: PrismaClient,
   projectId: string,
 ): Promise<string | null> {
-  const secret = await prisma.projectSecret.findUnique({
-    where: {
-      projectId_name: { projectId, name: LANGY_API_KEY_SECRET_NAME },
-    },
+  // findFirst with an explicit `projectId` (NOT findUnique-by-`projectId_name`):
+  // the request-scoped prisma client runs a multitenancy guard that recognizes a
+  // plain `projectId` predicate but NOT the `projectId_name` compound key, and
+  // would otherwise throw "requires a 'projectId' in the where clause". This is
+  // why the creation-hook mint silently failed under ctx.prisma. ProjectSecret is
+  // unique on (projectId, name), so this still returns exactly the one row.
+  const secret = await prisma.projectSecret.findFirst({
+    where: { projectId, name: LANGY_API_KEY_SECRET_NAME },
     select: { encryptedValue: true },
   });
   return secret ? decrypt(secret.encryptedValue) : null;

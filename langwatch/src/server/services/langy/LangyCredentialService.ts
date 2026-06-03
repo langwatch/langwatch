@@ -124,10 +124,12 @@ export class LangyCredentialService {
     organizationId: string;
     actorUserId: string;
   }): Promise<string> {
-    const existing = await this.prisma.projectSecret.findUnique({
-      where: {
-        projectId_name: { projectId, name: LANGY_VK_SECRET_NAME },
-      },
+    // findFirst with a plain `projectId` (not findUnique-by-`projectId_name`):
+    // the guarded prisma client's multitenancy middleware doesn't recognize the
+    // `projectId_name` compound key and throws. ProjectSecret is unique on
+    // (projectId, name), so this is still a single-row read.
+    const existing = await this.prisma.projectSecret.findFirst({
+      where: { projectId, name: LANGY_VK_SECRET_NAME },
       select: { encryptedValue: true },
     });
     if (existing) {
@@ -171,10 +173,8 @@ export class LangyCredentialService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        const winner = await this.prisma.projectSecret.findUnique({
-          where: {
-            projectId_name: { projectId, name: LANGY_VK_SECRET_NAME },
-          },
+        const winner = await this.prisma.projectSecret.findFirst({
+          where: { projectId, name: LANGY_VK_SECRET_NAME },
           select: { encryptedValue: true },
         });
         if (winner) return decrypt(winner.encryptedValue);
