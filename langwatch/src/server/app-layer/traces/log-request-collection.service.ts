@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -12,6 +14,21 @@ import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+
+/**
+ * Claude Code 2.1.x emits its OTLP logs with NO trace context — the
+ * standard exporter does not carry a current span when these fire
+ * since the cost-bearing api_request events are not wrapped in one.
+ * Without a trace_id+span_id the receiver writes empty-id rows and
+ * the fold projection skips them, so /me/traces shows nothing.
+ *
+ * Synthesizing stable ids from the event's own correlation keys
+ * (session.id groups every turn into one trace; prompt.id +
+ * event.name + event.sequence make each event a distinct row) lets
+ * the existing fold + I/O extractors do their job unchanged.
+ */
+const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
+
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
 }
@@ -85,16 +102,26 @@ export class LogRequestCollectionService {
                 // exporter is the canonical caller). Store an empty
                 // string instead; downstream join-to-span queries simply
                 // find no correlation, which is the correct semantics.
-                const traceId = logRecord.traceId
+                const wireTraceId = logRecord.traceId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.traceId as string | Uint8Array,
                     ) ?? ""
                   : "";
-                const spanId = logRecord.spanId
+                const wireSpanId = logRecord.spanId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.spanId as string | Uint8Array,
                     ) ?? ""
                   : "";
+
+                const logAttrs = normalizeOtlpAttributeMap(
+                  logRecord.attributes,
+                );
+                const { traceId, spanId } = synthesizeClaudeCodeIdsIfMissing({
+                  scopeName,
+                  wireTraceId,
+                  wireSpanId,
+                  attrs: logAttrs,
+                });
 
                 const timeUnixMs = logRecord.timeUnixNano
                   ? TraceRequestUtils.convertUnixNanoToUnixMs(
@@ -106,10 +133,6 @@ export class LogRequestCollectionService {
                       ),
                     )
                   : Date.now();
-
-                const logAttrs = normalizeOtlpAttributeMap(
-                  logRecord.attributes,
-                );
 
                 await this.deps.recordLog({
                   tenantId,
@@ -149,6 +172,60 @@ export class LogRequestCollectionService {
       },
     );
   }
+}
+
+/**
+ * Synthesize trace_id + span_id for claude_code log records that
+ * arrive without trace context (the normal case — Claude Code 2.1.x
+ * emits its api_request / user_prompt events outside any active
+ * span). Returns the wire ids unchanged for any other scope, or when
+ * the wire ids ARE present.
+ *
+ * Stability contract:
+ *   - trace_id = sha256(session.id) truncated to 32 hex.
+ *     Every turn of a single Claude Code session collapses into
+ *     one trace row — matches the /me/traces UX user expects.
+ *   - span_id = sha256(session.id || ':' || prompt.id || ':' ||
+ *     event.name || ':' || event.sequence) truncated to 16 hex.
+ *     Each event (user_prompt + api_request + tool_decision + …)
+ *     becomes its own log row under that trace, idempotent under
+ *     re-ingest through the stored_log_records ReplacingMergeTree.
+ *
+ * When session.id is missing we leave the ids empty rather than
+ * inventing them — the record still lands in stored_log_records
+ * with empty trace context (the c56eced2d behavior), and a future
+ * caller with session.id will get correlated correctly.
+ */
+function synthesizeClaudeCodeIdsIfMissing(args: {
+  scopeName: string;
+  wireTraceId: string;
+  wireSpanId: string;
+  attrs: Record<string, string>;
+}): { traceId: string; spanId: string } {
+  const { scopeName, wireTraceId, wireSpanId, attrs } = args;
+  if (scopeName !== CLAUDE_CODE_EVENT_SCOPE) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  if (wireTraceId && wireSpanId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const sessionId = attrs["session.id"];
+  if (!sessionId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const promptId = attrs["prompt.id"] ?? "";
+  const eventName = attrs["event.name"] ?? "";
+  const eventSequence = attrs["event.sequence"] ?? "";
+  const traceId = wireTraceId
+    ? wireTraceId
+    : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+  const spanId = wireSpanId
+    ? wireSpanId
+    : createHash("sha256")
+        .update(`${sessionId}:${promptId}:${eventName}:${eventSequence}`)
+        .digest("hex")
+        .slice(0, 16);
+  return { traceId, spanId };
 }
 
 /**

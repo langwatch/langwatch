@@ -9,6 +9,7 @@ export {
   TraceIOAccumulationService,
   shouldOverrideOutput,
   extractIOFromLogRecord,
+  extractClaudeCodeApiRequestMetrics,
   OUTPUT_SOURCE,
 } from "./trace-io-accumulation.service";
 export { TracePromptAccumulationService } from "./trace-prompt-accumulation.service";

@@ -47,6 +47,7 @@ import {
   TraceNameResolutionService,
   shouldOverrideOutput,
   extractIOFromLogRecord,
+  extractClaudeCodeApiRequestMetrics,
   OUTPUT_SOURCE,
 } from "./services";
 
@@ -358,6 +359,43 @@ export class TraceSummaryFoldProjection
         mergedAttributes["langwatch.reserved.output_source"] =
           OUTPUT_SOURCE.INFERRED;
         delete mergedAttributes["langwatch.reserved.output_is_fallback"];
+      }
+    }
+
+    // Lift cost / tokens / model off a claude_code.api_request
+    // event onto the canonical langwatch.* attributes so the trace
+    // renders the same shape as a real gen_ai span. Stored as
+    // strings on attributes (matches how every other lift writes
+    // here). The four numeric tokens are intentionally lifted to
+    // distinct keys; conflating cache_creation vs cache_read would
+    // mis-bill at the trace-summary layer.
+    const cc = extractClaudeCodeApiRequestMetrics(event.data);
+    if (cc !== null) {
+      if (cc.model !== null) {
+        mergedAttributes["langwatch.model"] = cc.model;
+      }
+      if (cc.costUsd !== null) {
+        mergedAttributes["langwatch.cost.usd"] = String(cc.costUsd);
+      }
+      if (cc.inputTokens !== null) {
+        mergedAttributes["langwatch.input_tokens"] = String(cc.inputTokens);
+      }
+      if (cc.outputTokens !== null) {
+        mergedAttributes["langwatch.output_tokens"] = String(cc.outputTokens);
+      }
+      if (cc.cacheReadTokens !== null) {
+        mergedAttributes["langwatch.cache_read_tokens"] = String(
+          cc.cacheReadTokens,
+        );
+      }
+      if (cc.cacheCreationTokens !== null) {
+        mergedAttributes["langwatch.cache_creation_tokens"] = String(
+          cc.cacheCreationTokens,
+        );
+      }
+      const sessionId = event.data.attributes["session.id"];
+      if (typeof sessionId === "string" && sessionId.length > 0) {
+        mergedAttributes["langwatch.thread.id"] = sessionId;
       }
     }
 

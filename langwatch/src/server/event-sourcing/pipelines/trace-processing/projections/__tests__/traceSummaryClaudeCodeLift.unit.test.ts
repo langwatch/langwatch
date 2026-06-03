@@ -1,0 +1,154 @@
+/**
+ * Fold-projection regression tests for the claude_code.api_request
+ * cost/tokens/model lift in handleTraceLogRecordReceived.
+ *
+ * Verifies the fold writes the canonical langwatch.* attributes
+ * onto the trace_summary state when a Claude Code api_request log
+ * lands with synthesized trace context. Without this lift, the
+ * trace UI shows blank cost/tokens/model even when the underlying
+ * log records carry them.
+ *
+ * Includes the cache_read vs cache_creation distinct-value
+ * regression — silently swapping those would misreport customer
+ * cost by ~12× in either direction.
+ */
+import { describe, expect, it } from "vitest";
+
+import { createTenantId } from "~/server/event-sourcing";
+
+import {
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+} from "../../schemas/constants";
+import type { LogRecordReceivedEvent } from "../../schemas/events";
+import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
+import { createInitState } from "./fixtures/trace-summary-test.fixtures";
+
+function makeProjection() {
+  return new TraceSummaryFoldProjection({
+    store: { store: async () => {}, get: async () => null },
+  });
+}
+
+function makeClaudeApiRequestEvent(
+  attrs: Record<string, string>,
+): LogRecordReceivedEvent {
+  return {
+    id: `evt-claude-api`,
+    type: LOG_RECORD_RECEIVED_EVENT_TYPE,
+    version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+    aggregateType: "trace",
+    aggregateId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: 1700000000000,
+    occurredAt: 1700000000000,
+    data: {
+      traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      spanId: "1122334455667788",
+      timeUnixMs: 1700000000000,
+      severityNumber: 9,
+      severityText: "INFO",
+      body: "claude_code.api_request",
+      attributes: {
+        "event.name": "api_request",
+        ...attrs,
+      },
+      resourceAttributes: { "service.name": "claude-code" },
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: "2.1.162",
+      piiRedactionLevel: "ESSENTIAL",
+    },
+    metadata: {},
+  };
+}
+
+describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
+  describe("when an api_request log carries cost, tokens, and model", () => {
+    it("lifts model + cost_usd + tokens onto langwatch.* canonical attributes", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+
+      const after = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          "session.id": "sess_42",
+          model: "claude-haiku-4-5-20251001",
+          cost_usd: "0.001234",
+          input_tokens: "462",
+          output_tokens: "39",
+          cache_read_tokens: "5",
+          cache_creation_tokens: "17",
+        }),
+        state,
+      );
+
+      expect(after.attributes["langwatch.model"]).toBe(
+        "claude-haiku-4-5-20251001",
+      );
+      expect(after.attributes["langwatch.cost.usd"]).toBe("0.001234");
+      expect(after.attributes["langwatch.input_tokens"]).toBe("462");
+      expect(after.attributes["langwatch.output_tokens"]).toBe("39");
+      expect(after.attributes["langwatch.thread.id"]).toBe("sess_42");
+    });
+
+    /**
+     * REGRESSION GUARD — anthropic's cache pricing tiers:
+     *   cache_creation ~1.25× regular input (writing)
+     *   cache_read     ~0.10× regular input (reading)
+     * A field-swap would silently mis-bill by ~12× in either
+     * direction. Distinct numeric values + by-name assertions
+     * make any flip visible at the test layer.
+     */
+    it("keeps cache_read distinct from cache_creation (no swap)", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+
+      const after = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          "session.id": "s",
+          model: "claude-opus-4-7",
+          cache_read_tokens: "1000",
+          cache_creation_tokens: "2000",
+        }),
+        state,
+      );
+      expect(after.attributes["langwatch.cache_read_tokens"]).toBe("1000");
+      expect(after.attributes["langwatch.cache_creation_tokens"]).toBe("2000");
+      expect(after.attributes["langwatch.cache_read_tokens"]).not.toBe(
+        after.attributes["langwatch.cache_creation_tokens"],
+      );
+    });
+
+    it("does NOT touch langwatch.* keys when the record is user_prompt", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({
+        "session.id": "s",
+        prompt: "What is 2+2?",
+      });
+      ev.data.attributes["event.name"] = "user_prompt";
+      ev.data.body = "claude_code.user_prompt";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
+      expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
+      expect(after.attributes["langwatch.model"]).toBeUndefined();
+    });
+  });
+
+  describe("when api_request comes from a non-claude scope", () => {
+    it("does NOT misfire on codex.api_request even with same event.name", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({
+        "session.id": "s",
+        model: "gpt-5",
+        cost_usd: "0.5",
+      });
+      ev.data.scopeName = "com.openai.codex.events";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
+      expect(after.attributes["langwatch.model"]).toBeUndefined();
+    });
+  });
+});

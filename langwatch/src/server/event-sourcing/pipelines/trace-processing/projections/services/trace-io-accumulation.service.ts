@@ -73,6 +73,65 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
 }
 
 /**
+ * Lift cost / token / model fields off a Claude Code
+ * `claude_code.api_request` log record into the canonical
+ * `langwatch.*` attributes the trace UI renders.
+ *
+ * Anthropic semantics — preserved carefully:
+ *   - `input_tokens`           = uncached input tokens (regular rate)
+ *   - `output_tokens`          = output tokens
+ *   - `cache_creation_tokens`  = tokens WRITTEN to cache (≥ 1.25× input rate)
+ *   - `cache_read_tokens`      = tokens READ from cache (~0.1× input rate)
+ * The two cache fields MUST NOT be swapped — they have very
+ * different billing rates and any flip would silently misreport
+ * customer cost. The unit suite includes an explicit regression
+ * test asserting each lifted field by name.
+ *
+ * Returns `null` when the record is anything other than a
+ * `claude_code.api_request` event so the caller can skip
+ * application without an extra check.
+ */
+export function extractClaudeCodeApiRequestMetrics(
+  data: LogRecordReceivedEventData,
+): {
+  model: string | null;
+  costUsd: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+} | null {
+  if (!CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) return null;
+  const eventName = data.attributes["event.name"];
+  if (eventName !== "api_request") return null;
+
+  const asNumber = (key: string): number | null => {
+    const raw = data.attributes[key];
+    if (raw === undefined || raw === null || raw === "") return null;
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number(raw)
+          : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const asString = (key: string): string | null => {
+    const raw = data.attributes[key];
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  };
+
+  return {
+    model: asString("model"),
+    costUsd: asNumber("cost_usd"),
+    inputTokens: asNumber("input_tokens"),
+    outputTokens: asNumber("output_tokens"),
+    cacheReadTokens: asNumber("cache_read_tokens"),
+    cacheCreationTokens: asNumber("cache_creation_tokens"),
+  };
+}
+
+/**
  * Accumulates computed input/output across spans using priority rules:
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
  */
