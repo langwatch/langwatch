@@ -6,11 +6,10 @@ message: >
 severity: warning
 language: Tsx
 rule:
-  any:
-    - pattern: $X ?? "http://localhost$REST"
-    - pattern: $X ?? "https://localhost$REST"
-    - pattern: $X ?? `http://localhost$$$REST`
-    - pattern: $X ?? `https://localhost$$$REST`
+  pattern: $X ?? $R
+constraints:
+  R:
+    regex: '^["''`]?https?://localhost([:/?#].*)?["''`]?$'
 files:
   - "langwatch/src/**/*.tsx"
 ignores:

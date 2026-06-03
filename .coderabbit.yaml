@@ -131,8 +131,9 @@ reviews:
 
         FAIL when this file imports from `~/components`, `~/components/...`,
         or any `langwatch/src/components/**` path. Server-layer code and
-        service-layer code must not depend on UI components. The dependency
-        direction is UI → services → server, never the reverse.
+        service-layer code must not depend on UI components. Allowed
+        dependency direction is UI → services and UI → server; the reverse
+        (server or service code importing UI) is never allowed.
 
     # Class component ban — restrict to component-bearing surface to keep
     # this from getting noisy on non-component files.
@@ -164,7 +165,7 @@ reviews:
         jest dependencies are out of scope here — promotion of this rule
         depends on a separate jest → vitest migration.
 
-    - path: "langwatch/src/server/api/routers/**/*.{ts,tsx}"
+    - path: "langwatch/src/server/{repositories,services}/**/*.{ts,tsx}"
       instructions: |
         Repository methods (under `langwatch/src/server/repositories/**`)
         must be named `findAll` / `findById` / `findBy*` / `create` / `update`

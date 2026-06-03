@@ -33,25 +33,25 @@ rules:
     patterns:
       - pattern-either:
           # Literal PII keys
-          - pattern: logger.$LEVEL($..., { ..., email: $E, ... }, $...)
-          - pattern: logger.$LEVEL($..., { ..., phone: $P, ... }, $...)
-          - pattern: logger.$LEVEL($..., { ..., userId: $U, ... }, $...)
-          - pattern: logger.$LEVEL($..., { ..., apiKey: $K, ... }, $...)
-          - pattern: logger.$LEVEL($..., { ..., token: $T, ... }, $...)
-          - pattern: console.$LEVEL($..., { ..., email: $E, ... }, $...)
-          - pattern: console.$LEVEL($..., { ..., userId: $U, ... }, $...)
-          - pattern: console.$LEVEL($..., { ..., apiKey: $K, ... }, $...)
-          - pattern: console.$LEVEL($..., { ..., token: $T, ... }, $...)
+          - pattern: 'logger.$LEVEL($..., { ..., email: $E, ... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { ..., phone: $P, ... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { ..., userId: $U, ... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { ..., apiKey: $K, ... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { ..., token: $T, ... }, $...)'
+          - pattern: 'console.$LEVEL($..., { ..., email: $E, ... }, $...)'
+          - pattern: 'console.$LEVEL($..., { ..., userId: $U, ... }, $...)'
+          - pattern: 'console.$LEVEL($..., { ..., apiKey: $K, ... }, $...)'
+          - pattern: 'console.$LEVEL($..., { ..., token: $T, ... }, $...)'
           # Spread of a user/session/account object
-          - pattern: logger.$LEVEL($..., { ...$USER, $... }, $...)
-          - pattern: console.$LEVEL($..., { ...$USER, $... }, $...)
+          - pattern: 'logger.$LEVEL($..., { ...$USER, $... }, $...)'
+          - pattern: 'console.$LEVEL($..., { ...$USER, $... }, $...)'
           # Shorthand property with a user-shaped name
-          - pattern: logger.$LEVEL($..., { user: $U, $... }, $...)
-          - pattern: logger.$LEVEL($..., { session: $S, $... }, $...)
-          - pattern: logger.$LEVEL($..., { account: $A, $... }, $...)
-          - pattern: logger.$LEVEL($..., { user }, $...)
-          - pattern: logger.$LEVEL($..., { session }, $...)
-          - pattern: logger.$LEVEL($..., { account }, $...)
+          - pattern: 'logger.$LEVEL($..., { user: $U, $... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { session: $S, $... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { account: $A, $... }, $...)'
+          - pattern: 'logger.$LEVEL($..., { user }, $...)'
+          - pattern: 'logger.$LEVEL($..., { session }, $...)'
+          - pattern: 'logger.$LEVEL($..., { account }, $...)'
 
   # ── PII regex literals outside fixtures ────────────────────────────────
   # SSN dropped: 3-2-4-digit regex false-positives on dates (`2026-05-21`),
@@ -116,9 +116,9 @@ rules:
         - "**/*.spec.ts"
     patterns:
       - pattern-either:
-          - pattern: clickhouse.query({ query: $Q, ... })
-          - pattern: clickhouse.exec({ query: $Q, ... })
-          - pattern: clickhouseClient.query({ query: $Q, ... })
+          - pattern: 'clickhouse.query({ query: $Q, ... })'
+          - pattern: 'clickhouse.exec({ query: $Q, ... })'
+          - pattern: 'clickhouseClient.query({ query: $Q, ... })'
       - pattern-not-regex: 'TenantId\s*=\s*\{tenantId'
 
   # ── ClickHouse dedup anti-pattern: ORDER BY … LIMIT 1 + heavy cols ─────

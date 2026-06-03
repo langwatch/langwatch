@@ -50,9 +50,9 @@ jobs:
           # for "actually filled in, not placeholder."
           SECTION=$(printf '%s\n' "$PR_BODY" | awk '
             BEGIN { capturing=0 }
-            /^##+[[:space:]]*[Dd]eployment[[:space:]]+[Ii]mpact/ { capturing=1; next }
-            /^##+[[:space:]]*[Oo]perator/ { if ($0 ~ /[Dd]eployment/) { capturing=1; next } }
-            capturing && /^##+[[:space:]]/ { exit }
+            /^##[[:space:]]+[Dd]eployment[[:space:]]+[Ii]mpact([[:space:]]|$)/ { capturing=1; next }
+            /^##[[:space:]]+[Oo]perator[[:space:]]*\/?[[:space:]]*[Dd]eployment[[:space:]]+[Ii]mpact([[:space:]]|$)/ { capturing=1; next }
+            capturing && /^##[[:space:]]+/ { exit }
             capturing { print }
           ')
           LEN=$(printf '%s' "$SECTION" | tr -d '[:space:]' | wc -c | tr -d ' ')
