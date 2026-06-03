@@ -29,8 +29,11 @@ not worth the operational risk surface and the maintenance it has demanded.
 
 ## Decision
 
-**Remove the orphan sweep entirely.** No background process deletes orphaned PG
-records anymore. Deleted:
+**Remove the orphan sweep entirely.** This removes **only the PostgreSQL
+traceId-reference sweep** (the `orphan_sweep` chain/process). It does **not**
+touch storage-level orphaned-trace cleanup — `cleanupOrphanedTraces` /
+`cleanupOrphanedHotTraces`, invoked from `server/routes/cron.ts`, stays. No
+background process deletes orphaned **PG** records anymore. Deleted:
 
 - `data-retention/orphan-sweep/` (service, repository, reactor, cursor store)
 - `background/queues/orphanSweepChainQueue.ts`,
@@ -56,8 +59,14 @@ indefinitely:
 - `PinnedTrace` of an expired trace remains — the pin resolves to nothing (the
   deleted sweep used to remove these; see `specs/data-retention/trace-pinning.feature`).
 
-None of these corrupts data or crosses tenants; they are stale references for
-data the user already let expire. Storage growth is negligible relative to the
+These are accepted as non-crashing phantoms. Read-time handling (where worth
+it) is deliberately **out of scope here** and tracked as follow-ups:
+- Annotation phantom tasks + inflated queue counts → #4529
+- Trigger suppression on same-project trace-id reuse → #4530
+- Public-share authorization not scoped to `projectId` (a pre-existing
+  cross-tenant concern, independent of this removal) → #4531
+
+Storage growth is negligible relative to the
 trace volume that drove the retention work in the first place.
 
 **Positive.** The ingestion path can never again be coupled to a heavy
