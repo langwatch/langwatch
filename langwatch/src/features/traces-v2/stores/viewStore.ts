@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { RowKind } from "../components/TraceTable/registry";
 import {
   LENS_CAPABILITIES,
+  reconcileAddons,
   reconcileColumns,
   reconcileSort,
 } from "../lens/capabilities";
@@ -52,11 +53,23 @@ export function getEffectiveLens(state: {
     state.allLenses.find((l) => l.id === state.activeLensId) ??
     state.allLenses[0];
   if (!lens) return null;
+  // Reconcile addons against the LIVE grouping's capability — not the
+  // saved lens's. The saved lens stores whatever addons matched its
+  // original grouping (e.g. `io-preview` + `expanded-peek` for a flat
+  // trace lens), but switching the active grouping to a grouped or
+  // conversation mode swaps the RowKind under the table. Without this
+  // filter, getEffectiveLens hands the renderer addons the new RowKind
+  // doesn't know how to mount, which renders as either nothing or, on
+  // a flat→group switch, the wrong second-row decoration on every
+  // group row. `reconcileAddons` drops the unknowns and returns the
+  // valid subset.
+  const capability = LENS_CAPABILITIES[state.grouping];
   return {
     ...lens,
     sort: state.sort,
     grouping: state.grouping,
     columns: state.columnOrder.length > 0 ? state.columnOrder : lens.columns,
+    addons: reconcileAddons(lens.addons, capability),
   };
 }
 
