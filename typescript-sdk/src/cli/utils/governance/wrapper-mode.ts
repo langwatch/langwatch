@@ -207,18 +207,10 @@ function buildOtelEnvBlock(
     case "claude":
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
-        // Claude Code 2.1.x dropped trace emission entirely (no /v1/traces
-        // POSTs even with this set). Kept anyway in case anthropic
-        // re-adds the path; cost is zero when claude code ignores it.
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_LOGS_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
-        // Forces the user_prompt event to include the prompt body
-        // attribute so the receiver-side log->span synthesizer has
-        // an input message to attach. Without this, claude code
-        // emits the event with only prompt_length and prompt.id.
-        OTEL_LOG_USER_PROMPTS: "1",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
       };
