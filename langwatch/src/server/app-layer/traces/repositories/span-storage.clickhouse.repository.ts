@@ -166,6 +166,7 @@ const SUMMARY_SPAN_SELECT = `
   StatusCode,
   SpanAttributes['langwatch.span.type'] AS SpanType,
   SpanAttributes['gen_ai.request.model'] AS Model,
+  SpanAttributes['gen_ai.usage.cost'] AS Cost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs
 `;
 
@@ -217,10 +218,19 @@ interface SpanSummaryQueryRow {
   StatusCode: number | null;
   SpanType: string;
   Model: string;
+  // `SpanAttributes['gen_ai.usage.cost']` materialises as the raw map value;
+  // ClickHouse Map values are typed `String`, so the wire payload is the
+  // stringified number (or "" when absent). Parsed to a number in the
+  // mapper below.
+  Cost: string;
   StartTimeMs: number;
 }
 
 function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+  // Cost arrives as a string (Map values are typed String in CH); empty
+  // means the span has no cost attribute, NaN means a malformed value.
+  // Either falls through to null so the renderer doesn't paint `$NaN`.
+  const costNum = row.Cost ? Number(row.Cost) : NaN;
   return {
     spanId: row.SpanId,
     parentSpanId: row.ParentSpanId,
@@ -229,6 +239,7 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
     model: row.Model || null,
+    cost: Number.isFinite(costNum) ? costNum : null,
     startTimeMs: Number(row.StartTimeMs),
   };
 }
