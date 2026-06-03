@@ -1,5 +1,6 @@
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 
@@ -19,7 +20,9 @@ export class EvaluationRunStore
     const stateWithId = state.evaluationId
       ? state
       : { ...state, evaluationId: String(context.aggregateId) };
-    await this.repo.upsert(stateWithId, String(context.tenantId));
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
   }
 
   async storeBatch(
@@ -32,14 +35,16 @@ export class EvaluationRunStore
         ? state
         : { ...state, evaluationId: String(context.aggregateId) },
       tenantId: String(context.tenantId),
+      retentionDays:
+        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     }));
 
     if (this.repo.upsertBatch) {
       await this.repo.upsertBatch(batchEntries);
     } else {
       await Promise.all(
-        batchEntries.map(({ data, tenantId }) =>
-          this.repo.upsert(data, tenantId),
+        batchEntries.map(({ data, tenantId, retentionDays }) =>
+          this.repo.upsert(data, tenantId, retentionDays),
         ),
       );
     }

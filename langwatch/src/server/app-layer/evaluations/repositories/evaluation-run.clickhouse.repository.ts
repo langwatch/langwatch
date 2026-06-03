@@ -1,8 +1,9 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
@@ -41,6 +42,7 @@ interface ClickHouseEvaluationRunRecord {
   CostId: string | null;
   LastProcessedEventId: string;
   LastEventOccurredAt: number;
+  _retention_days: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
@@ -53,7 +55,7 @@ export class EvaluationRunClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
+  async upsert(data: EvaluationRunData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.upsert",
@@ -74,6 +76,7 @@ export class EvaluationRunClickHouseRepository
         tenantId,
         projectionId,
         EVALUATION_PROJECTION_VERSIONS.STATE,
+        retentionDays,
       );
 
       await client.insert({
@@ -95,7 +98,7 @@ export class EvaluationRunClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: EvaluationRunData; tenantId: string }>,
+    entries: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -106,7 +109,7 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid }) => {
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
         const projectionId = data.scheduledAt
           ? IdUtils.generateDeterministicEvaluationRunId(
               tid,
@@ -119,6 +122,7 @@ export class EvaluationRunClickHouseRepository
           tid,
           projectionId,
           EVALUATION_PROJECTION_VERSIONS.STATE,
+          rd,
         );
       });
 
@@ -468,6 +472,7 @@ export class EvaluationRunClickHouseRepository
     tenantId: string,
     projectionId: string,
     version: string,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -496,6 +501,7 @@ export class EvaluationRunClickHouseRepository
       CompletedAt: data.completedAt != null ? new Date(data.completedAt) : null,
       CostId: data.costId ?? null,
       LastProcessedEventId: projectionId,
+      _retention_days: retentionDays,
     };
   }
 }

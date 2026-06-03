@@ -43,9 +43,10 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
 export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
     "type": "header",
+    {%- capture _header_prefix -%}{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'WARNING' %}⚠️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🔔{% endif %} {%- endcapture -%}
     "text": {
       "type": "plain_text",
-      "text": "{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'WARNING' %}⚠️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🔔{% endif %} {{ trigger.name }}",
+      "text": {{ trigger.name | prepend: _header_prefix | json }},
       "emoji": true
     }
   },
@@ -53,7 +54,7 @@ export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
     "type": "context",
     "elements": [
-      { "type": "mrkdwn", "text": "*Alert type:* {{ trigger.alertType }}" }
+      { "type": "mrkdwn", "text": {{ trigger.alertType | prepend: "*Alert type:* " | json }} }
     ]
   },
   {% endif %}
@@ -78,10 +79,11 @@ export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
     "type": "divider"
   },
+  {%- capture _footer_text -%}<{{ match.trace.url }}|View trace> · <{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
   {
     "type": "context",
     "elements": [
-      { "type": "mrkdwn", "text": "<{{ match.trace.url }}|View trace> · <{{ trigger.editUrl }}|Edit automation>" }
+      { "type": "mrkdwn", "text": {{ _footer_text | json }} }
     ]
   }
 ]`;

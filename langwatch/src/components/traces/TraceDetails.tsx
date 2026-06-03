@@ -34,6 +34,7 @@ import {
 } from "./Evaluations";
 import { Events } from "./Events";
 import { SequenceDiagramContainer } from "./SequenceDiagram";
+import { PinButton } from "./PinButton";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
@@ -308,6 +309,9 @@ export function TraceDetails(props: {
                 >
                   Add to Dataset
                 </Button>
+              )}
+              {project && (
+                <PinButton projectId={project.id} traceId={props.traceId} />
               )}
               {project && (
                 <ShareButton project={project} traceId={props.traceId} />

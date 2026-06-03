@@ -66,6 +66,12 @@ interface SpanReceivedEventRow {
   EventVersion: string;
   EventPayload: string;
   IdempotencyKey?: string;
+  /** Test-only sentinel. Backdated fixture rows would be TTL'd immediately
+   *  against the column's DEFAULT 308 retention; 0 means "never expire" in
+   *  the platform's TTL expression and survives regardless of timestamp.
+   *  ONLY acceptable in tests — production writes must always stamp a
+   *  finite retention. */
+  _retention_days: number;
 }
 
 function buildSpanReceivedEventRow({
@@ -118,6 +124,7 @@ function buildSpanReceivedEventRow({
     EventVersion: "2025-01-01",
     EventPayload: JSON.stringify(payload),
     IdempotencyKey: eventId,
+    _retention_days: 0,
   };
 }
 
@@ -167,22 +174,40 @@ async function insertStoredSpansFor({
   traceId: string;
   spanIds: string[];
 }): Promise<void> {
-  const now = Date.now();
+  // The fixture used to write `StartedAt` / `DurationNanos` — neither column
+  // exists in stored_spans. With unknown columns silently dropped and
+  // `StartTime` defaulting to epoch, the retention TTL deleted rows on the
+  // next merge and the readback assertion saw 0. Real schema:
+  //   TraceId, SpanId, ProjectionId, StartTime/EndTime (DateTime64),
+  //   DurationMs (UInt64), SpanName / SpanKind / ServiceName, …
+  const now = new Date();
   const values = spanIds.map((spanId, idx) => ({
+    ProjectionId: `${tenantId}/${traceId}/${spanId}`,
     TenantId: tenantId,
     TraceId: traceId,
     SpanId: spanId,
-    Name: `span-${idx}`,
-    StartedAt: now * 1_000_000,
-    DurationNanos: 1_000_000,
-    Attributes: "{}",
+    ParentSpanId: null,
+    Sampled: 1,
+    StartTime: now,
+    EndTime: now,
+    DurationMs: 1,
+    SpanName: `span-${idx}`,
+    SpanKind: 1,
+    ServiceName: "test",
+    ResourceAttributes: {},
+    SpanAttributes: {},
     StatusCode: 1,
-    ParentSpanId: "",
+    ScopeName: "test",
+    // Test-only sentinel: never-expire. Production writes always stamp a
+    // finite retention via the trace-pipeline projection store.
+    _retention_days: 0,
   }));
   await client.insert({
     table: "stored_spans",
     values,
     format: "JSONEachRow",
+    // Sync inserts so the readback assertion immediately sees the row.
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
 }
 

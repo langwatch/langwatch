@@ -166,6 +166,50 @@ export function visitContentPart<R>(
     }
   }
 
+  // AI-SDK file part: {type:"file", mediaType:"audio/...", data:"<base64>"}.
+  // The TypeScript scenario SDK emits this shape from `createAudioMessage`
+  // (see voice/messages.ts in langwatch/scenario). Newer SDK builds translate
+  // audio file parts to `input_audio` before sending, but older SDKs and
+  // first-party non-scenario callers may still ship the raw `file` shape;
+  // routing it here means the extractor externalises the bytes to stored-
+  // objects the same way it already does for `input_audio`, instead of
+  // dropping into the no-op `unknown` branch and letting full base64
+  // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
+  // `inputAudio` (preserves a playable shape downstream); other file payloads
+  // go to `binary` (generic externalisation by mimeType).
+  if (o["type"] === "file" && typeof o["mediaType"] === "string") {
+    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+    // file part should route the same as `audio/wav`. Normalise the type
+    // discriminator for the `audio/` prefix check + format mapping, but keep
+    // the original-case mimeType on the dispatched part so downstream
+    // consumers that pattern-match the exact value (e.g. an explicit
+    // allowlist) don't silently see a different string than the wire shape.
+    const mimeTypeRaw = o["mediaType"];
+    const mimeType = mimeTypeRaw.toLowerCase();
+    const data = typeof o["data"] === "string" ? o["data"] : undefined;
+    const url = typeof o["url"] === "string" ? o["url"] : undefined;
+    if (data || url) {
+      if (mimeType.startsWith("audio/")) {
+        return visitor.inputAudio
+          ? visitor.inputAudio({
+              data,
+              url,
+              format: mediaTypeToAudioFormat(mimeType),
+              mimeType,
+            })
+          : visitor.unknown?.(part);
+      }
+      return visitor.binary({
+        type: "binary",
+        mimeType,
+        data,
+        url,
+        id: typeof o["id"] === "string" ? o["id"] : undefined,
+        filename: typeof o["filename"] === "string" ? o["filename"] : undefined,
+      });
+    }
+  }
+
   // binary parts
   if (o["type"] === "binary" && o["mimeType"]) {
     return visitor.binary({
@@ -288,6 +332,50 @@ export async function visitContentPartAsync<R>(
     }
   }
 
+  // AI-SDK file part: {type:"file", mediaType:"audio/...", data:"<base64>"}.
+  // The TypeScript scenario SDK emits this shape from `createAudioMessage`
+  // (see voice/messages.ts in langwatch/scenario). Newer SDK builds translate
+  // audio file parts to `input_audio` before sending, but older SDKs and
+  // first-party non-scenario callers may still ship the raw `file` shape;
+  // routing it here means the extractor externalises the bytes to stored-
+  // objects the same way it already does for `input_audio`, instead of
+  // dropping into the no-op `unknown` branch and letting full base64
+  // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
+  // `inputAudio` (preserves a playable shape downstream); other file payloads
+  // go to `binary` (generic externalisation by mimeType).
+  if (o["type"] === "file" && typeof o["mediaType"] === "string") {
+    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+    // file part should route the same as `audio/wav`. Normalise the type
+    // discriminator for the `audio/` prefix check + format mapping, but keep
+    // the original-case mimeType on the dispatched part so downstream
+    // consumers that pattern-match the exact value (e.g. an explicit
+    // allowlist) don't silently see a different string than the wire shape.
+    const mimeTypeRaw = o["mediaType"];
+    const mimeType = mimeTypeRaw.toLowerCase();
+    const data = typeof o["data"] === "string" ? o["data"] : undefined;
+    const url = typeof o["url"] === "string" ? o["url"] : undefined;
+    if (data || url) {
+      if (mimeType.startsWith("audio/")) {
+        return visitor.inputAudio
+          ? visitor.inputAudio({
+              data,
+              url,
+              format: mediaTypeToAudioFormat(mimeType),
+              mimeType,
+            })
+          : visitor.unknown?.(part);
+      }
+      return visitor.binary({
+        type: "binary",
+        mimeType,
+        data,
+        url,
+        id: typeof o["id"] === "string" ? o["id"] : undefined,
+        filename: typeof o["filename"] === "string" ? o["filename"] : undefined,
+      });
+    }
+  }
+
   // binary parts
   if (o["type"] === "binary" && o["mimeType"]) {
     return visitor.binary({
@@ -336,4 +424,30 @@ export async function visitContentPartAsync<R>(
   }
 
   return visitor.unknown?.(part);
+}
+
+/**
+ * Best-effort `format` hint for the OpenAI Realtime `input_audio` shape based
+ * on an AI-SDK `mediaType` ("audio/wav", "audio/mpeg", etc.). Returns
+ * `undefined` for non-canonical types (e.g. "audio/pcm16") — the mimeType is
+ * still preserved on the dispatched part for downstream handling.
+ */
+function mediaTypeToAudioFormat(mediaType: string): string | undefined {
+  // Case-insensitive (RFC 2045 §5.1). Callers in this file already lowercase
+  // before passing in, but normalise here too so any future caller is safe.
+  switch (mediaType.toLowerCase()) {
+    case "audio/wav":
+    case "audio/x-wav":
+      return "wav";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/flac":
+      return "flac";
+    case "audio/ogg":
+      return "ogg";
+    case "audio/webm":
+      return "webm";
+    default:
+      return undefined;
+  }
 }

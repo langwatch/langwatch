@@ -1,5 +1,28 @@
 import type { Prisma } from "@prisma/client";
 
+// Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
+// the SQL string. The legacy outbox drainer and the advisory-lock
+// helper both already include these — only a genuinely scope-less
+// query would miss them.
+const RAW_TENANCY_PREDICATE_RE = /"?(projectId|organizationId|tenantId)"?/i;
+
+// Opt-out marker for the rare query that intentionally scans across
+// tenants (e.g. a global recovery sweep, a deploy-time migration helper).
+// `-- @tenancy: <reason>` is grep-able and surfaces in code review.
+const RAW_TENANCY_OPTOUT_RE = /--\s*@tenancy\s*:/i;
+
+function extractRawSql(args: unknown): string | null {
+  if (!args || typeof args !== "object") return null;
+  const a = args as Record<string, unknown>;
+  // Prisma's $queryRaw / $executeRaw middleware exposes the SQL on
+  // either `query` (string) or `strings` (the TemplateStringsArray
+  // joined with the parameter placeholders). Both shapes appear
+  // depending on Prisma version and call site.
+  if (typeof a.query === "string") return a.query;
+  if (Array.isArray(a.strings)) return a.strings.join(" ? ");
+  return null;
+}
+
 const EXEMPT_MODELS = [
   "Account",
   "Session",
@@ -547,6 +570,39 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021), one row per (scope, category). A
+  // query is bounded by a row id, the organizationId anchor, a
+  // (scopeType, scopeId) predicate, or the (scopeType, scopeId, category)
+  // compound unique used by per-scope upsert/delete. No legacy projectId
+  // column — retention was scope-based from the first migration.
+  RetentionPolicy: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          (c.scopeType_scopeId_category &&
+            typeof c.scopeType_scopeId_category.scopeId === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
@@ -557,15 +613,36 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
 
   // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
   // inside the SQL string itself — `WHERE "projectId" = ${projectId}` lives
-  // in the template literal, where the structural guard cannot see it. The
-  // guard's promise (refuse a query that doesn't carry a tenancy predicate)
-  // is therefore unmeetable at this layer; the call sites are responsible
-  // for embedding the scope in the SQL, and PG enforces it. Lifting them
-  // through the guard would force a refactor away from raw SQL for
-  // primitives that need `FOR UPDATE SKIP LOCKED` (outbox legacy drainer)
-  // or `pg_advisory_xact_lock` (model-default scope lock) — both of which
-  // the typed Prisma API cannot express.
-  if (action === "queryRaw" || action === "executeRaw") return;
+  // in the template literal, where the structural guard cannot see it.
+  // The guard's promise (refuse a query that doesn't carry a tenancy
+  // predicate) is unmeetable at this layer; the call sites are
+  // responsible for embedding the scope in the SQL, and PG enforces it.
+  //
+  // Still: a blanket exemption lets a raw query that simply *forgets*
+  // a tenancy predicate become a silent cross-tenant read. The two
+  // cheap structural defences this layer CAN apply:
+  //
+  //  1) Require the SQL text to mention `projectId`, `organizationId`,
+  //     or `tenantId` — every raw query in the codebase today carries
+  //     one of these (the outbox drainer and the advisory-lock helper
+  //     both do).
+  //  2) Accept an explicit `-- @tenancy: <reason>` opt-out marker for
+  //     the rare query that genuinely scans across all tenants (e.g.
+  //     a global recovery sweep). The marker is grep-able for review.
+  if (action === "queryRaw" || action === "executeRaw") {
+    const sql = extractRawSql(params.args);
+    if (!sql) return;
+    if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
+    if (!RAW_TENANCY_PREDICATE_RE.test(sql)) {
+      throw new Error(
+        "The raw query is missing a tenancy predicate. Include `projectId`, " +
+          "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
+          "`-- @tenancy: <reason>` comment if the query intentionally scans " +
+          "across tenants.",
+      );
+    }
+    return;
+  }
 
   // Scoped models opt in to a stricter check than EXEMPT_MODELS:
   // SOMETHING tenancy-shaped (row id, scope predicate, parent FK,
@@ -659,6 +736,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     !params.args?.where?.projectId_slug &&
     !params.args?.where?.projectId_date &&
     !params.args?.where?.projectId_modelProviderId_slot &&
+    !params.args?.where?.projectId_traceId &&
     !params.args?.where?.projectId?.in &&
     !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {

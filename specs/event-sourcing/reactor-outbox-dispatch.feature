@@ -17,7 +17,7 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
   dispatches at most once per trace, then enqueue onto the outbox for the
   durable dispatch lifecycle.
 
-  See dev/docs/adr/022-transactional-outbox-for-stake-sensitive-dispatch.md.
+  See dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md.
 
   Background:
     Given a pipeline registers a reactor "alertDispatch" via .withOutbox

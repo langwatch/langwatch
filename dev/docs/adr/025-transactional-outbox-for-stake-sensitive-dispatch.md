@@ -1,4 +1,4 @@
-# ADR-022: Transactional outbox for stake-sensitive reactor dispatch
+# ADR-025: Transactional outbox for stake-sensitive reactor dispatch
 
 **Date:** 2026-05-28 (revised 2026-06-01)
 
@@ -32,7 +32,7 @@ Introduce a **transactional outbox** as the durable substrate for stake-sensitiv
 - Settle and cadence dispatch execution rides the **main event-sourcing queue** (`event-sourcing/jobs`). Outbox payloads carry a `stage` discriminator (`"settle" | "cadence"`); the queue's callbacks (`groupKey`, `process`, `processBatch`, `coalesceMaxBatch`, `deduplication`) peel the outbox case off first and delegate to the outbox dispatcher, falling through to the existing registry-based event-sourcing dispatch for everything else. Per-trigger FIFO via `groupKey`, delayed dispatch for cadence windows (`delay` + `processBatch` for coalescing), per-tenant fairness, lease/heartbeat, and retry-with-backoff all come from the queue. Reactors registered via `.withOutbox` use this path going forward.
 - A PG table `ReactorOutbox` holds one row per dispatch, **maintained by a queue-side audit adapter** (`PgOutboxAuditAdapter`). The adapter receives every queue lifecycle event (`onEnqueue`, `onLeased`, `onDispatched`, `onFailed`, `onDead`) and writes the corresponding row state. Operators query PG for activity feeds, stuck-state alerts, retry buttons — never Redis.
 - The **match** half of the reactor runs in-band on the main event-sourcing queue (inheriting `_originGuardedReactor`'s loop-prevention guards) and calls `outboxQueue.send(payload, …)` per match. The queue's dedup config absorbs replay.
-- The **dispatch** half runs in the outbox queue's `process` callback. Failures throw `DispatchError` (ADR-025); the queue's retry semantics handle backoff, and the adapter mirrors each transition to PG.
+- The **dispatch** half runs in the outbox queue's `process` callback. Failures throw `DispatchError` (ADR-027); the queue's retry semantics handle backoff, and the adapter mirrors each transition to PG.
 - Best-effort reactors stay on `.withReactor` — no change to their execution model.
 
 **The queue is the source of truth for dispatch execution.** **The PG row is the source of truth for dispatch audit.** Both must agree on every transition, which is why the adapter lives inside the GroupQueue rather than alongside it — every lifecycle event publishes through one hook that cannot be bypassed.
@@ -49,7 +49,7 @@ The trigger dispatch path answers two distinct questions:
 These stay as **two separate tables** with distinct roles:
 
 - `TriggerSent` is **domain** state, scoped to triggers, with the cross-pipeline race winner property baked in via the unique constraint. **Unchanged** by this ADR.
-- `ReactorOutbox` is **framework** audit state, scoped per-reactor (the table will hold rows for `customerIoTraceSync` and future auditable reactors too), with the dispatch lifecycle columns operators query against (`status`, `attemptCount`, `lastError`, `scheduledAt`, `dispatchedAt`). Rows are maintained by the queue's audit adapter, not by application code. Row-per-match, with `@@unique([reactorName, dedupKey])` where:
+- `ReactorOutbox` is **framework** audit state, scoped per-reactor (the table will hold rows for `customerIoTraceSync` and future auditable reactors too), with the dispatch lifecycle columns operators query against (`status`, `attempts`, `lastError`, `nextAttemptAt`, `dispatchedAt`). Rows are maintained by the queue's audit adapter, not by application code. Row-per-match, with `@@unique([projectId, reactorName, dedupKey])` where:
   - Trace/evaluation triggers: `dedupKey = ${projectId}/${triggerId}:trace:${traceId}`.
   - Custom-graph alerts: `dedupKey = ${projectId}/${triggerId}:graph:${customGraphId}`.
 
@@ -63,10 +63,10 @@ Outbox dispatch rides the existing main event-sourcing `GroupQueueProcessor` ins
 
 The queue carries **two outbox stages as a discriminated payload union**:
 
-- `SettleStagePayload { stage: "settle", projectId, triggerId, traceId, … }` — per-(trigger, trace) Debounce Mode entry. The trace-readiness debounce from ADR-023 lives here. New events on the same (trigger, trace) collapse onto the existing pending job and reset the TTL. When the TTL elapses, the dispatcher re-reads the now-settled fold, runs filters, claims `TriggerSent`, and on match re-enqueues as `cadence`.
+- `SettleStagePayload { stage: "settle", projectId, triggerId, traceId, … }` — per-(trigger, trace) Debounce Mode entry. The trace-readiness debounce from ADR-026 lives here. New events on the same (trigger, trace) collapse onto the existing pending job and reset the TTL. When the TTL elapses, the dispatcher re-reads the now-settled fold, runs filters, claims `TriggerSent`, and on match re-enqueues as `cadence`.
 - `CadenceStagePayload { stage: "cadence", projectId, triggerId, match, … }` — per-trigger group, windowed delay snapped to the next wall-clock cadence boundary. The queue's `processBatch` + `coalesceMaxBatch` fold every cadence job for the same trigger landing in the same boundary into one digest invocation.
 
-Per-stage queue behavior (dedup mode, delay, group key, coalescing) is driven by the payload's `stage` discriminator so one queue serves both timing primitives without merging them — the operator's `traceDebounceMs` and `notificationCadence` knobs (ADR-023) stay independently tunable.
+Per-stage queue behavior (dedup mode, delay, group key, coalescing) is driven by the payload's `stage` discriminator so one queue serves both timing primitives without merging them — the operator's `traceDebounceMs` and `notificationCadence` knobs (ADR-026) stay independently tunable.
 
 **Per-trigger FIFO** is guaranteed by setting `groupKey = ${projectId}/${reactorName}:${triggerId}` (or, for non-trigger reactors, whatever stable identifier the reactor defines after the `${projectId}/` prefix). The `${projectId}/` prefix is mandatory: outbox payloads bypass `queueManager`'s automatic `${tenantId}/` wrapping (`queueManager` resolves prefixes through the registered job entry, and outbox payloads don't go through that registry), so the producer must include the prefix itself so `tenantIdFromGroupId` (see `src/server/observability/tenantRateTracker.ts`) can extract the tenant and per-tenant fairness via `TenantRateTracker` works.
 
@@ -106,7 +106,7 @@ type OutboxReactorDefinition<Event, FoldState> = {
 
 **Replay safety for `.withOutbox`**: the framework wrapper short-circuits `match` when `context.isReplay === true` — no outbox row is inserted, no wakeup is scheduled. Without this, replaying historical events (after the outbox row's 30/90-day retention has pruned the original dispatch record) would insert fresh `queued` rows and re-fire customer-visible side effects.
 
-`dispatch` runs in the outbox dispatch worker. It receives the batched payloads for a triggered wakeup, performs the actual side effect, and throws `DispatchError` (ADR-025) on failure.
+`dispatch` runs in the outbox dispatch worker. It receives the batched payloads for a triggered wakeup, performs the actual side effect, and throws `DispatchError` (ADR-027) on failure.
 
 **Folder layout** (framework code; domain code stays adjacent to other reactors):
 
@@ -114,7 +114,7 @@ type OutboxReactorDefinition<Event, FoldState> = {
 src/server/event-sourcing/
   outbox/                              -- framework primitive
     outbox.types.ts                   -- OutboxReactorDefinition, OutboxEntry
-    dispatchError.ts                  -- DispatchError class (see ADR-025)
+    dispatchError.ts                  -- DispatchError class (see ADR-027)
     setup.ts                          -- GroupQueue registration + processor
     outbox.service.ts                 -- service shim for tests and the audit projection
     outbox.repository.ts              -- PG repository abstraction
@@ -256,9 +256,9 @@ A single `.withReactor(..., { durable: true })` flag would force the API to acce
 ## References
 
 - ADR-007 — Event sourcing architecture (the framework this extends)
-- [ADR-023](./023-per-trigger-dispatch-timing.md) — Per-trigger cadence + trace-readiness debounce (timing knobs that ride this substrate)
+- [ADR-026](./023-per-trigger-dispatch-timing.md) — Per-trigger cadence + trace-readiness debounce (timing knobs that ride this substrate)
 - [ADR-024](./024-liquid-templates-for-trigger-notifications.md) — Liquid templates (what `dispatch` renders for notify reactors)
-- [ADR-025](./025-typed-dispatcherror-contract.md) — `DispatchError` contract dispatch handlers throw
+- [ADR-027](./025-typed-dispatcherror-contract.md) — `DispatchError` contract dispatch handlers throw
 - [ADR-026](./026-automation-operator-surfaces.md) — Authoring drawer + dispatch-health view that operators see
 - [ADR-014 (Skynet BullMQ removal)](./014-skynet-bullmq-removal.md) — why we're not reintroducing it
 - `src/server/event-sourcing/queues/groupQueue/` — the queue implementation

@@ -5,6 +5,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -60,12 +61,13 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
-  /** Optional outbox runtime (ADR-022 revision 3). When provided, the
+  /** Optional outbox runtime (ADR-025 revision 3). When provided, the
    *  global queue routes settle/cadence payloads to its dispatcher and
    *  wires its audit adapter onto every lifecycle event. Non-outbox
    *  payloads flow through the normal registry — the runtime piggy-backs
    *  on the existing queue instead of standing up its own. */
   outbox?: OutboxRuntime;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -122,6 +124,7 @@ export class EventSourcing {
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
   private readonly _outbox?: OutboxRuntime;
+  private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
@@ -129,6 +132,7 @@ export class EventSourcing {
     this._redis = options.redis;
     this._processRole = options.processRole;
     this._outbox = options.outbox;
+    this._retentionPolicyResolver = options.retentionPolicyResolver;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -315,6 +319,7 @@ export class EventSourcing {
           replayMarkerChecker: this._redis
             ? new RedisReplayMarkerChecker(this._redis)
             : undefined,
+          retentionPolicyResolver: this._retentionPolicyResolver,
         });
 
         // Get command dispatchers
@@ -413,6 +418,7 @@ export class EventSourcing {
     if (clickHouseEnabled) {
       this._eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(this._clickhouse!),
+        this._retentionPolicyResolver,
       );
       logger.debug("Using ClickHouse event store");
     } else if (!isProduction) {
@@ -449,7 +455,7 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
-    // ADR-022 revision 3: outbox payloads (settle/cadence) ride this same
+    // ADR-025 revision 3: outbox payloads (settle/cadence) ride this same
     // queue. Each callback peels off the outbox case first; everything else
     // falls through to the existing registry-based dispatch. The audit
     // adapter from the outbox runtime is wired below — it gates internally
@@ -490,8 +496,13 @@ export class EventSourcing {
       process: async (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
           if (!outbox) {
-            logger.warn({ stage: payload.stage }, "Outbox payload on a queue without a wired outbox runtime; skipping");
-            return;
+            // Fail closed: throwing here keeps the job in the queue's
+            // retryable state instead of ACKing and silently dropping a
+            // notification. Operators see the error in queue metrics
+            // and the worker boot wiring gets fixed.
+            throw new Error(
+              `Outbox payload (stage=${payload.stage}) arrived on a queue without a wired outbox runtime; failing closed so the row is retryable until the runtime is attached`,
+            );
           }
           await outbox.dispatcher.process(payload);
           return;
@@ -522,10 +533,34 @@ export class EventSourcing {
         const head = payloads[0]!;
         if (isOutboxPayload(head)) {
           if (!outbox) {
-            logger.warn(
-              { stage: head.stage, count: payloads.length },
-              "Outbox batch on a queue without a wired outbox runtime; skipping",
+            // Fail closed (see process() above): throwing keeps the
+            // rows retryable rather than ACKing and dropping the digest.
+            throw new Error(
+              `Outbox batch (stage=${head.stage}, count=${payloads.length}) on a queue without a wired outbox runtime; failing closed so the rows are retryable until the runtime is attached`,
             );
+          }
+          // Verify batch homogeneity before the cast — the GroupQueue
+          // only coalesces same-group jobs so this should already hold,
+          // but a stray non-outbox payload sneaking into an outbox
+          // batch would misroute. Fall back to per-item processing on
+          // mismatch so the non-outbox job lands in the normal lane.
+          const allOutbox = payloads.every((p) => isOutboxPayload(p));
+          if (!allOutbox) {
+            for (const p of payloads) {
+              if (isOutboxPayload(p)) {
+                await outbox.dispatcher.process(p);
+              } else {
+                const r = this.lookupEntry(p);
+                if (r) {
+                  await r.entry.process(r.clean);
+                } else {
+                  logger.warn(
+                    { payload: p },
+                    "Mixed outbox batch contained an unknown non-outbox payload; skipping",
+                  );
+                }
+              }
+            }
             return;
           }
           await outbox.dispatcher.processBatch(payloads as OutboxJob[]);
@@ -622,12 +657,14 @@ export class EventSourcing {
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
     processRole?: ProcessRole;
+    retentionPolicyResolver?: RetentionPolicyResolver;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
       processRole: options.processRole,
+      retentionPolicyResolver: options.retentionPolicyResolver,
     });
 
     es._initialized = true;

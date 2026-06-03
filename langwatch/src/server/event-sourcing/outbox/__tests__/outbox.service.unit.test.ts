@@ -176,7 +176,7 @@ describe("OutboxService", () => {
         const result = await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: { triggerId: "trigger1" },
         });
@@ -192,14 +192,14 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const second = await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "trigger1:trace1",
+          dedupKey: "proj1/trigger1:trace1",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
@@ -209,13 +209,13 @@ describe("OutboxService", () => {
     });
 
     describe("when groupKey does not start with `${projectId}/`", () => {
-      it("throws so the contract violation surfaces at enqueue (ADR-023)", async () => {
+      it("throws so the contract violation surfaces at enqueue (ADR-026)", async () => {
         const { service } = buildService();
         await expect(
           service.enqueue({
             projectId: "proj1",
             reactorName: "alertDispatch",
-            dedupKey: "trigger1:trace1",
+            dedupKey: "proj1/trigger1:trace1",
             groupKey: "alertDispatch:trigger1",
             payload: {},
           }),
@@ -228,11 +228,26 @@ describe("OutboxService", () => {
           service.enqueue({
             projectId: "proj1",
             reactorName: "alertDispatch",
-            dedupKey: "trigger1:trace1",
+            dedupKey: "proj1/trigger1:trace1",
             groupKey: "proj2/alertDispatch:trigger1",
             payload: {},
           }),
         ).rejects.toThrow(/must start with "proj1\/"/);
+      });
+    });
+
+    describe("when dedupKey does not start with `${projectId}/`", () => {
+      it("throws so a forgotten tenant prefix cannot suppress another project's row", async () => {
+        const { service } = buildService();
+        await expect(
+          service.enqueue({
+            projectId: "proj1",
+            reactorName: "alertDispatch",
+            dedupKey: "trigger1:trace1",
+            groupKey: "proj1/alertDispatch:trigger1",
+            payload: {},
+          }),
+        ).rejects.toThrow(/dedupKey must start with "proj1\/"/);
       });
     });
   });
@@ -245,7 +260,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
@@ -286,7 +301,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
@@ -317,7 +332,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
           maxAttempts: 1,
@@ -345,7 +360,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
@@ -371,7 +386,7 @@ describe("OutboxService", () => {
         await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
-          dedupKey: "k",
+          dedupKey: "proj1/k",
           groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });

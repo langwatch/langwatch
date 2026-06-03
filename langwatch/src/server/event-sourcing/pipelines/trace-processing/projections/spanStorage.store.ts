@@ -2,6 +2,7 @@ import { GovernanceContentStripService } from "@ee/governance/services/governanc
 
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedSpan } from "../schemas/spans";
@@ -9,7 +10,7 @@ import type { NormalizedSpan } from "../schemas/spans";
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.
  */
-function toAppLayer(span: NormalizedSpan): SpanInsertData {
+function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData {
   return {
     id: span.id,
     tenantId: span.tenantId,
@@ -45,6 +46,7 @@ function toAppLayer(span: NormalizedSpan): SpanInsertData {
     droppedAttributesCount: span.droppedAttributesCount,
     droppedEventsCount: span.droppedEventsCount,
     droppedLinksCount: span.droppedLinksCount,
+    retentionDays,
   };
 }
 
@@ -99,20 +101,24 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
 
   async append(
     record: NormalizedSpan,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
     const transformed = await applyGovernanceStrip(record, this.stripService);
-    await this.repo.insertSpan(toAppLayer(transformed));
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertSpan(toAppLayer(transformed, retentionDays));
   }
 
   async bulkAppend(
     records: NormalizedSpan[],
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
     if (records.length === 0) return;
     const transformed = await Promise.all(
       records.map((r) => applyGovernanceStrip(r, this.stripService)),
     );
-    await this.repo.insertSpans(transformed.map(toAppLayer));
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertSpans(transformed.map((r) => toAppLayer(r, retentionDays)));
   }
 }

@@ -23,7 +23,7 @@ export const CADENCE_WINDOW_MS: Record<NotificationCadence, number> = {
 };
 
 /**
- * Default trace-readiness debounce in milliseconds (ADR-030). The dedup window
+ * Default trace-readiness debounce in milliseconds (ADR-026). The dedup window
  * a notify-class trigger waits before its filters re-evaluate against the
  * settled fold. Matches the `Trigger.traceDebounceMs` schema default so new
  * rows inserted by the UI without a custom value preserve the historical

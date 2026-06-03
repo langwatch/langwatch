@@ -192,12 +192,30 @@ async function processContentPart({
         ownerId,
       };
 
-      const rewrittenPart = {
-        ...(part as Record<string, unknown>),
-        id: stored.id,
-        url: `/api/files/${stored.id}`,
-        data: undefined,
-      };
+      const original = part as Record<string, unknown>;
+      // AI-SDK file shape (`type:"file", mediaType, data`) is dispatched here
+      // by the visitor when mimeType is not audio/*. Normalise to a clean
+      // `binary` shape (the same canonical form the inputAudio handler
+      // produces for the audio path) so the rewrite is not a chimera of
+      // `type:"file"` + binary externalised fields.
+      const isFileShape = original.type === "file";
+      const rewrittenPart = isFileShape
+        ? {
+            type: "binary",
+            mimeType,
+            id: stored.id,
+            url: `/api/files/${stored.id}`,
+            data: undefined,
+            ...(typeof original.filename === "string"
+              ? { filename: original.filename }
+              : {}),
+          }
+        : {
+            ...original,
+            id: stored.id,
+            url: `/api/files/${stored.id}`,
+            data: undefined,
+          };
 
       return { part: rewrittenPart, ref };
     },
@@ -247,16 +265,20 @@ async function processContentPart({
 
     // OpenAI Realtime API: {type:"input_audio", input_audio:{data:"<base64>", format:"wav"}}.
     // This is the shape the langwatch python-sdk emits for scenario audio
-    // turns today. Format determines the mime type (wav -> audio/wav, mp3
-    // -> audio/mpeg, etc.); we map a small allowlist and default to
-    // application/octet-stream when the format is missing or unknown.
+    // turns today, and the shape the typescript-sdk's
+    // convert-core-messages-to-agui-messages translates AI-SDK file+audio
+    // parts to. Mime type resolution priority: explicit `mimeType` (set by
+    // the file-part dispatch path in visit-content-part for AI-SDK
+    // `audio/pcm16` etc.) > format-to-mimeType allowlist > a final
+    // `application/octet-stream` fallback when neither is recognised.
     async inputAudio(audioPart) {
       // Already-externalized: nothing to extract, pass through unchanged.
       if (!audioPart.data) return noOp;
 
       const format = audioPart.format?.toLowerCase();
       const mimeType =
-        format === "wav"
+        audioPart.mimeType ??
+        (format === "wav"
           ? "audio/wav"
           : format === "mp3"
             ? "audio/mpeg"
@@ -266,7 +288,7 @@ async function processContentPart({
                 ? "audio/ogg"
                 : format === "webm"
                   ? "audio/webm"
-                  : "application/octet-stream";
+                  : "application/octet-stream");
 
       const bytes = Buffer.from(audioPart.data, "base64");
       const stored = await service.storeFromBytes({
@@ -287,22 +309,35 @@ async function processContentPart({
       };
 
       const original = part as Record<string, unknown>;
+      const isFileShape = original.type === "file";
       const originalInputAudio =
         typeof original.input_audio === "object" && original.input_audio !== null
           ? (original.input_audio as Record<string, unknown>)
           : {};
-      // Rewrite to a shape the UI MediaPart already understands: keep the
-      // input_audio key for backward compatibility with consumers that
-      // already look at it, but swap `data` for an externalized `url`.
-      const rewrittenPart = {
-        ...original,
-        input_audio: {
-          ...originalInputAudio,
-          data: undefined,
-          url: `/api/files/${stored.id}`,
-          mimeType,
-        },
-      };
+
+      // Rewrite to the canonical externalised `input_audio` shape so the UI
+      // MediaPart renders a playable reference. When the inbound part was an
+      // AI-SDK `file` shape (`{type:"file", mediaType, data}`), drop the
+      // file-specific discriminants so the rewritten part is a clean
+      // input_audio reference rather than a chimera of both shapes.
+      const rewrittenPart = isFileShape
+        ? {
+            type: "input_audio",
+            input_audio: {
+              data: undefined,
+              url: `/api/files/${stored.id}`,
+              mimeType,
+            },
+          }
+        : {
+            ...original,
+            input_audio: {
+              ...originalInputAudio,
+              data: undefined,
+              url: `/api/files/${stored.id}`,
+              mimeType,
+            },
+          };
 
       return { part: rewrittenPart, ref };
     },

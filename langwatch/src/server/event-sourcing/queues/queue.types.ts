@@ -161,7 +161,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
   /**
    * Optional audit adapter that mirrors every job lifecycle event to a
    * durable side-store (typically PG). Used by the outbox dispatch queue
-   * per ADR-021 revision: the queue owns scheduling and execution, and
+   * per ADR-025 revision: the queue owns scheduling and execution, and
    * the adapter projects each transition into a row that operator
    * dashboards query against.
    *
@@ -175,7 +175,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
 
 /**
  * Lifecycle hooks for queues that want to project state into a durable
- * side-store. Used by the outbox dispatch queue (ADR-021 revision).
+ * side-store. Used by the outbox dispatch queue (ADR-025 revision).
  *
  * The queue invokes:
  *   - `onEnqueue` on a successful new-stage `send` (skipped on a
@@ -196,18 +196,41 @@ export interface QueueAuditAdapter<Payload> {
     maxAttempts?: number;
   }): Promise<void>;
 
-  onLeased(event: { payload: Payload }): Promise<void>;
+  /**
+   * `attempt` is the current attempt number (1-indexed) carried by the
+   * job. Adapters that maintain a projection use it as a CAS token so a
+   * late event from a stale lease (attempt N) can't overwrite a
+   * re-leased row (attempt N+1).
+   *
+   * `leasedUntil` is the wall-clock time the queue intends to hold the
+   * job before its retry layer reschedules it. Adapters that track
+   * stuck-state observability project it onto the audit row.
+   */
+  onLeased(event: {
+    payload: Payload;
+    attempt: number;
+    leasedUntil?: Date;
+  }): Promise<void>;
 
-  onDispatched(event: { payload: Payload; at: Date }): Promise<void>;
+  onDispatched(event: {
+    payload: Payload;
+    at: Date;
+    attempt: number;
+  }): Promise<void>;
 
   onFailed(event: {
     payload: Payload;
     error: string;
     willRetry: boolean;
     nextAttemptAt?: Date;
+    attempt: number;
   }): Promise<void>;
 
-  onDead(event: { payload: Payload; lastError: string }): Promise<void>;
+  onDead(event: {
+    payload: Payload;
+    lastError: string;
+    attempt: number;
+  }): Promise<void>;
 }
 
 /**

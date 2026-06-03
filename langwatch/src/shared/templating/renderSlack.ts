@@ -80,11 +80,19 @@ export async function renderTriggerSlack({
 
   const effectiveTemplate = template ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
   const usedDefaultTemplate = template == null;
+  // `customMissing` captures the missing-variable diagnostics from the
+  // customer's template render. If the JSON.parse / allowlist filter
+  // below throws, we still want to surface THOSE diagnostics (the
+  // author's typos) rather than swap them out for the framework
+  // default's. Without this the preview UI loses the actual signal the
+  // author needs to fix their template.
+  let customMissing: string[] | undefined;
   try {
     const rendered = await renderLiquid({
       template: effectiveTemplate,
       context: ctx,
     });
+    customMissing = rendered.missingVariables;
     const parsed: unknown = JSON.parse(rendered.output);
     const blocksInput = Array.isArray(parsed)
       ? parsed
@@ -104,7 +112,7 @@ export async function renderTriggerSlack({
     return {
       payload: { text: fallback.text },
       usedDefault: true,
-      missingVariables: fallback.missingVariables,
+      missingVariables: customMissing ?? fallback.missingVariables,
       errors: [errorMessage(err)],
     };
   }

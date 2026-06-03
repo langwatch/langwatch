@@ -90,7 +90,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
       `Invalid Slack template type "${draft.slackTemplateType}". Allowed: ${SLACK_TEMPLATE_TYPES.join(", ")}.`,
     );
   }
-  // ADR-024 makes the Slack type discriminator explicit so a Block Kit JSON
+  // ADR-028 makes the Slack type discriminator explicit so a Block Kit JSON
   // template can't silently dispatch as plain text. Reject a Slack source
   // without a type instead of falling back to "string", which is the kind of
   // silent mis-send the discriminator exists to prevent.
@@ -152,6 +152,14 @@ export class TriggerTemplateService {
     webhook: string | null;
   }): Promise<TestFireResult> {
     const context = this.context(trigger, project);
+
+    // Run the same validation save uses so a Test Fire can't bypass the
+    // discriminator contract — without this, a draft with `slackTemplate`
+    // set but `slackTemplateType` unset would have `normalizeSlackType`
+    // collapse to null and quietly render the framework default while
+    // (from the operator's POV) "testing" their template. Validate first,
+    // dispatch second.
+    validateTemplateDraft(draft);
 
     if (channel === "email") {
       if (recipients.length === 0) {

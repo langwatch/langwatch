@@ -57,9 +57,8 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
-      data: { ...testProject, teamId: testTeam.id, personalFeatures: {} },
+      data: { ...projectFactory.build({ slug: nanoid() }), teamId: testTeam.id },
     });
 
     testApiKey = testProject.apiKey;

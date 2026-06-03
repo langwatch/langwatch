@@ -13,8 +13,8 @@ import type { OutboxRow } from "./outbox.types";
  *
  * `leaseNext` and `recoverExpiredLeases` use raw SQL with
  * `FOR UPDATE SKIP LOCKED` so concurrent drainers across processes
- * race cleanly without dead-locking. See ADR-023 for the lease
- * design and ADR-022 for the claim primitive.
+ * race cleanly without dead-locking. See ADR-026 for the lease
+ * design and ADR-025 for the claim primitive.
  */
 export class PrismaOutboxRepository implements OutboxRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -42,29 +42,59 @@ export class PrismaOutboxRepository implements OutboxRepository {
   async leaseNext({
     projectId,
     reactorName,
+    groupKey,
     leasedUntil,
     now,
   }: OutboxLeaseQuery): Promise<OutboxRow | null> {
-    const rows = await this.prisma.$queryRaw<OutboxRow[]>`
-      UPDATE "ReactorOutbox"
-      SET
-        "status" = 'dispatching',
-        "leasedUntil" = ${leasedUntil},
-        "attempts" = "attempts" + 1,
-        "updatedAt" = ${now}
-      WHERE "id" = (
-        SELECT "id"
-        FROM "ReactorOutbox"
-        WHERE "projectId" = ${projectId}
-          AND "reactorName" = ${reactorName}
-          AND "status" IN ('queued', 'failed_retryable')
-          AND "nextAttemptAt" <= ${now}
-        ORDER BY "nextAttemptAt" ASC, "createdAt" ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-      )
-      RETURNING *
-    `;
+    // `groupKey` is intentionally optional so the recovery / sweep paths
+    // can still ignore it, but wakeup-driven leases ALWAYS pass it —
+    // otherwise a wakeup for one group can drain another group's rows
+    // for the same (projectId, reactorName), breaking the per-group
+    // ordering this channel exists to preserve. Branches over a
+    // template literal so the optional predicate doesn't fight Prisma's
+    // tagged-template parameterisation.
+    const rows = groupKey === undefined
+      ? await this.prisma.$queryRaw<OutboxRow[]>`
+          UPDATE "ReactorOutbox"
+          SET
+            "status" = 'dispatching',
+            "leasedUntil" = ${leasedUntil},
+            "attempts" = "attempts" + 1,
+            "updatedAt" = ${now}
+          WHERE "id" = (
+            SELECT "id"
+            FROM "ReactorOutbox"
+            WHERE "projectId" = ${projectId}
+              AND "reactorName" = ${reactorName}
+              AND "status" IN ('queued', 'failed_retryable')
+              AND "nextAttemptAt" <= ${now}
+            ORDER BY "nextAttemptAt" ASC, "createdAt" ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING *
+        `
+      : await this.prisma.$queryRaw<OutboxRow[]>`
+          UPDATE "ReactorOutbox"
+          SET
+            "status" = 'dispatching',
+            "leasedUntil" = ${leasedUntil},
+            "attempts" = "attempts" + 1,
+            "updatedAt" = ${now}
+          WHERE "id" = (
+            SELECT "id"
+            FROM "ReactorOutbox"
+            WHERE "projectId" = ${projectId}
+              AND "reactorName" = ${reactorName}
+              AND "groupKey" = ${groupKey}
+              AND "status" IN ('queued', 'failed_retryable')
+              AND "nextAttemptAt" <= ${now}
+            ORDER BY "nextAttemptAt" ASC, "createdAt" ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING *
+        `;
     return rows[0] ?? null;
   }
 
@@ -76,6 +106,7 @@ export class PrismaOutboxRepository implements OutboxRepository {
     limit: number;
   }): Promise<number> {
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      -- @tenancy: global crash-recovery sweep across all tenants
       UPDATE "ReactorOutbox"
       SET
         "status" = 'queued',

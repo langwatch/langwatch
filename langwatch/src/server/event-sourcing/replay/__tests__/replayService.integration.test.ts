@@ -35,6 +35,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           EventOccurredAt: 1700000000000,
           EventVersion: "2025-01-01",
           EventPayload: JSON.stringify({ value: 1 }),
+          // Backdated fixture timestamp (Nov 2023). Stamp the never-expire
+          // sentinel so the platform retention TTL doesn't delete the row
+          // on the next merge — DEFAULT 308 on the column would TTL it.
+          _retention_days: 0,
         },
         {
           TenantId: tenantA,
@@ -46,6 +50,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           EventOccurredAt: 1700000001000,
           EventVersion: "2025-01-01",
           EventPayload: JSON.stringify({ value: 2 }),
+          _retention_days: 0,
         },
       ],
       format: "JSONEachRow",
@@ -65,6 +70,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           EventOccurredAt: 1700000002000,
           EventVersion: "2025-01-01",
           EventPayload: JSON.stringify({ value: 100 }),
+          _retention_days: 0,
         },
       ],
       format: "JSONEachRow",
@@ -202,6 +208,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
             EventOccurredAt: 1700000003000,
             EventVersion: "2025-01-01",
             EventPayload: JSON.stringify({ value: 999 }),
+            _retention_days: 0,
           },
         ],
         format: "JSONEachRow",
