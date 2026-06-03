@@ -57,6 +57,28 @@ export interface GovernanceConfig {
   shell_rc_preference?: "skip";
 
   /**
+   * Per-wrapped-tool routing mode answer.
+   *
+   *   "gateway"   — Path A: route the tool's HTTP calls through
+   *                  the AI Gateway via base-URL swap (full server-
+   *                  side I/O + cost capture, no client OTel).
+   *   "ingestion" — Path B: enable the tool's native OTel exporter
+   *                  pointed at /api/otel + mint the user's
+   *                  UserIngestionBinding token. For codex this
+   *                  also writes the [otel] block to
+   *                  ~/.codex/config.toml automatically.
+   *   "ask"       — re-prompt on the next `langwatch <tool>`. The
+   *                  default when this key is absent.
+   *
+   * The two modes are mutually exclusive per the no-double-trace
+   * rule — gateway capture + OTel emission on the same call would
+   * double-count both traces and cost. The wrapper picks Path A
+   * by default when a personal VK is configured, and falls back
+   * to Path B when no VK + the user opts in.
+   */
+  tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
+
+  /**
    * Most-recent signed `request_increase_url` returned by the
    * gateway in a 402 budget_exceeded payload — cached so
    * `langwatch request-increase` opens the exact URL the gateway

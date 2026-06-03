@@ -410,10 +410,16 @@ ingestCmd
     }
   });
 
+// `langwatch ingest install <tool>` — hidden primitive used by CI /
+// devcontainer / scripted setups. The user surface is
+// `langwatch <tool>` (the wrapper auto-resolves Path A vs Path B
+// per cfg.tool_mode + VK presence). Kept registered so existing
+// scripts continue to work and so reviewers can find the install
+// helper from the help with `--help --all` if needed.
 ingestCmd
-  .command("install <tool>")
+  .command("install <tool>", { hidden: true })
   .description(
-    "Path B activation for a wrapped tool. Mints or rotates the user's ingestion binding, prints the OTLP export block, and (for codex) idempotently merges the [otel] block into ~/.codex/config.toml.",
+    "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
   )
   .option("--env-only", "skip the codex config.toml write; print exports only")
   .option("--json", "emit machine-readable JSON")

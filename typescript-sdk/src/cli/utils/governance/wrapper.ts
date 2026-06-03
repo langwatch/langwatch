@@ -20,6 +20,7 @@ import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
+import { resolveWrapperMode } from "./wrapper-mode";
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -311,13 +312,37 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.exit(2);
   }
 
-  const probe = await preflightWrapper(cfg, tool);
-  if (!probe.ok) {
-    process.stderr.write(probe.message ?? "preflight failed\n");
+  const gatewayVars = envForTool(cfg, tool).vars;
+  let modeResult;
+  try {
+    modeResult = await resolveWrapperMode(cfg, tool, gatewayVars);
+  } catch (err) {
+    process.stderr.write(`mode resolution failed: ${(err as Error).message}\n`);
     process.exit(2);
   }
 
-  const env = { ...process.env, ...envForTool(cfg, tool).vars };
+  if (modeResult.mode === "gateway") {
+    const probe = await preflightWrapper(cfg, tool);
+    if (!probe.ok) {
+      process.stderr.write(probe.message ?? "preflight failed\n");
+      process.exit(2);
+    }
+  } else {
+    // ingestion mode side-effect feedback so the user sees what
+    // the wrapper just did on their behalf.
+    if (modeResult.newBindingMinted) {
+      process.stderr.write(
+        `langwatch: minted a personal ingestion token for ${tool}.\n`,
+      );
+    }
+    if (modeResult.codexConfigPath) {
+      process.stderr.write(
+        `langwatch: wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
+      );
+    }
+  }
+
+  const env = { ...process.env, ...modeResult.vars };
   // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
   // bare spawn() can't resolve them without a shell. shell:true is safe
   // here because `tool` is whitelisted (claude/codex/cursor/gemini) and
