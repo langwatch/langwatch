@@ -410,6 +410,25 @@ ingestCmd
     }
   });
 
+ingestCmd
+  .command("install <tool>")
+  .description(
+    "Path B activation for a wrapped tool. Mints or rotates the user's ingestion binding, prints the OTLP export block, and (for codex) idempotently merges the [otel] block into ~/.codex/config.toml.",
+  )
+  .option("--env-only", "skip the codex config.toml write; print exports only")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (
+      tool: string,
+      options: { envOnly?: boolean; json?: boolean },
+    ) => {
+      const { installCommand } = await import(
+        "./commands/ingestion/install.js"
+      );
+      await installCommand(tool, options);
+    },
+  );
+
 const governanceCmd = program
   .command("governance")
   .description(
