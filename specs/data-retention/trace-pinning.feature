@@ -40,12 +40,12 @@ Feature: Trace pinning as a UI annotation
     Then trace "abc123" remains pinned
 
   # Pinning is a UI annotation, not a retention exemption — so when a pinned
-  # trace's data ages out under the project policy, the pin has nothing left
-  # to point at. The orphan sweep then removes the dangling PinnedTrace record.
-  # A manual pin therefore disappears once its trace passes retention; pinning
-  # is not a way to keep a trace forever.
-  Scenario: A manual pin is swept once its trace ages out
+  # trace's data ages out under the project policy, the trace data is gone and
+  # the pin resolves to nothing. The dangling PinnedTrace record is NOT cleaned
+  # up — orphan cleanup was removed (see ADR-025) — so it lingers as a harmless
+  # stale reference. Pinning is not a way to keep a trace's data forever.
+  Scenario: A manual pin does not exempt its trace from retention
     Given trace "abc123" is manually pinned by a user
     And trace "abc123" has aged out of ClickHouse under the project retention policy
-    When the orphan sweep runs for the project
-    Then the PinnedTrace record for "abc123" is deleted from PostgreSQL
+    Then the trace data is gone and the pin resolves to nothing
+    And the PinnedTrace record for "abc123" remains in PostgreSQL (no orphan cleanup)

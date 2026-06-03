@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-01
 
-**Status:** Accepted
+**Status:** Accepted — but the **orphan-cleanup half** described here (the PG-side sweep of rows referencing TTL-expired traces) was **removed** on 2026-06-03; see [ADR-025](./025-remove-orphan-sweep.md). The ClickHouse-native TTL retention below remains in force; mentions of the "orphan sweep" / "orphan-cleanup" are historical.
 
 ## Context
 
@@ -76,7 +76,7 @@ and returns `appliedRetentionDays` so the UI shows the truth, not the form.
 | Constant | Value | Purpose |
 |---|---|---|
 | `PLATFORM_DEFAULT_RETENTION_DAYS` | 49 | What new rows get stamped when no override resolves. Default-on. |
-| `MIN_RETENTION_DAYS` | 49 | Floor for any override; below this, TTL churn and orphan-sweep ROI collapse. |
+| `MIN_RETENTION_DAYS` | 49 | Floor for any override; below this, ClickHouse TTL churn ROI collapses. |
 | `MAX_RETENTION_DAYS` | 65534 | UInt16 max, kept week-aligned. |
 | `RETENTION_WEEK_DAYS` | 7 | Tables are weekly-partitioned; values must be multiples of 7. |
 | `INDEFINITE_RETENTION_DAYS` | 0 | Sentinel. Platform-admin only. Maps to year-2106 TTL expiry. |
@@ -288,9 +288,9 @@ single per-table ALTER with no batching logic. The storage breakdown UI
 gives tenants a real number, not an estimate.
 
 **Negative.** A bug in the reconciler that drops the retention TTL
-silently keeps data alive past policy — the orphan-sweep chain still
-runs, but the underlying CH rows don't expire. Mitigation: regression
-tests for the MODIFY-TTL re-emit invariant, plus a check on every deploy.
+silently keeps data alive past policy — the underlying CH rows don't
+expire. Mitigation: regression tests for the MODIFY-TTL re-emit
+invariant, plus a check on every deploy.
 
 A bug in ingestion stamping that floors to 0 instead of 49 silently makes
 data indefinite for new inserts. Mitigation: `_retention_days = 0` is
@@ -298,13 +298,14 @@ only acceptable in test fixtures; production paths always fall back to
 `PLATFORM_DEFAULT_RETENTION_DAYS`.
 
 **Neutral.** Pinning growth is unbounded — manual pins survive until
-explicitly unpinned, and only the orphan sweep cleans them once the
-underlying trace TTLs out. Acceptable given expected pin volume.
+explicitly unpinned. Since the orphan sweep was removed (ADR-025), a
+pin's `PinnedTrace` row is no longer cleaned when its trace TTLs out; it
+lingers as a stale reference. Acceptable given expected pin volume.
 
 ## References
 
-- Related ADRs: ADR-023 (orphan-sweep reactor + chain), ADR-019
-  (repository-service layering)
+- Related ADRs: ADR-023 (orphan-sweep reactor + chain — superseded),
+  ADR-025 (orphan sweep removed), ADR-019 (repository-service layering)
 - Migration: `langwatch/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `langwatch/src/server/data-retention/`,
   `langwatch/src/server/clickhouse/ttlReconciler.ts`,

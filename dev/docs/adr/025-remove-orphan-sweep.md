@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-03
 
-**Status:** Accepted (supersedes ADR-023 and the never-merged ADR-024)
+**Status:** Accepted (supersedes ADR-023; the groupQueue-migration attempt in PR #4524 is closed unmerged)
 
 ## Context
 
@@ -21,9 +21,8 @@ the system:
   running the heavy sweep **inline on the ingestion path**, and ClickHouse was
   hammered per trace event.
 - Containing and re-doing it consumed two follow-up efforts — the #4518 hot-fix
-  and a full groupQueue migration (ADR-024 / PR #4524) — for a feature whose
-  only job is opportunistic cleanup of rows that are, at worst, dangling
-  references in the UI.
+  and a full groupQueue migration (PR #4524) — for a feature whose only job is
+  opportunistic cleanup of rows that are, at worst, dangling references in the UI.
 
 The cost/benefit no longer holds: a background deleter of orphaned PG rows is
 not worth the operational risk surface and the maintenance it has demanded.
@@ -38,7 +37,8 @@ records anymore. Deleted:
   `background/workers/orphanSweepChainWorker.ts`
 - all wiring: the trace-processing reactor attach, the `PipelineRegistry` /
   `DataRetentionDependencies` plumbing, the worker registration, the
-  `orphan_sweep_chain` metric label, and `specs/data-retention/orphan-sweep.feature`.
+  `orphan_sweep_chain` job metric + the `data_retention_orphans_swept_total`
+  counter, and `specs/data-retention/orphan-sweep.feature`.
 
 PR #4524 (the groupQueue migration) is **closed unmerged** — superseded by this
 removal. PR #4518 (the hot-fix) is moot for the storm since the sweep no longer
@@ -70,8 +70,8 @@ matters. Either would get its own ADR.
 
 ## References
 
-- Supersedes: ADR-023 (orphan-sweep BullMQ chain), ADR-024 (groupQueue
-  migration — never merged).
+- Supersedes: ADR-023 (orphan-sweep BullMQ chain). The groupQueue migration
+  (PR #4524) was never merged — no ADR number was assigned on `main`.
 - Related: ADR-022 (data retention, CH-native TTL).
 - Incident: `EPIC/Q2/data-retention/errors/postmortem.md` (RC #2).
 - PRs: #4518 (hot-fix), #4524 (groupQueue migration — closed).
