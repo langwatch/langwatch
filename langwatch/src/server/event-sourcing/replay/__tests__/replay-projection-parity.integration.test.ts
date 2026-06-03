@@ -104,61 +104,89 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
 
   describe("when the same event sequence is replayed from event_log via replayExecutor", () => {
     it("leanForProjection is invoked on every event at the same logical point in both the live and replay paths, producing byte-identical projection state", async () => {
-      // Phase 1: insert synthetic event_log rows representing a completed live ingestion.
+      // Phase 1: insert a SEQUENCE of synthetic event_log rows representing a
+      // completed live ingestion (the scenario is "a sequence of span events").
       // This simulates what the live pipeline writes after the storeEvents step.
       const LARGE_OUTPUT = "x".repeat(100 * 1024);
 
-      const eventPayload = JSON.stringify({
-        id: "evt-replay-parity-001",
-        aggregateId: traceId,
-        aggregateType: "trace",
-        tenantId,
-        type: SPAN_RECEIVED_EVENT_TYPE,
-        version: "2025-12-14",
-        createdAt: 1700000000000,
-        occurredAt: 1700000000000,
-        data: {
-          span: {
-            traceId,
-            spanId: "span-replay-001",
-            name: "test-span",
-            kind: 1,
-            attributes: [
-              { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
-            ],
-            events: [],
-            links: [],
-            status: {},
-            startTimeUnixNano: "1700000000000000000",
-            endTimeUnixNano: "1700000001000000000",
-            droppedAttributesCount: 0,
-            droppedEventsCount: 0,
-            droppedLinksCount: 0,
+      // Three span events of the SAME trace. Each carries the large IO attribute
+      // so the parity assertions below hold for every event in the sequence.
+      const EVENT_IDS = [
+        "evt-replay-parity-001",
+        "evt-replay-parity-002",
+        "evt-replay-parity-003",
+      ] as const;
+
+      const records = EVENT_IDS.map((eventId, i) => {
+        const occurredAt = 1700000000000 + i * 1000;
+        const eventPayload = JSON.stringify({
+          id: eventId,
+          aggregateId: traceId,
+          aggregateType: "trace",
+          tenantId,
+          type: SPAN_RECEIVED_EVENT_TYPE,
+          version: "2025-12-14",
+          createdAt: occurredAt,
+          occurredAt,
+          // event_log dedups on IdempotencyKey, so the payload's idempotencyKey
+          // mirrors the row's IdempotencyKey (production sets both — see below).
+          idempotencyKey: eventId,
+          data: {
+            span: {
+              traceId,
+              spanId: `span-replay-00${i + 1}`,
+              name: "test-span",
+              kind: 1,
+              attributes: [
+                { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
+              ],
+              events: [],
+              links: [],
+              status: {},
+              startTimeUnixNano: `${occurredAt}000000`,
+              endTimeUnixNano: `${occurredAt + 1000}000000`,
+              droppedAttributesCount: 0,
+              droppedEventsCount: 0,
+              droppedLinksCount: 0,
+            },
+            resource: null,
+            instrumentationScope: null,
+            piiRedactionLevel: "DISABLED",
           },
-          resource: null,
-          instrumentationScope: null,
-          piiRedactionLevel: "DISABLED",
-        },
+        });
+
+        return {
+          TenantId: tenantId,
+          AggregateType: "trace",
+          AggregateId: traceId,
+          EventId: eventId,
+          EventType: SPAN_RECEIVED_EVENT_TYPE,
+          EventTimestamp: occurredAt,
+          EventOccurredAt: occurredAt,
+          EventVersion: "2025-12-14",
+          EventPayload: eventPayload,
+          // event_log is ReplacingMergeTree(EventTimestamp) keyed by
+          // (TenantId, AggregateType, AggregateId, IdempotencyKey). Production
+          // ALWAYS stamps IdempotencyKey = event.idempotencyKey || event.id
+          // (eventStoreUtils.eventToRecord), so distinct events of one trace get
+          // distinct sort keys and never collapse. Omitting it here let every
+          // event of this trace share the key (""), so a background merge in the
+          // insert→read window collapsed the sequence to the single
+          // max-EventTimestamp row — the read then returned fewer rows than were
+          // inserted (the observed shard-5 flake). Stamp it to match production.
+          IdempotencyKey: eventId,
+        };
       });
 
       await client.insert({
         table: "event_log",
-        values: [
-          {
-            TenantId: tenantId,
-            AggregateType: "trace",
-            AggregateId: traceId,
-            EventId: "evt-replay-parity-001",
-            EventType: SPAN_RECEIVED_EVENT_TYPE,
-            EventTimestamp: 1700000000000,
-            EventOccurredAt: 1700000000000,
-            EventVersion: "2025-12-14",
-            EventPayload: eventPayload,
-          },
-        ],
+        values: records,
         format: "JSONEachRow",
-        // Synchronous insert: the SELECT below reads this row back immediately;
-        // async insert under CI load raced and returned 0 rows (flake).
+        // Synchronous insert so the SELECT below reads the rows back immediately.
+        // (async_insert:0 is harmless but was NOT the flake fix — a prior harden
+        // wrongly attributed the 0-rows failure to async-insert visibility; the
+        // real cause was ReplacingMergeTree dedup on an empty IdempotencyKey,
+        // fixed by the distinct IdempotencyKey stamped above.)
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 1 },
       });
 
@@ -178,37 +206,38 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
       });
       const eventLogRows = await replayRows.json<{ EventPayload: string }>();
 
-      expect(eventLogRows).toHaveLength(1);
+      // Every inserted event must be read back — none collapsed by the merge.
+      expect(eventLogRows).toHaveLength(EVENT_IDS.length);
 
       // Apply leanForProjection to every row — mimicking replayExecutor.apply.
-      // leanForProjection throws "not implemented" until Step 5 — that is the
-      // TDD failure signal expected at this stage.
       const leanedEvents = eventLogRows.map((row) => {
         const event = JSON.parse(row.EventPayload) as Parameters<typeof leanForProjection>[0];
         return leanForProjection(event);
       });
 
-      // Parity assertions: the leaned events must have the IO attr truncated
-      // to IO_PREVIEW_BYTES and carry an eventref pointer.
-      expect(leanedEvents).toHaveLength(1);
+      // Parity assertions hold for EVERY event in the sequence: each leaned span
+      // must have the IO attr truncated to IO_PREVIEW_BYTES and carry an eventref.
+      expect(leanedEvents).toHaveLength(EVENT_IDS.length);
 
-      const leanedSpanData = leanedEvents[0]?.data as {
-        span: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
-      };
-      const outputAttr = leanedSpanData?.span?.attributes?.find(
-        (a) => a.key === "langwatch.output",
-      );
-      expect(outputAttr).toBeDefined();
-      // Preview must be shorter than the original 100 KB value
-      expect(
-        Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
-      ).toBeLessThan(Buffer.byteLength(LARGE_OUTPUT, "utf-8"));
+      for (const leaned of leanedEvents) {
+        const leanedSpanData = leaned?.data as {
+          span: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+        };
+        const outputAttr = leanedSpanData?.span?.attributes?.find(
+          (a) => a.key === "langwatch.output",
+        );
+        expect(outputAttr).toBeDefined();
+        // Preview must be shorter than the original 100 KB value
+        expect(
+          Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
+        ).toBeLessThan(Buffer.byteLength(LARGE_OUTPUT, "utf-8"));
 
-      // eventref must be attached
-      const eventrefAttr = leanedSpanData?.span?.attributes?.find(
-        (a) => a.key === "langwatch.reserved.eventref.langwatch.output",
-      );
-      expect(eventrefAttr).toBeDefined();
+        // eventref must be attached
+        const eventrefAttr = leanedSpanData?.span?.attributes?.find(
+          (a) => a.key === "langwatch.reserved.eventref.langwatch.output",
+        );
+        expect(eventrefAttr).toBeDefined();
+      }
     });
   });
 });
