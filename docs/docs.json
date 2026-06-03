@@ -1283,6 +1283,38 @@
       "destination": "/self-hosting/docker-compose"
     },
     {
+      "source": "/agent-simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
     },
