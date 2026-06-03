@@ -14,19 +14,19 @@ If you have already run `langwatch login --device`, the one-liner unified wrappe
 langwatch claude
 ```
 
-The wrapper auto-mints a personal ingestion token, injects both the gateway env vars (Path B) and the OTLP env vars (Path A), and execs `claude` so you get the same UX you would running it directly. First-run state is cached at `~/.langwatch/config.json`, no rotation per invocation.
+The wrapper sets `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` on the spawned `claude` process so every API call routes through the LangWatch gateway. The gateway captures full request / response server-side (Path B below). No client-side OpenTelemetry injection — the gateway already records every call, so doubling up via OTLP would double-trace and double-bill in your /me view.
 
-Same shape works for the other supported assistants:
+Same shape works for the other supported assistants. Path A vs Path B are mutually exclusive per session: use the wrapper when you have an API key on file (gateway-only), use the /me install drawer when you can't (Path A, OTLP-only).
 
-| Command | What it routes | Telemetry today |
+| Command | Provider env routed via gateway | Path A install (OTLP) |
 |---|---|---|
-| `langwatch claude` | Anthropic API via gateway + Claude Code OTel | Active |
-| `langwatch gemini` | Google GenAI API via gateway + Gemini CLI OTel | Active |
-| `langwatch codex` | OpenAI API via gateway + OTel | Active once `~/.codex/config.toml` has `[otel]` enabled (codex 0.x requires the toml flag in addition to env vars) |
-| `langwatch opencode` | OpenAI + Anthropic via gateway + OTel | Wiring shipped; opencode 1.14.22 does not yet read `OTEL_*_EXPORTER` natively, so the OTel half is forward-looking |
-| `langwatch cursor` | OpenAI + Anthropic via gateway | No OTel (Cursor is a GUI app; terminal-launch envs never reach the agent panel) |
+| `langwatch claude` | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | Available via /me Trace Ingest |
+| `langwatch gemini` | `GOOGLE_GENAI_API_BASE` + `GEMINI_API_KEY` | Available via /me Trace Ingest (gen_ai.* native) |
+| `langwatch codex` | `OPENAI_BASE_URL` + `OPENAI_API_KEY` | Available via /me Trace Ingest (needs `[otel]` flag in `~/.codex/config.toml`) |
+| `langwatch opencode` | both `OPENAI_*` + `ANTHROPIC_*` pairs | Wired; opencode 1.14.22 emits structural spans only (no gen_ai.* attrs yet) |
+| `langwatch cursor` | both `OPENAI_*` + `ANTHROPIC_*` pairs | Not wired (GUI app, terminal-launch envs don't reach the agent panel) |
 
-The rest of this guide explains the underlying env-var paths in case you need to wire the integration without the wrapper (custom shells, CI, devcontainers).
+The rest of this guide explains the underlying env-var paths in case you need to wire the integration without the wrapper (custom shells, CI, devcontainers), or in case you can't route through the gateway at all and need Path A's OTLP-only flow.
 
 
 When you finish you will have:
