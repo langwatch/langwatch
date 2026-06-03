@@ -1,4 +1,5 @@
-import { Badge, Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useFacetLensStore } from "../../stores/facetLensStore";
@@ -27,6 +28,8 @@ interface FacetSectionProps {
   /** When set, renders a "(none)" row pinned at the bottom that toggles a `none:`/`has:` filter. */
   noneRow?: { active: boolean; onToggle: () => void };
   onShiftToggle?: (nextOpen: boolean) => void;
+  /** Remove this section from the sidebar (per-user). */
+  onHide?: () => void;
   orGroupId?: string;
   orPeers?: readonly string[];
   orMemberValues?: ReadonlySet<string>;
@@ -42,6 +45,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   dragHandleProps,
   noneRow,
   onShiftToggle,
+  onHide,
   orGroupId,
   orPeers,
   orMemberValues,
@@ -121,6 +125,8 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      hideLabel={`Hide ${title}`}
       orGroupId={orGroupId}
       orPeers={orPeers}
       valueCount={items.length}
@@ -192,15 +198,53 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
           />
         )}
 
-        {isHighCardinality && (
-          <Input
-            size="xs"
-            placeholder="Filter..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            marginTop={1}
-            textStyle="xs"
-          />
+        {/* Search is unconditional. The threshold-gated version (only
+            shown when ≥10 items) hid Enter-to-apply behind cardinality
+            — but the typed-value filter is exactly what users reach
+            for on SHORT enumerated sections too (e.g. typing a custom
+            error string into a `errorMessage` section that returned
+            no top values, typing a one-off topic). Always on; the
+            placeholder doubles as a hint that the typed value
+            applies on Enter. */}
+        {items.length > 0 && (
+          // Inset paddingX so the Input's 2px focus ring has room to
+          // render — without it, the ring's left/right edges were
+          // clipped by the sidebar scroll container's
+          // `overflowX: "hidden"`. The 2px gutter on each side keeps
+          // the focused state legible without pulling the input far
+          // away from the rest of the section's content.
+          <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5}>
+            <Input
+              size="xs"
+              placeholder="Search or press Enter to apply…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const value = searchQuery.trim();
+                if (!value) return;
+                // Apply the typed value as a filter even when no
+                // discovered facet matches — needed for rare values
+                // (a one-off `metadata.tenant`, a long error string
+                // copy-pasted from a log) that don't surface in the
+                // top-50 facet response. Toggle is symmetric: typing
+                // the same value again removes the filter.
+                e.preventDefault();
+                handleToggle(value);
+                setSearchQuery("");
+              }}
+              textStyle="xs"
+            />
+            {searchQuery.trim() && facetWindow.visible.length === 0 && (
+              <Text textStyle="2xs" color="fg.muted" paddingX={1}>
+                No match. Press <Kbd>Enter</Kbd> to filter by "
+                <Box as="span" fontWeight="600" color="fg">
+                  {searchQuery.trim()}
+                </Box>
+                " anyway.
+              </Text>
+            )}
+          </VStack>
         )}
       </VStack>
     </SidebarSection>
@@ -281,8 +325,13 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
   return (
     <>
       {beyondExpanded > 0 && (
+        // The 50 backend-returned values are now all visible —
+        // anything beyond that didn't surface in the top response,
+        // so the hint points at the always-on search input (which
+        // doubles as Enter-to-filter for arbitrary values).
         <Text textStyle="xs" color="fg.subtle" paddingX={1} paddingY={0.5}>
-          And {beyondExpanded} more — use search to filter
+          {beyondExpanded}+ rare values aren't shown — type a value
+          and press Enter to filter.
         </Text>
       )}
       <LinkButton onClick={onShowLess}>Show less</LinkButton>
