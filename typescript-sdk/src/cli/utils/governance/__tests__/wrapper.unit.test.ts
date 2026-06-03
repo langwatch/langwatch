@@ -75,119 +75,25 @@ describe("envForTool", () => {
     expect(env).toEqual({});
   });
 
-  describe("when a personal ingestion token is also present", () => {
+  it("never injects OTEL_*_EXPORTER for any wrapped tool (gateway captures I/O; OTLP would double-trace)", () => {
     const cfgWithIk: GovernanceConfig = {
       ...cfg,
       default_personal_ingestion_tokens: {
-        claude_code: {
-          id: "ik_claude",
-          secret: "ik-lw-abc123",
-          prefix: "ik-lw-",
-        },
-        codex: {
-          id: "ik_codex",
-          secret: "ik-lw-codex0",
-          prefix: "ik-lw-",
-        },
-        gemini: {
-          id: "ik_gemini",
-          secret: "ik-lw-gem456",
-          prefix: "ik-lw-",
-        },
-        opencode: {
-          id: "ik_opencode",
-          secret: "ik-lw-open77",
-          prefix: "ik-lw-",
-        },
+        claude_code: { id: "ik_c", secret: "ik-lw-x", prefix: "ik-lw-" },
+        codex: { id: "ik_co", secret: "ik-lw-y", prefix: "ik-lw-" },
+        gemini: { id: "ik_g", secret: "ik-lw-z", prefix: "ik-lw-" },
+        opencode: { id: "ik_o", secret: "ik-lw-w", prefix: "ik-lw-" },
       },
     };
-
-    it("claude → adds the OTEL_*_EXPORTER triple alongside the gateway pair", () => {
-      const env = envForTool(cfgWithIk, "claude").vars;
-      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
-      expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
-      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
-      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
-      expect(env.OTEL_LOGS_EXPORTER).toBe("otlp");
-      expect(env.OTEL_METRICS_EXPORTER).toBe("otlp");
-      expect(env.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/json");
-      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "http://app.example.com/api/otel",
-      );
-      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-abc123",
-      );
-      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=claude-code");
-    });
-
-    it("each tool picks up its OWN per-template ingestion token (no cross-tool token leakage)", () => {
-      const claudeEnv = envForTool(cfgWithIk, "claude").vars;
-      const codexEnv = envForTool(cfgWithIk, "codex").vars;
-      const geminiEnv = envForTool(cfgWithIk, "gemini").vars;
-      const opencodeEnv = envForTool(cfgWithIk, "opencode").vars;
-      expect(claudeEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-abc123");
-      expect(codexEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-codex0");
-      expect(geminiEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-gem456");
-      expect(opencodeEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-open77");
-    });
-
-    it("OTEL_EXPORTER_OTLP_ENDPOINT strips a trailing slash from control_plane_url", () => {
-      const trailing: GovernanceConfig = {
-        ...cfgWithIk,
-        control_plane_url: "http://app.example.com/",
-      };
-      const env = envForTool(trailing, "claude").vars;
-      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "http://app.example.com/api/otel",
-      );
-    });
-
-    it("codex → OTEL trio without any tool-specific telemetry-enable gate", () => {
-      const env = envForTool(cfgWithIk, "codex").vars;
-      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
-      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
-      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "http://app.example.com/api/otel",
-      );
-      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
-      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
-      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
-    });
-
-    it("gemini → OTEL trio + GEMINI_TELEMETRY_ENABLED=true", () => {
-      const env = envForTool(cfgWithIk, "gemini").vars;
-      expect(env.GOOGLE_GENAI_API_BASE).toBe("http://gw.example.com");
-      expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
-      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
-      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=gemini-cli");
-      expect(env.GEMINI_TELEMETRY_ENABLED).toBe("true");
-      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
-    });
-
-    it("opencode → OTEL trio + both provider pairs, no per-tool gate env", () => {
-      const env = envForTool(cfgWithIk, "opencode").vars;
-      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
-      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
-      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
-      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=opencode");
-      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
-      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
-    });
-
-    it("cursor → no OTEL injection (GUI app, terminal-launch envs don't reach the agent panel)", () => {
-      const env = envForTool(cfgWithIk, "cursor").vars;
-      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
-      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+    for (const tool of ["claude", "codex", "gemini", "cursor", "opencode"]) {
+      const env = envForTool(cfgWithIk, tool).vars;
       expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
-    });
-  });
-
-  it("claude without ingestion token → only the gateway pair (existing behavior, no regression)", () => {
-    const env = envForTool(cfg, "claude").vars;
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
-    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
-    expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
-    expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+      expect(env.OTEL_LOGS_EXPORTER).toBeUndefined();
+      expect(env.OTEL_METRICS_EXPORTER).toBeUndefined();
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
+    }
   });
 
   it("strips trailing slash from gateway_url", () => {
