@@ -157,17 +157,21 @@ export function BudgetExceededBanner({
               {adminEmail && (
                 <Text color="red.700" _dark={{ color: "red.200" }}>
                   Admin:{" "}
-                  <Link
-                    href={contactHref(adminEmail)}
-                    color="red.700"
-                    _dark={{ color: "red.200" }}
-                    {...(isUrlContact(adminEmail) && {
-                      target: "_blank",
-                      rel: "noreferrer",
-                    })}
-                  >
-                    {adminEmail}
-                  </Link>
+                  {isUrlContact(adminEmail) || isEmailContact(adminEmail) ? (
+                    <Link
+                      href={contactHref(adminEmail)}
+                      color="red.700"
+                      _dark={{ color: "red.200" }}
+                      {...(isUrlContact(adminEmail) && {
+                        target: "_blank",
+                        rel: "noreferrer",
+                      })}
+                    >
+                      {adminEmail}
+                    </Link>
+                  ) : (
+                    <Text as="span">{adminEmail}</Text>
+                  )}
                 </Text>
               )}
             </HStack>
