@@ -332,6 +332,11 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         `langwatch: wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
       );
     }
+    if (modeResult.codexProfilePath) {
+      process.stderr.write(
+        `langwatch: wrote profile body to ${modeResult.codexProfilePath}.\n`,
+      );
+    }
   } else {
     // ingestion mode side-effect feedback so the user sees what
     // the wrapper just did on their behalf.

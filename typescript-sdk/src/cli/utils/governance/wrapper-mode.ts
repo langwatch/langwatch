@@ -48,10 +48,17 @@ export interface WrapperModeResult {
   vars: Record<string, string>;
   /**
    * Path of the codex config.toml that was created / updated. Set
-   * for both codex Path A (writes [model_providers.langwatch] +
-   * [profiles.langwatch-gateway]) and Path B (writes [otel]).
+   * for both codex Path A (writes [model_providers.langwatch]) and
+   * Path B (writes [otel]).
    */
   codexConfigPath?: string;
+  /**
+   * Path of the sibling profile file
+   * (~/.codex/langwatch-gateway.config.toml). Set only on codex
+   * Path A. codex 0.134+ requires the profile body in a separate
+   * file when --profile is passed.
+   */
+  codexProfilePath?: string;
   /**
    * Extra args to prepend to the child invocation. Used for codex
    * Path A: `--profile langwatch-gateway` forces the new provider
@@ -118,6 +125,7 @@ export async function resolveWrapperMode(
         mode,
         vars: gatewayVars,
         codexConfigPath: gw.path,
+        codexProfilePath: gw.profilePath,
         extraArgs: ["--profile", gw.profile],
       };
     }

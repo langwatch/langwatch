@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildCodexGatewayBlock,
+  buildCodexGatewayProfileFile,
   buildCodexOtelBlock,
   CODEX_GATEWAY_PROFILE_NAME,
+  defaultCodexProfilePath,
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "../codex-config-toml";
@@ -172,7 +174,7 @@ describe("buildCodexGatewayBlock", () => {
    * OPENAI_API_KEY and routed to auth.openai.com instead of the
    * local gateway.
    */
-  it("emits the langwatch model_provider + gateway profile", () => {
+  it("emits the langwatch model_provider entry only", () => {
     const out = buildCodexGatewayBlock({
       gatewayUrl: "https://gateway.langwatch.ai",
     });
@@ -181,8 +183,21 @@ describe("buildCodexGatewayBlock", () => {
     expect(out).toContain(`base_url = "https://gateway.langwatch.ai/v1"`);
     expect(out).toContain(`env_key = "OPENAI_API_KEY"`);
     expect(out).toContain(`wire_api = "responses"`);
-    expect(out).toContain(`[profiles.${CODEX_GATEWAY_PROFILE_NAME}]`);
-    expect(out).toContain(`model_provider = "langwatch"`);
+  });
+
+  /**
+   * codex 0.134+ rejects [profiles.<name>] inside config.toml when
+   * --profile <name> is passed; the profile body lives in a sibling
+   * file. Andre's dogfood at the 4f37ed27a HEAD surfaced this with
+   * "cannot be used while config.toml contains legacy `profile = ...`
+   * or `[profiles.langwatch-gateway]` config".
+   */
+  it("does NOT embed [profiles.X] inside config.toml", () => {
+    const out = buildCodexGatewayBlock({
+      gatewayUrl: "https://gateway.langwatch.ai",
+    });
+    expect(out).not.toContain(`[profiles.${CODEX_GATEWAY_PROFILE_NAME}]`);
+    expect(out).not.toContain(`[profiles.`);
   });
 
   describe("when the gatewayUrl already ends with /v1", () => {
@@ -207,9 +222,18 @@ describe("buildCodexGatewayBlock", () => {
   });
 });
 
+describe("buildCodexGatewayProfileFile", () => {
+  it("emits model_provider at TOP level (no [profiles.X] header)", () => {
+    const out = buildCodexGatewayProfileFile();
+    expect(out).toContain(`model_provider = "langwatch"`);
+    expect(out).not.toContain(`[profiles.`);
+  });
+});
+
 describe("writeCodexGatewayBlock", () => {
   it("does not collide with a pre-existing [otel] marker block", () => {
     const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
     writeCodexOtelBlock(
       {
         endpoint: "http://localhost:5560/api/otel",
@@ -220,7 +244,7 @@ describe("writeCodexGatewayBlock", () => {
 
     const result = writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
-      { filePath },
+      { filePath, profilePath },
     );
     expect(result.action).toBe("updated");
 
@@ -232,27 +256,89 @@ describe("writeCodexGatewayBlock", () => {
     expect(contents).toContain("[otel]");
   });
 
+  it("writes the profile body to a SEPARATE file (codex 0.134+ requirement)", () => {
+    const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
+    const result = writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath, profilePath },
+    );
+    expect(result.profilePath).toBe(profilePath);
+    expect(result.profileAction).toBe("created");
+    expect(fs.existsSync(profilePath)).toBe(true);
+    const profileBody = fs.readFileSync(profilePath, "utf8");
+    expect(profileBody).toContain(`model_provider = "langwatch"`);
+  });
+
+  it("does NOT write [profiles.X] into config.toml", () => {
+    const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
+    writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath, profilePath },
+    );
+    const contents = fs.readFileSync(filePath, "utf8");
+    expect(contents).not.toContain("[profiles.langwatch-gateway]");
+    expect(contents).not.toContain("[profiles.");
+  });
+
   it("returns the langwatch-gateway profile name for the wrapper to pass via --profile", () => {
     const result = writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
-      { filePath: path.join(tmp, "config.toml") },
+      {
+        filePath: path.join(tmp, "config.toml"),
+        profilePath: path.join(tmp, "langwatch-gateway.config.toml"),
+      },
     );
     expect(result.profile).toBe(CODEX_GATEWAY_PROFILE_NAME);
   });
 
   it("idempotently replaces the bracketed region on re-run", () => {
     const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
     writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
-      { filePath },
+      { filePath, profilePath },
     );
     const result = writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
-      { filePath },
+      { filePath, profilePath },
     );
     expect(result.action).toBe("unchanged");
+    expect(result.profileAction).toBe("unchanged");
     const contents = fs.readFileSync(filePath, "utf8");
     const beginCount = (contents.match(/langwatch gateway begin/g) ?? []).length;
     expect(beginCount).toBe(1);
+  });
+
+  it("rewrites the profile file when its content drifts", () => {
+    const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
+    writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath, profilePath },
+    );
+    fs.writeFileSync(profilePath, "# stale hand-edit\n");
+    const result = writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath, profilePath },
+    );
+    expect(result.profileAction).toBe("updated");
+    const profileBody = fs.readFileSync(profilePath, "utf8");
+    expect(profileBody).toContain(`model_provider = "langwatch"`);
+  });
+});
+
+describe("defaultCodexProfilePath", () => {
+  it("derives from CODEX_HOME when set", () => {
+    const prev = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = tmp;
+    try {
+      const p = defaultCodexProfilePath();
+      expect(p).toBe(path.join(tmp, "langwatch-gateway.config.toml"));
+    } finally {
+      if (prev === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prev;
+    }
   });
 });

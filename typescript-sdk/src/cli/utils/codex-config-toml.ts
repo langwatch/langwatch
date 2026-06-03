@@ -146,7 +146,23 @@ export interface CodexGatewayBlockInputs {
 
 export interface CodexGatewayWriteResult {
   action: CodexOtelWriteAction;
+  /**
+   * The ~/.codex/config.toml path that received the
+   * [model_providers.langwatch] block.
+   */
   path: string;
+  /**
+   * The separate ~/.codex/<profile>.config.toml path that received
+   * the profile body. codex 0.134+ rejects [profiles.X] entries
+   * inside config.toml when the user passes --profile X, requiring
+   * a sibling file named <profile>.config.toml.
+   */
+  profilePath: string;
+  /**
+   * Result of the profile-file write. Independent of `action` so
+   * callers can report both writes accurately.
+   */
+  profileAction: CodexOtelWriteAction;
   /**
    * The profile name codex must be invoked with to actually route
    * through the langwatch provider — e.g. `codex --profile
@@ -159,17 +175,16 @@ export interface CodexGatewayWriteResult {
 const PROFILE_NAME = "langwatch-gateway";
 
 /**
- * Build the additive [model_providers.langwatch] +
- * [profiles.langwatch-gateway] block. Codex 0.130+ defaults to
- * ChatGPT OAuth and ignores OPENAI_API_KEY unless an explicit
- * model_provider config is selected with `name = "OpenAI"`,
- * `env_key`, and `wire_api = "responses"` (the "chat" wire_api
- * is no longer supported per the codex binary strings dump).
+ * Build the additive [model_providers.langwatch] block that lives
+ * in ~/.codex/config.toml. Codex 0.130+ defaults to ChatGPT OAuth
+ * and ignores OPENAI_API_KEY unless an explicit model_provider
+ * config is selected with `name = "OpenAI"`, `env_key`, and
+ * `wire_api = "responses"` (the "chat" wire_api is no longer
+ * supported per the codex binary strings dump).
  *
- * We deliberately write a NEW provider entry + a NEW profile so
- * the user's existing top-level `model_provider` / default codex
- * behaviour is untouched. Activation happens via `codex --profile
- * langwatch-gateway`, set by the wrapper at spawn time.
+ * Codex 0.134+ rejects a [profiles.<name>] entry inside
+ * config.toml when the user passes --profile <name>; the profile
+ * body is now written to a sibling file (see buildCodexGatewayProfileFile).
  */
 export function buildCodexGatewayBlock(
   inputs: CodexGatewayBlockInputs,
@@ -183,58 +198,116 @@ export function buildCodexGatewayBlock(
     `# wrapper updates this block in place; remove the marker pair`,
     `# above and below to opt back out.`,
     `# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
-    `# block doesn't change codex's default model_provider.`,
+    `# provider doesn't change codex's default model_provider.`,
+    `# The matching profile body lives at ~/.codex/${PROFILE_NAME}.config.toml`,
+    `# (codex 0.134+ requires the profile in a separate file).`,
     `[model_providers.langwatch]`,
     `name = "OpenAI"`,
     `base_url = "${baseUrl}"`,
     `env_key = "${envKey}"`,
     `wire_api = "responses"`,
-    ``,
-    `[profiles.${PROFILE_NAME}]`,
-    `model_provider = "langwatch"`,
     GW_END,
     "",
   ].join("\n");
 }
 
 /**
- * Idempotent merge of the gateway profile block. Same shape as
- * writeCodexOtelBlock — creates / updates / unchanged. Marker
- * pair is distinct from the [otel] pair so both blocks can
- * coexist without colliding (a user on Path A who later flips to
- * Path B keeps both blocks; only one fires per invocation per
- * the no-double-trace rule).
+ * Build the contents of the sibling profile file
+ * (~/.codex/langwatch-gateway.config.toml). The filename IS the
+ * profile name; the body holds the settings that previously went
+ * under [profiles.langwatch-gateway] inside config.toml.
+ *
+ * We DO NOT bracket this file with langwatch markers because the
+ * file is entirely owned by langwatch — the wrapper creates it
+ * fresh on every invocation. Hand-edits to it will be overwritten
+ * (a header comment explains this to anyone reading the file).
+ */
+export function buildCodexGatewayProfileFile(): string {
+  return [
+    `# Managed by 'langwatch codex' (Path A wrapper).`,
+    `# This file is the body of the '${PROFILE_NAME}' codex profile,`,
+    `# selected at spawn time via 'codex --profile ${PROFILE_NAME}'.`,
+    `# The matching [model_providers.langwatch] entry lives in`,
+    `# ~/.codex/config.toml, bracketed by langwatch marker comments.`,
+    `# Re-running 'langwatch codex' regenerates this file in place;`,
+    `# remove it and the [model_providers.langwatch] block in`,
+    `# config.toml to opt back out.`,
+    `model_provider = "langwatch"`,
+    "",
+  ].join("\n");
+}
+
+/** Default path for the sibling profile file. */
+export function defaultCodexProfilePath(profile: string = PROFILE_NAME): string {
+  const codexHome = process.env.CODEX_HOME;
+  const baseDir = codexHome ?? path.join(os.homedir(), ".codex");
+  return path.join(baseDir, `${profile}.config.toml`);
+}
+
+/**
+ * Idempotent merge of the gateway provider block into config.toml
+ * + write of the sibling profile file. Both writes happen in one
+ * call so the wrapper can't end up with a half-installed state.
+ *
+ * config.toml: regex-replace inside the marker pair or append. The
+ * [otel] marker pair (Path B) coexists independently — a user who
+ * runs both Path A and Path B keeps both blocks; only one fires per
+ * invocation per the no-double-trace rule.
+ *
+ * <profile>.config.toml: full-file replace. The file is entirely
+ * owned by langwatch.
  */
 export function writeCodexGatewayBlock(
   inputs: CodexGatewayBlockInputs,
-  options: { filePath?: string } = {},
+  options: { filePath?: string; profilePath?: string } = {},
 ): CodexGatewayWriteResult {
   const filePath = options.filePath ?? defaultCodexConfigPath();
+  const profilePath = options.profilePath ?? defaultCodexProfilePath();
   const block = buildCodexGatewayBlock(inputs);
+  const profileBody = buildCodexGatewayProfileFile();
 
+  let action: CodexOtelWriteAction;
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, block, { mode: 0o600 });
-    return { action: "created", path: filePath, profile: PROFILE_NAME };
-  }
-
-  const prior = fs.readFileSync(filePath, "utf8");
-  const re = new RegExp(
-    `${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
-    "m",
-  );
-  if (re.test(prior)) {
-    const next = prior.replace(re, block);
-    if (next === prior) {
-      return { action: "unchanged", path: filePath, profile: PROFILE_NAME };
+    action = "created";
+  } else {
+    const prior = fs.readFileSync(filePath, "utf8");
+    const re = new RegExp(
+      `${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
+      "m",
+    );
+    if (re.test(prior)) {
+      const next = prior.replace(re, block);
+      if (next === prior) {
+        action = "unchanged";
+      } else {
+        fs.writeFileSync(filePath, next, { mode: 0o600 });
+        action = "updated";
+      }
+    } else {
+      const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+      fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+      action = "updated";
     }
-    fs.writeFileSync(filePath, next, { mode: 0o600 });
-    return { action: "updated", path: filePath, profile: PROFILE_NAME };
   }
 
-  const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-  fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
-  return { action: "updated", path: filePath, profile: PROFILE_NAME };
+  let profileAction: CodexOtelWriteAction;
+  if (!fs.existsSync(profilePath)) {
+    fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+    fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+    profileAction = "created";
+  } else {
+    const priorProfile = fs.readFileSync(profilePath, "utf8");
+    if (priorProfile === profileBody) {
+      profileAction = "unchanged";
+    } else {
+      fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+      profileAction = "updated";
+    }
+  }
+
+  return { action, path: filePath, profilePath, profileAction, profile: PROFILE_NAME };
 }
 
 /** Exported so callers + tests can reference the profile name from one place. */

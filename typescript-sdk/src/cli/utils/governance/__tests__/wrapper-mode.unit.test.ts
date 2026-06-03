@@ -249,6 +249,38 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when codex resolves to gateway mode", () => {
+    /**
+     * codex 0.134+ rejects --profile <X> when [profiles.X] lives
+     * inside config.toml; the profile body must be in a sibling
+     * <X>.config.toml file. Andre's dogfood at 4f37ed27a HEAD
+     * surfaced this rejection — guard against regression.
+     */
+    it("returns codexProfilePath + writes profile body to the sibling file", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      const cfg = baseCfg({
+        default_personal_vk: { id: "vk1", secret: "lw_vk_secret", prefix: "lw_vk_" },
+      });
+      const gw = { OPENAI_API_KEY: "lw_vk_secret" };
+      const out = await resolveWrapperMode(cfg, "codex", gw);
+
+      expect(out.mode).toBe("gateway");
+      expect(out.codexConfigPath).toBeDefined();
+      expect(out.codexProfilePath).toBeDefined();
+      expect(out.codexProfilePath).toMatch(/langwatch-gateway\.config\.toml$/);
+
+      const configContents = fs.readFileSync(out.codexConfigPath!, "utf8");
+      expect(configContents).toContain("[model_providers.langwatch]");
+      expect(configContents).not.toContain("[profiles.langwatch-gateway]");
+      expect(configContents).not.toContain("[profiles.");
+
+      const profileContents = fs.readFileSync(out.codexProfilePath!, "utf8");
+      expect(profileContents).toContain(`model_provider = "langwatch"`);
+
+      expect(out.extraArgs).toEqual(["--profile", "langwatch-gateway"]);
+    });
+  });
+
   describe("when the tool has no ingestion template (e.g. cursor)", () => {
     it("falls back to gateway mode without erroring", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
