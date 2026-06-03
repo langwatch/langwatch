@@ -8,10 +8,16 @@ describe("filterBlockKit", () => {
         { type: "header", text: { type: "plain_text", text: "Hi" } },
         { type: "section", text: { type: "mrkdwn", text: "body" } },
         { type: "divider" },
+        { type: "markdown", text: "## md body" },
         { type: "actions", elements: [{ type: "button", text: "Click" }] },
         { type: "input", label: "x" },
       ]);
-      expect(blocks.map((b) => b.type)).toEqual(["header", "section", "divider"]);
+      expect(blocks.map((b) => b.type)).toEqual([
+        "header",
+        "section",
+        "divider",
+        "markdown",
+      ]);
     });
   });
 

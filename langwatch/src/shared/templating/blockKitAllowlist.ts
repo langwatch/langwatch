@@ -15,6 +15,7 @@ export const ALLOWED_BLOCK_TYPES = [
   "context",
   "header",
   "image",
+  "markdown",
 ] as const;
 
 export type AllowedBlockType = (typeof ALLOWED_BLOCK_TYPES)[number];

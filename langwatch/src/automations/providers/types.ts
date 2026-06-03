@@ -92,6 +92,12 @@ export interface ConfigFormCtx<TPreview = unknown> {
    *  or undefined for action providers. Shape is owned by the provider. */
   preview?: TPreview;
   previewLoading?: boolean;
+  /** "immediate" vs "digest" — derived from the draft's notificationCadence.
+   *  Providers use it to pick template defaults or default-render shapes. */
+  cadenceMode: "immediate" | "digest";
+  /** True when the draft has any evaluations.* filter set — used by the
+   *  Slack picker to surface the eval-failure template. */
+  hasEvaluationFilter: boolean;
 }
 
 /** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the

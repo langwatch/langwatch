@@ -413,6 +413,12 @@ export function AutomationDrawer({
     upsert,
   ]);
 
+  const cadenceMode: "immediate" | "digest" =
+    draft.notificationCadence === "immediate" ? "immediate" : "digest";
+  const hasEvaluationFilter = Object.keys(draft.filters).some((k) =>
+    k.startsWith("evaluations."),
+  );
+
   const configCtx = useMemo<ConfigFormCtx<NotifyPreview>>(
     () => ({
       projectId,
@@ -423,8 +429,18 @@ export function AutomationDrawer({
       preview,
       // Synchronous render — there is never a loading state to show.
       previewLoading: false,
+      cadenceMode,
+      hasEvaluationFilter,
     }),
-    [projectId, organization?.id, team?.slug, exampleContext, preview],
+    [
+      projectId,
+      organization?.id,
+      team?.slug,
+      exampleContext,
+      preview,
+      cadenceMode,
+      hasEvaluationFilter,
+    ],
   );
 
   return (

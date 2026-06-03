@@ -21,6 +21,7 @@ import type {
   SummaryIdentity,
 } from "../../types";
 import { type SlackActionParams, type SlackPreview } from "./shared";
+import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
 interface FieldDraft {
   value: string;
@@ -134,6 +135,19 @@ function SlackConfigForm({
           </HStack>
         }
       />
+      {isBlockKit ? (
+        <SlackBlockKitTemplatePicker
+          cadence={ctx.cadenceMode}
+          hasEvaluationFilter={ctx.hasEvaluationFilter}
+          currentSource={templateValue}
+          onSelect={(option) =>
+            onChange({
+              ...slice,
+              template: { value: option.source, usingDefault: false },
+            })
+          }
+        />
+      ) : null}
       {/* Block Kit templates are JSON whose string values contain Liquid.
           We use the custom `liquid-json` Monaco language so the editor
           tokenizes both, and we pass the Block Kit schema down — the
