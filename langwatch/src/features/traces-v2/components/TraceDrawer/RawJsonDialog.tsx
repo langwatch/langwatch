@@ -96,7 +96,13 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
       .join("\n");
   }, [fullPayload, search]);
 
-  const byteSize = useMemo(() => fullPayload.length, [fullPayload]);
+  // `charCount` is the JavaScript string length (UTF-16 code units).
+  // The repo uses "bytes" elsewhere for `string.length * 2` so we
+  // deliberately avoid the word here — the value rendered in the
+  // SizeBadge is character count, which is honest about what JS
+  // measures without an encoder, and doesn't collide with other
+  // "bytes" readings elsewhere on the page.
+  const charCount = useMemo(() => fullPayload.length, [fullPayload]);
   const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
   const matchedLines = useMemo(
     () =>
@@ -136,7 +142,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
                 onChange={(t) => setTab(t as RawTab)}
                 options={["trace", "spans"]}
               />
-              <SizeBadge bytes={byteSize} lines={lineCount} />
+              <SizeBadge chars={charCount} lines={lineCount} />
               <Box flex={1} />
               <ToggleButton
                 active={pretty}
@@ -310,10 +316,10 @@ function ToggleButton({
   );
 }
 
-function SizeBadge({ bytes, lines }: { bytes: number; lines: number }) {
+function SizeBadge({ chars, lines }: { chars: number; lines: number }) {
   return (
     <Tooltip
-      content={`${bytes.toLocaleString()} bytes · ${lines.toLocaleString()} lines`}
+      content={`${chars.toLocaleString()} chars · ${lines.toLocaleString()} lines`}
       positioning={{ placement: "bottom" }}
     >
       <Text
@@ -322,16 +328,21 @@ function SizeBadge({ bytes, lines }: { bytes: number; lines: number }) {
         fontFamily="mono"
         whiteSpace="nowrap"
       >
-        {formatBytes(bytes)} · {lines}L
+        {formatCharCount(chars)} · {lines}L
       </Text>
     </Tooltip>
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+/** Badge sizes are JavaScript string-length values (UTF-16 code units),
+ *  not UTF-8 byte counts — the rest of the repo treats these as "chars"
+ *  to keep the unit honest (the byte cost of the same string depends on
+ *  encoding). Format uses K/M cutoffs at 1000/1000000 because the unit
+ *  is character count, not memory bytes. */
+function formatCharCount(chars: number): string {
+  if (chars < 1000) return `${chars}`;
+  if (chars < 1_000_000) return `${(chars / 1000).toFixed(1)}K`;
+  return `${(chars / 1_000_000).toFixed(1)}M`;
 }
 
 function CopyButton({
@@ -342,11 +353,21 @@ function CopyButton({
   disabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const handleClick = () => {
+  const handleClick = async () => {
     if (disabled) return;
-    void navigator.clipboard.writeText(payload);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+    try {
+      // Await the clipboard promise before flipping the success label.
+      // Optimistic "Copied" was misleading on permission-denied (Safari
+      // private mode, secure context failures) — users saw the
+      // confirmation even when nothing reached the clipboard.
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+    } catch {
+      // Stay silent on rejection — the surface is small (a button with
+      // no slot for an error string), and the user can retry. A toast
+      // here would compete with the dialog itself.
+    }
   };
   return (
     <Button
