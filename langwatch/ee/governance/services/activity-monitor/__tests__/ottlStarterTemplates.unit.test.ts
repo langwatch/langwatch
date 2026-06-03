@@ -12,6 +12,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   CLAUDE_CODE_OTTL_STARTER,
+  CODEX_OTTL_STARTER,
+  GEMINI_OTTL_STARTER,
   LANGWATCH_OTTL_FIELDS,
   OTTL_ENABLED_SOURCE_TYPES,
   OTTL_STARTER_BY_SOURCE_TYPE,
@@ -65,8 +67,91 @@ describe("OTTL_STARTER_BY_SOURCE_TYPE", () => {
     );
   });
 
+  it("seeds codex with the empirically-captured starter", () => {
+    expect(OTTL_STARTER_BY_SOURCE_TYPE.codex).toBe(CODEX_OTTL_STARTER);
+  });
+
+  it("seeds gemini with the gen_ai mirror starter", () => {
+    expect(OTTL_STARTER_BY_SOURCE_TYPE.gemini).toBe(GEMINI_OTTL_STARTER);
+  });
+
   it("leaves otel_generic blank — admin pastes their own", () => {
     expect(OTTL_STARTER_BY_SOURCE_TYPE.otel_generic).toEqual([]);
+  });
+});
+
+describe("CODEX_OTTL_STARTER", () => {
+  describe("when matching the empirically-captured codex 0.134 wire shape", () => {
+    it("maps codex.sse_event tokens to langwatch.* canonical", () => {
+      const tokenFields = CODEX_OTTL_STARTER.filter((s) =>
+        s.includes("codex.sse_event"),
+      );
+      expect(
+        tokenFields.some((s) =>
+          s.includes(`set(attributes["langwatch.input_tokens"]`),
+        ),
+      ).toBe(true);
+      expect(
+        tokenFields.some((s) =>
+          s.includes(`set(attributes["langwatch.output_tokens"]`),
+        ),
+      ).toBe(true);
+      expect(
+        tokenFields.some((s) =>
+          s.includes(`set(attributes["langwatch.cache_read_tokens"]`),
+        ),
+      ).toBe(true);
+    });
+
+    it("maps codex.user_prompt to langwatch.input", () => {
+      const inputStatement = CODEX_OTTL_STARTER.find((s) =>
+        s.includes(`langwatch.input`) && !s.includes(`input_tokens`),
+      );
+      expect(inputStatement).toContain(`codex.user_prompt`);
+      expect(inputStatement).toContain(`attributes["prompt"]`);
+    });
+
+    it("maps conversation.id to langwatch.thread.id", () => {
+      const threadStatements = CODEX_OTTL_STARTER.filter((s) =>
+        s.includes(`langwatch.thread.id`),
+      );
+      expect(threadStatements.length).toBeGreaterThan(0);
+      for (const s of threadStatements) {
+        expect(s).toContain(`attributes["conversation.id"]`);
+      }
+    });
+  });
+});
+
+describe("GEMINI_OTTL_STARTER", () => {
+  describe("when matching the empirically-captured gemini-cli 0.32 wire shape", () => {
+    it("mirrors gen_ai.* canonical onto langwatch.* (defensive)", () => {
+      const inputTokenStatement = GEMINI_OTTL_STARTER.find((s) =>
+        s.includes(`langwatch.input_tokens`),
+      );
+      expect(inputTokenStatement).toContain(
+        `attributes["gen_ai.usage.input_tokens"]`,
+      );
+
+      const outputTokenStatement = GEMINI_OTTL_STARTER.find((s) =>
+        s.includes(`langwatch.output_tokens`),
+      );
+      expect(outputTokenStatement).toContain(
+        `attributes["gen_ai.usage.output_tokens"]`,
+      );
+    });
+
+    it("maps gen_ai.input.messages + gen_ai.output.messages to langwatch.input/output", () => {
+      const inputStatement = GEMINI_OTTL_STARTER.find((s) =>
+        s.includes(`langwatch.input`) && !s.includes(`input_tokens`),
+      );
+      expect(inputStatement).toContain(`gen_ai.input.messages`);
+
+      const outputStatement = GEMINI_OTTL_STARTER.find((s) =>
+        s.includes(`langwatch.output`) && !s.includes(`output_tokens`),
+      );
+      expect(outputStatement).toContain(`gen_ai.output.messages`);
+    });
   });
 });
 
@@ -85,8 +170,10 @@ describe("getStarterTemplate", () => {
 
 describe("isOttlEnabledSourceType", () => {
   describe("when the source type ships an OTTL editor in v1", () => {
-    it("returns true for claude_code and otel_generic", () => {
+    it("returns true for claude_code, codex, gemini, and otel_generic", () => {
       expect(isOttlEnabledSourceType("claude_code")).toBe(true);
+      expect(isOttlEnabledSourceType("codex")).toBe(true);
+      expect(isOttlEnabledSourceType("gemini")).toBe(true);
       expect(isOttlEnabledSourceType("otel_generic")).toBe(true);
     });
   });

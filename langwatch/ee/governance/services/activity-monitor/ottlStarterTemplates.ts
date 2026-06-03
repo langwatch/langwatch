@@ -66,13 +66,77 @@ export const CLAUDE_CODE_OTTL_STARTER: readonly string[] = [
 ] as const;
 
 /**
+ * Codex 0.134+ OTLP wire shape — captured empirically from
+ * `OTEL_EXPORTER_OTLP_HEADERS=... codex exec` against a local catcher.
+ * Each cost-bearing turn is one `codex.sse_event` LogRecord with the
+ * usage attributes on `attributes[]` (input_token_count,
+ * output_token_count, cached_token_count, reasoning_token_count,
+ * tool_token_count). Model + thread + principal flow via the
+ * `codex.user_prompt` + `codex.conversation_starts` events.
+ *
+ * Codex does NOT emit a cost field on the wire; receiver-side
+ * model-pricing lookup populates langwatch.cost.usd from
+ * (langwatch.model, langwatch.input_tokens, langwatch.output_tokens).
+ *
+ * The `where` clauses gate on `attributes["event.name"]` literal
+ * matches because OTTL doesn't expose log record body kind portably.
+ *
+ * Spec: specs/ai-governance/ingestion-sources/codex-otlp.feature
+ */
+export const CODEX_OTTL_STARTER: readonly string[] = [
+  `set(attributes["langwatch.model"], attributes["model"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.input_tokens"], attributes["input_token_count"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.output_tokens"], attributes["output_token_count"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.cache_read_tokens"], attributes["cached_token_count"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.thread.id"], attributes["conversation.id"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.principal.email"], attributes["user.email"]) where attributes["event.name"] == "codex.sse_event"`,
+  `set(attributes["langwatch.input"], attributes["prompt"]) where attributes["event.name"] == "codex.user_prompt"`,
+  `set(attributes["langwatch.thread.id"], attributes["conversation.id"]) where attributes["event.name"] == "codex.user_prompt"`,
+  `set(attributes["langwatch.model"], attributes["model"]) where attributes["event.name"] == "codex.conversation_starts"`,
+  `set(attributes["langwatch.principal.email"], attributes["user.email"]) where attributes["event.name"] == "codex.conversation_starts"`,
+];
+
+/**
+ * Gemini CLI 0.32+ OTLP wire shape — captured empirically from
+ * `GEMINI_TELEMETRY_ENABLED=true gemini --yolo --prompt …` against a
+ * local catcher. Gemini emits FULL gen_ai semantic conventions on
+ * both spans and log records (gen_ai.usage.input_tokens,
+ * gen_ai.usage.output_tokens, gen_ai.request.model,
+ * gen_ai.input.messages, gen_ai.output.messages, gen_ai.conversation.id).
+ *
+ * These statements are DEFENSIVE: the OpenInferenceExtractor on the
+ * receiver already maps gen_ai.* → canonical, so this OTTL is a
+ * belt-and-suspenders mirror — any extractor regression still leaves
+ * the langwatch.* fields populated. Gated on `attributes["event.name"]`
+ * starting with "gen_ai." because gemini emits per-call events under
+ * that prefix.
+ *
+ * Spec: specs/ai-governance/ingestion-sources/gemini-cli-otlp.feature
+ */
+export const GEMINI_OTTL_STARTER: readonly string[] = [
+  `set(attributes["langwatch.model"], attributes["gen_ai.request.model"]) where attributes["gen_ai.request.model"] != nil`,
+  `set(attributes["langwatch.input_tokens"], attributes["gen_ai.usage.input_tokens"]) where attributes["gen_ai.usage.input_tokens"] != nil`,
+  `set(attributes["langwatch.output_tokens"], attributes["gen_ai.usage.output_tokens"]) where attributes["gen_ai.usage.output_tokens"] != nil`,
+  `set(attributes["langwatch.thread.id"], attributes["gen_ai.conversation.id"]) where attributes["gen_ai.conversation.id"] != nil`,
+  `set(attributes["langwatch.input"], attributes["gen_ai.input.messages"]) where attributes["gen_ai.input.messages"] != nil`,
+  `set(attributes["langwatch.output"], attributes["gen_ai.output.messages"]) where attributes["gen_ai.output.messages"] != nil`,
+  `set(attributes["langwatch.cache_read_tokens"], attributes["cached_content_token_count"]) where attributes["cached_content_token_count"] != nil`,
+];
+
+/**
  * Source-type → starter statements. Push-mode source types that ship
  * with a known wire shape get a starter; otel_generic stays blank so
- * admins paste their own without a misleading default. Future tools
- * (codex, gemini, copilot_studio) ship as data-only additions here.
+ * admins paste their own without a misleading default. opencode 1.14+
+ * emits structural OTel spans (Session.*, LLM.run, Provider.*) but
+ * does NOT populate gen_ai.* attributes on any of them today —
+ * landing it as a row would risk shipping a misleading "empty mapping"
+ * default, so opencode is intentionally absent until upstream adds
+ * the semantic-conv attributes.
  */
 export const OTTL_STARTER_BY_SOURCE_TYPE: Record<string, readonly string[]> = {
   claude_code: CLAUDE_CODE_OTTL_STARTER,
+  codex: CODEX_OTTL_STARTER,
+  gemini: GEMINI_OTTL_STARTER,
   otel_generic: [],
 };
 
@@ -83,6 +147,8 @@ export const OTTL_STARTER_BY_SOURCE_TYPE: Record<string, readonly string[]> = {
  */
 export const OTTL_ENABLED_SOURCE_TYPES: readonly string[] = [
   "claude_code",
+  "codex",
+  "gemini",
   "otel_generic",
 ];
 
