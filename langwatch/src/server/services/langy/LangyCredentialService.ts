@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 
 import { encrypt, decrypt } from "~/utils/encryption";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
 
 /**
  * Name under which the auto-provisioned Langy VK secret is stored in
@@ -88,6 +89,18 @@ export class LangyCredentialService {
       );
     }
 
+    // Prefer the dedicated, least-privilege "Langy" key over the human's
+    // ingestion key. Provision-on-first-use makes it self-healing if project
+    // creation / backfill missed it; we fall back to project.apiKey only when
+    // no token could be stored (e.g. no resolvable user to attribute it to).
+    await provisionLangyApiKey({
+      prisma: this.prisma,
+      projectId,
+      organizationId: project.team.organizationId,
+      createdByUserId: actorUserId,
+    });
+    const langyApiKeyToken = await getLangyApiKeyToken(this.prisma, projectId);
+
     const llmVirtualKey = await this.getOrProvisionVirtualKey({
       projectId,
       organizationId: project.team.organizationId,
@@ -95,7 +108,7 @@ export class LangyCredentialService {
     });
 
     return {
-      langwatchApiKey: project.apiKey,
+      langwatchApiKey: langyApiKeyToken ?? project.apiKey,
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl,
