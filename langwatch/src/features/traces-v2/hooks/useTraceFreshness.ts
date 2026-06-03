@@ -3,7 +3,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list
@@ -32,7 +31,6 @@ export function useTraceFreshness() {
     (s) => s.setSseConnectionState,
   );
   const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
-  const pulse = useRefreshUIStore((s) => s.pulse);
   const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -49,12 +47,25 @@ export function useTraceFreshness() {
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
-      // Spin the refresh icon for every update event — invalidations that
-      // resolve from cache wouldn't otherwise flip isFetching long enough
-      // for the user to notice anything happened. Skipped in `ask` mode
-      // because the operator hasn't asked to see anything yet — flashing
-      // the icon would look like a stealth refresh.
-      if (mode === "live") pulse();
+      // The refresh pulse (top-of-page aurora) used to fire on every
+      // SSE trace_summary_updated event in "live" mode. For high-
+      // throughput projects that's a constant flash — users called it
+      // out as visual noise that didn't seem to correspond to anything
+      // appearing in the table. We now keep the pulse for two cases
+      // only:
+      //
+      //   1. User-initiated refresh — handled implicitly via
+      //      `useTraceListRefresh.refresh()` and lens/tab/refresh
+      //      switches that flip TanStack's `isFetching`.
+      //   2. An incoming trace that's about to land in the visible
+      //      window — handled in `useTraceNewCount` (it watches the
+      //      newCount response and pulses when count rises above zero
+      //      in live mode, just before the list refetch lands the new
+      //      rows under the user's cursor).
+      //
+      // The bare SSE event no longer fires the pulse. The (N new) pill
+      // remains the per-event surface — it stays accurate because we
+      // still invalidate `newCount` below.
 
       // Refresh the new-count query in BOTH live and ask modes so the
       // floating "(N new)" pill stays in sync. In `ask` we deliberately
@@ -101,7 +112,7 @@ export function useTraceFreshness() {
         });
       }
     },
-    [trpcUtils, requestFastPoll, pulse, project?.id],
+    [trpcUtils, requestFastPoll, project?.id],
   );
 
   const onSpanStored = useCallback(

@@ -3,6 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
+import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceListRefresh } from "./useTraceListRefresh";
 
@@ -87,6 +88,14 @@ export function useTraceNewCount(): TraceNewCountResult {
 
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
 
+  // Aurora refresh pulse is now scoped to "trace about to appear" — fires
+  // once when the count transitions from 0 to >0 in live mode, signalling
+  // to the user that the list is being merged with new rows. In ask mode
+  // the user opted to gate merges behind the floating pill click, so we
+  // stay quiet there; the pill itself is the signal.
+  const pulseRefresh = useRefreshUIStore((s) => s.pulse);
+  const prevCountRef = useRef(0);
+
   const query = api.tracesV2.newCount.useQuery(
     {
       projectId: project?.id ?? "",
@@ -119,6 +128,20 @@ export function useTraceNewCount(): TraceNewCountResult {
         } else {
           consecutiveZerosRef.current = 0;
           setIntervalMs(FAST_MS);
+        }
+        // Fire the aurora pulse only on the 0→N transition in live
+        // mode. Ask mode stays quiet (the floating pill is the
+        // operator's chosen signal). High-throughput projects no longer
+        // see the pulse loop every SSE event — it now correlates with
+        // an actual UI change (new rows are about to land).
+        const prev = prevCountRef.current;
+        prevCountRef.current = data.count;
+        if (
+          prev === 0 &&
+          data.count > 0 &&
+          useSseStatusStore.getState().liveUpdatesMode === "live"
+        ) {
+          pulseRefresh();
         }
       },
       onError: () => {
