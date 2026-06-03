@@ -18,8 +18,19 @@ import { spawn } from "node:child_process";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
-import { getCliBootstrap } from "./cli-api";
+import {
+  getCliBootstrap,
+  installUserIngestionBinding,
+  listIngestionTemplates,
+  listUserIngestionBindings,
+  rotateUserIngestionBindingToken,
+} from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
+
+/** Templates we auto-mint a personal ingestion binding for, per wrapped tool. */
+const TOOL_INGESTION_TEMPLATE_SLUG: Record<string, string> = {
+  claude: "claude_code",
+};
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -27,31 +38,35 @@ export interface ToolEnv {
 }
 
 /**
- * Standard OTEL_*_EXPORTER + endpoint + headers triple for Claude
- * Code's telemetry. Claude Code reads these envs at startup, sets
- * up an OTLP exporter, and emits logs/metrics/spans alongside the
- * normal API traffic. The gateway routes the API calls (via the VK
- * env above), AND we also get the in-process OTLP signal — both
- * data shapes, one CLI command.
+ * Standard OTEL_*_EXPORTER + endpoint + headers triple for the
+ * wrapped tool. Tools that natively read OTEL env vars (Claude
+ * Code, opencode, ...) emit their logs/metrics/spans to
+ * `<control_plane>/api/otel` alongside the normal API traffic. The
+ * gateway routes the API calls (via the provider env above), AND
+ * we also get the in-process OTLP signal — both data shapes, one
+ * CLI command.
  *
- * Resource attrs go via OTEL_RESOURCE_ATTRIBUTES (comma-separated
- * key=value); we tag service.name=claude-code so the recorded
- * traces surface under a human-readable name in /messages.
+ * `serviceName` lands in OTEL_RESOURCE_ATTRIBUTES so the recorded
+ * traces surface under a human-readable name in /messages. `extras`
+ * lets a tool pass tool-specific gate envs (eg. claude-code
+ * requires `CLAUDE_CODE_ENABLE_TELEMETRY=1`).
  */
-function envForClaudeOtel(
+function envForToolOtel(
+  serviceName: string,
   controlPlaneBase: string,
   ingestionToken: string,
+  extras: Record<string, string> = {},
 ): Record<string, string> {
   const cp = controlPlaneBase.replace(/\/+$/, "");
   return {
-    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
     OTEL_TRACES_EXPORTER: "otlp",
     OTEL_LOGS_EXPORTER: "otlp",
     OTEL_METRICS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
     OTEL_EXPORTER_OTLP_ENDPOINT: `${cp}/api/otel`,
     OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${ingestionToken}`,
-    OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
+    OTEL_RESOURCE_ATTRIBUTES: `service.name=${serviceName}`,
+    ...extras,
   };
 }
 
@@ -76,14 +91,22 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         vars: {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
-          ...(ik ? envForClaudeOtel(cfg.control_plane_url, ik) : {}),
+          ...(ik
+            ? envForToolOtel("claude-code", cfg.control_plane_url, ik, {
+                CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+              })
+            : {}),
         },
       };
     case "codex":
+      // codex 0.x has no native telemetry-enable env yet; the
+      // OTEL_* vars are harmless if it ignores them but pick up
+      // once codex adds support, no rev-bump on our side.
       return {
         vars: {
           OPENAI_BASE_URL: gw,
           OPENAI_API_KEY: auth,
+          ...(ik ? envForToolOtel("codex", cfg.control_plane_url, ik) : {}),
         },
       };
     case "cursor":
@@ -100,6 +123,11 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         vars: {
           GOOGLE_GENAI_API_BASE: gw,
           GEMINI_API_KEY: auth,
+          ...(ik
+            ? envForToolOtel("gemini-cli", cfg.control_plane_url, ik, {
+                GEMINI_TELEMETRY_ENABLED: "true",
+              })
+            : {}),
         },
       };
     case "opencode":
@@ -107,12 +135,16 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
       // OPENAI_*/ANTHROPIC_* env vars depending on which model the
       // user selected at the prompt. Mirror cursor's both-pairs
       // injection so any provider the user hops to lands at our gw.
+      // Native OTEL_*_EXPORTER support added when ingestion token is
+      // present (no per-tool gate env required; emission is
+      // env-only).
       return {
         vars: {
           OPENAI_BASE_URL: gw,
           OPENAI_API_KEY: auth,
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
+          ...(ik ? envForToolOtel("opencode", cfg.control_plane_url, ik) : {}),
         },
       };
     default:
@@ -288,6 +320,63 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
+ * Lazy auto-mint of the personal ingestion binding for the tool's
+ * canonical template (e.g. `claude_code` for the claude wrapper).
+ * Runs once per machine: the resulting token is cached at
+ * `cfg.default_personal_ingestion_token` and reused on every
+ * subsequent wrapper invocation. If the user already has the
+ * binding but we lost the secret (eg. fresh worktree, config wipe),
+ * we rotate to get a fresh token.
+ *
+ * Failures are non-fatal — the wrapper falls back to gateway-only
+ * env injection (existing behavior). The tool still runs; we just
+ * lose the OTLP telemetry side.
+ */
+async function ensureIngestionToken(
+  cfg: GovernanceConfig,
+  tool: string,
+): Promise<GovernanceConfig> {
+  if (cfg.default_personal_ingestion_token?.secret) return cfg;
+  const targetSlug = TOOL_INGESTION_TEMPLATE_SLUG[tool];
+  if (!targetSlug) return cfg;
+
+  try {
+    const templates = await listIngestionTemplates(cfg);
+    const target = templates.find((t) => t.slug === targetSlug && t.enabled);
+    if (!target) return cfg;
+
+    const bindings = await listUserIngestionBindings(cfg);
+    const existing = bindings.find((b) => b.template_id === target.id);
+
+    let result;
+    if (existing) {
+      // Rotate to recover a fresh secret — the original is stored
+      // only at install time + shown once. Lossless from the user's
+      // perspective since the wrapper is the sole consumer.
+      result = await rotateUserIngestionBindingToken(cfg, existing.id);
+    } else {
+      result = await installUserIngestionBinding(cfg, target.id);
+    }
+
+    cfg.default_personal_ingestion_token = {
+      id: result.user_ingestion_binding.id,
+      secret: result.binding_access_token,
+      prefix: result.user_ingestion_binding.binding_access_token_prefix,
+    };
+    try {
+      saveConfig(cfg);
+    } catch {
+      // Persist failure doesn't break this run — env vars already
+      // built off the in-memory cfg below.
+    }
+  } catch {
+    // Network / 4xx / disabled-template all fall back to
+    // gateway-only env injection.
+  }
+  return cfg;
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -341,6 +430,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(probe.message ?? "preflight failed\n");
     process.exit(2);
   }
+
+  cfg = await ensureIngestionToken(cfg, tool);
 
   const env = { ...process.env, ...envForTool(cfg, tool).vars };
   // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;

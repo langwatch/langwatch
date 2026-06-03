@@ -114,11 +114,43 @@ describe("envForTool", () => {
       );
     });
 
-    it("codex → no OTEL vars (claude-only telemetry envs)", () => {
+    it("codex → OTEL trio without any tool-specific telemetry-enable gate", () => {
       const env = envForTool(cfgWithIk, "codex").vars;
       expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
-      expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
+      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
       expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
+    });
+
+    it("gemini → OTEL trio + GEMINI_TELEMETRY_ENABLED=true", () => {
+      const env = envForTool(cfgWithIk, "gemini").vars;
+      expect(env.GOOGLE_GENAI_API_BASE).toBe("http://gw.example.com");
+      expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
+      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=gemini-cli");
+      expect(env.GEMINI_TELEMETRY_ENABLED).toBe("true");
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+    });
+
+    it("opencode → OTEL trio + both provider pairs, no per-tool gate env", () => {
+      const env = envForTool(cfgWithIk, "opencode").vars;
+      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
+      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+      expect(env.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=opencode");
+      expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBeUndefined();
+      expect(env.GEMINI_TELEMETRY_ENABLED).toBeUndefined();
+    });
+
+    it("cursor → no OTEL injection (GUI app, terminal-launch envs don't reach the agent panel)", () => {
+      const env = envForTool(cfgWithIk, "cursor").vars;
+      expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
+      expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+      expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
     });
   });
 
