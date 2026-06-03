@@ -256,6 +256,12 @@ model Organization {
   ssoDomain                String?              @unique
   ssoProvider              String?
   presenceEnabled          Boolean              @default(true)
+  /// Org-configurable contact surfaced to users in CLI "contact your
+  /// admin" messages and the in-app budget-exceeded banner. Free text:
+  /// accepts an email, a URL (internal ticketing system), or any other
+  /// instruction. When null, callers fall back to the first ADMIN
+  /// member's email (`resolveSupportContact` helper).
+  supportContact           String?
 
   promoCode              String?
   stripeCustomerId       String?                @unique

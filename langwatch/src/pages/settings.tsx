@@ -52,6 +52,7 @@ type OrganizationFormData = {
   elasticsearchApiKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
+  supportContact: string;
 };
 
 function Settings() {
@@ -84,6 +85,9 @@ function SettingsForm({
     elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
+    supportContact:
+      (organization as { supportContact?: string | null }).supportContact ??
+      "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
@@ -109,6 +113,7 @@ function SettingsForm({
         elasticsearchApiKey: data.elasticsearchApiKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
+        supportContact: data.supportContact.trim() || null,
       },
       {
         onSuccess: () => {
@@ -197,6 +202,34 @@ function SettingsForm({
                   type="text"
                   value={project.id}
                 />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                label="Support contact"
+                helper={
+                  "Surfaced to your members in CLI 'contact your admin' messages and the in-app budget-exceeded banner. " +
+                  "Accepts an email, a URL pointing at an internal ticketing system, or any short instruction. " +
+                  "When empty we fall back to the first admin's email."
+                }
+              >
+                {hasPermission("organization:manage") ? (
+                  <Input
+                    width="full"
+                    type="text"
+                    maxLength={500}
+                    placeholder="support@your-company.com or https://your.ticketing.system"
+                    {...register("supportContact", { maxLength: 500 })}
+                  />
+                ) : (
+                  <Text>
+                    {(organization as { supportContact?: string | null })
+                      .supportContact || (
+                      <Text as="span" color="fg.subtle">
+                        Not set
+                      </Text>
+                    )}
+                  </Text>
+                )}
               </HorizontalFormControl>
 
               <HorizontalFormControl

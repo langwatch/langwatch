@@ -14,7 +14,6 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
-import { MyProjectsCard } from "~/components/me/MyProjectsCard";
 import MyLayout from "~/components/me/MyLayout";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
@@ -63,10 +62,6 @@ function MyUsagePage() {
         </VStack>
 
         <TraceIngestSection />
-
-        {ctx.organizationId ? (
-          <MyProjectsCard organizationId={ctx.organizationId} />
-        ) : null}
 
         <HStack alignItems="end" paddingTop={4}>
           <VStack align="start" gap={0}>

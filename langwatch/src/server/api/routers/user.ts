@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
@@ -27,6 +26,8 @@ import {
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:user-router");
@@ -688,7 +689,10 @@ export const userRouter = createTRPCRouter({
             ? ("warning" as const)
             : ("ok" as const);
 
-      const adminEmail = await resolveOrgAdminEmail({
+      // Display-facing contact: prefers admin-configured Organization.supportContact
+      // (may be email, URL, or short instruction), falls back to the first admin email.
+      // Distinct from the email-only resolver used below for actual email sending.
+      const adminEmail = await resolveSupportContact({
         prisma: ctx.prisma,
         organizationId: input.organizationId,
       });
@@ -809,59 +813,6 @@ export const userRouter = createTRPCRouter({
     }),
 
   /**
-   * Persona-2 enrichment: list the user's projects (across all teams in
-   * the org) for the "Your projects" card on /me. Each row carries the
-   * minimum the card needs to render — { id, slug, name, lastEventAt }.
-   * Sorted by lastEventAt DESC so the most-touched project surfaces
-   * first; null lastEventAt sinks to the bottom.
-   *
-   * Spec: specs/ai-gateway/governance/persona-home-content.feature
-   */
-  userProjects: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        limit: z.number().int().min(1).max(20).optional(),
-      }),
-    )
-    .use(checkOrganizationPermission("organization:view"))
-    .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-      // The Project model has no per-trace lastEventAt — that lives on
-      // IngestionSource (governance) and on raw recorded_spans (CH).
-      // Until a project-level activity field is wired, sort by
-      // updatedAt as a coarse "last touched" proxy. Honest UX in the
-      // card itself: don't show a precise time, just "Open project →".
-      const projects = await ctx.prisma.project.findMany({
-        where: {
-          team: {
-            organizationId: input.organizationId,
-            members: { some: { userId } },
-          },
-          archivedAt: null,
-          // Hide the per-org hidden internal_governance project from
-          // user-facing surfaces. Same invariant as every other project
-          // picker in the app.
-          kind: "application",
-        },
-        orderBy: { updatedAt: "desc" },
-        take: input.limit ?? 5,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          team: { select: { id: true, name: true } },
-        },
-      });
-      return projects.map((p) => ({
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        teamName: p.team.name,
-      }));
-    }),
-
-  /**
    * Persist (or clear) the user's pinned home destination. NULL clears
    * the pin and reverts to auto-detection. The picker UI (on
    * /me/configure) calls this when the user picks a destination from the
@@ -971,17 +922,3 @@ function requestIncreaseUrl(opts: {
   return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-async function resolveOrgAdminEmail({
-  prisma,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  organizationId: string;
-}): Promise<string | undefined> {
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  return admin?.user.email ?? undefined;
-}
