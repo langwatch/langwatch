@@ -195,6 +195,10 @@ export class FoldProjectionExecutor {
     return state;
   }
 
+  /**
+   * Whether the projection cares about this event. An empty `eventTypes` list
+   * means the projection subscribes to every event type.
+   */
   private matchesEventTypes<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,

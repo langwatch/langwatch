@@ -13,6 +13,10 @@ export class TraceSummaryStore
 {
   constructor(private readonly repo: TraceSummaryRepository) {}
 
+  /**
+   * Persists a single trace summary. Skips empty traces (spanCount 0) and
+   * backfills the traceId from the aggregate id when the state omits it.
+   */
   async store(
     state: TraceSummaryData,
     context: ProjectionStoreContext,
@@ -26,6 +30,11 @@ export class TraceSummaryStore
     await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
   }
 
+  /**
+   * Persists many trace summaries in one round-trip. Empty traces are dropped
+   * and the repository's batch upsert is used when available, falling back to
+   * per-entry upserts otherwise.
+   */
   async storeBatch(
     entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
   ): Promise<void> {
