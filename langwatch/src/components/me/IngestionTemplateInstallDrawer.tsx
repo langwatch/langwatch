@@ -170,8 +170,8 @@ export function IngestionTemplateInstallDrawer({
         <DrawerBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Traces normalized into <code>gen_ai.*</code> canonical.
-              Cost, tokens, and model populated automatically by the receiver.
+              Cost, tokens, and model are picked up automatically on every
+              request, no change to how you call the API.
             </Text>
 
             {installError && (
