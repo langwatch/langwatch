@@ -78,10 +78,27 @@ describe("envForTool", () => {
   describe("when a personal ingestion token is also present", () => {
     const cfgWithIk: GovernanceConfig = {
       ...cfg,
-      default_personal_ingestion_token: {
-        id: "ik_x",
-        secret: "ik-lw-abc123",
-        prefix: "ik-lw-",
+      default_personal_ingestion_tokens: {
+        claude_code: {
+          id: "ik_claude",
+          secret: "ik-lw-abc123",
+          prefix: "ik-lw-",
+        },
+        codex: {
+          id: "ik_codex",
+          secret: "ik-lw-codex0",
+          prefix: "ik-lw-",
+        },
+        gemini: {
+          id: "ik_gemini",
+          secret: "ik-lw-gem456",
+          prefix: "ik-lw-",
+        },
+        opencode: {
+          id: "ik_opencode",
+          secret: "ik-lw-open77",
+          prefix: "ik-lw-",
+        },
       },
     };
 
@@ -101,6 +118,17 @@ describe("envForTool", () => {
         "Authorization=Bearer ik-lw-abc123",
       );
       expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=claude-code");
+    });
+
+    it("each tool picks up its OWN per-template ingestion token (no cross-tool token leakage)", () => {
+      const claudeEnv = envForTool(cfgWithIk, "claude").vars;
+      const codexEnv = envForTool(cfgWithIk, "codex").vars;
+      const geminiEnv = envForTool(cfgWithIk, "gemini").vars;
+      const opencodeEnv = envForTool(cfgWithIk, "opencode").vars;
+      expect(claudeEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-abc123");
+      expect(codexEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-codex0");
+      expect(geminiEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-gem456");
+      expect(opencodeEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-open77");
     });
 
     it("OTEL_EXPORTER_OTLP_ENDPOINT strips a trailing slash from control_plane_url", () => {

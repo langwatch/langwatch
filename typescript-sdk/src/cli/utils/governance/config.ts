@@ -27,22 +27,25 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
-   * Personal ingestion key (the ik-lw-<base32> shape minted by
-   * `/api/governance/user-ingestion-bindings`). When present, the
-   * `langwatch claude` wrapper additionally injects the standard
-   * OTEL_*_EXPORTER env vars pointing at `<control_plane>/api/otel`
-   * with this key as the Authorization bearer, so Claude Code emits
-   * its OTLP logs/metrics/spans alongside the gateway-routed calls.
+   * Personal ingestion keys (the ik-lw-<base32> shape minted by
+   * `/api/governance/user-ingestion-bindings`), keyed by the
+   * IngestionTemplate slug (`claude_code` / `codex` / `gemini` /
+   * `opencode`). One token per template so different wrapped tools
+   * surface as their own ingestion source in /me + /messages.
    *
-   * Unset until the first run of the bootstrap mint flow (next
-   * commits). When unset, the wrapper falls back to the
-   * gateway-only env shape (existing behavior, no regression).
+   * When the right key is present for a wrapped tool, the
+   * `langwatch <tool>` wrapper additionally injects the standard
+   * OTEL_*_EXPORTER env vars pointing at `<control_plane>/api/otel`
+   * with this key as the Authorization bearer. When unset, the
+   * wrapper falls back to the gateway-only env shape (existing
+   * behavior, no regression).
+   *
+   * Unset until the wrapper's first auto-mint for that tool.
    */
-  default_personal_ingestion_token?: {
-    id?: string;
-    secret?: string;
-    prefix?: string;
-  };
+  default_personal_ingestion_tokens?: Record<
+    string,
+    { id?: string; secret?: string; prefix?: string }
+  >;
 
   /**
    * Most-recent signed `request_increase_url` returned by the

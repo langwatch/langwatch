@@ -96,7 +96,10 @@ function envForToolOtel(
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   const gw = cfg.gateway_url.replace(/\/+$/, "");
   const auth = cfg.default_personal_vk?.secret;
-  const ik = cfg.default_personal_ingestion_token?.secret;
+  const slug = TOOL_INGESTION_TEMPLATE_SLUG[tool];
+  const ik = slug
+    ? cfg.default_personal_ingestion_tokens?.[slug]?.secret
+    : undefined;
   if (!auth) return { vars: {} };
   switch (tool) {
     case "claude":
@@ -349,9 +352,9 @@ async function ensureIngestionToken(
   cfg: GovernanceConfig,
   tool: string,
 ): Promise<GovernanceConfig> {
-  if (cfg.default_personal_ingestion_token?.secret) return cfg;
   const targetSlug = TOOL_INGESTION_TEMPLATE_SLUG[tool];
   if (!targetSlug) return cfg;
+  if (cfg.default_personal_ingestion_tokens?.[targetSlug]?.secret) return cfg;
 
   try {
     const templates = await listIngestionTemplates(cfg);
@@ -371,10 +374,13 @@ async function ensureIngestionToken(
       result = await installUserIngestionBinding(cfg, target.id);
     }
 
-    cfg.default_personal_ingestion_token = {
-      id: result.user_ingestion_binding.id,
-      secret: result.binding_access_token,
-      prefix: result.user_ingestion_binding.binding_access_token_prefix,
+    cfg.default_personal_ingestion_tokens = {
+      ...(cfg.default_personal_ingestion_tokens ?? {}),
+      [targetSlug]: {
+        id: result.user_ingestion_binding.id,
+        secret: result.binding_access_token,
+        prefix: result.user_ingestion_binding.binding_access_token_prefix,
+      },
     };
     try {
       saveConfig(cfg);
