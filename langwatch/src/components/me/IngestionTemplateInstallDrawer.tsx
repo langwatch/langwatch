@@ -24,7 +24,11 @@ import { toaster } from "~/components/ui/toaster";
 
 const SECRET_MASK = "•".repeat(48);
 
-function buildEnvSnippet(slug: string, endpoint: string, token: string): string {
+export function buildEnvSnippet(
+  slug: string,
+  endpoint: string,
+  token: string,
+): string {
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
