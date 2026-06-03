@@ -1216,6 +1216,23 @@ func paramAuth(params []dsl.Field) *httpblock.Auth {
 			Password: raw.Password,
 		}
 	}
+	// Fallback: the Studio UI and the experiments builder emit auth as
+	// discrete `auth_type` + `auth_token`/`auth_header`/`auth_value`/
+	// `auth_username`/`auth_password` params (see HttpPropertiesPanel.tsx
+	// and experiments-v3/workflowBuilder.ts), NOT a single `auth` object.
+	// Honor that shape too, otherwise HTTP-block auth is silently dropped on
+	// the real UI path (engine sent no Authorization header). Secret refs in
+	// these values are resolved downstream by resolveAuthSecrets.
+	if authType := paramString(params, "auth_type"); authType != "" && authType != "none" {
+		return &httpblock.Auth{
+			Type:     authType,
+			Token:    paramString(params, "auth_token"),
+			Header:   paramString(params, "auth_header"),
+			Value:    paramString(params, "auth_value"),
+			Username: paramString(params, "auth_username"),
+			Password: paramString(params, "auth_password"),
+		}
+	}
 	return nil
 }
 
