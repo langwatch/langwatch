@@ -39,6 +39,7 @@ export const spanInsertDataSchema = z.object({
   droppedAttributesCount: z.number(),
   droppedEventsCount: z.number(),
   droppedLinksCount: z.number(),
+  retentionDays: z.number().optional().default(0),
 });
 
 export type SpanInsertData = z.infer<typeof spanInsertDataSchema>;

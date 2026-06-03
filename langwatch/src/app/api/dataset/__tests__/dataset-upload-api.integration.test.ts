@@ -50,10 +50,9 @@ describe("Feature: Dataset File Upload REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

@@ -1,4 +1,5 @@
 import type { MetricRecordStorageRepository } from "~/server/app-layer/traces/repositories/metric-record-storage.repository";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedMetricRecord } from "../schemas/metricRecords";
@@ -10,8 +11,10 @@ export class MetricRecordAppendStore
 
   async append(
     record: NormalizedMetricRecord,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.insertMetricRecord(record);
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertMetricRecord(record, retentionDays);
   }
 }

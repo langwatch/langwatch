@@ -547,6 +547,39 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021), one row per (scope, category). A
+  // query is bounded by a row id, the organizationId anchor, a
+  // (scopeType, scopeId) predicate, or the (scopeType, scopeId, category)
+  // compound unique used by per-scope upsert/delete. No legacy projectId
+  // column — retention was scope-based from the first migration.
+  RetentionPolicy: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          (c.scopeType_scopeId_category &&
+            typeof c.scopeType_scopeId_category.scopeId === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
@@ -659,6 +692,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     !params.args?.where?.projectId_slug &&
     !params.args?.where?.projectId_date &&
     !params.args?.where?.projectId_modelProviderId_slot &&
+    !params.args?.where?.projectId_traceId &&
     !params.args?.where?.projectId?.in &&
     !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {

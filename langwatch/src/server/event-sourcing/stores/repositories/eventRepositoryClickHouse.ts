@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createLogger } from "../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
@@ -285,10 +286,16 @@ export class EventRepositoryClickHouse implements EventRepository {
 
     try {
       const tenantId = records[0]!.TenantId;
+      const stampedRecords = records.map((r) => ({
+        ...r,
+        // Default-on: stamp the platform default when the store didn't resolve
+        // a value (e.g. no resolver wired), never leave it to the column default.
+        _retention_days: r._retention_days ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      }));
       const client = await this.getClient(tenantId);
       await client.insert({
         table: "event_log",
-        values: records,
+        values: stampedRecords,
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });

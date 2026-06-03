@@ -78,14 +78,10 @@ describe("Prompts API", () => {
       },
     });
 
-    // Test data setup
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     // Create test project in the database with the proper team
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

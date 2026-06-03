@@ -2,8 +2,12 @@ import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger/server";
 import { parseConnectionUrl } from "./goose";
+import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
+
+/** Sentinel date treated as "never expire" — UInt32 epoch limit ~2106. */
+const INDEFINITE_RETENTION_SENTINEL_DATE = "2106-01-01";
 
 export interface TableTTLEntry {
   table: string;
@@ -12,6 +16,10 @@ export interface TableTTLEntry {
   ttlColumnExpression?: string;
   envVar: string;
   hardcodedDefault: number;
+  /** Immutable business-timestamp column for retention TTL (may differ from cold-storage anchor). */
+  retentionTTLColumn?: string;
+  /** Override for the retention TTL column expression (e.g. for UInt64 epoch ms). */
+  retentionTTLColumnExpression?: string;
 }
 
 /**
@@ -34,12 +42,20 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "dspy_steps",
     ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_DSPY_STEPS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "evaluation_runs",
     ttlColumn: "UpdatedAt",
+    // Retention anchors on UpdatedAt (= partition key `toYearWeek(UpdatedAt)`),
+    // not ScheduledAt/StartedAt. Both of those are Nullable(DateTime64) on this
+    // table and ClickHouse rejects Nullable in TTL expressions with
+    // BAD_TTL_EXPRESSION (code 450). UpdatedAt is non-null and partition-aligned,
+    // so TTL drops whole weekly partitions at the part level instead of running
+    // row-level mutations across still-warm parts.
+    retentionTTLColumn: "UpdatedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
@@ -47,48 +63,64 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     table: "event_log",
     ttlColumn: "EventOccurredAt",
     ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
+    retentionTTLColumn: "EventOccurredAt",
+    retentionTTLColumnExpression: "toDateTime(EventOccurredAt / 1000)",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "experiment_run_items",
     ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUN_ITEMS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "experiment_runs",
     ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "simulation_runs",
     ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_SIMULATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_log_records",
     ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
     envVar: "CLICKHOUSE_COLD_STORAGE_LOG_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "suite_runs",
+    ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_SUITE_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_metric_records",
     ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
     envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_RECORDS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_spans",
     ttlColumn: "EndTime",
+    retentionTTLColumn: "StartTime",
     envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "trace_summaries",
     ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_SUMMARIES_TTL_DAYS",
     hardcodedDefault: 49,
   },
@@ -184,6 +216,25 @@ export function buildDesiredTTLExpression({
   return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
+export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
+  if (!config.retentionTTLColumn) return null;
+  const colExpr =
+    config.retentionTTLColumnExpression ??
+    `toDateTime(${config.retentionTTLColumn})`;
+  return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('${INDEFINITE_RETENTION_SENTINEL_DATE}')) DELETE`;
+}
+
+export function hasRetentionTTL(engineFull: string): boolean {
+  // ClickHouse normalizes a bare-DateTime TTL to an implicit DELETE and drops
+  // the keyword from stored metadata, so engine_full reads e.g.
+  //   TTL if(_retention_days > 0, toDateTime(StartTime) + toIntervalDay(_retention_days), ...)
+  // with no "DELETE". Matching on "DELETE" therefore gives a permanent
+  // false-negative, making the reconciler re-issue ALTER MODIFY TTL on every
+  // run. The `_retention_days` reference is the unique, reliable marker — it
+  // only appears inside the TTL expression (engine_full never lists columns).
+  return engineFull.includes("_retention_days");
+}
+
 interface ReconcileOptions {
   connectionUrl?: string;
   database?: string;
@@ -215,19 +266,19 @@ export const TIERED_STORAGE_POLICY = "local_primary";
 export async function reconcileTTL(
   options: ReconcileOptions = {},
 ): Promise<void> {
-  // When called without an explicit connectionUrl (i.e. from production startup),
-  // respect the CLICKHOUSE_COLD_STORAGE_ENABLED gate.
-  // Direct callers (e.g. integration tests) pass connectionUrl explicitly to bypass.
-  if (!options.connectionUrl && process.env.CLICKHOUSE_COLD_STORAGE_ENABLED !== "true") {
-    logger.info("CLICKHOUSE_COLD_STORAGE_ENABLED is not set, skipping TTL reconciliation.");
-    return;
-  }
-
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrl) {
     logger.info("CLICKHOUSE_URL not configured, skipping TTL reconciliation.");
     return;
   }
+
+  // The cold-storage MOVE clause is operator-managed and only meaningful on
+  // tiered-storage tables. The DELETE-by-_retention_days clause is the
+  // platform's retention enforcement and must run on every deployment, or
+  // ingestion stamps `_retention_days` but nothing ever deletes. Gate the
+  // tiered-storage rewrite on the env flag; let retention TTL always reconcile.
+  const coldStorageEnabled =
+    process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
 
   const config = parseConnectionUrl(connectionUrl, options.database);
   const client = createClient({ url: config.databaseUrl });
@@ -260,15 +311,40 @@ export async function reconcileTTL(
       }
 
       // TTL volume routing (`TO VOLUME 'cold'`) only works on tables using the
-      // tiered storage policy. Tables on 'default' policy don't have a cold volume.
-      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY) {
-        if (options.verbose) {
-          logger.info(
-            { table: tableConfig.table, policy: tableInfo.storage_policy },
-            `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping TTL`,
-          );
+      // tiered storage policy. Tables on 'default' policy don't have a cold volume,
+      // but they CAN still have retention DELETE TTL. Likewise, when the operator
+      // disables cold-storage management we still need to install retention TTL,
+      // so collapse to the retention-only branch in both cases.
+      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
+        const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+        if (
+          retentionTTLExpr &&
+          (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table) &&
+          !hasRetentionTTL(tableInfo.engine_full)
+        ) {
+          // No ON CLUSTER: whenever a cluster is configured the database uses
+          // the Replicated engine (enforced in goose.ts), which auto-replicates
+          // DDL to every replica via Keeper. Adding ON CLUSTER on a table inside
+          // a Replicated DB is rejected: "It's not initial query. ON CLUSTER is
+          // not allowed for Replicated database (INCORRECT_QUERY)".
+          const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
+          if (options.verbose) {
+            logger.info(
+              { table: tableConfig.table },
+              "Applying retention-only TTL (no cold storage)",
+            );
+          }
+          await client.command({ query: alterQuery });
+          updatedCount++;
+        } else {
+          if (options.verbose) {
+            logger.info(
+              { table: tableConfig.table, policy: tableInfo.storage_policy },
+              `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping cold-storage TTL`,
+            );
+          }
+          skippedCount++;
         }
-        skippedCount++;
         continue;
       }
 
@@ -277,7 +353,18 @@ export async function reconcileTTL(
       const desiredDays = resolveHotDays(tableConfig);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
-      if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull })) {
+      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+      const isManaged = (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table);
+      // Whether the cold TTL alone is enough to skip this run — i.e. nothing
+      // has changed in the cold-TTL space. For managed tables we must still
+      // run when retention TTL is missing from the table (first-time apply).
+      const retentionMissing =
+        isManaged && retentionTTLExpr && !hasRetentionTTL(engineFull);
+
+      if (
+        !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
+        !retentionMissing
+      ) {
         skippedCount++;
         if (options.verbose) {
           logger.debug(
@@ -288,18 +375,35 @@ export async function reconcileTTL(
         continue;
       }
 
-      const ttlExpr = buildDesiredTTLExpression({
+      const coldTTLExpr = buildDesiredTTLExpression({
         config: tableConfig,
         days: desiredDays,
       });
-      const onCluster = config.clusterName
-        ? ` ON CLUSTER \`${config.clusterName}\``
-        : "";
-      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${ttlExpr} SETTINGS materialize_ttl_after_modify = 0`;
+
+      // MODIFY TTL replaces the whole expression atomically, so for managed
+      // tables we ALWAYS re-emit retentionTTLExpr — even when it's already
+      // present — otherwise a hot-days bump silently drops the retention
+      // DELETE clause from the table.
+      const ttlClauses = [
+        coldTTLExpr,
+        isManaged && retentionTTLExpr ? retentionTTLExpr : null,
+      ]
+        .filter(Boolean)
+        .join(",\n  ");
+
+      // No ON CLUSTER — see note in the retention-only branch above: a
+      // Replicated DB auto-replicates this DDL, and ON CLUSTER on a table inside
+      // it is rejected with INCORRECT_QUERY.
+      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
 
       if (options.verbose) {
         logger.info(
-          { table: tableConfig.table, from: currentDays, to: desiredDays },
+          {
+            table: tableConfig.table,
+            from: currentDays,
+            to: desiredDays,
+            retentionTTL: isManaged && !!retentionTTLExpr,
+          },
           "Updating TTL",
         );
       }

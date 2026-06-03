@@ -13,6 +13,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 
+// The existing `vi.mock("~/hooks/useOrganizationTeamProject", ...)` below
+// (richer shape with slug / hasAnyPermission / isLoading) covers
+// VoiceAgentsCallout's `project.id` requirement — no separate mock needed here.
+
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("~/hooks/useSSESubscription", () => ({
   useSSESubscription: () => ({
     connectionState: "connected",

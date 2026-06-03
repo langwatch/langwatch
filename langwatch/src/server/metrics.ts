@@ -85,7 +85,8 @@ type JobType =
   | "usage_reporting"
   | "event_sourcing"
   | "scenario"
-  | "anomaly_detection";
+  | "anomaly_detection"
+  | "orphan_sweep_chain";
 
 type JobStatus = "processing" | "completed" | "failed";
 
@@ -541,4 +542,26 @@ export async function withMetrics<T>({
     onFail(performance.now() - start);
     throw error;
   }
+}
+
+// --- Data Retention Metrics ---
+//
+// We deliberately do NOT expose tenant-cardinality gauges for retention
+// lag or per-mutation progress on the Prometheus side. Following the same
+// rule as evaluatorLoopBlockedCounter above (post-2026-05-11 incident):
+// per-tenant attribution lives in structured logs, not as Prometheus
+// labels — one series per tenant per table would balloon cardinality on
+// a multi-thousand-tenant fleet. If/when an operator dashboard needs
+// fleet-wide retention health, add it as a label-free aggregate counter
+// here and log the tenant alongside each emission.
+
+register.removeSingleMetric("data_retention_orphans_swept_total");
+export const dataRetentionOrphansSweptTotal = new Counter({
+  name: "data_retention_orphans_swept_total",
+  help: "Count of PG orphan records cleaned up by retention sweep",
+  labelNames: ["model"] as const,
+});
+
+export function incrementOrphansSwept(model: string, count: number): void {
+  dataRetentionOrphansSweptTotal.inc({ model }, count);
 }

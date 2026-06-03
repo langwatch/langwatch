@@ -23,8 +23,8 @@ export interface GetByEvaluationIdParams {
 }
 
 export interface EvaluationRunRepository {
-  upsert(data: EvaluationRunData, tenantId: string): Promise<void>;
-  upsertBatch?(entries: Array<{ data: EvaluationRunData; tenantId: string }>): Promise<void>;
+  upsert(data: EvaluationRunData, tenantId: string, retentionDays?: number): Promise<void>;
+  upsertBatch?(entries: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>): Promise<void>;
   getByEvaluationId(params: GetByEvaluationIdParams): Promise<EvaluationRunData | null>;
   findByTraceId(
     tenantId: string,

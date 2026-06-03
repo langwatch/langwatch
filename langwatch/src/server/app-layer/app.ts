@@ -2,7 +2,7 @@ import { createLogger } from "~/utils/logger/server";
 import { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { AppConfig } from "./config";
-import type { AppDependencies, OpsDependencies } from "./dependencies";
+import type { AppDependencies, DataRetentionDependencies, OpsDependencies } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -32,6 +32,9 @@ export class App {
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops?: OpsDependencies;
+  readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
+  readonly dataRetention: DataRetentionDependencies;
+  readonly share: AppDependencies["share"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -68,6 +71,9 @@ export class App {
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.ops = deps.ops;
+    this.retentionPolicyCache = deps.retentionPolicyCache;
+    this.dataRetention = deps.dataRetention;
+    this.share = deps.share;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createLogger } from "../../../../../utils/logger";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
@@ -32,10 +33,17 @@ export function createExperimentRunItemAppendStore(
         return;
       }
 
+      const retentionDays =
+        context.retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+      const recordWithRetention = {
+        ...record,
+        _retention_days: retentionDays,
+      };
+
       const client = await resolveClient(context.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
+        values: [recordWithRetention],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });

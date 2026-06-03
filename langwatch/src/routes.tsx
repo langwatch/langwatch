@@ -105,6 +105,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/annotation-scores")),
   },
   {
+    path: "/settings/data-retention",
+    ...page(() => import("./pages/settings/data-retention")),
+  },
+  {
     path: "/settings/audit-log",
     ...page(() => import("./pages/settings/audit-log")),
   },

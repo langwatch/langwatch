@@ -36,7 +36,6 @@ import {
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
-import { revokeAllTraceShares } from "./share";
 import { getUserProtectionsForProject } from "../utils";
 
 export const projectRouter = createTRPCRouter({
@@ -396,7 +395,7 @@ export const projectRouter = createTRPCRouter({
         input.traceSharingEnabled === false &&
         project.traceSharingEnabled === true
       ) {
-        await revokeAllTraceShares(input.projectId);
+        await getApp().share.revokeAllTraceShares(input.projectId);
       }
 
       return { success: true, projectSlug: updatedProject.slug };

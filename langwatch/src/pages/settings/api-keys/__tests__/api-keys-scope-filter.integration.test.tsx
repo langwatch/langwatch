@@ -103,29 +103,42 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", name: "Project Alpha", apiKey: null },
-    organization: {
-      id: "org-1",
-      name: "Acme Corp",
-      teams: [
-        {
-          id: "team-1",
-          name: "Team Red",
-          projects: [{ id: "proj-1", name: "Project Alpha" }],
-        },
-        {
-          id: "team-2",
-          name: "Team Blue",
-          projects: [{ id: "proj-2", name: "Project Beta" }],
-        },
-      ],
-    },
-    team: { id: "team-1", name: "Team Red" },
-    hasPermission: () => true,
-  }),
-}));
+// NOTE: the org/project/team objects are built ONCE in the factory closure and
+// returned by reference on every call. Returning fresh object literals per call
+// would give `organization` a new identity each render, busting the
+// `useMemo([organization])` inside `useAvailableScopes` and the
+// `[..., filterAvailable]` effect dep inside `useUrlScopeFilter` — an infinite
+// render→effect→setState loop that hangs the worker until it OOMs. In production
+// `useOrganizationTeamProject` is backed by react-query, which is referentially
+// stable, so this only bites the mock.
+vi.mock("~/hooks/useOrganizationTeamProject", () => {
+  const project = { id: "proj-1", name: "Project Alpha", apiKey: null };
+  const organization = {
+    id: "org-1",
+    name: "Acme Corp",
+    teams: [
+      {
+        id: "team-1",
+        name: "Team Red",
+        projects: [{ id: "proj-1", name: "Project Alpha" }],
+      },
+      {
+        id: "team-2",
+        name: "Team Blue",
+        projects: [{ id: "proj-2", name: "Project Beta" }],
+      },
+    ],
+  };
+  const team = { id: "team-1", name: "Team Red" };
+  return {
+    useOrganizationTeamProject: () => ({
+      project,
+      organization,
+      team,
+      hasPermission: () => true,
+    }),
+  };
+});
 
 vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { id: "u-1" } } }),
