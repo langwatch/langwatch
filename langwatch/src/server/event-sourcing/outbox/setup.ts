@@ -26,7 +26,7 @@ import { PgOutboxAuditAdapter } from "./pgAuditAdapter";
  * pair the consumer wires up after the queue is constructed. The runtime
  * does NOT own its own queue.
  *
- * ADR-022 revision (third pass, 2026-06-02): the outbox no longer
+ * ADR-025 revision (third pass, 2026-06-02): the outbox no longer
  * constructs a `langwatch:outbox` queue. Settle and cadence payloads ride
  * the main event-sourcing queue (`event-sourcing/jobs`), routed by
  * payload discriminator (`stage`). The audit adapter is wired onto that

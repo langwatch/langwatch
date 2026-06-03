@@ -17,7 +17,7 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
   debounce applies to all action classes (a half-formed dataset row corrupts
   the customer's eval set just as surely as a half-formed notification).
 
-  See dev/docs/adr/023-per-trigger-dispatch-timing.md.
+  See dev/docs/adr/026-per-trigger-dispatch-timing.md.
 
   Background:
     Given a project with automations enabled

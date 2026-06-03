@@ -729,17 +729,17 @@ model Trigger {
   message       String?
   deleted       Boolean       @default(false)
   alertType     AlertType?
-  // Customer-authored Liquid notification templates (see ADR-024). NULL on any
+  // Customer-authored Liquid notification templates (see ADR-028). NULL on any
   // column means "render with the framework default", so existing triggers are
   // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
   slackTemplateType    String?
   slackTemplate        String?
   emailSubjectTemplate String?
   emailBodyTemplate    String?
-  // Per-trigger digest cadence (ADR-023). Ignored for persist actions.
+  // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
   notificationCadence  String        @default("immediate")
-  // Per-trigger trace-readiness debounce in ms (ADR-023). Notify-class
+  // Per-trigger trace-readiness debounce in ms (ADR-026). Notify-class
   // triggers wait this long after the last span before filters re-evaluate
   // on the settled fold. Persist-class actions dispatch inline and ignore this.
   traceDebounceMs      Int           @default(30000)
@@ -2742,11 +2742,14 @@ model FeatureFlag {
     updatedAt    DateTime @default(now()) @updatedAt
 }
 
-// Durable outbox for stake-sensitive reactor dispatch (ADR-022). Reactors
+// Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
 // registered via `.withOutbox` enqueue rows here; a queue-side audit
 // adapter projects every queue lifecycle event into the row's status.
-// The unique (reactorName, dedupKey) is the claim primitive that makes
-// replays safe — `createMany skipDuplicates` is a no-op on collision.
+// The unique (projectId, reactorName, dedupKey) is the claim primitive
+// that makes replays safe — `createMany skipDuplicates` is a no-op on
+// collision. projectId is part of the uniqueness contract so a caller
+// that forgets to project-scope `dedupKey` cannot silently suppress
+// another tenant's row for the same (reactorName, dedupKey) pair.
 enum ReactorOutboxStatus {
     queued
     dispatching
@@ -2762,10 +2765,10 @@ model ReactorOutbox {
     // Stable identifier of the reactor that enqueued the row. Matches
     // the reactor's `name` in the pipeline builder.
     reactorName    String
-    // Deduplication key scoped to (reactorName, ...). Typically encodes
-    // the match identity, e.g. `${projectId}/${triggerId}:trace:${traceId}`.
-    // Collisions on (reactorName, dedupKey) are the claim primitive that
-    // makes replays safe.
+    // Deduplication key scoped to (projectId, reactorName, ...). Typically
+    // encodes the match identity, e.g. `${triggerId}:trace:${traceId}`.
+    // Collisions on (projectId, reactorName, dedupKey) are the claim
+    // primitive that makes replays safe.
     dedupKey       String
     // GroupQueue routing key. Drives per-group FIFO and fair scheduling
     // across tenants. Always `${projectId}/`-prefixed.
@@ -2789,10 +2792,13 @@ model ReactorOutbox {
     createdAt      DateTime            @default(now())
     updatedAt      DateTime            @default(now()) @updatedAt
 
-    @@unique([reactorName, dedupKey])
+    @@unique([projectId, reactorName, dedupKey])
     // Drainer hot path: pick the next claimable row for a (project,
     // reactor) whose backoff has elapsed.
     @@index([projectId, reactorName, status, nextAttemptAt])
+    // Wakeup-driven lease scopes by (projectId, reactorName, groupKey)
+    // so one group's wakeup can't drain another group's ready rows.
+    @@index([projectId, reactorName, groupKey, status, nextAttemptAt])
     // Operator surface: list stuck/dead dispatches per project.
     @@index([projectId, status, updatedAt])
     // Crash recovery scan: find leased rows whose worker never came back.

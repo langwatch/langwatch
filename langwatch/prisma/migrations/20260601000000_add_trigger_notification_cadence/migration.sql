@@ -2,7 +2,7 @@
 -- (SEND_EMAIL, SEND_SLACK_MESSAGE). Persist actions (ADD_TO_DATASET,
 -- ADD_TO_ANNOTATION_QUEUE) always dispatch immediately and ignore this column.
 --
--- See dev/docs/adr/025-notify-persistent-action-classification.md.
+-- See dev/docs/adr/026-per-trigger-dispatch-timing.md.
 --
 -- Default is 'immediate' so every existing trigger keeps firing without a
 -- digest delay. The app-layer default for *new* notify triggers is

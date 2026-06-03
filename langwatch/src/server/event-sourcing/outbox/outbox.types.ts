@@ -7,7 +7,7 @@ export type OutboxStatus = ReactorOutboxStatus;
  * JSON payload stored on a ReactorOutbox row.
  *
  * Variable-size data goes here (trigger config, target ids, rendered
- * template inputs) so wakeup payloads stay constant-size — see ADR-023.
+ * template inputs) so wakeup payloads stay constant-size — see ADR-026.
  */
 export type OutboxPayload = Prisma.InputJsonValue;
 
@@ -17,7 +17,7 @@ export interface EnqueueOutboxParams {
   /**
    * Stable identifier of the match. Collisions on (reactorName, dedupKey)
    * are the claim primitive that makes pipeline replays safe — see
-   * ADR-022.
+   * ADR-025.
    *
    * Convention (per-trigger subject scoping; the `${projectId}/` prefix
    * mirrors the `groupKey` shape so every dedup/group identifier in the
@@ -33,7 +33,7 @@ export interface EnqueueOutboxParams {
    */
   dedupKey: string;
   /**
-   * GroupQueue routing key for the wakeup payload — see ADR-023.
+   * GroupQueue routing key for the wakeup payload — see ADR-026.
    * MUST begin with `${projectId}/` so `tenantIdFromGroupId` can
    * extract the tenant for per-tenant fairness via
    * `TenantRateTracker`. The outbox queue is free-standing and
@@ -60,6 +60,13 @@ export interface EnqueueOutboxResult {
 export interface LeaseOutboxParams {
   projectId: string;
   reactorName: string;
+  /**
+   * When set, the lease is scoped to a single `groupKey`. Wakeup-driven
+   * leases pass this through from the wakeup payload so one group's
+   * wakeup can't drain another group's ready rows. Sweep / recovery
+   * paths leave it unset.
+   */
+  groupKey?: string;
   /** How long the lease should hold before another worker can re-claim. */
   leaseDurationMs: number;
 }

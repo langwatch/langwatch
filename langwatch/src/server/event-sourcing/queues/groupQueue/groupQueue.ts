@@ -321,7 +321,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (tenantId) {
         void this.rateTracker.record(tenantId);
       }
-      // Audit hook (ADR-021 revision): only on the new-stage path, not on
+      // Audit hook (ADR-025 revision): only on the new-stage path, not on
       // dedup-collapse. The adapter's audit row already exists for the
       // first send under this dedup ID.
       await this.runAudit(() =>
@@ -440,7 +440,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
     }
 
-    // Audit hooks (ADR-022 revision). The Lua's stageBatch returns a count,
+    // Audit hooks (ADR-025 revision). The Lua's stageBatch returns a count,
     // not a per-payload new/dedup map, so we fire onEnqueue for every
     // payload and let the adapter's idempotency (createMany skipDuplicates)
     // absorb dedup-collapsed duplicates. Index alignment is by position —
@@ -476,7 +476,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   /**
    * Best-effort audit-adapter invocation. PG outages log + continue;
-   * the queue stays available. See ADR-021 revision for the "audit lags
+   * the queue stays available. See ADR-025 revision for the "audit lags
    * but never blocks dispatch" property.
    */
   private async runAudit(op: () => Promise<unknown> | undefined): Promise<void> {
@@ -626,13 +626,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // Audit hook: onLeased fires once per leased payload (including
               // each drained sibling in a coalesced batch). Best-effort —
               // PG outage logs+continues.
+              //
+              // `leasedUntil` is a soft projection of when the queue's retry
+              // layer would reschedule the job if it stalled: now +
+              // maxBackoffMs. Adapters use it for stuck-state dashboards.
+              const leasedUntil = new Date(
+                Date.now() + JOB_RETRY_CONFIG.maxBackoffMs,
+              );
               await this.runAudit(() =>
-                this.auditAdapter?.onLeased({ payload }),
+                this.auditAdapter?.onLeased({ payload, attempt, leasedUntil }),
               );
               if (batchPayloads && this.auditAdapter) {
                 for (const sibling of batchPayloads.slice(1)) {
                   await this.runAudit(() =>
-                    this.auditAdapter?.onLeased({ payload: sibling }),
+                    this.auditAdapter?.onLeased({
+                      payload: sibling,
+                      attempt,
+                      leasedUntil,
+                    }),
                   );
                 }
               }
@@ -658,7 +669,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // (dispatched + every drained sibling on success).
               const dispatchedAt = new Date();
               await this.runAudit(() =>
-                this.auditAdapter?.onDispatched({ payload, at: dispatchedAt }),
+                this.auditAdapter?.onDispatched({
+                  payload,
+                  at: dispatchedAt,
+                  attempt,
+                }),
               );
               if (batchPayloads && this.auditAdapter) {
                 for (const sibling of batchPayloads.slice(1)) {
@@ -666,6 +681,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     this.auditAdapter?.onDispatched({
                       payload: sibling,
                       at: dispatchedAt,
+                      attempt,
                     }),
                   );
                 }
@@ -725,6 +741,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     error: error.message,
                     willRetry: true,
                     nextAttemptAt,
+                    attempt,
                   }),
                 );
                 if (batchPayloads && this.auditAdapter) {
@@ -735,6 +752,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                         error: error.message,
                         willRetry: true,
                         nextAttemptAt,
+                        attempt,
                       }),
                     );
                   }
@@ -787,6 +805,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   this.auditAdapter?.onDead({
                     payload,
                     lastError: error.message,
+                    attempt,
                   }),
                 );
                 if (batchPayloads && this.auditAdapter) {
@@ -795,6 +814,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       this.auditAdapter?.onDead({
                         payload: sibling,
                         lastError: error.message,
+                        attempt,
                       }),
                     );
                   }

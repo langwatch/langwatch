@@ -52,8 +52,13 @@ export class ModelDefaultsRepository {
     scopeType: ModelDefaultScopeType,
     scopeId: string,
   ): Promise<void> {
+    // -- @tenancy: advisory-lock helper; the lock key already carries
+    // the (scopeType, scopeId) scope and the call site is bounded by
+    // the caller's transaction. No tenancy predicate in the SQL itself
+    // because there is no row read or write here.
     await this.prisma
-      .$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
+      .$queryRaw`-- @tenancy: advisory-lock helper, scopeType+scopeId bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
   }
 
   /** Mint a fresh KSUID-prefixed id for a new config row. Exposed so

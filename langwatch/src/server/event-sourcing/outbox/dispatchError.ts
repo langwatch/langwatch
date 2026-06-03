@@ -83,12 +83,20 @@ export function extractHttpStatus(error: unknown): number | undefined {
  * decision derived from its HTTP status. An already-typed DispatchError is
  * returned unchanged. Failures with no recognizable status default to
  * retryable — see ADR-027 for why the unknown case is conservative.
+ *
+ * When the caller knows the failure cannot be retried (e.g. a template
+ * render failure where the payload itself is malformed), it can pass
+ * `retryable: false` to short-circuit the HTTP-status heuristic and
+ * promote the row straight to `dead`.
  */
 export function toDispatchError(
   error: unknown,
-  { message }: { message: string },
+  { message, retryable: retryableOverride }: { message: string; retryable?: boolean },
 ): DispatchError {
   if (isDispatchError(error)) return error;
+  if (retryableOverride !== undefined) {
+    return new DispatchError({ message, retryable: retryableOverride, cause: error });
+  }
   const status = extractHttpStatus(error);
   const retryable = status === undefined ? true : isRetryableHttpStatus(status);
   return new DispatchError({ message, retryable, cause: error });

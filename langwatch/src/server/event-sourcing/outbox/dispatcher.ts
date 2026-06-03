@@ -69,7 +69,7 @@ export interface OutboxDispatcherDeps {
 
 /**
  * Unified outbox process callback. Branches on `stage` so one queue
- * carries both ADR-030 settle and ADR-025 cadence digest stages with
+ * carries both ADR-026 settle and ADR-027 cadence digest stages with
  * the operator's two knobs (`traceDebounceMs`, `notificationCadence`)
  * still independently tunable.
  *
@@ -183,13 +183,13 @@ async function handleSettle(
     return;
   }
 
-  const claimed = await deps.triggers.claimSend({
-    triggerId: trigger.id,
-    traceId,
-    projectId,
-  });
-  if (!claimed) return;
-
+  // The `TriggerSent` claim moved into `handleCadenceBatch` (below) so
+  // that claim + dispatch share a single retry boundary. Claiming here
+  // and then losing the cadence enqueue to a Redis blip would commit
+  // the claim while the cadence row never lands — replays would see
+  // claim=false and silently drop the notification. Settle now just
+  // re-enqueues; cadence claims-then-dispatches, so a failed dispatch
+  // retries with the row already in place.
   const cadencePayload: CadenceStagePayload = {
     stage: "cadence",
     projectId,
@@ -255,9 +255,37 @@ async function handleCadenceBatch(
     });
   }
 
+  // Claim each (trigger, trace) pair against `TriggerSent` before
+  // composing the digest. The claim is the at-most-once gate; settle
+  // re-enqueues are idempotent at the queue level only by collapsing on
+  // the digest boundary, so a (trigger, trace) pair may legitimately
+  // appear twice in the batch (settle retry after a Redis blip). Both
+  // duplicate-within-batch and prior-dispatch cases are eliminated
+  // here: the first claim wins, every later attempt at the same
+  // (trigger, trace) gets dropped.
   const params = (trigger.actionParams ?? {}) as ActionParams;
+  const claimedPayloads: CadenceStagePayload[] = [];
+  const seenTraceIds = new Set<string>();
+  for (const p of payloads) {
+    if (seenTraceIds.has(p.match.traceId)) continue;
+    seenTraceIds.add(p.match.traceId);
+    const claimed = await deps.triggers.claimSend({
+      triggerId,
+      traceId: p.match.traceId,
+      projectId,
+    });
+    if (claimed) claimedPayloads.push(p);
+  }
+  if (claimedPayloads.length === 0) {
+    logger.debug(
+      { projectId, triggerId, batchSize: payloads.length },
+      "Cadence batch fully suppressed by prior TriggerSent claims — no dispatch",
+    );
+    return;
+  }
+
   const triggerData = await Promise.all(
-    payloads.map(async (p) => {
+    claimedPayloads.map(async (p) => {
       const fullTrace =
         (await deps.traceById(projectId, p.match.traceId)) ??
         ({ trace_id: p.match.traceId } as Trace);
@@ -316,14 +344,37 @@ async function handleCadenceBatch(
     throw error;
   }
 
-  await deps.triggers.updateLastRunAt(triggerId, projectId);
+  // `updateLastRunAt` is a soft-state cosmetic for the operator UI
+  // (last-fired column on the trigger list). The provider-side send
+  // above has already happened; if this write fails we MUST NOT throw,
+  // because the outer outbox retry would re-emit an identical digest
+  // and burn a real notification on a write-only race. Log + capture
+  // and move on.
+  try {
+    await deps.triggers.updateLastRunAt(triggerId, projectId);
+  } catch (lastRunErr) {
+    logger.warn(
+      {
+        projectId,
+        triggerId,
+        error:
+          lastRunErr instanceof Error
+            ? lastRunErr.message
+            : String(lastRunErr),
+      },
+      "updateLastRunAt failed post-dispatch — swallowing to avoid double-send on retry",
+    );
+    captureException(lastRunErr, {
+      extra: { projectId, triggerId, phase: "updateLastRunAt-post-dispatch" },
+    });
+  }
   logger.info(
     {
       projectId,
       triggerId,
       action: trigger.action,
       cadence: trigger.notificationCadence,
-      digestSize: payloads.length,
+      digestSize: claimedPayloads.length,
     },
     "Outbox cadence digest dispatched",
   );
