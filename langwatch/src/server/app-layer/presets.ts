@@ -4,7 +4,7 @@ import { prisma as globalPrisma } from "~/server/db";
 import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
-import { setupOutbox } from "../event-sourcing/outbox/setup";
+import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { App, getApp, globalForApp, initializeApp } from "./app";
@@ -485,10 +485,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // processes don't build this (no settle traffic; no consumer to drain).
   const outbox =
     config.processRole === "worker"
-      ? setupOutbox({
+      ? buildOutboxRuntime({
           prisma,
           redis: redis ?? null,
-          processRole: config.processRole,
           triggers,
           projects,
           evaluations: { runs: evaluations.runs },
@@ -588,12 +587,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       await broadcast.close();
     },
   });
-  if (outbox) {
-    gracefulCloseables.push({
-      name: "outbox-queue",
-      close: () => outbox.queue.close(),
-    });
-  }
+  // The outbox runtime piggy-backs on the main event-sourcing queue
+  // (ADR-025 revision 3), so there's nothing outbox-specific to close —
+  // the event-sourcing queue's own close registration covers it.
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
