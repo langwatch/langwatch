@@ -1,19 +1,8 @@
-import crypto from "crypto";
 import type { OrganizationUserRole, PrismaClient } from "@prisma/client";
 import { createLogger } from "../../utils/logger/server";
-import {
-  afterUserCreate,
-  afterAccountCreate,
-  afterSessionCreate,
-} from "~/server/better-auth/hooks";
-import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
-import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { SsoAuthRepository } from "./ssoAuth.repository";
-import type { OAuthUserInfo } from "./ssoOAuth";
 
 const logger = createLogger("langwatch:sso:auth");
-
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const ROLE_PRIORITY: Record<string, number> = {
   ADMIN: 3,
@@ -21,17 +10,37 @@ const ROLE_PRIORITY: Record<string, number> = {
   EXTERNAL: 1,
 };
 
-interface RoleMappingConfig {
+/** Policy resolved from the SsoProvider row by the better-auth provisionUser hook. */
+export interface SsoProvisioningPolicy {
+  organizationId: string | null;
+  jitProvisioning: boolean;
   defaultOrgRole: OrganizationUserRole;
-  roleMapping: Record<string, unknown> | null;
+  roleMapping: unknown;
 }
 
-interface SsoLoginResult {
-  sessionToken: string;
-  expiresAt: Date;
-  redirectTo?: string;
+/** Thrown when a user must not be granted an SSO session. */
+export class SsoLoginRejectedError extends Error {
+  constructor(
+    readonly reason:
+      | "deactivated"
+      | "not_provisioned"
+      | "no_organization",
+    message: string,
+  ) {
+    super(message);
+    this.name = "SsoLoginRejectedError";
+  }
 }
 
+/**
+ * Bridges the @better-auth/sso plugin to LangWatch's own membership/RBAC model.
+ *
+ * The plugin handles authentication, user/account linking (by email — which is
+ * what makes existing Auth0/Okta users carry over seamlessly), and session
+ * creation. This service runs inside the plugin's `provisionUser` callback to
+ * apply LangWatch policy the plugin knows nothing about: org membership, JIT
+ * provisioning, role mapping, and deactivation/non-provisioned rejection.
+ */
 export class SsoAuthService {
   private readonly repository: SsoAuthRepository;
 
@@ -43,129 +52,78 @@ export class SsoAuthService {
     return new SsoAuthService(prisma);
   }
 
-  async handleSsoCallback({
-    userInfo,
-    provider,
-    organizationId,
-    roleMappingConfig,
-    jitProvisioning,
-    ipAddress,
-    userAgent,
+  /**
+   * Reconcile a freshly-authenticated SSO user against their organization.
+   * Throws {@link SsoLoginRejectedError} to block the session when the user is
+   * deactivated or not provisioned (and JIT is off).
+   */
+  async provisionSsoUser({
+    userId,
+    policy,
+    rawClaims,
   }: {
-    userInfo: OAuthUserInfo;
-    provider: string;
-    organizationId: string;
-    roleMappingConfig: RoleMappingConfig;
-    jitProvisioning: boolean;
-    ipAddress: string | null;
-    userAgent: string | null;
-  }): Promise<SsoLoginResult> {
-    let user = await this.repository.findUserByEmail({
-      email: userInfo.email,
-    });
+    userId: string;
+    policy: SsoProvisioningPolicy;
+    rawClaims: Record<string, unknown>;
+  }): Promise<void> {
+    if (!policy.organizationId) {
+      // Provider not linked to an org: nothing to provision. The user is
+      // authenticated but lands on the empty-state / org-selection flow.
+      return;
+    }
+    const organizationId = policy.organizationId;
 
-    if (!user) {
-      if (!jitProvisioning) {
-        return {
-          sessionToken: "",
-          expiresAt: new Date(),
-          redirectTo: `/auth/signin?error=${encodeURIComponent("Your account is not provisioned. Contact your administrator.")}`,
-        };
-      }
-
-      user = await this.repository.createUser({
-        email: userInfo.email,
-        name: userInfo.name ?? userInfo.email.split("@")[0] ?? "SSO User",
-        image: userInfo.picture ?? null,
-      });
-
-      await afterUserCreate({
-        prisma: this.prisma,
-        user: { id: user.id, email: user.email!, name: user.name ?? "" },
-      });
+    if (await this.repository.isUserDeactivated({ userId })) {
+      throw new SsoLoginRejectedError(
+        "deactivated",
+        "Your account has been deactivated.",
+      );
     }
 
-    if (user.deactivatedAt) {
-      return {
-        sessionToken: "",
-        expiresAt: new Date(),
-        redirectTo: `/auth/signin?error=${encodeURIComponent("Your account has been deactivated.")}`,
-      };
-    }
-
-    const existingAccount = await this.repository.findAccount({
-      userId: user.id,
-      provider,
-      providerAccountId: userInfo.sub,
-    });
-
-    if (!existingAccount) {
-      await this.repository.createAccount({
-        userId: user.id,
-        provider,
-        providerAccountId: userInfo.sub,
-      });
-
-      await afterAccountCreate({
-        prisma: this.prisma,
-        account: {
-          userId: user.id,
-          providerId: provider,
-          accountId: userInfo.sub,
-        },
-      });
-    }
-
-    const membership = await this.repository.findMembership({
-      userId: user.id,
+    let membership = await this.repository.findMembership({
+      userId,
       organizationId,
     });
 
-    if (!membership && jitProvisioning) {
+    if (!membership) {
+      if (!policy.jitProvisioning) {
+        throw new SsoLoginRejectedError(
+          "not_provisioned",
+          "Your account is not provisioned for this organization. Contact your administrator.",
+        );
+      }
       await this.repository.createMembership({
-        userId: user.id,
+        userId,
         organizationId,
-        role: roleMappingConfig.defaultOrgRole,
+        role: policy.defaultOrgRole,
       });
-
+      membership = { role: policy.defaultOrgRole, scimManaged: false };
       logger.info(
-        { userId: user.id, organizationId, role: roleMappingConfig.defaultOrgRole },
+        { userId, organizationId, role: policy.defaultOrgRole },
         "JIT-provisioned org membership via SSO",
       );
-    } else if (!membership) {
-      return {
-        sessionToken: "",
-        expiresAt: new Date(),
-        redirectTo: `/auth/signin?error=${encodeURIComponent("You are not a member of this organization. Contact your administrator.")}`,
-      };
     }
 
-    await this.applyRoleMapping({
-      userId: user.id,
-      organizationId,
-      userInfo,
-      config: roleMappingConfig,
+    // SCIM-managed memberships are owned by the directory, not the IdP token.
+    if (membership.scimManaged) return;
+
+    const resolvedRole = this.resolveRole({
+      rawClaims,
+      roleMapping: policy.roleMapping,
+      defaultOrgRole: policy.defaultOrgRole,
     });
 
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-
-    await this.repository.createSession({
-      sessionToken,
-      userId: user.id,
-      expiresAt,
-      ipAddress,
-      userAgent,
-    });
-
-    await afterSessionCreate({
-      prisma: this.prisma,
-      userId: user.id,
-      fireActivityTrackingNurturing,
-      ensureUserSyncedToCio,
-    });
-
-    return { sessionToken, expiresAt };
+    if (resolvedRole !== membership.role) {
+      await this.repository.updateMembershipRole({
+        userId,
+        organizationId,
+        role: resolvedRole,
+      });
+      logger.info(
+        { userId, organizationId, from: membership.role, to: resolvedRole },
+        "Applied SSO role mapping",
+      );
+    }
   }
 
   async isSoleAdminByEmail({
@@ -177,11 +135,7 @@ export class SsoAuthService {
   }): Promise<boolean> {
     const user = await this.repository.findUserByEmail({ email });
     if (!user) return false;
-
-    return this.repository.isSoleAdmin({
-      userId: user.id,
-      organizationId,
-    });
+    return this.repository.isSoleAdmin({ userId: user.id, organizationId });
   }
 
   async findMembership({
@@ -206,68 +160,52 @@ export class SsoAuthService {
     return this.repository.updateMembershipRole({ userId, organizationId, role });
   }
 
-  private async applyRoleMapping({
-    userId,
-    organizationId,
-    userInfo,
-    config,
-  }: {
-    userId: string;
-    organizationId: string;
-    userInfo: OAuthUserInfo;
-    config: RoleMappingConfig;
-  }): Promise<void> {
-    const membership = await this.repository.findMembership({
-      userId,
-      organizationId,
-    });
-
-    if (!membership) return;
-    if (membership.scimManaged) return;
-
-    const resolvedRole = this.resolveRole({ userInfo, config });
-
-    if (resolvedRole !== membership.role) {
-      await this.repository.updateMembershipRole({
-        userId,
-        organizationId,
-        role: resolvedRole,
-      });
-
-      logger.info(
-        { userId, organizationId, from: membership.role, to: resolvedRole },
-        "Applied SSO role mapping",
-      );
-    }
-  }
-
+  /**
+   * Map IdP group/role claims to an org role. Group-priority based: the
+   * highest-ranked role across all matched groups wins; `useRoleAttribute`
+   * trusts a direct role claim instead.
+   */
   private resolveRole({
-    userInfo,
-    config,
+    rawClaims,
+    roleMapping,
+    defaultOrgRole,
   }: {
-    userInfo: OAuthUserInfo;
-    config: RoleMappingConfig;
+    rawClaims: Record<string, unknown>;
+    roleMapping: unknown;
+    defaultOrgRole: OrganizationUserRole;
   }): OrganizationUserRole {
-    const roleMap = (config.roleMapping ?? {}) as Record<string, unknown>;
-    const useRoleAttribute = roleMap.useRoleAttribute === true;
-    const groupMappings = (roleMap.groupMappings ?? []) as Array<{
-      group: string;
-      role: string;
-    }>;
+    const map = (roleMapping ?? {}) as {
+      useRoleAttribute?: boolean;
+      groupMappings?: Array<{ group: string; role: string }>;
+      groupsClaim?: string;
+      roleClaim?: string;
+    };
 
-    if (useRoleAttribute && userInfo.role) {
-      const normalized = userInfo.role.toUpperCase();
-      if (normalized === "ADMIN" || normalized === "MEMBER" || normalized === "EXTERNAL") {
-        return normalized as OrganizationUserRole;
+    if (map.useRoleAttribute) {
+      const roleValue = rawClaims[map.roleClaim ?? "role"];
+      if (typeof roleValue === "string") {
+        const normalized = roleValue.toUpperCase();
+        if (
+          normalized === "ADMIN" ||
+          normalized === "MEMBER" ||
+          normalized === "EXTERNAL"
+        ) {
+          return normalized as OrganizationUserRole;
+        }
       }
     }
 
-    if (groupMappings.length > 0 && userInfo.groups && userInfo.groups.length > 0) {
+    const groupMappings = map.groupMappings ?? [];
+    const rawGroups = rawClaims[map.groupsClaim ?? "groups"];
+    const groups = Array.isArray(rawGroups)
+      ? rawGroups.filter((g): g is string => typeof g === "string")
+      : [];
+
+    if (groupMappings.length > 0 && groups.length > 0) {
       let highestRole: OrganizationUserRole | null = null;
       let highestPriority = 0;
-
       for (const mapping of groupMappings) {
-        if (userInfo.groups.includes(mapping.group)) {
+        if (groups.includes(mapping.group)) {
           const normalized = mapping.role.toUpperCase() as OrganizationUserRole;
           const priority = ROLE_PRIORITY[normalized] ?? 0;
           if (priority > highestPriority) {
@@ -276,10 +214,9 @@ export class SsoAuthService {
           }
         }
       }
-
       if (highestRole) return highestRole;
     }
 
-    return config.defaultOrgRole;
+    return defaultOrgRole;
   }
 }

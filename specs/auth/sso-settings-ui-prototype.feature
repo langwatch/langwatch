@@ -3,11 +3,13 @@ Feature: SSO Settings UI Prototype
   I want to configure SSO connections, view SCIM settings, and manage enforcement
   So that my team can authenticate via our identity provider without engineering help
 
-  # tracked: forward-looking UI prototype. Every scenario below describes
-  # not-yet-built SSO/SCIM settings UI (connection table, provider modal,
-  # attribute/role mapping, SCIM logs). React Testing Library coverage is out
-  # of scope for this backend-focused Phase 1 PR, so each scenario is tagged
-  # until the UI lands with its own integration tests.
+  # SSO/SCIM settings UI (connection table, provider modal, attribute/role
+  # mapping, SCIM logs) for per-org SSO. The per-org SSO runtime is backed by
+  # the @better-auth/sso plugin: OIDC (with id_token signature validation) and
+  # SAML (via samlify) are both real, working login flows — not hand-rolled.
+  # The settings UI persists provider config into the plugin's SsoProvider
+  # record (oidcConfig / samlConfig) plus a LangWatch policy companion for
+  # enforcement, JIT, and role mapping.
 
   Background:
     Given the user is an organization admin
@@ -104,10 +106,18 @@ Feature: SSO Settings UI Prototype
     And a "Verified" badge is shown when the domain has been verified
 
   @integration
-  Scenario: Callback URL is shown with copy button
+  Scenario: OIDC redirect URI is shown with copy button
+    Given the admin is configuring an OIDC provider with provider ID "acme-okta"
     When the admin enters domain "acme.com" in the modal
-    Then a read-only Callback URL "{origin}/api/auth/sso/acme.com" is displayed
-    And a copy button is shown next to the Callback URL
+    Then a read-only redirect URI "{origin}/api/auth/sso/callback/acme-okta" is displayed
+    And a copy button is shown next to the redirect URI
+
+  @integration
+  Scenario: SAML ACS and SP metadata URLs are shown for SAML providers
+    Given the admin is configuring a SAML provider with provider ID "acme-saml"
+    When the admin selects "Custom SAML" as the provider
+    Then a read-only ACS URL "{origin}/api/auth/sso/saml2/callback/acme-saml" is displayed
+    And a read-only SP metadata URL "{origin}/api/auth/sso/saml2/sp/metadata?providerId=acme-saml" is displayed
 
   @integration
   Scenario: Provider dropdown shows supported providers

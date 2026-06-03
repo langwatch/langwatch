@@ -2,6 +2,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { auth0, genericOAuth, okta } from "better-auth/plugins/generic-oauth";
+import { sso } from "@better-auth/sso";
 import { compare, hash } from "bcrypt";
 
 import { env } from "~/env.mjs";
@@ -22,6 +23,7 @@ import {
 import { extractEmailDomain } from "./sso";
 import { getApp } from "../app-layer/app";
 import { checkSsoEnforcement } from "./sso-enforcement";
+import { SsoLoginRejectedError } from "../sso/ssoAuth.service";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -203,10 +205,49 @@ if (
 // it would override admin impersonation with its own mechanism. We use our
 // own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
 // Session.impersonating JSON column handled in src/server/auth.ts.
-const plugins =
-  genericOAuthConfigs.length > 0
+const plugins = [
+  ...(genericOAuthConfigs.length > 0
     ? [genericOAuth({ config: genericOAuthConfigs })]
-    : [];
+    : []),
+  /**
+   * Per-org self-service SSO (OIDC + SAML). The plugin owns the login runtime —
+   * id_token signature validation (jose), SAML assertion validation (samlify),
+   * email-based account linking (which carries existing Auth0/Okta users over
+   * unchanged), and session creation. We only inject LangWatch policy through
+   * `provisionUser`: org membership, JIT, role mapping, and rejection.
+   *
+   * `domainVerification.enabled` makes the plugin refuse to sign a user in
+   * through a provider whose `domainVerified` flag is false; LangWatch sets that
+   * flag via its own DNS-TXT verifyDomain flow.
+   */
+  sso({
+    provisionUserOnEveryLogin: true,
+    domainVerification: { enabled: true },
+    provisionUser: async ({ user, userInfo, provider }) => {
+      const policy = await getApp().ssoProvider.getPolicyByProviderId({
+        providerId: provider.providerId,
+      });
+      if (!policy) return;
+      try {
+        await getApp().ssoAuth.provisionSsoUser({
+          userId: user.id,
+          policy,
+          rawClaims: (userInfo ?? {}) as Record<string, unknown>,
+        });
+      } catch (e) {
+        if (e instanceof SsoLoginRejectedError) {
+          // Block the session: the plugin sets the session cookie only after
+          // provisionUser resolves, so throwing here denies the login.
+          throw APIError.from("FORBIDDEN", {
+            code: "SSO_LOGIN_REJECTED",
+            message: e.message,
+          });
+        }
+        throw e;
+      }
+    },
+  }),
+];
 
 /**
  * Wire BetterAuth's secondary storage to the shared Redis connection.
@@ -553,8 +594,8 @@ export const auth = betterAuth({
                   where: { ssoDomain: domain },
                   select: { id: true, ssoProvider: true },
                 }),
-              findEnforcedSsoConnection: (domain) =>
-                getApp().ssoConnection.getEnforcedConnectionByDomain({ domain }),
+              findEnforcedSsoProvider: (domain) =>
+                getApp().ssoProvider.getEnforcedProviderByDomain({ domain }),
               getActivePlanType: async (organizationId) => {
                 try {
                   const plan = await getApp().planProvider.getActivePlan({ organizationId });
@@ -581,7 +622,7 @@ export const auth = betterAuth({
           if (newEmail && typeof newEmail === "string") {
             const newDomain = extractEmailDomain(newEmail);
             if (newDomain) {
-              const enforced = await getApp().ssoConnection.getEnforcedConnectionByDomain({ domain: newDomain });
+              const enforced = await getApp().ssoProvider.getEnforcedProviderByDomain({ domain: newDomain });
               if (enforced) {
                 throw APIError.from("BAD_REQUEST", {
                   code: "SSO_EMAIL_CHANGE_BLOCKED",

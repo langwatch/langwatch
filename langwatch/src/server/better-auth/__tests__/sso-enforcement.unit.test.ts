@@ -15,7 +15,7 @@ import { checkSsoEnforcement } from "../sso-enforcement";
 function makeDeps(overrides: Partial<SsoEnforcementDeps> = {}): SsoEnforcementDeps {
   return {
     findOrgByDomain: vi.fn().mockResolvedValue(null),
-    findEnforcedSsoConnection: vi.fn().mockResolvedValue(null),
+    findEnforcedSsoProvider: vi.fn().mockResolvedValue(null),
     getActivePlanType: vi.fn().mockResolvedValue("ENTERPRISE"),
     isSoleAdmin: vi.fn().mockResolvedValue(false),
     ...overrides,
@@ -46,9 +46,9 @@ async function expectSsoEnforcedError(
 describe("checkSsoEnforcement", () => {
   describe("when SSO is enforced for the domain", () => {
     /** @scenario Password login is rejected when SSO is enforced for the domain */
-    it("rejects /sign-in/email with SSO_ENFORCED when an enforced SsoConnection exists", async () => {
+    it("rejects /sign-in/email with SSO_ENFORCED when an enforced SsoProvider exists", async () => {
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
         getActivePlanType: vi.fn().mockResolvedValue("ENTERPRISE"),
         isSoleAdmin: vi.fn().mockResolvedValue(false),
       });
@@ -61,9 +61,9 @@ describe("checkSsoEnforcement", () => {
     });
 
     /** @scenario Password reset is rejected when SSO is enforced for the domain */
-    it("rejects /request-password-reset with SSO_ENFORCED when an enforced SsoConnection exists", async () => {
+    it("rejects /request-password-reset with SSO_ENFORCED when an enforced SsoProvider exists", async () => {
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
         getActivePlanType: vi.fn().mockResolvedValue("ENTERPRISE"),
       });
 
@@ -78,10 +78,10 @@ describe("checkSsoEnforcement", () => {
   describe("when SSO is not enforced", () => {
     /** @scenario Password login succeeds when SSO is not enforced */
     it("allows /sign-in/email when connection exists but ssoEnforced is false (no enforced connection returned)", async () => {
-      // findEnforcedSsoConnection only returns rows with ssoEnforced=true;
+      // findEnforcedSsoProvider only returns rows with ssoEnforced=true;
       // returning null simulates a connection where enforcement is off.
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue(null),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue(null),
         findOrgByDomain: vi.fn().mockResolvedValue(null),
       });
 
@@ -100,7 +100,7 @@ describe("checkSsoEnforcement", () => {
     it("allows /sign-in/email when no SSO is configured for the domain", async () => {
       const deps = makeDeps({
         findOrgByDomain: vi.fn().mockResolvedValue(null),
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue(null),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue(null),
       });
 
       await expect(
@@ -116,7 +116,7 @@ describe("checkSsoEnforcement", () => {
     it("allows /request-password-reset when no SSO enforcement exists for the domain", async () => {
       const deps = makeDeps({
         findOrgByDomain: vi.fn().mockResolvedValue(null),
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue(null),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue(null),
       });
 
       await expect(
@@ -132,7 +132,7 @@ describe("checkSsoEnforcement", () => {
   describe("when the enforced org is not on an enterprise plan", () => {
     it("allows login (silently degrades enforcement when license expires)", async () => {
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
         getActivePlanType: vi.fn().mockResolvedValue("FREE"),
       });
 
@@ -147,7 +147,7 @@ describe("checkSsoEnforcement", () => {
 
     it("allows reset (silently degrades enforcement when license expires)", async () => {
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
         getActivePlanType: vi.fn().mockResolvedValue("FREE"),
       });
 
@@ -164,7 +164,7 @@ describe("checkSsoEnforcement", () => {
   describe("when the user is the sole active admin (escape hatch)", () => {
     it("allows /sign-in/email even under enforcement", async () => {
       const deps = makeDeps({
-        findEnforcedSsoConnection: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+        findEnforcedSsoProvider: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
         getActivePlanType: vi.fn().mockResolvedValue("ENTERPRISE"),
         isSoleAdmin: vi.fn().mockResolvedValue(true),
       });
@@ -187,7 +187,7 @@ describe("checkSsoEnforcement", () => {
         checkSsoEnforcement({ email: undefined, path: "/api/auth/sign-in/email", deps }),
       ).resolves.toBeUndefined();
 
-      expect(deps.findEnforcedSsoConnection).not.toHaveBeenCalled();
+      expect(deps.findEnforcedSsoProvider).not.toHaveBeenCalled();
     });
   });
 });

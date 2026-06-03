@@ -140,7 +140,7 @@ export const getServerAuthSession = async (ctx: {
       if (ageMs > SSO_REAUTH_WINDOW_MS && result.user.email) {
         const domain = result.user.email.split("@")[1];
         if (domain) {
-          const enforced = await getApp().ssoConnection.getEnforcedConnectionByDomain({ domain });
+          const enforced = await getApp().ssoProvider.getEnforcedProviderByDomain({ domain });
           if (enforced) {
             logger.info(
               { sessionId: result.session.id, userId: result.user.id, domain },

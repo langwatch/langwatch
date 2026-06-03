@@ -24,7 +24,7 @@ import { toaster } from "~/components/ui/toaster";
 import type { RouterOutputs } from "~/utils/api";
 
 export type SsoConnectionListItem =
-  RouterOutputs["ssoConnection"]["list"][number];
+  RouterOutputs["ssoProvider"]["list"][number];
 
 interface FormState {
   domain: string;
@@ -40,7 +40,7 @@ interface FormState {
   jitProvisioning: boolean;
   defaultOrgRole: string;
   verificationToken: string;
-  verifiedAt: Date | null;
+  domainVerified: boolean;
   attributeMapping: {
     email: string;
     name: string;
@@ -125,7 +125,7 @@ function defaultFormState(): FormState {
     jitProvisioning: false,
     defaultOrgRole: "MEMBER",
     verificationToken: "",
-    verifiedAt: null,
+    domainVerified: false,
     attributeMapping: { email: "email", name: "name", groups: "groups", role: "role" },
     roleMapping: {
       defaultRole: "MEMBER",
@@ -136,7 +136,6 @@ function defaultFormState(): FormState {
 }
 
 function connectionToForm(conn: SsoConnectionListItem): FormState {
-  const attrMap = (conn.attributeMapping ?? {}) as Record<string, string>;
   const roleMap = (conn.roleMapping ?? {}) as Record<string, unknown>;
 
   return {
@@ -153,13 +152,8 @@ function connectionToForm(conn: SsoConnectionListItem): FormState {
     jitProvisioning: conn.jitProvisioning,
     defaultOrgRole: conn.defaultOrgRole,
     verificationToken: conn.verificationToken,
-    verifiedAt: conn.verifiedAt,
-    attributeMapping: {
-      email: attrMap.email ?? "email",
-      name: attrMap.name ?? "name",
-      groups: attrMap.groups ?? "groups",
-      role: attrMap.role ?? "role",
-    },
+    domainVerified: conn.domainVerified,
+    attributeMapping: { email: "email", name: "name", groups: "groups", role: "role" },
     roleMapping: {
       defaultRole: (roleMap.defaultRole as string) ?? "MEMBER",
       useRoleAttribute: (roleMap.useRoleAttribute as boolean) ?? false,
@@ -223,10 +217,22 @@ export function SsoConnectionModal({
     value: FormState[K],
   ) => setForm((c) => ({ ...c, [key]: value }));
 
-  const callbackUrl =
-    typeof window !== "undefined" && form.domain
-      ? `${window.location.origin}/api/auth/sso/${form.domain}/callback`
-      : "";
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+
+  // Provider URLs are keyed by providerId, which only exists after save (edit mode)
+  const savedProviderId = editingConnection?.providerId ?? null;
+  const isSaml = form.provider === "custom-saml";
+
+  const oidcRedirectUri = savedProviderId
+    ? `${origin}/api/auth/sso/callback/${savedProviderId}`
+    : null;
+  const samlAcsUrl = savedProviderId
+    ? `${origin}/api/auth/sso/saml2/callback/${savedProviderId}`
+    : null;
+  const samlMetadataUrl = savedProviderId
+    ? `${origin}/api/auth/sso/saml2/sp/metadata?providerId=${savedProviderId}`
+    : null;
 
   const handleSave = () => {
     if (form.provider === "custom-saml") {
@@ -336,10 +342,10 @@ export function SsoConnectionModal({
                         Domain Verification
                       </Text>
                       <Badge
-                        colorPalette={form.verifiedAt ? "green" : "yellow"}
+                        colorPalette={form.domainVerified ? "green" : "yellow"}
                         size="sm"
                       >
-                        {form.verifiedAt ? "Verified" : "Pending"}
+                        {form.domainVerified ? "Verified" : "Pending"}
                       </Badge>
                     </HStack>
                     <Text fontSize="xs" color="fg.muted">
@@ -378,7 +384,7 @@ export function SsoConnectionModal({
                         </HStack>
                       </VStack>
                     </Box>
-                    {isEditing && !form.verifiedAt && onVerify && (
+                    {isEditing && !form.domainVerified && onVerify && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -412,81 +418,125 @@ export function SsoConnectionModal({
                 </NativeSelect.Root>
               </VStack>
 
-              {/* Callback URL */}
-              {form.domain && (
+              {/* Provider URLs */}
+              {savedProviderId ? (
                 <Box bg="bg.subtle" borderRadius="sm" padding={3}>
-                  <HStack justify="space-between">
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="xs" color="fg.muted">
-                        Callback URL — add this as redirect URI in your IdP
-                      </Text>
-                      <Text fontSize="sm" fontFamily="mono">
-                        {callbackUrl}
-                      </Text>
-                    </VStack>
-                    <CopyButton value={callbackUrl} />
-                  </HStack>
+                  <VStack align="start" gap={3}>
+                    {!isSaml && oidcRedirectUri && (
+                      <HStack justify="space-between" width="full">
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="xs" color="fg.muted">
+                            OIDC Redirect URI — add this as redirect URI in your IdP
+                          </Text>
+                          <Text fontSize="sm" fontFamily="mono">
+                            {oidcRedirectUri}
+                          </Text>
+                        </VStack>
+                        <CopyButton value={oidcRedirectUri} />
+                      </HStack>
+                    )}
+                    {isSaml && samlAcsUrl && (
+                      <>
+                        <HStack justify="space-between" width="full">
+                          <VStack align="start" gap={0}>
+                            <Text fontSize="xs" color="fg.muted">
+                              SAML ACS URL
+                            </Text>
+                            <Text fontSize="sm" fontFamily="mono">
+                              {samlAcsUrl}
+                            </Text>
+                          </VStack>
+                          <CopyButton value={samlAcsUrl} />
+                        </HStack>
+                        {samlMetadataUrl && (
+                          <HStack justify="space-between" width="full">
+                            <VStack align="start" gap={0}>
+                              <Text fontSize="xs" color="fg.muted">
+                                SP Metadata URL
+                              </Text>
+                              <Text fontSize="sm" fontFamily="mono">
+                                {samlMetadataUrl}
+                              </Text>
+                            </VStack>
+                            <CopyButton value={samlMetadataUrl} />
+                          </HStack>
+                        )}
+                      </>
+                    )}
+                  </VStack>
                 </Box>
+              ) : (
+                form.domain && (
+                  <Box bg="bg.subtle" borderRadius="sm" padding={3}>
+                    <Text fontSize="xs" color="fg.muted">
+                      Redirect/ACS URLs become available after you save this provider.
+                    </Text>
+                  </Box>
+                )
               )}
 
               {/* Provider-specific fields */}
               <VStack align="start" gap={3}>
-                <VStack align="start" gap={1} width="full">
-                  <Text fontSize="sm" fontWeight="medium">
-                    Client ID *
-                  </Text>
-                  <Input
-                    placeholder="your-client-id"
-                    value={form.clientId}
-                    onChange={(e) => update("clientId", e.target.value)}
-                  />
-                </VStack>
+                {form.provider !== "custom-saml" && (
+                  <>
+                    <VStack align="start" gap={1} width="full">
+                      <Text fontSize="sm" fontWeight="medium">
+                        Client ID *
+                      </Text>
+                      <Input
+                        placeholder="your-client-id"
+                        value={form.clientId}
+                        onChange={(e) => update("clientId", e.target.value)}
+                      />
+                    </VStack>
 
-                <VStack align="start" gap={1} width="full">
-                  <Text fontSize="sm" fontWeight="medium">
-                    Client Secret {isEditing ? "(leave blank to keep)" : "*"}
-                  </Text>
-                  <Input
-                    type="password"
-                    placeholder={
-                      isEditing
-                        ? "Leave blank to keep existing secret"
-                        : "your-client-secret"
-                    }
-                    value={form.clientSecret}
-                    onChange={(e) => update("clientSecret", e.target.value)}
-                  />
-                </VStack>
+                    <VStack align="start" gap={1} width="full">
+                      <Text fontSize="sm" fontWeight="medium">
+                        Client Secret {isEditing ? "(leave blank to keep)" : "*"}
+                      </Text>
+                      <Input
+                        type="password"
+                        placeholder={
+                          isEditing
+                            ? "Leave blank to keep existing secret"
+                            : "your-client-secret"
+                        }
+                        value={form.clientSecret}
+                        onChange={(e) => update("clientSecret", e.target.value)}
+                      />
+                    </VStack>
 
-                {(form.provider === "okta" ||
-                  form.provider === "custom-oidc") && (
-                  <VStack align="start" gap={1} width="full">
-                    <Text fontSize="sm" fontWeight="medium">
-                      Issuer URL *
-                    </Text>
-                    <Input
-                      placeholder={
-                        form.provider === "okta"
-                          ? "https://your-org.okta.com"
-                          : "https://your-idp.example.com"
-                      }
-                      value={form.issuerUrl}
-                      onChange={(e) => update("issuerUrl", e.target.value)}
-                    />
-                  </VStack>
-                )}
+                    {(form.provider === "okta" ||
+                      form.provider === "custom-oidc") && (
+                      <VStack align="start" gap={1} width="full">
+                        <Text fontSize="sm" fontWeight="medium">
+                          Issuer URL *
+                        </Text>
+                        <Input
+                          placeholder={
+                            form.provider === "okta"
+                              ? "https://your-org.okta.com"
+                              : "https://your-idp.example.com"
+                          }
+                          value={form.issuerUrl}
+                          onChange={(e) => update("issuerUrl", e.target.value)}
+                        />
+                      </VStack>
+                    )}
 
-                {form.provider === "azure-ad" && (
-                  <VStack align="start" gap={1} width="full">
-                    <Text fontSize="sm" fontWeight="medium">
-                      Tenant ID *
-                    </Text>
-                    <Input
-                      placeholder="your-tenant-id"
-                      value={form.tenantId}
-                      onChange={(e) => update("tenantId", e.target.value)}
-                    />
-                  </VStack>
+                    {form.provider === "azure-ad" && (
+                      <VStack align="start" gap={1} width="full">
+                        <Text fontSize="sm" fontWeight="medium">
+                          Tenant ID *
+                        </Text>
+                        <Input
+                          placeholder="your-tenant-id"
+                          value={form.tenantId}
+                          onChange={(e) => update("tenantId", e.target.value)}
+                        />
+                      </VStack>
+                    )}
+                  </>
                 )}
 
                 {form.provider === "custom-saml" && (

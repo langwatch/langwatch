@@ -109,7 +109,6 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   RoutingPolicy: {},
   AiToolEntry: {},
   GatewayBudget: {},
-  SsoConnection: {},
 };
 
 /**
@@ -129,6 +128,12 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "CustomLLMModelCost",
   "ModelProvider",
   "ModelDefaultConfig",
+  // Owned by the @better-auth/sso plugin adapter: the login flow routes by
+  // email domain and scans providers by `domain` (unbounded findMany), so a
+  // mandatory-organizationId predicate cannot apply. organizationId is also
+  // nullable. Org isolation for management (list/get/update/delete) is enforced
+  // one layer up in SsoProviderService / the tRPC router.
+  "SsoProvider",
   // organizationId is NULLABLE here (NULL = platform-published default), so a
   // mandatory-organizationId guard cannot apply.
   "IngestionTemplate",

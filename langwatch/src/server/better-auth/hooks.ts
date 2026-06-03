@@ -336,11 +336,11 @@ const applySsoRoleMapping = async ({
   // SCIM is authoritative — never override SCIM-managed roles
   if (membership?.scimManaged) return;
 
-  const ssoConnection = await getApp().ssoConnection.getRoleMappingByDomain({ domain, organizationId });
-  if (!ssoConnection) return;
+  const ssoProvider = await getApp().ssoProvider.getRoleMappingByDomain({ domain, organizationId });
+  if (!ssoProvider) return;
 
-  const roleMap = (ssoConnection.roleMapping ?? {}) as Record<string, unknown>;
-  const defaultRole = ssoConnection.defaultOrgRole as OrganizationUserRole;
+  const roleMap = (ssoProvider.roleMapping ?? {}) as Record<string, unknown>;
+  const defaultRole = ssoProvider.defaultOrgRole as OrganizationUserRole;
 
   let resolvedRole: OrganizationUserRole = defaultRole;
 

@@ -38,20 +38,22 @@ const {
   connectionsRef: {
     current: [] as Array<{
       id: string;
+      providerId: string;
       domain: string;
       provider: string;
       ssoEnforced: boolean;
       jitProvisioning: boolean;
       defaultOrgRole: string;
-      verifiedAt: Date | null;
+      domainVerified: boolean;
       verificationToken: string;
       clientId: string | null;
       issuerUrl: string | null;
       tenantId: string | null;
       samlEntityId: string | null;
       samlSsoUrl: string | null;
-      attributeMapping: Record<string, unknown> | null;
       roleMapping: Record<string, unknown> | null;
+      createdAt: Date;
+      updatedAt: Date;
     }>,
   },
   scimLogsRef: {
@@ -77,7 +79,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    ssoConnection: {
+    ssoProvider: {
       list: {
         useQuery: () => ({
           data: connectionsRef.current,
@@ -248,20 +250,22 @@ describe("<SsoSettings/>", () => {
   describe("when an SSO connection exists for domain acme.com with provider okta", () => {
     const mockConnection = {
       id: "conn-1",
+      providerId: "provider-okta-1",
       domain: "acme.com",
       provider: "okta",
       ssoEnforced: false,
       jitProvisioning: false,
       defaultOrgRole: "MEMBER",
-      verifiedAt: null,
+      domainVerified: false,
       verificationToken: "tok-abc",
       clientId: "client-123",
       issuerUrl: "https://acme.okta.com",
       tenantId: null,
       samlEntityId: null,
       samlSsoUrl: null,
-      attributeMapping: null,
       roleMapping: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     beforeEach(() => {
@@ -356,37 +360,41 @@ describe("<SsoSettings/>", () => {
       connectionsRef.current = [
         {
           id: "conn-1",
+          providerId: "provider-okta-1",
           domain: "acme.com",
           provider: "okta",
           ssoEnforced: false,
           jitProvisioning: false,
           defaultOrgRole: "MEMBER",
-          verifiedAt: null,
+          domainVerified: false,
           verificationToken: "tok-1",
           clientId: "cid-1",
           issuerUrl: null,
           tenantId: null,
           samlEntityId: null,
           samlSsoUrl: null,
-          attributeMapping: null,
           roleMapping: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
           id: "conn-2",
+          providerId: "provider-azure-2",
           domain: "corp.io",
           provider: "azure-ad",
           ssoEnforced: false,
           jitProvisioning: false,
           defaultOrgRole: "MEMBER",
-          verifiedAt: null,
+          domainVerified: false,
           verificationToken: "tok-2",
           clientId: "cid-2",
           issuerUrl: null,
           tenantId: "tenant-123",
           samlEntityId: null,
           samlSsoUrl: null,
-          attributeMapping: null,
           roleMapping: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ];
       renderPage();

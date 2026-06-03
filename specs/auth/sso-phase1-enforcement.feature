@@ -93,6 +93,90 @@ Feature: SSO Phase 1 — Enforcement Gaps & SCIM Hardening
     When the user requests a password reset
     Then the password reset proceeds normally
 
+  # ── Per-Org SSO Login Runtime (@better-auth/sso) ──
+  # The per-org SSO login is handled by the @better-auth/sso plugin, which
+  # validates OIDC id_token signatures (jose) and SAML assertions (samlify).
+  # User provisioning bridges to LangWatch's own OrganizationUser / RoleBinding
+  # model via the plugin's provisionUser callback.
+  #
+  # tracked: the protocol scenarios below (id_token signature validation, SAML
+  # assertion validation, SP metadata) are owned and covered by the
+  # @better-auth/sso plugin's own test suite; exercising them in-repo needs a
+  # booted BetterAuth instance + a mock IdP, which the harness can't stand up
+  # (same limitation as the password-enforcement scenarios above). LangWatch's
+  # contribution — the provisionUser bridge (JIT, role mapping, deactivated /
+  # not-provisioned rejection, SCIM-managed precedence) and secret-at-rest
+  # encryption — is unit-tested in ssoAuth.service.unit.test.ts and
+  # dbSsoProviderSecretEncryption.unit.test.ts. Email-based account linking
+  # (the migration carry-over) is a built-in BetterAuth behavior.
+
+  @integration
+  Scenario: OIDC login validates the id_token signature
+    Given a verified OIDC SSO provider exists for domain "acme.com"
+    When a user completes the IdP login and the provider returns a valid signed id_token
+    Then the user is authenticated and a session is created
+    And an id_token with an invalid signature is rejected
+
+  @integration
+  Scenario: SAML login authenticates via a signed assertion
+    Given a verified SAML SSO provider exists for domain "acme.com"
+    When the IdP posts a signed SAML assertion to the ACS callback
+    Then the assertion signature is validated
+    And the user is authenticated and a session is created
+
+  @integration
+  Scenario: SP metadata is served for a SAML provider
+    When a GET request is made to the SAML SP metadata endpoint for the provider
+    Then valid SP metadata XML is returned
+
+  @integration
+  Scenario: Existing Auth0/Okta user is linked by email on first plugin login
+    Given a user "user@acme.com" already exists from a prior Auth0 login
+    And a verified SSO provider exists for domain "acme.com"
+    When that user signs in through the new SSO provider
+    Then the existing user account is reused, not duplicated
+    And the user retains their existing organization membership
+
+  @integration
+  Scenario: New user is JIT-provisioned when JIT is enabled
+    Given a verified SSO provider for "acme.com" with JIT provisioning enabled
+    And no user exists for "new@acme.com"
+    When "new@acme.com" signs in through the provider
+    Then a user is created
+    And an OrganizationUser membership and RoleBinding are created in one transaction
+
+  @integration
+  Scenario: Login is rejected when the user is not provisioned and JIT is off
+    Given a verified SSO provider for "acme.com" with JIT provisioning disabled
+    And no membership exists for "stranger@acme.com"
+    When "stranger@acme.com" signs in through the provider
+    Then the login is rejected and no session is created
+
+  @integration
+  Scenario: Deactivated user cannot sign in via SSO
+    Given a deactivated user "gone@acme.com" with a verified provider for "acme.com"
+    When "gone@acme.com" signs in through the provider
+    Then the login is rejected and no session is created
+
+  @integration
+  Scenario: Role mapping is applied on every login
+    Given a verified SSO provider for "acme.com" with a group-to-role mapping
+    When a user whose IdP groups map to ADMIN signs in
+    Then the user's organization role is set to ADMIN
+
+  # ── SSO Provider Secrets At Rest (Security) ──
+
+  @unit
+  Scenario: OIDC client secret is encrypted at rest
+    When an SSO provider is saved with an OIDC client secret
+    Then the persisted oidcConfig does not contain the plaintext client secret
+    And the secret is decrypted transparently when the plugin reads the provider
+
+  @unit
+  Scenario: SAML private keys are encrypted at rest
+    When a SAML SSO provider is saved with a private key
+    Then the persisted samlConfig does not contain the plaintext private key
+
   # ── SCIM Routes Enterprise Plan Check (P0) ──
   # tracked: implemented via requireEnterprise() on every SCIM v2 provisioning
   # route in server/routes/scim.ts. End-to-end coverage needs app.request()

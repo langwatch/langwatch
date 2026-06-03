@@ -4,6 +4,7 @@ import { env } from "../env.mjs";
 import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 import { guardProjectId } from "../utils/dbMultiTenancyProtection";
 import { guardOrganizationId } from "../utils/dbOrganizationIdProtection";
+import { encryptSsoProviderSecrets } from "../utils/dbSsoProviderSecretEncryption";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -20,6 +21,7 @@ if (!prisma.middlewaresSetUp) {
   prisma.$use(guardEnMasse);
   prisma.$use(guardProjectId);
   prisma.$use(guardOrganizationId);
+  prisma.$use(encryptSsoProviderSecrets);
   //@ts-ignore
   prisma.middlewaresSetUp = true;
 }

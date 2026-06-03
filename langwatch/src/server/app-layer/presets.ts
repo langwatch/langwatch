@@ -108,7 +108,7 @@ import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient"
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
-import { SsoConnectionService } from "../sso/ssoConnection.service";
+import { SsoProviderService } from "../sso/ssoProvider.service";
 import { SsoAuthService } from "../sso/ssoAuth.service";
 import { ScimService } from "../scim/scim.service";
 import { ScimGroupService } from "../scim/scim-group.service";
@@ -530,7 +530,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       : null,
   };
 
-  const ssoConnection = SsoConnectionService.create(prisma);
+  const ssoProvider = SsoProviderService.create(prisma, env.NEXTAUTH_URL);
   const ssoAuth = SsoAuthService.create(prisma);
   const scim = ScimService.create(prisma);
   const scimGroups = ScimGroupService.create(prisma);
@@ -558,7 +558,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     notifications,
     nurturing,
     usageLimits,
-    ssoConnection,
+    ssoProvider,
     ssoAuth,
     scim,
     scimGroups,
@@ -658,7 +658,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
-    ssoConnection: SsoConnectionService.create(testPrisma),
+    ssoProvider: SsoProviderService.create(testPrisma, env.NEXTAUTH_URL),
     ssoAuth: SsoAuthService.create(testPrisma),
     scim: ScimService.create(testPrisma),
     scimGroups: ScimGroupService.create(testPrisma),

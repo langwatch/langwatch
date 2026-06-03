@@ -17,13 +17,11 @@ const {
   mockVerifyScimToken,
   mockListUsers,
   mockListGroups,
-  mockScimLogRequest,
 } = vi.hoisted(() => ({
   mockGetActivePlan: vi.fn(),
   mockVerifyScimToken: vi.fn(),
   mockListUsers: vi.fn(),
   mockListGroups: vi.fn(),
-  mockScimLogRequest: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -37,9 +35,6 @@ vi.mock("~/server/app-layer/app", () => ({
     scimGroups: {
       listGroups: mockListGroups,
       createGroup: vi.fn(),
-    },
-    ssoConnection: {
-      logScimRequest: mockScimLogRequest,
     },
   }),
 }));
@@ -69,7 +64,6 @@ const FREE_BEARER = "Bearer valid-free-token";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockScimLogRequest.mockResolvedValue(undefined);
   mockListUsers.mockResolvedValue({ totalResults: 0, Resources: [] });
   mockListGroups.mockResolvedValue({ totalResults: 0, Resources: [] });
 

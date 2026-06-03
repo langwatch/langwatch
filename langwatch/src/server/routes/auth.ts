@@ -8,7 +8,6 @@
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
 import type { Context } from "hono";
-import { setSignedCookie } from "hono/cookie";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
@@ -16,18 +15,7 @@ import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
-import {
-  buildAuthorizationUrl,
-  buildStateCookie,
-  clearStateCookie,
-  exchangeCodeForUser,
-  generateState,
-  parseStateCookie,
-} from "~/server/sso/ssoOAuth";
-import { getApp } from "~/server/app-layer/app";
 
-const logger = createLogger("auth-routes");
 const secured = createServiceApp({ basePath: "/api" });
 
 const authPolicy = () =>
@@ -163,151 +151,9 @@ const logoutHandler = async (c: Context) => {
 secured.access(authPolicy()).get("/auth/logout", logoutHandler);
 secured.access(authPolicy()).post("/auth/logout", logoutHandler);
 
-// ---------- GET /api/auth/sso/:domain ----------
-secured.access(authPolicy()).get("/auth/sso/:domain", async (c) => {
-  const domain = c.req.param("domain");
-  if (!domain) {
-    return c.json({ error: "Domain is required" }, 400);
-  }
-
-  const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
-  const state = generateState();
-  const isSecure = env.NEXTAUTH_URL.startsWith("https");
-
-  try {
-    const connection = await getApp().ssoConnection.getVerifiedConnectionByDomain({ domain });
-
-    if (!connection) {
-      throw new Error(`No verified SSO connection for domain ${domain}`);
-    }
-
-    const { url } = await buildAuthorizationUrl({
-      connection,
-      callbackUrl,
-      state,
-    });
-
-    c.header(
-      "Set-Cookie",
-      buildStateCookie({ state, domain, secure: isSecure }),
-    );
-
-    return c.redirect(url, 302);
-  } catch (err) {
-    logger.error({ err, domain }, "Failed to initiate SSO login");
-    return c.redirect(
-      `/auth/signin?error=${encodeURIComponent("SSO configuration error. Contact your administrator.")}`,
-      302,
-    );
-  }
-});
-
-// ---------- GET /api/auth/sso/:domain/callback ----------
-secured.access(authPolicy()).get("/auth/sso/:domain/callback", async (c) => {
-  const domain = c.req.param("domain");
-  const code = c.req.query("code");
-  const returnedState = c.req.query("state");
-  const error = c.req.query("error");
-  const isSecure = env.NEXTAUTH_URL.startsWith("https");
-
-  c.header("Set-Cookie", clearStateCookie({ secure: isSecure }));
-
-  if (error) {
-    logger.warn({ domain, error }, "IdP returned error");
-    return c.redirect(
-      `/auth/signin?error=${encodeURIComponent("Identity provider denied the request.")}`,
-      302,
-    );
-  }
-
-  if (!code || !returnedState || !domain) {
-    return c.redirect(
-      `/auth/signin?error=${encodeURIComponent("Invalid SSO callback.")}`,
-      302,
-    );
-  }
-
-  const storedState = parseStateCookie(c.req.header("cookie"));
-  if (
-    !storedState ||
-    storedState.state !== returnedState ||
-    storedState.domain !== domain
-  ) {
-    return c.redirect(
-      `/auth/signin?error=${encodeURIComponent("Invalid SSO state — please try again.")}`,
-      302,
-    );
-  }
-
-  const callbackUrl = `${env.NEXTAUTH_URL}/api/auth/sso/${domain}/callback`;
-
-  try {
-    const connection = await getApp().ssoConnection.getVerifiedConnectionByDomain({ domain });
-
-    if (!connection) {
-      throw new Error(`No verified SSO connection for domain ${domain}`);
-    }
-
-    const { userInfo, provider } = await exchangeCodeForUser({
-      connection,
-      code,
-      callbackUrl,
-    });
-
-    const emailDomain = userInfo.email?.split("@")[1]?.toLowerCase();
-    if (!emailDomain || emailDomain !== domain.toLowerCase()) {
-      logger.warn(
-        { domain, emailDomain },
-        "IdP returned email outside the SSO connection domain",
-      );
-      return c.redirect(
-        `/auth/signin?error=${encodeURIComponent("Your email domain does not match this SSO connection.")}`,
-        302,
-      );
-    }
-
-    const result = await getApp().ssoAuth.handleSsoCallback({
-      userInfo,
-      provider,
-      organizationId: connection.organizationId,
-      roleMappingConfig: {
-        defaultOrgRole: connection.defaultOrgRole,
-        roleMapping: connection.roleMapping as Record<string, unknown> | null,
-      },
-      jitProvisioning: connection.jitProvisioning,
-      ipAddress:
-        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
-      userAgent: c.req.header("user-agent") ?? null,
-    });
-
-    if (result.redirectTo) {
-      return c.redirect(result.redirectTo, 302);
-    }
-
-    await setSignedCookie(
-      c,
-      "better-auth.session_token",
-      result.sessionToken,
-      env.NEXTAUTH_SECRET,
-      {
-        path: "/",
-        httpOnly: true,
-        sameSite: "Lax",
-        maxAge: 30 * 24 * 60 * 60,
-        secure: isSecure,
-        prefix: isSecure ? "secure" : undefined,
-      },
-    );
-
-    return c.redirect("/", 302);
-  } catch (err) {
-    logger.error({ err, domain }, "SSO callback failed");
-    return c.redirect(
-      `/auth/signin?error=${encodeURIComponent("SSO login failed. Please try again or contact your administrator.")}`,
-      302,
-    );
-  }
-});
+// Per-org SSO login/callback (OIDC + SAML) is served by the @better-auth/sso
+// plugin under `/api/auth/sso/*`, which the BetterAuth catch-all below forwards
+// to `auth.handler`. Sign-in is initiated via `/api/auth/sign-in/sso`.
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
 const betterAuthCatchAll = async (c: Context) => {

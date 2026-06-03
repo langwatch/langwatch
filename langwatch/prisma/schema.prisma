@@ -283,7 +283,7 @@ model Organization {
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
   userIngestionBindings  UserIngestionBinding[]
-  ssoConnections         SsoConnection[]
+  ssoProviders           SsoProvider[]
 
   @@index([ssoProvider])
 }
@@ -301,34 +301,45 @@ model ScimToken {
   @@index([hashedToken])
 }
 
-model SsoConnection {
-  id                String               @id @default(nanoid())
-  organizationId    String
-  organization      Organization         @relation(fields: [organizationId], references: [id])
+// Per-org SSO provider, backed by the @better-auth/sso plugin.
+//
+// The first block of fields is the plugin's adapter schema (better-auth model
+// "ssoProvider"): the plugin reads/writes these during register and login.
+// `oidcConfig` / `samlConfig` are JSON blobs the plugin (de)serializes; they
+// carry secrets (OIDC client secret, SAML private keys) and are encrypted at
+// rest transparently by a Prisma client extension (see src/server/db) so the
+// plugin never sees ciphertext and the DB never sees plaintext.
+//
+// The second block is LangWatch policy the plugin does not know about. The
+// plugin's adapter only selects its own fields, so these extra columns are
+// inert to it and owned entirely by SsoProviderRepository. Domain ownership is
+// proven via the plugin's built-in DNS verification (`domainVerified`).
+model SsoProvider {
+  // --- @better-auth/sso plugin-managed fields ---
+  id              String        @id @default(nanoid())
+  issuer          String
+  oidcConfig      String?       @db.Text
+  samlConfig      String?       @db.Text
+  userId          String?
+  providerId      String        @unique
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  domain          String
+  // domainVerified is the plugin's login-time gate (it refuses to sign a user
+  // in through a provider whose domain is unverified). LangWatch proves domain
+  // ownership with its own DNS-TXT flow (verificationToken -> verifyDomain),
+  // then flips domainVerified; the plugin only reads it.
+  domainVerified  Boolean       @default(false)
+  verificationToken String      @unique @default(uuid())
 
-  domain            String
-  verificationToken String               @unique @default(uuid())
-  verifiedAt        DateTime?
+  // --- LangWatch policy companion (inert to the plugin adapter) ---
+  ssoEnforced     Boolean              @default(false)
+  jitProvisioning Boolean              @default(false)
+  defaultOrgRole  OrganizationUserRole @default(MEMBER)
+  roleMapping     Json?
 
-  provider          String
-  clientId          String?
-  clientSecretEnc   String?
-  issuerUrl         String?
-  tenantId          String?
-
-  samlEntityId      String?
-  samlSsoUrl        String?
-  samlCertificate   String?              @db.Text
-
-  attributeMapping  Json?
-  roleMapping       Json?
-
-  ssoEnforced       Boolean              @default(false)
-  jitProvisioning   Boolean              @default(false)
-  defaultOrgRole    OrganizationUserRole @default(MEMBER)
-
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
 
   @@index([organizationId])
   @@index([domain])

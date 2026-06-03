@@ -33,7 +33,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
-import type { SsoConnectionService } from "../sso/ssoConnection.service";
+import type { SsoProviderService } from "../sso/ssoProvider.service";
 import type { SsoAuthService } from "../sso/ssoAuth.service";
 import type { ScimService } from "../scim/scim.service";
 import type { ScimGroupService } from "../scim/scim-group.service";
@@ -91,7 +91,7 @@ export interface AppDependencies {
   notifications: NotificationService;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
-  ssoConnection: SsoConnectionService;
+  ssoProvider: SsoProviderService;
   ssoAuth: SsoAuthService;
   scim: ScimService;
   scimGroups: ScimGroupService;

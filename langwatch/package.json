@@ -78,6 +78,7 @@
     "@aws-sdk/client-ses": "^3.1041.0",
     "@aws-sdk/client-sts": "^3.1041.0",
     "@aws-sdk/s3-request-presigner": "^3.1041.0",
+    "@better-auth/sso": "1.6.9",
     "@chakra-ui/react": "^3.35.0",
     "@clickhouse/client": "^1.18.3",
     "@copilotkit/react-core": "~1.8.14",

@@ -31,7 +31,7 @@ export class App {
   readonly notifications: AppDependencies["notifications"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
-  readonly ssoConnection: AppDependencies["ssoConnection"];
+  readonly ssoProvider: AppDependencies["ssoProvider"];
   readonly ssoAuth: AppDependencies["ssoAuth"];
   readonly scim: AppDependencies["scim"];
   readonly scimGroups: AppDependencies["scimGroups"];
@@ -64,7 +64,7 @@ export class App {
     this.notifications = deps.notifications;
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
-    this.ssoConnection = deps.ssoConnection;
+    this.ssoProvider = deps.ssoProvider;
     this.ssoAuth = deps.ssoAuth;
     this.scim = deps.scim;
     this.scimGroups = deps.scimGroups;

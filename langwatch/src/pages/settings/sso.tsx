@@ -79,12 +79,12 @@ function SsoSettings() {
   const [scimFilter, setScimFilter] = useState<ScimLogFilter>("all");
   const [scimSearch, setScimSearch] = useState("");
 
-  const connectionsQuery = api.ssoConnection.list.useQuery(
+  const connectionsQuery = api.ssoProvider.list.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization?.id },
   );
 
-  const createMutation = api.ssoConnection.create.useMutation({
+  const createMutation = api.ssoProvider.create.useMutation({
     onSuccess: () => {
       void connectionsQuery.refetch();
       setModalOpen(false);
@@ -96,7 +96,7 @@ function SsoSettings() {
     },
   });
 
-  const updateMutation = api.ssoConnection.update.useMutation({
+  const updateMutation = api.ssoProvider.update.useMutation({
     onSuccess: () => {
       void connectionsQuery.refetch();
       setModalOpen(false);
@@ -108,7 +108,7 @@ function SsoSettings() {
     },
   });
 
-  const deleteMutation = api.ssoConnection.delete.useMutation({
+  const deleteMutation = api.ssoProvider.delete.useMutation({
     onSuccess: () => {
       void connectionsQuery.refetch();
       setDeleteTarget(null);
@@ -119,7 +119,7 @@ function SsoSettings() {
     },
   });
 
-  const verifyMutation = api.ssoConnection.verifyDomain.useMutation({
+  const verifyMutation = api.ssoProvider.verifyDomain.useMutation({
     onSuccess: (result) => {
       void connectionsQuery.refetch();
       if (result.verified) {
@@ -136,7 +136,7 @@ function SsoSettings() {
     },
   });
 
-  const toggleMutation = api.ssoConnection.toggleEnforcement.useMutation({
+  const toggleMutation = api.ssoProvider.toggleEnforcement.useMutation({
     onSuccess: () => {
       void connectionsQuery.refetch();
     },
@@ -145,7 +145,7 @@ function SsoSettings() {
     },
   });
 
-  const scimLogsQuery = api.ssoConnection.scimLogs.useQuery(
+  const scimLogsQuery = api.ssoProvider.scimLogs.useQuery(
     {
       organizationId: organization?.id ?? "",
       statusFilter: scimFilter,
@@ -257,10 +257,10 @@ function SsoSettings() {
                       <Table.Cell>{providerLabel(conn.provider)}</Table.Cell>
                       <Table.Cell>
                         <Badge
-                          colorPalette={conn.verifiedAt ? "green" : "yellow"}
+                          colorPalette={conn.domainVerified ? "green" : "yellow"}
                           size="sm"
                         >
-                          {conn.verifiedAt ? "Verified" : "Pending"}
+                          {conn.domainVerified ? "Verified" : "Pending"}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>

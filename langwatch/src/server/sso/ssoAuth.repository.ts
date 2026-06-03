@@ -1,8 +1,18 @@
-import type { PrismaClient, User, Account, OrganizationUser, OrganizationUserRole } from "@prisma/client";
+import type {
+  OrganizationUser,
+  OrganizationUserRole,
+  PrismaClient,
+  User,
+} from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
+/**
+ * Membership/RBAC persistence for the SSO provisioning bridge. User, account,
+ * and session rows are owned by the @better-auth/sso plugin (via better-auth's
+ * adapter), so this repository only touches LangWatch's own org models.
+ */
 export class SsoAuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -10,90 +20,16 @@ export class SsoAuthRepository {
     return new SsoAuthRepository(prisma);
   }
 
-  async findUserByEmail({
-    email,
-  }: {
-    email: string;
-  }): Promise<User | null> {
-    return this.prisma.user.findFirst({
-      where: { email },
-    });
+  async findUserByEmail({ email }: { email: string }): Promise<User | null> {
+    return this.prisma.user.findFirst({ where: { email } });
   }
 
-  async createUser({
-    email,
-    name,
-    image,
-  }: {
-    email: string;
-    name: string;
-    image: string | null;
-  }): Promise<User> {
-    return this.prisma.user.create({
-      data: {
-        email,
-        name,
-        image,
-        emailVerified: true,
-      },
+  async isUserDeactivated({ userId }: { userId: string }): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { deactivatedAt: true },
     });
-  }
-
-  async findAccount({
-    userId,
-    provider,
-    providerAccountId,
-  }: {
-    userId: string;
-    provider: string;
-    providerAccountId: string;
-  }): Promise<Account | null> {
-    return this.prisma.account.findFirst({
-      where: { userId, provider, providerAccountId },
-    });
-  }
-
-  async createAccount({
-    userId,
-    provider,
-    providerAccountId,
-  }: {
-    userId: string;
-    provider: string;
-    providerAccountId: string;
-  }): Promise<Account> {
-    return this.prisma.account.create({
-      data: {
-        userId,
-        provider,
-        providerAccountId,
-      },
-    });
-  }
-
-  async createSession({
-    sessionToken,
-    userId,
-    expiresAt,
-    ipAddress,
-    userAgent,
-  }: {
-    sessionToken: string;
-    userId: string;
-    expiresAt: Date;
-    ipAddress: string | null;
-    userAgent: string | null;
-  }): Promise<void> {
-    await this.prisma.session.create({
-      data: {
-        sessionToken,
-        userId,
-        expires: expiresAt,
-        ssoAuthenticatedAt: new Date(),
-        ipAddress,
-        userAgent,
-      },
-    });
+    return !!user?.deactivatedAt;
   }
 
   async findMembership({

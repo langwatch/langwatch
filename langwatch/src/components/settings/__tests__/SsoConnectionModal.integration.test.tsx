@@ -90,19 +90,19 @@ describe("<SsoConnectionModal/>", () => {
       // This requires editing an existing connection with a verificationToken.
       const existingConn = {
         id: "conn-1",
+        providerId: "provider-abc",
         domain: "acme.com",
-        provider: "okta",
+        provider: "okta" as const,
         ssoEnforced: false,
         jitProvisioning: false,
         defaultOrgRole: "MEMBER" as const,
-        verifiedAt: null,
+        domainVerified: false,
         verificationToken: "abc123token",
         clientId: "cid",
         issuerUrl: "https://acme.okta.com",
         tenantId: null,
         samlEntityId: null,
         samlSsoUrl: null,
-        attributeMapping: null,
         roleMapping: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -117,22 +117,22 @@ describe("<SsoConnectionModal/>", () => {
     });
 
     /** @scenario Domain verification status badge reflects state */
-    it("shows Pending badge when domain is not yet verified and Verified badge when verifiedAt is set", () => {
+    it("shows Pending badge when domain is not yet verified and Verified badge when domainVerified is true", () => {
       const pendingConn = {
         id: "conn-1",
+        providerId: "provider-abc",
         domain: "acme.com",
-        provider: "okta",
+        provider: "okta" as const,
         ssoEnforced: false,
         jitProvisioning: false,
         defaultOrgRole: "MEMBER" as const,
-        verifiedAt: null,
+        domainVerified: false,
         verificationToken: "tok",
         clientId: "cid",
         issuerUrl: null,
         tenantId: null,
         samlEntityId: null,
         samlSsoUrl: null,
-        attributeMapping: null,
         roleMapping: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -143,7 +143,7 @@ describe("<SsoConnectionModal/>", () => {
       });
       expect(screen.getByText("Pending")).toBeTruthy();
 
-      const verifiedConn = { ...pendingConn, verifiedAt: new Date() };
+      const verifiedConn = { ...pendingConn, domainVerified: true };
       rerender(
         <ChakraProvider value={defaultSystem}>
           <SsoConnectionModal
@@ -158,17 +158,79 @@ describe("<SsoConnectionModal/>", () => {
       expect(screen.getByText("Verified")).toBeTruthy();
     });
 
-    /** @scenario Callback URL is shown with copy button */
-    it("shows the callback URL and a copy button when domain is entered", async () => {
+    /** @scenario Callback URL placeholder shown in create mode */
+    it("shows a placeholder note when no providerId exists yet (create mode)", async () => {
       renderModal();
       const domainInput = screen.getByPlaceholderText("acme.com");
       await act(async () => {
         fireEvent.change(domainInput, { target: { value: "acme.com" } });
       });
       await waitFor(() => {
-        // Callback URL rendered as text inside the subtle box
-        expect(screen.getByText(/\/api\/auth\/sso\/acme\.com/i)).toBeTruthy();
+        expect(
+          screen.getByText(/Redirect\/ACS URLs become available after you save this provider/i),
+        ).toBeTruthy();
       });
+    });
+
+    /** @scenario OIDC redirect URI is shown with copy button in edit mode */
+    it("shows the OIDC redirect URI with copy button when editing a saved provider", async () => {
+      const savedConn = {
+        id: "conn-1",
+        providerId: "provider-abc",
+        domain: "acme.com",
+        provider: "okta" as const,
+        ssoEnforced: false,
+        jitProvisioning: false,
+        defaultOrgRole: "MEMBER" as const,
+        domainVerified: false,
+        verificationToken: "tok",
+        clientId: "cid",
+        issuerUrl: "https://acme.okta.com",
+        tenantId: null,
+        samlEntityId: null,
+        samlSsoUrl: null,
+        roleMapping: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      renderModal({ editingConnection: savedConn, onVerify: mockOnVerify });
+      await waitFor(() => {
+        expect(
+          screen.getByText(/\/api\/auth\/sso\/callback\/provider-abc/i),
+        ).toBeTruthy();
+      });
+    });
+
+    /** @scenario SAML ACS and SP metadata URLs are shown for SAML providers */
+    it("shows SAML ACS URL and SP metadata URL when editing a SAML provider", async () => {
+      const samlConn = {
+        id: "conn-2",
+        providerId: "provider-saml-xyz",
+        domain: "acme.com",
+        provider: "custom-saml" as const,
+        ssoEnforced: false,
+        jitProvisioning: false,
+        defaultOrgRole: "MEMBER" as const,
+        domainVerified: false,
+        verificationToken: "tok",
+        clientId: null,
+        issuerUrl: null,
+        tenantId: null,
+        samlEntityId: "https://idp.example.com/metadata",
+        samlSsoUrl: "https://idp.example.com/sso",
+        roleMapping: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      renderModal({ editingConnection: samlConn, onVerify: mockOnVerify });
+      await waitFor(() => {
+        expect(
+          screen.getByText(/\/api\/auth\/sso\/saml2\/callback\/provider-saml-xyz/i),
+        ).toBeTruthy();
+      });
+      expect(
+        screen.getByText(/\/api\/auth\/sso\/saml2\/sp\/metadata\?providerId=provider-saml-xyz/i),
+      ).toBeTruthy();
     });
 
     /** @scenario Provider dropdown shows supported providers */

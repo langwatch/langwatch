@@ -6,7 +6,7 @@ import { APIError } from "better-auth/api";
  */
 export interface SsoEnforcementDeps {
   findOrgByDomain(domain: string): Promise<{ id: string; ssoProvider: string | null } | null>;
-  findEnforcedSsoConnection(domain: string): Promise<{ organizationId: string } | null>;
+  findEnforcedSsoProvider(domain: string): Promise<{ organizationId: string } | null>;
   getActivePlanType(organizationId: string): Promise<string | null>;
   isSoleAdmin(params: { email: string; organizationId: string }): Promise<boolean>;
 }
@@ -50,11 +50,11 @@ export async function checkSsoEnforcement({
   // Phase 1: legacy ssoDomain field on Organization
   const org = await deps.findOrgByDomain(domain);
 
-  // Phase 2: SsoConnection with ssoEnforced=true
-  const ssoConnection = await deps.findEnforcedSsoConnection(domain);
+  // Per-org SsoProvider with ssoEnforced=true (verified domain)
+  const ssoProvider = await deps.findEnforcedSsoProvider(domain);
 
   let enforcedOrgId =
-    ssoConnection?.organizationId ?? (org?.ssoProvider ? org.id : null);
+    ssoProvider?.organizationId ?? (org?.ssoProvider ? org.id : null);
 
   // Login-time license revalidation: if the org's enterprise license
   // expired, silently degrade SSO enforcement so users aren't locked out.
