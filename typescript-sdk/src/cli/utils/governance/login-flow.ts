@@ -31,6 +31,14 @@ import {
   type ExchangeDeviceSessionResult,
 } from "./device-flow";
 import { loadConfig, saveConfig, type GovernanceConfig } from "./config";
+import {
+  askPersistChoice,
+  buildExportBlock,
+  detectShell,
+  isShellAlreadyConfigured,
+  persistBlockToRc,
+  rcPath,
+} from "./shell-rc";
 import { formatLoginCeremony } from "./login-ceremony";
 import { getCliBootstrap, type CliBootstrapResponse } from "./cli-api";
 
@@ -126,6 +134,9 @@ export async function runUnifiedLoginFlow(
       console.log();
       console.log(chalk.gray(`  Gateway:   ${cfg.gateway_url}`));
       console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+
+      await maybeOfferShellRcPersist(cfg);
+
       return cfg;
     }
 
@@ -266,6 +277,66 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
     await open(url, { app: { name: choice } });
   } catch {
     // browser failure shouldn't break login — user can paste manually
+  }
+}
+
+/**
+ * Bug-bash item 1.2 + 1.3 — post-login, OFFER to persist the union
+ * export block to the user's shell rc. Stays quiet when:
+ *   - the user already picked "never" (shell_rc_preference=skip)
+ *   - the current shell already has the gateway env exported
+ *     (process.env.ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN present)
+ *   - stdin is not a TTY (CI / scripted callers)
+ *   - the shell isn't one we can write to (cmd / powershell stay
+ *     on the eval'd `langwatch init-shell` flow)
+ *
+ * The prompt is Y / n / never. "n" doesn't persist — the next
+ * login on an unconfigured shell re-asks. "never" sets
+ * shell_rc_preference=skip so we stay quiet on this machine.
+ */
+async function maybeOfferShellRcPersist(
+  cfg: GovernanceConfig,
+): Promise<void> {
+  if (cfg.shell_rc_preference === "skip") return;
+  if (isShellAlreadyConfigured()) return;
+  const shell = detectShell();
+  if (!shell) return;
+  if (!cfg.default_personal_vk?.secret) return;
+
+  const target = rcPath(shell);
+  const block = buildExportBlock(cfg, shell);
+  if (!block.trim()) return;
+
+  console.log();
+  console.log(
+    chalk.gray(
+      "  langwatch can persist these exports so any new shell picks them up.",
+    ),
+  );
+  const choice = await askPersistChoice(target);
+  if (choice === "skip" || choice === "no") return;
+  if (choice === "never") {
+    cfg.shell_rc_preference = "skip";
+    try {
+      saveConfig(cfg);
+    } catch {
+      // best effort
+    }
+    return;
+  }
+  // "yes"
+  try {
+    const wrote = persistBlockToRc(shell, block);
+    console.log(chalk.green(`  ✓ Wrote langwatch export block to ${wrote}`));
+    console.log(
+      chalk.gray(`  Open a new shell or run \`source ${wrote}\` to load it.`),
+    );
+  } catch (err) {
+    console.log(
+      chalk.yellow(
+        `  ! Couldn't write to ${target}: ${(err as Error).message}`,
+      ),
+    );
   }
 }
 

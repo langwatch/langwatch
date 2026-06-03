@@ -1,0 +1,162 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import type { GovernanceConfig } from "../config";
+import {
+  buildExportBlock,
+  detectShell,
+  isShellAlreadyConfigured,
+  persistBlockToRc,
+  rcPath,
+} from "../shell-rc";
+
+const cfg: GovernanceConfig = {
+  gateway_url: "http://gw.example.com",
+  control_plane_url: "http://app.example.com",
+  default_personal_vk: { id: "vk_x", secret: "vk-lw-test", prefix: "vk-lw-" },
+  default_personal_ingestion_tokens: {
+    claude_code: { id: "ik_c", secret: "ik-lw-claude", prefix: "ik-lw-" },
+    codex: { id: "ik_co", secret: "ik-lw-codex", prefix: "ik-lw-" },
+  },
+};
+
+describe("detectShell", () => {
+  const origShell = process.env.SHELL;
+  afterEach(() => {
+    process.env.SHELL = origShell;
+  });
+
+  it("returns 'zsh' for /bin/zsh", () => {
+    process.env.SHELL = "/bin/zsh";
+    expect(detectShell()).toBe("zsh");
+  });
+
+  it("returns 'bash' for /usr/bin/bash", () => {
+    process.env.SHELL = "/usr/bin/bash";
+    expect(detectShell()).toBe("bash");
+  });
+
+  it("returns 'fish' for /usr/local/bin/fish", () => {
+    process.env.SHELL = "/usr/local/bin/fish";
+    expect(detectShell()).toBe("fish");
+  });
+});
+
+describe("rcPath", () => {
+  it("zsh → ~/.zshrc", () => {
+    expect(rcPath("zsh")).toBe(path.join(os.homedir(), ".zshrc"));
+  });
+  it("bash → ~/.bashrc", () => {
+    expect(rcPath("bash")).toBe(path.join(os.homedir(), ".bashrc"));
+  });
+  it("fish → ~/.config/fish/config.fish", () => {
+    expect(rcPath("fish")).toBe(
+      path.join(os.homedir(), ".config", "fish", "config.fish"),
+    );
+  });
+});
+
+describe("buildExportBlock", () => {
+  it("zsh emits export lines for gateway pair + per-tool OTEL with dedup", () => {
+    const block = buildExportBlock(cfg, "zsh");
+    expect(block).toMatch(/^export ANTHROPIC_BASE_URL=http:\/\/gw/m);
+    expect(block).toMatch(/^export ANTHROPIC_AUTH_TOKEN=vk-lw-test/m);
+    expect(block).toMatch(/^export OTEL_TRACES_EXPORTER=otlp/m);
+    expect(block).toMatch(/^export OPENAI_BASE_URL=/m);
+    expect(block).toMatch(/^export OPENAI_API_KEY=/m);
+    // duplicates collapsed: only one ANTHROPIC_BASE_URL despite many
+    // tools sharing it (claude / cursor / opencode all need it).
+    const matches = block.match(/ANTHROPIC_BASE_URL/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it("fish emits set -gx lines", () => {
+    const block = buildExportBlock(cfg, "fish");
+    expect(block).toMatch(/^set -gx ANTHROPIC_BASE_URL http:\/\/gw/m);
+  });
+
+  it("empty when no personal VK is provisioned", () => {
+    const noVk: GovernanceConfig = {
+      ...cfg,
+      default_personal_vk: undefined,
+    };
+    expect(buildExportBlock(noVk, "zsh")).toBe("");
+  });
+});
+
+describe("isShellAlreadyConfigured", () => {
+  const origBase = process.env.ANTHROPIC_BASE_URL;
+  const origTok = process.env.ANTHROPIC_AUTH_TOKEN;
+
+  afterEach(() => {
+    process.env.ANTHROPIC_BASE_URL = origBase;
+    process.env.ANTHROPIC_AUTH_TOKEN = origTok;
+  });
+
+  it("true when both gateway env vars are present", () => {
+    process.env.ANTHROPIC_BASE_URL = "http://gw";
+    process.env.ANTHROPIC_AUTH_TOKEN = "vk-lw-x";
+    expect(isShellAlreadyConfigured()).toBe(true);
+  });
+
+  it("false when only one is present", () => {
+    process.env.ANTHROPIC_BASE_URL = "http://gw";
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    expect(isShellAlreadyConfigured()).toBe(false);
+  });
+
+  it("false when neither is present", () => {
+    delete process.env.ANTHROPIC_BASE_URL;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    expect(isShellAlreadyConfigured()).toBe(false);
+  });
+});
+
+describe("persistBlockToRc", () => {
+  let tmpHome: string;
+  const origHome = process.env.HOME;
+  const origUserprofile = process.env.USERPROFILE;
+
+  beforeEach(() => {
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-shellrc-"));
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = origHome;
+    process.env.USERPROFILE = origUserprofile;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it("creates a fresh rc file when none exists and writes the block with markers", () => {
+    const written = persistBlockToRc("zsh", "export FOO=bar");
+    const content = fs.readFileSync(written, "utf8");
+    expect(content).toMatch(/# >>> langwatch begin >>>/);
+    expect(content).toMatch(/export FOO=bar/);
+    expect(content).toMatch(/# <<< langwatch end <<</);
+  });
+
+  it("appends without disturbing existing rc content", () => {
+    const target = rcPath("zsh");
+    fs.writeFileSync(target, 'alias g="git"\nplugins=(z)');
+    persistBlockToRc("zsh", "export FOO=bar");
+    const content = fs.readFileSync(target, "utf8");
+    expect(content).toMatch(/^alias g="git"\nplugins=\(z\)/);
+    expect(content).toMatch(/# >>> langwatch begin >>>/);
+    expect(content).toMatch(/export FOO=bar/);
+  });
+
+  it("is idempotent — a second run replaces the block in place, not duplicates it", () => {
+    persistBlockToRc("zsh", "export FOO=bar");
+    persistBlockToRc("zsh", "export FOO=baz");
+    const content = fs.readFileSync(rcPath("zsh"), "utf8");
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
+      .length;
+    expect(beginCount).toBe(1);
+    expect(content).toMatch(/export FOO=baz/);
+    expect(content).not.toMatch(/export FOO=bar/);
+  });
+});

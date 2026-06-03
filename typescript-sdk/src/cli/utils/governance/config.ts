@@ -48,6 +48,15 @@ export interface GovernanceConfig {
   >;
 
   /**
+   * Persistent answer to the post-login "save export block to your
+   * shell rc?" prompt. `skip` = user picked "never", stay quiet
+   * forever. `undefined` = ask each login that lands in an
+   * unconfigured shell. The "not now" answer doesn't persist — it
+   * lets the next login re-ask on its own.
+   */
+  shell_rc_preference?: "skip";
+
+  /**
    * Most-recent signed `request_increase_url` returned by the
    * gateway in a 402 budget_exceeded payload — cached so
    * `langwatch request-increase` opens the exact URL the gateway
