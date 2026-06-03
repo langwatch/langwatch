@@ -452,6 +452,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         ...(input.presenceEnabled !== undefined
           ? { presenceEnabled: input.presenceEnabled }
           : {}),
+        ...(input.supportContact !== undefined
+          ? { supportContact: input.supportContact?.trim() || null }
+          : {}),
       },
     });
   }

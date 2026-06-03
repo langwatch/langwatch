@@ -58,6 +58,7 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -877,17 +878,6 @@ function requestIncreaseUrl(opts: {
   return `${base.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-async function resolveOrgAdminEmail(
-  organizationId: string,
-): Promise<string | null> {
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  return admin?.user.email ?? null;
-}
-
 secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
@@ -941,7 +931,10 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   // Pick the most-restrictive blocker. The check() result orders by
   // strictness; first entry is the binding one.
   const blocker = decision.blockedBy[0]!;
-  const adminEmail = await resolveOrgAdminEmail(tokenRecord.organization_id);
+  const adminEmail = await resolveSupportContact({
+    prisma,
+    organizationId: tokenRecord.organization_id,
+  });
 
   return c.json(
     {

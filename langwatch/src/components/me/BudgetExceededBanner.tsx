@@ -35,6 +35,24 @@ export type BudgetExceededBannerProps = {
   adminEmail?: string | null;
 };
 
+// Admin contact is free text: admins can set Organization.supportContact
+// to an email, a URL pointing at an internal ticketing system, or any
+// short instruction. The banner renders an actionable link when the
+// value parses as a URL, a mailto: when it parses as an email, and
+// plain text otherwise. Resolver: server/organizations/resolveSupportContact.
+function isUrlContact(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+function isEmailContact(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+function contactHref(value: string): string {
+  const trimmed = value.trim();
+  if (isUrlContact(trimmed)) return trimmed;
+  if (isEmailContact(trimmed)) return `mailto:${trimmed}`;
+  return "#";
+}
+
 // `api.user.personalBudget` and the gateway 402 payload both pass
 // `period` as the lowercased root form of the `GatewayBudgetWindow`
 // Prisma enum ("month" / "week" / "day" / "hour" / "minute" / "total").
@@ -137,9 +155,13 @@ export function BudgetExceededBanner({
                 <Text color="red.700" _dark={{ color: "red.200" }}>
                   Admin:{" "}
                   <Link
-                    href={`mailto:${adminEmail}`}
+                    href={contactHref(adminEmail)}
                     color="red.700"
                     _dark={{ color: "red.200" }}
+                    {...(isUrlContact(adminEmail) && {
+                      target: "_blank",
+                      rel: "noreferrer",
+                    })}
                   >
                     {adminEmail}
                   </Link>

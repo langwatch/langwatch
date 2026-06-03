@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
@@ -27,6 +26,8 @@ import {
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:user-router");
@@ -688,7 +689,10 @@ export const userRouter = createTRPCRouter({
             ? ("warning" as const)
             : ("ok" as const);
 
-      const adminEmail = await resolveOrgAdminEmail({
+      // Display-facing contact: prefers admin-configured Organization.supportContact
+      // (may be email, URL, or short instruction), falls back to the first admin email.
+      // Distinct from the email-only resolver used below for actual email sending.
+      const adminEmail = await resolveSupportContact({
         prisma: ctx.prisma,
         organizationId: input.organizationId,
       });
@@ -971,17 +975,3 @@ function requestIncreaseUrl(opts: {
   return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-async function resolveOrgAdminEmail({
-  prisma,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  organizationId: string;
-}): Promise<string | undefined> {
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  return admin?.user.email ?? undefined;
-}
