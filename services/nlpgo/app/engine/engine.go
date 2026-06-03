@@ -378,11 +378,15 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	}
 	res, err := e.http.Execute(ctx, req)
 	if err != nil {
+		// Redact resolved secret values from the error message: Go HTTP
+		// errors embed the request URL, so a `{{ secrets.X }}` in the
+		// URL/query/headers must not leak into the stored NodeError.
+		msg := redactSecrets(err.Error(), secrets)
 		var ue *httpblock.UpstreamError
 		if errors.As(err, &ue) {
-			return nil, &NodeError{Type: "upstream_http_error", Message: err.Error(), Status: ue.Status}
+			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
 		}
-		return nil, &NodeError{Type: "http_error", Message: err.Error()}
+		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)
 	if res.Output != nil {

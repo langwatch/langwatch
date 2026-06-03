@@ -2,6 +2,7 @@ package engine
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
@@ -48,6 +49,25 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 		out[k] = resolveSecretRefs(v, secrets)
 	}
 	return out
+}
+
+// redactSecrets replaces any occurrence of a resolved secret *value* in s with
+// a placeholder. The HTTP error path returns err.Error() as the node error
+// message, and Go transport/build errors commonly embed the full request URL
+// (e.g. `Get "https://api/x?token=rotated-value": dial ...`) — so a secret
+// substituted into the URL/query/headers could otherwise be reflected into
+// execution events, traces, and logs on failure. Scrub before returning.
+func redactSecrets(s string, secrets map[string]string) string {
+	if s == "" || len(secrets) == 0 {
+		return s
+	}
+	for _, v := range secrets {
+		if v == "" {
+			continue
+		}
+		s = strings.ReplaceAll(s, v, "[redacted]")
+	}
+	return s
 }
 
 // resolveAuthSecrets resolves secret references in the credential-bearing

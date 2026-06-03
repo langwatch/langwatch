@@ -61,3 +61,25 @@ func TestParamAuth(t *testing.T) {
 		assert.Nil(t, paramAuth(params))
 	})
 }
+
+// TestRedactSecrets guards against plaintext secrets leaking into HTTP error
+// messages (which become the node error in execution events/traces/logs).
+func TestRedactSecrets(t *testing.T) {
+	secrets := map[string]string{"TOKEN": "rotated-value", "EMPTY": ""}
+
+	t.Run("scrubs a resolved secret embedded in a Go URL error", func(t *testing.T) {
+		msg := `Get "https://api.example.com/x?token=rotated-value": dial tcp: lookup failed`
+		got := redactSecrets(msg, secrets)
+		assert.NotContains(t, got, "rotated-value")
+		assert.Contains(t, got, "[redacted]")
+	})
+
+	t.Run("ignores empty secret values (no spurious redaction)", func(t *testing.T) {
+		assert.Equal(t, "nothing to scrub here", redactSecrets("nothing to scrub here", secrets))
+	})
+
+	t.Run("no-op on empty inputs", func(t *testing.T) {
+		assert.Equal(t, "", redactSecrets("", secrets))
+		assert.Equal(t, "x", redactSecrets("x", nil))
+	})
+}
