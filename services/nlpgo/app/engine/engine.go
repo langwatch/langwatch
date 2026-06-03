@@ -280,7 +280,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentCode:
 		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentHTTP:
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
 		return e.runSignature(ctx, req, node, inputs)
 	case dsl.ComponentPromptingTechnique:
@@ -358,27 +358,35 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	return res.Outputs, nil
 }
 
-func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.http == nil {
 		return nil, &NodeError{Type: "http_executor_unavailable", Message: "no http executor configured"}
 	}
+	// Resolve `{{ secrets.NAME }}` in the URL, headers, and auth at
+	// request-build time. BodyTemplate is deliberately left unresolved:
+	// it is rendered against inputs and surfaced in execution events, so
+	// substituting a secret there would leak the plaintext into logs.
 	req := httpblock.Request{
-		URL:          paramString(node.Data.Parameters, "url"),
+		URL:          resolveSecretRefs(paramString(node.Data.Parameters, "url"), secrets),
 		Method:       paramString(node.Data.Parameters, "method"),
 		BodyTemplate: paramString(node.Data.Parameters, "body_template"),
 		OutputPath:   paramString(node.Data.Parameters, "output_path"),
-		Headers:      paramStringMap(node.Data.Parameters, "headers"),
-		Auth:         paramAuth(node.Data.Parameters),
+		Headers:      resolveSecretsInMap(paramStringMap(node.Data.Parameters, "headers"), secrets),
+		Auth:         resolveAuthSecrets(paramAuth(node.Data.Parameters), secrets),
 		TimeoutMS:    paramInt(node.Data.Parameters, "timeout_ms"),
 		Inputs:       inputs,
 	}
 	res, err := e.http.Execute(ctx, req)
 	if err != nil {
+		// Redact resolved secret values from the error message: Go HTTP
+		// errors embed the request URL, so a `{{ secrets.X }}` in the
+		// URL/query/headers must not leak into the stored NodeError.
+		msg := redactSecrets(err.Error(), secrets)
 		var ue *httpblock.UpstreamError
 		if errors.As(err, &ue) {
-			return nil, &NodeError{Type: "upstream_http_error", Message: err.Error(), Status: ue.Status}
+			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
 		}
-		return nil, &NodeError{Type: "http_error", Message: err.Error()}
+		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)
 	if res.Output != nil {
@@ -753,7 +761,7 @@ func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
 	case "http":
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "code":
 		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "workflow":
@@ -1210,6 +1218,23 @@ func paramAuth(params []dsl.Field) *httpblock.Auth {
 			Value:    raw.Value,
 			Username: raw.Username,
 			Password: raw.Password,
+		}
+	}
+	// Fallback: the Studio UI and the experiments builder emit auth as
+	// discrete `auth_type` + `auth_token`/`auth_header`/`auth_value`/
+	// `auth_username`/`auth_password` params (see HttpPropertiesPanel.tsx
+	// and experiments-v3/workflowBuilder.ts), NOT a single `auth` object.
+	// Honor that shape too, otherwise HTTP-block auth is silently dropped on
+	// the real UI path (engine sent no Authorization header). Secret refs in
+	// these values are resolved downstream by resolveAuthSecrets.
+	if authType := paramString(params, "auth_type"); authType != "" && authType != "none" {
+		return &httpblock.Auth{
+			Type:     authType,
+			Token:    paramString(params, "auth_token"),
+			Header:   paramString(params, "auth_header"),
+			Value:    paramString(params, "auth_value"),
+			Username: paramString(params, "auth_username"),
+			Password: paramString(params, "auth_password"),
 		}
 	}
 	return nil
