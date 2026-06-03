@@ -3,9 +3,9 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
-  StartEvaluationCommand,
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
+  StartEvaluationCommand,
 } from "./commands";
 import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
@@ -14,9 +14,14 @@ import type { EvaluationProcessingEvent } from "./schemas/events";
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
-  evaluationAlertTriggerReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
-  customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  evaluationAlertTriggerReactor: ReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
+  customerIoEvaluationSyncReactor?: ReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
 }
 
 /**
@@ -27,19 +32,27 @@ export interface EvaluationProcessingPipelineDeps {
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + ES write + emit events (reactor path)
+ * - executeEvaluation: Preconditions + sampling + run eval + emit events (reactor path)
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
-export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPipelineDeps) {
+export function createEvaluationProcessingPipeline(
+  deps: EvaluationProcessingPipelineDeps,
+) {
   let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
-    .withFoldProjection("evaluationRun", new EvaluationRunFoldProjection({
-      store: deps.evalRunStore,
-    }))
-    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
-    .withReactor("evaluationRun", "evaluationAlertTrigger", deps.evaluationAlertTriggerReactor);
+    .withFoldProjection(
+      "evaluationRun",
+      new EvaluationRunFoldProjection({
+        store: deps.evalRunStore,
+      }),
+    )
+    .withReactor(
+      "evaluationRun",
+      "evaluationAlertTrigger",
+      deps.evaluationAlertTriggerReactor,
+    );
 
   if (deps.customerIoEvaluationSyncReactor) {
     builder = builder.withReactor(
@@ -50,13 +63,18 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
   }
 
   return builder
-    .withCommandInstance("executeEvaluation", ExecuteEvaluationCommand, deps.executeEvaluationCommand, {
-      delay: 30_000,
-      deduplication: {
-        makeId: ExecuteEvaluationCommand.makeJobId,
-        ttlMs: 30_000,
+    .withCommandInstance(
+      "executeEvaluation",
+      ExecuteEvaluationCommand,
+      deps.executeEvaluationCommand,
+      {
+        delay: 30_000,
+        deduplication: {
+          makeId: ExecuteEvaluationCommand.makeJobId,
+          ttlMs: 30_000,
+        },
       },
-    })
+    )
     .withCommand("startEvaluation", StartEvaluationCommand)
     .withCommand("completeEvaluation", CompleteEvaluationCommand)
     .withCommand("reportEvaluation", ReportEvaluationCommand)

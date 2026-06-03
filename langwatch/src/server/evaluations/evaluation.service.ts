@@ -1,108 +1,163 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
-import { ClickHouseEvaluationService } from "./clickhouse-evaluation.service";
-import { ElasticsearchEvaluationService } from "./elasticsearch-evaluation.service";
+import { safeJsonParse } from "~/utils/safeJsonParse";
+import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
+import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
- * Unified service for fetching per-trace evaluation runs from ClickHouse.
- *
- * This service acts as a facade that routes all requests to the ClickHouse backend.
- *
- * @example
- * ```ts
- * const service = EvaluationService.create(prisma);
- * const evaluations = await service.getEvaluationsForTrace({
- *   projectId: "proj_123",
- *   traceId: "trace_abc",
- *   protections: { canSeeCosts: true },
- * });
- * ```
+ * Columns the evaluation mapper actually reads, minus the heavy `Inputs`
+ * blob. `evaluation_runs` is `ORDER BY (TenantId, EvaluationId)`, so a
+ * `TraceId` filter can't prune granules — ClickHouse reads whole granules
+ * to evaluate the predicate, and when `Inputs` holds multi-MB payloads
+ * (RAG contexts, full conversations) materialising one granule blows past
+ * the per-query memory ceiling. The light projection lets us still return
+ * verdicts/scores when the heavy read would OOM.
+ */
+const EVAL_COLUMNS_LIGHT = [
+  "ProjectionId",
+  "TenantId",
+  "EvaluationId",
+  "Version",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  "ScheduledAt",
+  "StartedAt",
+  "CompletedAt",
+  "LastProcessedEventId",
+  "UpdatedAt",
+].join(", ");
+
+const EVAL_COLUMNS_WITH_INPUTS = `${EVAL_COLUMNS_LIGHT}, Inputs`;
+
+/**
+ * ClickHouse raises this when a query would exceed `max_memory_usage`.
+ * We match on the stable prefix rather than the (variable) GiB figures.
+ */
+function isMemoryLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /memory limit\s*(exceeded|.*exceeded)/i.test(message);
+}
+
+/**
+ * Service for fetching per-trace evaluation runs from ClickHouse.
+ * Queries `evaluation_runs` and collapses ReplacingMergeTree versions.
  */
 export class EvaluationService {
-  private readonly clickHouseService: ClickHouseEvaluationService;
-  private readonly elasticsearchService: ElasticsearchEvaluationService;
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.evaluations.service",
-  );
   private readonly logger = createLogger("langwatch:evaluations:service");
+  private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseService = ClickHouseEvaluationService.create(prisma);
-    this.elasticsearchService =
-      ElasticsearchEvaluationService.create(prisma);
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
-  /**
-   * Static factory method for creating EvaluationService with default dependencies.
-   *
-   * @param prisma - PrismaClient instance
-   * @returns EvaluationService instance
-   */
   static create(prisma: PrismaClient = defaultPrisma): EvaluationService {
     return new EvaluationService(prisma);
   }
 
-  /**
-   * Get evaluations for a single trace.
-   *
-   * @param params.projectId - The project ID
-   * @param params.traceId - The trace ID
-   * @param params.protections - Field redaction protections
-   * @returns Array of TraceEvaluation
-   */
   async getEvaluationsForTrace({
     projectId,
     traceId,
-    protections,
+    protections: _protections,
   }: {
     projectId: string;
     traceId: string;
-    protections: Protections;
+    protections?: Protections;
   }): Promise<TraceEvaluation[]> {
-    return this.tracer.withActiveSpan(
+    return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsForTrace",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result =
-          await this.clickHouseService.getEvaluationsForTrace({
-            projectId,
-            traceId,
-            protections,
-          });
-        if (result === null) {
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           throw new Error(
-            "ClickHouse is enabled but returned null for getEvaluationsForTrace — check ClickHouse client configuration",
+            `ClickHouse client unavailable for project ${projectId}`,
           );
         }
-        return result;
+
+        const runQuery = async (columns: string) => {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT ${columns}
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId = {traceId:String}
+                  GROUP BY TenantId, EvaluationId
+                )
+            `,
+            query_params: { tenantId: projectId, traceId },
+            format: "JSONEachRow",
+          });
+          return (await result.json()) as ClickHouseEvaluationRunRow[];
+        };
+
+        try {
+          const rows = await runQuery(EVAL_COLUMNS_WITH_INPUTS);
+          return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+        } catch (error) {
+          if (isMemoryLimitError(error)) {
+            this.logger.warn(
+              { projectId, traceId },
+              "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
+            );
+            try {
+              const rows = await runQuery(EVAL_COLUMNS_LIGHT);
+              return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+            } catch (retryError) {
+              this.logger.error(
+                {
+                  projectId,
+                  traceId,
+                  error:
+                    retryError instanceof Error
+                      ? retryError.message
+                      : retryError,
+                },
+                "Failed to fetch evaluations for trace from ClickHouse after light-projection retry",
+              );
+              throw new Error("Failed to fetch evaluations for trace");
+            }
+          }
+          this.logger.error(
+            {
+              projectId,
+              traceId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluations for trace from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluations for trace");
+        }
       },
     );
   }
 
-  /**
-   * Get evaluations for multiple traces, grouped by trace ID.
-   *
-   * @param params.projectId - The project ID
-   * @param params.traceIds - Array of trace IDs
-   * @param params.protections - Field redaction protections
-   * @returns Record mapping traceId to TraceEvaluation[]
-   */
   async getEvaluationsMultiple({
     projectId,
     traceIds,
-    protections,
+    protections: _protections,
   }: {
     projectId: string;
     traceIds: string[];
-    protections: Protections;
+    protections?: Protections;
   }): Promise<Record<string, TraceEvaluation[]>> {
-    return this.tracer.withActiveSpan(
+    return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsMultiple",
       {
         attributes: {
@@ -110,33 +165,109 @@ export class EvaluationService {
           "trace.count": traceIds.length,
         },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result =
-          await this.clickHouseService.getEvaluationsMultiple({
-            projectId,
-            traceIds,
-            protections,
-          });
-        if (result === null) {
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           throw new Error(
-            "ClickHouse is enabled but returned null for getEvaluationsMultiple — check ClickHouse client configuration",
+            `ClickHouse client unavailable for project ${projectId}`,
           );
         }
-        return result;
+
+        if (traceIds.length === 0) {
+          return {};
+        }
+
+        const runQuery = async (columns: string) => {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT ${columns}
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId IN ({traceIds:Array(String)})
+                  GROUP BY TenantId, EvaluationId
+                )
+            `,
+            query_params: { tenantId: projectId, traceIds },
+            format: "JSONEachRow",
+          });
+          return (await result.json()) as ClickHouseEvaluationRunRow[];
+        };
+
+        const groupByTrace = (
+          rows: ClickHouseEvaluationRunRow[],
+        ): Record<string, TraceEvaluation[]> => {
+          const grouped: Record<string, TraceEvaluation[]> = {};
+          for (const traceId of traceIds) {
+            grouped[traceId] = [];
+          }
+          for (const row of rows) {
+            const traceId = row.TraceId;
+            if (traceId) {
+              if (!grouped[traceId]) {
+                grouped[traceId] = [];
+              }
+              grouped[traceId]!.push(
+                mapClickHouseEvaluationToTraceEvaluation(row),
+              );
+            }
+          }
+          return grouped;
+        };
+
+        try {
+          return groupByTrace(await runQuery(EVAL_COLUMNS_WITH_INPUTS));
+        } catch (error) {
+          if (isMemoryLimitError(error)) {
+            this.logger.warn(
+              { projectId, traceIdCount: traceIds.length },
+              "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
+            );
+            try {
+              return groupByTrace(await runQuery(EVAL_COLUMNS_LIGHT));
+            } catch (retryError) {
+              this.logger.error(
+                {
+                  projectId,
+                  traceIdCount: traceIds.length,
+                  error:
+                    retryError instanceof Error
+                      ? retryError.message
+                      : retryError,
+                },
+                "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry",
+              );
+              throw new Error(
+                "Failed to fetch evaluations for multiple traces",
+              );
+            }
+          }
+          this.logger.error(
+            {
+              projectId,
+              traceIdCount: traceIds.length,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluations for multiple traces from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluations for multiple traces");
+        }
       },
     );
   }
 
   /**
-   * Lazily fetch one evaluation's inputs (see
-   * ClickHouseEvaluationService.getEvaluationInputs). Returns null when no
-   * inputs are available so the caller can fall back to whatever the list
-   * query carried.
+   * Fetch the heavy `Inputs` blob for one evaluation, on demand.
    *
-   * @param params.projectId - The project ID
-   * @param params.evaluationId - The evaluation to fetch inputs for
+   * The list reads drop `Inputs` under memory pressure because a `TraceId`
+   * filter can't prune granules. This read is keyed by `EvaluationId` — the
+   * table's second sort column — so ClickHouse prunes to the matching
+   * granule(s) and the read stays bounded. Returns null when the evaluation
+   * recorded no inputs, or the (already-pruned) read still hits the ceiling.
    */
   async getEvaluationInputs({
     projectId,
@@ -144,8 +275,9 @@ export class EvaluationService {
   }: {
     projectId: string;
     evaluationId: string;
+    protections?: Protections;
   }): Promise<Record<string, unknown> | null> {
-    return this.tracer.withActiveSpan(
+    return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationInputs",
       {
         attributes: {
@@ -153,12 +285,48 @@ export class EvaluationService {
           "evaluation.id": evaluationId,
         },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-        return this.clickHouseService.getEvaluationInputs({
-          projectId,
-          evaluationId,
-        });
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
+          throw new Error(
+            `ClickHouse client unavailable for project ${projectId}`,
+          );
+        }
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT argMax(Inputs, UpdatedAt) AS Inputs
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND EvaluationId = {evaluationId:String}
+            `,
+            query_params: { tenantId: projectId, evaluationId },
+            format: "JSONEachRow",
+          });
+          const rows = (await result.json()) as { Inputs: string | null }[];
+          const parsed = safeJsonParse(rows[0]?.Inputs ?? null);
+          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+        } catch (error) {
+          if (isMemoryLimitError(error)) {
+            this.logger.warn(
+              { projectId, evaluationId },
+              "Evaluation inputs read hit the ClickHouse memory limit even when keyed by EvaluationId",
+            );
+            return null;
+          }
+          this.logger.error(
+            {
+              projectId,
+              evaluationId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluation inputs from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluation inputs");
+        }
       },
     );
   }

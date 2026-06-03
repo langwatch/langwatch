@@ -15,7 +15,6 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "../../utils/types";
-import type { CollectorJob } from "../background/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import {
   extractStrandsAgentsInputOutput,
@@ -34,8 +33,11 @@ import {
   typedValueChatMessagesSchema,
   type BaseSpan,
   type ChatMessage,
+  type CustomMetadata,
   type LLMSpan,
   type RAGChunk,
+  type RESTEvaluation,
+  type ReservedTraceMetadata,
   type Span,
   type SpanTypes,
   type TypedValueChatMessages,
@@ -45,14 +47,13 @@ import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 const logger = createLogger("langwatch.tracer.otel.traces");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.traces");
 
-export type TraceForCollection = Pick<
-  CollectorJob,
-  | "traceId"
-  | "spans"
-  | "reservedTraceMetadata"
-  | "customMetadata"
-  | "evaluations"
->;
+export type TraceForCollection = {
+  traceId: string;
+  spans: Span[];
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+  evaluations: RESTEvaluation[] | undefined;
+};
 
 export const openTelemetryTraceRequestToTracesForCollection = async (
   otelTrace: DeepPartial<IExportTraceServiceRequest>,

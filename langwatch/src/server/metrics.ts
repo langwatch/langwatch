@@ -1,5 +1,11 @@
 import { performance } from "node:perf_hooks";
-import { Counter, Gauge, Histogram, register, collectDefaultMetrics } from "prom-client";
+import {
+  Counter,
+  collectDefaultMetrics,
+  Gauge,
+  Histogram,
+  register,
+} from "prom-client";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
@@ -73,7 +79,6 @@ export const traceSpanCountHistogram = new Histogram({
     150, 175, 200,
   ],
 });
-
 
 type JobType =
   | "collector"
@@ -263,7 +268,6 @@ export const getBullMQJobStalledCounter = (queueName: string) =>
 // ============================================================================
 // Event Sourcing Metrics
 // ============================================================================
-
 
 // Counter for events stored (tracks throughput at event level, not job level)
 register.removeSingleMetric("event_sourcing_events_stored_total");
@@ -516,14 +520,14 @@ const storedObjectSizeBytesHistogram = new Histogram({
   help: "Size of stored object payloads in bytes",
   labelNames: ["purpose"] as const,
   buckets: [
-    128,      // 0.125 KB
-    1024,     // 1 KB
-    4096,     // 4 KB
-    16384,    // 16 KB
-    65536,    // 64 KB
-    262144,   // 256 KB
-    1048576,  // 1 MB
-    4194304,  // 4 MB
+    128, // 0.125 KB
+    1024, // 1 KB
+    4096, // 4 KB
+    16384, // 16 KB
+    65536, // 64 KB
+    262144, // 256 KB
+    1048576, // 1 MB
+    4194304, // 4 MB
     16777216, // 16 MB
   ],
 });
@@ -559,3 +563,41 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+// =============================================================================
+// Worker metrics HTTP listener port
+// =============================================================================
+
+/**
+ * Worker metrics port follows PORT so non-default PORT slots (5570, 5580...)
+ * don't all collide on 2999. PORT=5560 → 2999 (back-compat).
+ */
+const WORKER_METRICS_PORT_OFFSET = 2561;
+
+export const DEFAULT_WORKER_METRICS_PORT = 2999;
+
+const getDefaultWorkerMetricsPort = (): number => {
+  const portString = process.env.PORT;
+  if (portString === undefined || portString === "") {
+    return DEFAULT_WORKER_METRICS_PORT;
+  }
+  const basePort = parseInt(portString, 10);
+  if (Number.isNaN(basePort)) {
+    return DEFAULT_WORKER_METRICS_PORT;
+  }
+  return basePort - WORKER_METRICS_PORT_OFFSET;
+};
+
+export const getWorkerMetricsPort = (): number => {
+  const portString =
+    process.env.WORKER_METRICS_PORT ?? String(getDefaultWorkerMetricsPort());
+  const port = parseInt(portString, 10);
+
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `Invalid WORKER_METRICS_PORT: "${portString}". Must be a number between 1 and 65535.`,
+    );
+  }
+
+  return port;
+};

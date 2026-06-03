@@ -41,8 +41,6 @@ type OrganizationFormData = {
   s3Endpoint: string;
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
-  elasticsearchNodeUrl: string;
-  elasticsearchApiKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
   supportContact: string;
@@ -74,8 +72,6 @@ function SettingsForm({
     s3Endpoint: organization.s3Endpoint ?? "",
     s3AccessKeyId: organization.s3AccessKeyId ?? "",
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
-    elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
-    elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     supportContact:
@@ -101,8 +97,6 @@ function SettingsForm({
         s3Endpoint: data.s3Endpoint,
         s3AccessKeyId: data.s3AccessKeyId,
         s3SecretAccessKey: data.s3SecretAccessKey,
-        elasticsearchNodeUrl: data.elasticsearchNodeUrl,
-        elasticsearchApiKey: data.elasticsearchApiKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
         supportContact: data.supportContact.trim() || null,
@@ -291,35 +285,6 @@ function SettingsForm({
                     <Text>
                       S3 storage configuration is only visible to organization
                       managers
-                    </Text>
-                  )}
-                </HorizontalFormControl>
-              )}
-
-              {organization.useCustomElasticsearch && (
-                <HorizontalFormControl
-                  label="Elasticsearch"
-                  helper="Configure your Elasticsearch instance for advanced search capabilities"
-                >
-                  {hasPermission("organization:manage") ? (
-                    <VStack width="full" align="start" gap={3}>
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="Elasticsearch Node URL"
-                        {...register("elasticsearchNodeUrl")}
-                      />
-                      <Input
-                        width="full"
-                        type="password"
-                        placeholder="Elasticsearch API Key"
-                        {...register("elasticsearchApiKey")}
-                      />
-                    </VStack>
-                  ) : (
-                    <Text>
-                      Elasticsearch configuration is only visible to
-                      organization managers
                     </Text>
                   )}
                 </HorizontalFormControl>

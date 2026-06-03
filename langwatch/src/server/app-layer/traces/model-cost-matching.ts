@@ -1,10 +1,10 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+} from "~/server/tracer/collector/cost";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 
 /**

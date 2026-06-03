@@ -126,9 +126,6 @@ importers:
       '@dnd-kit/utilities':
         specifier: 3.2.2
         version: 3.2.2(react@19.2.5)
-      '@elastic/elasticsearch':
-        specifier: ~8.15.3
-        version: 8.15.3
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.14)(react@19.2.5)
@@ -13249,6 +13246,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@elastic/transport@8.10.1':
     dependencies:
@@ -13262,6 +13260,7 @@ snapshots:
       undici: 6.25.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -20106,7 +20105,8 @@ snapshots:
 
   hono@4.12.23: {}
 
-  hpagent@1.2.0: {}
+  hpagent@1.2.0:
+    optional: true
 
   html-encoding-sniffer@6.0.0(@noble/hashes@2.2.0):
     dependencies:
@@ -23401,7 +23401,8 @@ snapshots:
   secure-json-parse@2.7.0:
     optional: true
 
-  secure-json-parse@3.0.2: {}
+  secure-json-parse@3.0.2:
+    optional: true
 
   secure-json-parse@4.1.0: {}
 
@@ -24090,7 +24091,8 @@ snapshots:
 
   undici-types@7.19.2: {}
 
-  undici@6.25.0: {}
+  undici@6.25.0:
+    optional: true
 
   undici@7.25.0: {}
 

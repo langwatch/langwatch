@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PIICheckOptions } from "~/server/background/workers/collector/piiCheck";
+import type { PIICheckOptions } from "~/server/tracer/collector/piiCheck";
 import type { PIIRedactionLevel } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpKeyValue,

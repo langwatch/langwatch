@@ -30,7 +30,7 @@ import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type {
   CategoryVisibility,
   Protections,
-} from "../elasticsearch/protections";
+} from "../traces/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");

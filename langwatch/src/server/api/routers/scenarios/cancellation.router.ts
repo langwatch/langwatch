@@ -13,10 +13,9 @@
 
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
-import { SimulationFacade } from "~/server/simulations/simulation.facade";
-import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -36,7 +35,7 @@ const cancelBatchRunSchema = projectSchema.extend({
 });
 
 function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
-  const facade = SimulationFacade.create();
+  const facade = getApp().simulations.runs;
 
   return async (params) => {
     const result = await facade.getRunDataForBatchRun(params);
@@ -49,14 +48,23 @@ function getService(): ScenarioCancellationService {
   if (!_service) {
     _service = new ScenarioCancellationService({
       getRunsForBatch: createGetRunsForBatch(),
-      dispatchCancelRequested: async ({ tenantId, scenarioRunId, occurredAt }) => {
+      dispatchCancelRequested: async ({
+        tenantId,
+        scenarioRunId,
+        occurredAt,
+      }) => {
         await getApp().simulations.cancelRun({
           tenantId,
           scenarioRunId,
           occurredAt,
         });
       },
-      dispatchFinishRun: async ({ tenantId, scenarioRunId, status, occurredAt }) => {
+      dispatchFinishRun: async ({
+        tenantId,
+        scenarioRunId,
+        status,
+        occurredAt,
+      }) => {
         await getApp().simulations.finishRun({
           tenantId,
           scenarioRunId,
@@ -75,7 +83,11 @@ export const cancellationRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       logger.info(
-        { projectId: input.projectId, scenarioRunId: input.scenarioRunId, batchRunId: input.batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioRunId: input.scenarioRunId,
+          batchRunId: input.batchRunId,
+        },
         "Cancel job request received",
       );
 
@@ -87,7 +99,11 @@ export const cancellationRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       logger.info(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, batchRunId: input.batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          batchRunId: input.batchRunId,
+        },
         "Cancel batch run request received",
       );
 

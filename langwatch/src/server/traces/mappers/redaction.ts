@@ -3,7 +3,6 @@ import {
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type {
   Event,
   Span,
@@ -13,6 +12,7 @@ import type {
   TraceInput,
   TraceOutput,
 } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 import { redactHiddenAttributes } from "./redactAttributes";
 

@@ -30,10 +30,10 @@ import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 
 import { env } from "~/env.mjs";
-import type { IngestionPullerJob } from "~/server/background/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { withJobContext } from "~/server/context/asyncContext";
 import { prisma } from "~/server/db";
+import { makeQueueName } from "~/server/redis";
 import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -41,8 +41,19 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import { PULLER_QUEUE } from "~/server/background/queues/constants";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+
+export type IngestionPullerJob = {
+  /** IngestionSource id this run targets. */
+  ingestionSourceId: string;
+  /** Wall-clock dispatch time (ms since epoch). */
+  scheduledAt: number;
+};
+
+export const PULLER_QUEUE = {
+  NAME: makeQueueName("ingestion_puller"),
+  JOB: "ingestion_puller",
+} as const;
 
 import {
   GovernanceOcsfEventsClickHouseRepository,

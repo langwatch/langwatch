@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { FilterField } from "~/server/filters/types";
+
+type QueryDslBoolQuery = Record<string, unknown>;
 
 const mockLoggerWarn = vi.fn();
 
@@ -144,7 +145,9 @@ describe("generateFilterConditions()", () => {
       });
 
       expect(filterConditions).toHaveLength(1);
-      expect(filterConditions[0]).toEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
+      expect(filterConditions[0]).toEqual({
+        terms: { "spans.model": ["gpt-5-mini"] },
+      });
     });
 
     it("sets hasUnknownFilter to false", () => {
@@ -164,7 +167,9 @@ describe("generateFilterConditions()", () => {
       });
 
       expect(filterConditions).toHaveLength(2);
-      expect(filterConditions).toContainEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
+      expect(filterConditions).toContainEqual({
+        terms: { "spans.model": ["gpt-5-mini"] },
+      });
       expect(filterConditions).toContainEqual({ match_none: {} });
     });
 

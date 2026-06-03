@@ -1,6 +1,8 @@
 import IORedis, { Cluster } from "ioredis";
+
 // PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
+
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
 import { parseRedisDbIndex } from "./redis-db-index";
@@ -134,10 +136,7 @@ if (!isBuildOrNoRedis) {
 // errors; it just shouldn't trip on a real-world TLS handshake.
 export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
   if (isBuildOrNoRedis || !connection) return;
-  const target =
-    env.REDIS_CLUSTER_ENDPOINTS ??
-    env.REDIS_URL ??
-    "(unset)";
+  const target = env.REDIS_CLUSTER_ENDPOINTS ?? env.REDIS_URL ?? "(unset)";
   try {
     await Promise.race([
       connection.ping(),
@@ -161,4 +160,29 @@ export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
     // Don't throw in build phase — some tools import start.ts at build time.
     process.exit(1);
   }
+}
+
+/**
+ * Wraps a queue name in a Redis Cluster hash tag.
+ *
+ * BullMQ + the in-house GroupQueue both create multiple Redis keys per
+ * queue (`bull:<name>:wait`, `bull:<name>:active`, ...). Redis Cluster
+ * distributes keys across slots by hashing the key name; without a hash
+ * tag, those keys land on different slots and Lua scripts that touch
+ * them atomically fail with CROSSSLOT.
+ *
+ * Wrapping the name in {braces} forces Redis to hash only the braced
+ * portion, guaranteeing all keys for a queue land on the same slot.
+ *
+ * @example
+ *   makeQueueName("collector")        // → "{collector}"
+ *   makeQueueName("pipeline/handler") // → "{pipeline/handler}"
+ */
+export function makeQueueName(name: string): string {
+  if (name.startsWith("{") && name.endsWith("}")) {
+    throw new Error(
+      `Queue name "${name}" is already wrapped in hash tags. Do not call makeQueueName twice.`,
+    );
+  }
+  return `{${name}}`;
 }

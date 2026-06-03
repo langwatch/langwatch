@@ -1,17 +1,17 @@
+import NProgress from "nprogress";
 import { Suspense, useEffect } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   createBrowserRouter,
   Outlet,
   redirect,
+  type RouteObject,
   useLocation,
   useNavigation,
-  type RouteObject,
 } from "react-router";
-import { ErrorBoundary } from "react-error-boundary";
-import NProgress from "nprogress";
+import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
-import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
@@ -179,10 +179,6 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/teams/[team]")),
   },
   {
-    path: "/settings/topic-clustering",
-    ...page(() => import("./pages/settings/topic-clustering")),
-  },
-  {
     path: "/settings/usage",
     ...page(() => import("./pages/settings/usage")),
   },
@@ -211,8 +207,8 @@ const routes: RouteObject[] = [
   },
   {
     path: "/settings/governance/ingestion-sources/:id",
-    ...page(() =>
-      import("@ee/governance/dashboard/pages/ingestion-source-detail"),
+    ...page(
+      () => import("@ee/governance/dashboard/pages/ingestion-source-detail"),
     ),
   },
   {
@@ -392,14 +388,12 @@ const routes: RouteObject[] = [
   },
   {
     path: "/:project/messages/:trace/:openTab",
-    ...page(
-      () => import("./pages/[project]/messages/[trace]/[openTab]/index")
-    ),
+    ...page(() => import("./pages/[project]/messages/[trace]/[openTab]/index")),
   },
   {
     path: "/:project/messages/:trace/:openTab/:span",
     ...page(
-      () => import("./pages/[project]/messages/[trace]/[openTab]/[span]")
+      () => import("./pages/[project]/messages/[trace]/[openTab]/[span]"),
     ),
   },
   {

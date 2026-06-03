@@ -12,12 +12,12 @@ import {
   isAzureEvaluatorType,
 } from "../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
-import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
+import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

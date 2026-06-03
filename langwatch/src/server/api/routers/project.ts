@@ -448,7 +448,7 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { projectId } = input;
       const { scheduleTopicClusteringForProject } = await import(
-        "../../background/queues/topicClusteringQueue"
+        "../../topicClustering/topicClusteringQueue"
       );
 
       try {
