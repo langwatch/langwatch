@@ -1,12 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useDrawerParams, useUpdateDrawerParams } from "~/hooks/useDrawer";
 import {
-  type DrawerTab,
   type DrawerUrlState,
   type DrawerViewMode,
-  isDrawerTab,
   isViewMode,
   isVizTab,
+  parsePinnedSpansParam,
+  serializePinnedSpansParam,
   useDrawerStore,
   type VizTab,
 } from "../stores/drawerStore";
@@ -14,7 +14,6 @@ import {
 const DEFAULTS = {
   mode: "trace" as DrawerViewMode,
   viz: "waterfall" as VizTab,
-  tab: "summary" as DrawerTab,
 } as const;
 
 function parseMode(raw: string | undefined): DrawerViewMode {
@@ -25,18 +24,13 @@ function parseViz(raw: string | undefined): VizTab {
   return raw && isVizTab(raw) ? raw : DEFAULTS.viz;
 }
 
-function parseTab(raw: string | undefined, hasSpan: boolean): DrawerTab {
-  if (raw && isDrawerTab(raw)) return raw;
-  return hasSpan ? "span" : DEFAULTS.tab;
-}
-
 function readUrlState(): DrawerUrlState {
   if (typeof window === "undefined") {
     return {
       viewMode: DEFAULTS.mode,
       vizTab: DEFAULTS.viz,
-      activeTab: DEFAULTS.tab,
       selectedSpanId: null,
+      pinnedSpanIds: [],
     };
   }
   const params = new URLSearchParams(window.location.search);
@@ -44,8 +38,8 @@ function readUrlState(): DrawerUrlState {
   return {
     viewMode: parseMode(params.get("drawer.mode") ?? undefined),
     vizTab: parseViz(params.get("drawer.viz") ?? undefined),
-    activeTab: parseTab(params.get("drawer.tab") ?? undefined, !!span),
     selectedSpanId: span,
+    pinnedSpanIds: parsePinnedSpansParam(params.get("drawer.pinnedSpans")),
   };
 }
 
@@ -73,8 +67,8 @@ export function useDrawerUrlSync() {
 
   const viewMode = useDrawerStore((s) => s.viewMode);
   const vizTab = useDrawerStore((s) => s.vizTab);
-  const activeTab = useDrawerStore((s) => s.activeTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
 
   // Parsed URL view of the same fields. We compare against these — not
   // raw store-vs-store — so a freshly-clicked tab never re-pushes when the
@@ -82,27 +76,37 @@ export function useDrawerUrlSync() {
   const urlMode = parseMode(params.mode);
   const urlViz = parseViz(params.viz);
   const urlSpan = params.span ?? null;
-  const urlTab = parseTab(params.tab, !!urlSpan);
+  // `params.pinnedSpans` is a comma string (or undefined). Serialise our
+  // store value the same way so the equality check is one cheap string ==.
+  const urlPinnedRaw = params.pinnedSpans ?? "";
+  const storePinnedRaw = useMemo(
+    () => serializePinnedSpansParam(pinnedSpanIds) ?? "",
+    [pinnedSpanIds],
+  );
 
   useEffect(() => {
     const updates: Record<string, string | undefined> = {};
     if (viewMode !== urlMode) updates.mode = viewMode;
     if (vizTab !== urlViz) updates.viz = vizTab;
-    if (activeTab !== urlTab) updates.tab = activeTab;
     if (selectedSpanId !== urlSpan) {
       updates.span = selectedSpanId ?? undefined;
+    }
+    if (storePinnedRaw !== urlPinnedRaw) {
+      // `undefined` removes the param when the store has zero pins —
+      // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
+      updates.pinnedSpans = storePinnedRaw || undefined;
     }
     if (Object.keys(updates).length === 0) return;
     updateDrawerParams(updates);
   }, [
     viewMode,
     vizTab,
-    activeTab,
     selectedSpanId,
+    storePinnedRaw,
     urlMode,
     urlViz,
-    urlTab,
     urlSpan,
+    urlPinnedRaw,
     updateDrawerParams,
   ]);
 
