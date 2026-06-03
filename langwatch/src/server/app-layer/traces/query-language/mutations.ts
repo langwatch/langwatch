@@ -241,6 +241,34 @@ export function removeFacetValueFromQuery({
 }
 
 /**
+ * Remove a free-text (ImplicitField) literal from the query. Used by
+ * the empty-state query breakdown chips when the user wants to drop a
+ * single bare token (e.g. "Ω" they typed by accident) without
+ * clearing the whole query. `filterAST` collapses any orphaned logical
+ * parents so we don't leave stray ANDs/ORs behind.
+ */
+export function removeImplicitTermFromQuery({
+  currentQuery,
+  value,
+}: {
+  currentQuery: string;
+  value: string;
+}): string {
+  if (!currentQuery.trim()) return "";
+  try {
+    const next = filterAST(parse(currentQuery), (node) => {
+      if (node.type !== "Tag") return true;
+      if (node.field.type !== "ImplicitField") return true;
+      if (node.expression.type !== "LiteralExpression") return true;
+      return String(node.expression.value) !== value;
+    });
+    return isEmptyAST(next) ? "" : serialize(next);
+  } catch {
+    return currentQuery;
+  }
+}
+
+/**
  * Drop the Tag node at the given liqe location (start/end relative to the
  * @-stripped query string). Used by the inline X-button on each token —
  * `filterAST` collapses any orphaned logical/parenthesized parents so we
