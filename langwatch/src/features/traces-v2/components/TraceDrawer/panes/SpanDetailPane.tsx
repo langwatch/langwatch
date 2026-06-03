@@ -7,9 +7,6 @@ import type {
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useTraceResources } from "../../../hooks/useTraceResources";
-import { parseTracePromptIds } from "../../../utils/promptAttributes";
-import { LlmPanel } from "../LlmPanel";
-import { PromptsPanel } from "../PromptsPanel";
 import { ScopeChip } from "../ScopeChip";
 import { SpanTabBar } from "../SpanTabBar";
 import { TraceAccordions } from "../traceAccordions";
@@ -28,15 +25,24 @@ interface SpanDetailPaneProps {
 }
 
 /**
- * Right-side (or bottom-stacked) panel: SpanTabBar acts as the panel's
- * own header chrome (with a collapse toggle at its leftmost edge), and
- * the active detail panel (`Summary` / `LlmPanel` / `PromptsPanel` /
- * span-specific accordion) renders below it inside its own scroll
- * viewport so the drawer body itself never scrolls.
+ * Right-side (or bottom-stacked) panel — only mounts when a span is
+ * selected (the gate lives in `PaneLayout`). The SpanTabBar carries
+ * span-scope tabs (selected + pinned); the body always renders the
+ * per-span accordion stack (TraceAccordions activeTab="span"): input/
+ * output, attributes, evals, events, exceptions.
  *
- * When the user collapses the panel through the SpanTabBar's chevron,
- * the SpanTabBar itself remains visible (it's now the only thing the
- * collapsed Panel renders) and the body area is hidden.
+ * An earlier iteration of this pane auto-routed LLM spans to a
+ * dedicated `LlmPanel` (the old "LLM-Optimized" tab body). User
+ * feedback: clicking an LLM span should still show the regular span
+ * detail, not a different layout — surprise mode-swaps based on span
+ * kind broke the user's mental model. The LlmPanel surface is still
+ * available via its keyboard shortcut history, but it's no longer the
+ * default click destination.
+ *
+ * The collapse toggle on the SpanTabBar is preserved as an escape
+ * hatch — when collapsed the SpanTabBar stays visible (it's the only
+ * thing rendered) so the user can re-expand or pick a different
+ * pinned span.
  */
 export const SpanDetailPane = memo(function SpanDetailPane({
   trace,
@@ -44,7 +50,6 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   selectedSpan,
   layout,
 }: SpanDetailPaneProps) {
-  const activeTab = useDrawerStore((s) => s.activeTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const collapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
@@ -58,19 +63,27 @@ export const SpanDetailPane = memo(function SpanDetailPane({
       width="100%"
       minHeight={0}
       minWidth={0}
+      // `overflow: hidden` on the pane root makes this a proper
+      // scroll-container ancestor. Without it, the inner flex:1 +
+      // overflow:auto child could end up taller than its parent in
+      // contexts where the Panel from react-resizable-panels doesn't
+      // strictly clamp child height — and the scrollbar then attached
+      // to an ancestor instead of the accordion area, which the
+      // operator read as "scroll doesn't work". Combined with the
+      // explicit `height: 100%` style below, this guarantees the
+      // accordion list lives inside a fixed-height box and its own
+      // overflow:auto engages.
+      overflow="hidden"
+      style={{ height: "100%" }}
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
-      <Box
-        flexShrink={0}
-        bg={{ base: "bg.surface", _dark: "bg.panel" }}
-      >
+      <Box flexShrink={0} bg={{ base: "bg.surface", _dark: "bg.panel" }}>
         <IsolatedErrorBoundary
           scope="Couldn't render span tabs"
           resetKeys={[trace.traceId]}
         >
           <SpanTabBar
             spanTree={spans}
-            promptCount={parseTracePromptIds(trace.attributes).length}
             rightSlot={<ScopeChip scope={resources.scope} />}
             collapsePosition={layout === "horizontal" ? "leading" : "trailing"}
           />
@@ -82,29 +95,23 @@ export const SpanDetailPane = memo(function SpanDetailPane({
           minHeight={0}
           minWidth={0}
           overflow="auto"
-          style={{ overflowAnchor: "none" }}
+          // Explicit `height: 100%` on the scroll body so it actually
+          // owns the available pane height even if a flex:1 collapse
+          // happens upstream — pairs with the `overflow: hidden` on
+          // the outer Box.
+          style={{ overflowAnchor: "none", height: "100%" }}
         >
           <IsolatedErrorBoundary
-            scope={`Couldn't render the ${activeTab} tab`}
-            resetKeys={[trace.traceId, activeTab, selectedSpanId]}
+            scope="Couldn't render the span detail"
+            resetKeys={[trace.traceId, selectedSpanId]}
           >
-            {activeTab === "llm" ? (
-              <LlmPanel trace={trace} spans={spans} />
-            ) : activeTab === "prompts" ? (
-              <PromptsPanel
-                trace={trace}
-                spans={spans}
-                onSelectSpan={selectSpan}
-              />
-            ) : (
-              <TraceAccordions
-                trace={trace}
-                spans={spans}
-                selectedSpan={selectedSpan}
-                activeTab={activeTab}
-                onSelectSpan={selectSpan}
-              />
-            )}
+            <TraceAccordions
+              trace={trace}
+              spans={spans}
+              selectedSpan={selectedSpan}
+              activeTab="span"
+              onSelectSpan={selectSpan}
+            />
           </IsolatedErrorBoundary>
         </Box>
       )}
