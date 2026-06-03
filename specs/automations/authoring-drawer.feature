@@ -172,13 +172,11 @@ Feature: Staged automation authoring drawer
       Given automations exist in a project
       When the user opens the automation settings list
       Then each row shows the last-triggered timestamp and total fired count
-      And the values come from the TriggerSent claim ledger
 
     Scenario: Pending and failed counts appear once outbox-backed dispatch is live
       Given outbox-backed notify dispatch is wired in this environment
       When the user opens the automation settings list
       Then each notification row shows pending, failed, and dead counts
-      And the counts come from grouping ReactorOutbox rows by status
 
     Scenario: Template-health warnings surface on the per-automation panel
       Given a notification dispatched with a custom template that fell back to the default

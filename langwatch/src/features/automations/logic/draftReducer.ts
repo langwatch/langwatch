@@ -84,11 +84,11 @@ export const INITIAL_DRAFT: AutomationDraft = {
   source: "trace",
   filters: {},
   customGraphId: null,
-  // Matches the app-layer create-default for notify triggers (ADR-025).
+  // Matches the app-layer create-default for notify triggers (ADR-026).
   // Persist actions ignore this at the router boundary, so leaving it set
   // here while the user is picking an action is safe.
   notificationCadence: "5min_digest",
-  // Matches the `Trigger.traceDebounceMs` column default (ADR-030). Persist
+  // Matches the `Trigger.traceDebounceMs` column default (ADR-026). Persist
   // actions ignore this at dispatch time, so a non-zero default is harmless
   // even while the user is type-switching.
   traceDebounceMs: DEFAULT_TRACE_DEBOUNCE_MS,

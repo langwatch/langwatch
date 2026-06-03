@@ -1,4 +1,4 @@
-# ADR-026: Automation operator surfaces — authoring drawer & dispatch-health view
+# ADR-029: Automation operator surfaces — authoring drawer & dispatch-health view
 
 **Date:** 2026-05-29
 

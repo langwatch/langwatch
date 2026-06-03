@@ -60,7 +60,7 @@ export function TestFireSection({
               <>
                 {formatTimeAgo(last.at)}
                 {lastIsSuccess
-                  ? ` — delivered to ${last.recipientCount} ${
+                  ? ` — delivered to ${last.recipientCount ?? 0} ${
                       channel === "email" ? "recipient" : "webhook"
                     }${(last.recipientCount ?? 0) === 1 ? "" : "s"}`
                   : ` — ${last.errorTitle ?? "failed"}`}

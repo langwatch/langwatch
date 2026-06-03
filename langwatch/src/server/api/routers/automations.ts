@@ -69,7 +69,12 @@ function resolveCadenceForUpdate(
   action: TriggerAction,
   requested: NotificationCadence | undefined,
 ): NotificationCadence | undefined {
-  if (requested === undefined) return undefined;
+  // Persist actions always pin to `immediate`. Returning `undefined`
+  // here when the client omits the field would skip the column update
+  // and leak a stale notify-class cadence onto a row that's been
+  // edited from notify → persist (since the digest cadence stays on
+  // the row but the dispatch path no longer reads it). Force the
+  // boundary invariant on every update.
   if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
   return requested;
 }
@@ -235,18 +240,20 @@ export const automationRouter = createTRPCRouter({
           });
         }
       } else if (input.action === TriggerAction.SEND_EMAIL) {
-        const teamEmails = teamBindings
-          .flatMap((b) => (b.user ? [b.user.email] : []));
-
-        if (input.actionParams.members) {
-          input.actionParams.members.map((email: string) => {
-            if (!teamEmails.includes(email)) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Error with selected emails",
-              });
-            }
-          });
+        // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
+        // shape only. External recipients are intentionally allowed; the
+        // UI surfaces an "External" warning badge for any non-team
+        // address so operators know what they're shipping. Two server
+        // contracts for the same action would force the drawer to
+        // branch on create-vs-edit, which is a footgun. `teamBindings`
+        // above is left in place because other action branches still
+        // read team state.
+        if (input.actionParams.members && input.actionParams.members.length > 0) {
+          try {
+            validateEmailRecipientFormats(input.actionParams.members);
+          } catch (err) {
+            throw toTemplateTRPCError(err);
+          }
         }
       }
 
