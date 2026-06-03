@@ -43,13 +43,16 @@ export type BudgetExceededBannerProps = {
 function isUrlContact(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
+function stripMailto(value: string): string {
+  return value.replace(/^mailto:/i, "");
+}
 function isEmailContact(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stripMailto(value.trim()));
 }
 function contactHref(value: string): string {
   const trimmed = value.trim();
   if (isUrlContact(trimmed)) return trimmed;
-  if (isEmailContact(trimmed)) return `mailto:${trimmed}`;
+  if (isEmailContact(trimmed)) return `mailto:${stripMailto(trimmed)}`;
   return "#";
 }
 

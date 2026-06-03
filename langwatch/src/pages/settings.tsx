@@ -216,8 +216,9 @@ function SettingsForm({
                   <Input
                     width="full"
                     type="text"
+                    maxLength={500}
                     placeholder="support@your-company.com or https://your.ticketing.system"
-                    {...register("supportContact")}
+                    {...register("supportContact", { maxLength: 500 })}
                   />
                 ) : (
                   <Text>

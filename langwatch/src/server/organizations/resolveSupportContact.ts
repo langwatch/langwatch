@@ -1,10 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { resolveOrgAdminEmail } from "./resolveOrgAdminEmail";
+
 /**
  * Resolves the user-facing "contact your admin" string for an org. Prefers
- * the admin-configured `Organization.supportContact` (free text — email,
+ * the admin-configured `Organization.supportContact` (free text: email,
  * URL, or short instruction). Falls back to the first ADMIN member's
- * email so legacy orgs that never set the override keep working.
+ * email via resolveOrgAdminEmail so legacy orgs that never set the
+ * override keep working.
  *
  * Returns null when neither resolves (eg. an org with zero admin members
  * yet has no contact to surface).
@@ -26,10 +29,5 @@ export async function resolveSupportContact({
   const trimmed = org?.supportContact?.trim();
   if (trimmed) return trimmed;
 
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  return admin?.user.email ?? null;
+  return resolveOrgAdminEmail({ prisma, organizationId });
 }

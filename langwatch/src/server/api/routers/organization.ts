@@ -324,24 +324,7 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const organizationUser = await prisma.organizationUser.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-          role: "ADMIN",
-        },
-      });
-
-      if (!organizationUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
-
+    .mutation(async ({ input }) => {
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
