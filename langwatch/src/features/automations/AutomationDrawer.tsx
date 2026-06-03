@@ -135,10 +135,19 @@ export function AutomationDrawer({
     if (!row) return;
     const action = row.action as TriggerAction;
     const provider = CLIENT_PROVIDERS[action];
-    const filtersRaw =
-      typeof row.filters === "string"
-        ? (JSON.parse(row.filters) as Record<string, TriggerFilterValue>)
-        : {};
+    // `Trigger.filters` is persisted as a JSON string via `JSON.stringify`, but a
+    // malformed legacy row would crash the prefill if we trusted that. Fall
+    // back to an empty filter set on parse error so the drawer still opens —
+    // the user can re-enter the conditions instead of seeing the whole
+    // automations page fail to render.
+    let filtersRaw: Record<string, TriggerFilterValue> = {};
+    if (typeof row.filters === "string") {
+      try {
+        filtersRaw = JSON.parse(row.filters) as Record<string, TriggerFilterValue>;
+      } catch {
+        filtersRaw = {};
+      }
+    }
     const { sanitized } = sanitizeTriggerFilters(filtersRaw);
     const next: AutomationDraft = {
       ...INITIAL_DRAFT,

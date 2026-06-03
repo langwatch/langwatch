@@ -2,9 +2,11 @@ import { TriggerAction } from "@prisma/client";
 import { z } from "zod";
 import type { PreviewEnvelope, SharedDef } from "../../types";
 
-/** Shape check: `something@something.something`. Deliverability is the
- *  mailer's job. */
-export const EMAIL_RX = /^.+@.+\..+$/;
+/** Shape check: `something@something.something` with no whitespace anywhere.
+ *  Deliverability is the mailer's job; the no-whitespace rule additionally
+ *  rejects header-injection / CRLF smuggling shapes like `"a@b.com\nBcc: …"`
+ *  before they reach the SES / SendGrid `to` slots. */
+export const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const emailActionParamsSchema = z.object({
   members: z.array(z.string().regex(EMAIL_RX, "Invalid email address")),
