@@ -2,8 +2,6 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import {
   LuArrowUpRight,
-  LuCheck,
-  LuCopy,
   LuFilter,
   LuPin,
   LuSparkles,
@@ -149,8 +147,11 @@ export function PinnedMetricPill({
         >
           {label}
         </Text>
-        {/* Value: click copies. Doubles as the primary affordance —
-            users mostly want the value; unpinning is secondary. */}
+        {/* Value: click copies. The chip body itself is the affordance —
+            the dedicated copy icon was dropped to claim back the
+            horizontal space (every pin previously ate ~14px of icon
+            chrome). Tooltip + the "copied" text replacing the value on
+            click are now the cue. */}
         <Box
           as="button"
           onClick={(e: React.MouseEvent) => {
@@ -176,14 +177,6 @@ export function PinnedMetricPill({
           >
             {copied ? "copied" : display}
           </Text>
-          <Icon
-            as={copied ? LuCheck : LuCopy}
-            boxSize={2.5}
-            color={fg}
-            opacity={copied ? 1 : 0.55}
-            transition="opacity 0.12s ease"
-            flexShrink={0}
-          />
         </Box>
         {onNavigate && value != null && (
           <Tooltip
