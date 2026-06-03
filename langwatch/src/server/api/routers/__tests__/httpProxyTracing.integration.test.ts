@@ -25,19 +25,25 @@ vi.mock("~/utils/ssrfProtection", () => ({
 
 // Mock getApp().traces.recordSpan to capture the OTLP span the route records.
 // Mock both path forms used across the codebase — relative (matches the
-// httpProxyTracing.ts import) and tsconfig-alias (matches anything that imports
-// via `~/server/...`). Vitest treats each import-specifier as a separate
-// module mock, so we register both.
-const mockScheduleTrace = vi.fn().mockResolvedValue(undefined);
-const fakeApp = {
+// httpProxyTracing.ts import) and tsconfig-alias. vi.mock is hoisted so the
+// shared mock fn lives in vi.hoisted() to be visible to both factories.
+const { mockScheduleTrace } = vi.hoisted(() => ({
+  mockScheduleTrace: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     traces: {
       recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
     },
   }),
-};
-vi.mock("~/server/app-layer/app", () => fakeApp);
-vi.mock("../../../app-layer/app", () => fakeApp);
+}));
+vi.mock("../../../app-layer/app", () => ({
+  getApp: () => ({
+    traces: {
+      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+    },
+  }),
+}));
 
 type OtlpAttr = { key: string; value: { stringValue?: string; doubleValue?: number; boolValue?: boolean } };
 type OtlpSpan = {
