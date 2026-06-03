@@ -57,7 +57,15 @@ export const DensityToggle: React.FC = () => {
               aria-label={label}
               aria-pressed={isActive}
               variant="outline"
-              bg={isActive ? "transparent" : "bg.emphasized"}
+              // Active button gets a clear "selected" treatment instead
+              // of the previous subtle opacity-only difference. The
+              // previous styling (transparent bg + 0.6 opacity on the
+              // inactive icon) read as two near-identical icon buttons
+              // sitting side by side — users couldn't tell which mode
+              // was active without hovering for the tooltip.
+              bg={isActive ? "bg.muted" : "transparent"}
+              color={isActive ? "fg" : "fg.muted"}
+              borderColor={isActive ? "border" : "border.muted"}
               size="2xs"
               onClick={toggle}
             >
