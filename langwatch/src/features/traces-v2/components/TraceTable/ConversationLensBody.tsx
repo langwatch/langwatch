@@ -83,7 +83,11 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
     setExpandedKey((prev) => (prev === id ? null : id));
 
   return (
-    <TraceTableShell table={table} minWidth={CONVERSATION_MIN_WIDTH}>
+    <TraceTableShell
+      table={table}
+      minWidth={CONVERSATION_MIN_WIDTH}
+      stickyFirstColumn
+    >
       <VirtualSpacer height={paddingTop} colSpan={colSpan} />
       {virtualItems.map((virtualItem) => {
         const row = rows[virtualItem.index];
