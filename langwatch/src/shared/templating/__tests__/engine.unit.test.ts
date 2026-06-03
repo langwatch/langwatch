@@ -13,13 +13,25 @@ describe("renderLiquid", () => {
   });
 
   describe("when the template references a variable the context omits", () => {
-    it("renders it as empty and reports it as missing", async () => {
+    it("renders it as empty and reports the full path as missing", async () => {
       const { output, missingVariables } = await renderLiquid({
         template: "Hi {{ projct.name }}{{ project.name }}",
         context: { project: { name: "Acme" } },
       });
       expect(output).toBe("Hi Acme");
-      expect(missingVariables).toContain("projct");
+      expect(missingVariables).toContain("projct.name");
+      expect(missingVariables).not.toContain("project.name");
+    });
+  });
+
+  describe("when the template references a property of an existing root that the context omits", () => {
+    it("reports the full dotted path so authors see property-level typos", async () => {
+      const { output, missingVariables } = await renderLiquid({
+        template: "Hi {{ project.nmae }}",
+        context: { project: { name: "Acme" } },
+      });
+      expect(output).toBe("Hi ");
+      expect(missingVariables).toContain("project.nmae");
       expect(missingVariables).not.toContain("project");
     });
   });

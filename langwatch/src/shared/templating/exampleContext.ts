@@ -98,6 +98,12 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
     description: "ISO-8601 — only set for digest cadences.",
   },
   {
+    path: "matches",
+    type: "TemplateMatchVars[]",
+    description:
+      "Canonical iteration surface. Immediate dispatch has length 1, a digest has N — iterate with `{% for m in matches %}` and the same template handles both.",
+  },
+  {
     path: "match.trace.id",
     type: "string | null",
     description: "Trace ID that matched the conditions.",

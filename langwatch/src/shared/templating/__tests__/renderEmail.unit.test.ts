@@ -130,14 +130,14 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when a template references a missing variable", () => {
-    it("renders empty for it and reports the name", async () => {
+    it("renders empty for it and reports the full path", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: "{{ trigger.name }}{{ projct.name }}",
         bodyTemplate: null,
         context: makeContext(),
       });
       expect(email.subject).toBe("High latency");
-      expect(email.missingVariables).toContain("projct");
+      expect(email.missingVariables).toContain("projct.name");
     });
   });
 
