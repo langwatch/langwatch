@@ -1,6 +1,5 @@
 import type { Tokens } from "@chakra-ui/react";
 
-const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
@@ -23,8 +22,12 @@ export function formatRelativeTime(timestamp: number): string {
  * narrow TIME column).
  */
 export function formatVerboseRelative(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
-  if (diffMs < 0) return "in the future";
+  // Clock skew can produce `timestamp > Date.now()` for traces that arrive
+  // a hair ahead of the viewer's clock. The narrow `formatRelativeTime`
+  // clamps the same way; matching that behaviour here keeps the Since
+  // column and the hover card from blinking "in the future" on traces
+  // that are really just landing live.
+  const diffMs = Math.max(0, Date.now() - timestamp);
   if (diffMs < MS_PER_MINUTE) return "just now";
   const pick = (
     n: number,
