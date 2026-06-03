@@ -76,14 +76,23 @@ Feature: AI Tools Portal — Model-provider tile inline VK creation
     And the form re-appears with `defaultLabel` re-populated
     And the secret is no longer accessible (cannot be re-revealed)
 
-  Scenario: 409 no_default_routing_policy surfaces inline
+  Scenario: 409 no_eligible_providers surfaces inline when the org has zero providers
     Given the org has NO default routing policy published
+    And the org has NO ModelProvider reachable from "jane@acme.com"'s personal team
     And the Anthropic tile is expanded with label "my-app"
     When user "jane@acme.com" clicks "Issue key"
-    Then `api.personalVirtualKeys.issuePersonal` returns 409 with code "no_default_routing_policy"
+    Then `api.personalVirtualKeys.issuePersonal` returns 409 with code "no_eligible_providers"
     And an inline error renders in the form
-    And the error includes a link "Ask your admin to publish a default routing policy"
+    And the error includes the actionable message "Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers."
     And the form does NOT swap to the success state
+
+  Scenario: Issue with no default policy but providers exist mints with null routingPolicyId
+    Given the org has NO default routing policy published
+    And at least one ModelProvider scoped at ORGANIZATION is enabled
+    And the Anthropic tile is expanded with label "my-app"
+    When user "jane@acme.com" clicks "Issue key"
+    Then `api.personalVirtualKeys.issuePersonal` returns 200 with `routingPolicyId: null`
+    And the success state renders with the new secret revealed once
 
   Scenario: tile without projectSuggestionText omits the hint
     Given the org-scoped catalog has OpenAI entry with no `projectSuggestionText` field

@@ -174,21 +174,46 @@ export class PersonalVirtualKeyService {
       throw new PersonalVirtualKeyNotFoundError(routingPolicyId);
     }
 
-    // Spec contract (specs/ai-gateway/governance/personal-keys.feature
-    // lines 57-63): when the caller relied on default-policy resolution
-    // and the org has no default policy, the device-exchange MUST 409
-    // with `{ error: "no_default_routing_policy" }` and NO personal VK
-    // should be created.
-    if (routingPolicyId === undefined && !policy) {
-      throw new NoDefaultRoutingPolicyError(organizationId);
+    // Default-resolution path: when the caller did not pin a specific
+    // routingPolicyId AND the org has no default policy (or the
+    // default points at an empty provider list), fall back to minting
+    // the VK with `routingPolicyId: null`. The gateway's
+    // `eligibleModelProvidersForVk` already handles a null policy by
+    // ranking every scope-cascade-eligible ModelProvider on
+    // `fallbackPriorityGlobal` ASC then `createdAt` ASC — so the VK
+    // dispatches correctly as long as at least one provider is
+    // reachable. Only when truly zero providers are reachable does the
+    // mint fail with an actionable error.
+    //
+    // When the caller pinned an explicit routingPolicyId, the empty-
+    // policy invariant from G34 still applies — they asked for THIS
+    // policy and we refuse to silently substitute a different shape.
+    const defaultResolution = routingPolicyId === undefined;
+    const policyIsEmpty =
+      !!policy && extractModelProviderIds(policy).length === 0;
+
+    if (defaultResolution && (!policy || policyIsEmpty)) {
+      const eligibleCount = await this.countEligibleProviders({
+        organizationId,
+        personalTeamId,
+        personalProjectId,
+      });
+      if (eligibleCount === 0) {
+        throw new NoEligibleProvidersError(organizationId);
+      }
+      // Fall through with policy = null (gateway uses cascade order).
+      // Important: clear `policy` so the create call below writes
+      // routingPolicyId: null instead of the stale empty-default.
+      // The local rebind is fine — `policy` is only read by the
+      // `policy?.id` accessors after this point.
+    } else if (policyIsEmpty) {
+      // Caller pinned an empty policy explicitly — preserve the
+      // validate-before-mint contract from G34.
+      throw new RoutingPolicyHasNoProvidersError(policy!.id, policy!.name);
     }
 
-    // G34: validate the resolved policy has at least one eligible
-    // ModelProvider before minting, otherwise the user copy-pastes a
-    // curl that 504s at the gateway.
-    if (policy && extractModelProviderIds(policy).length === 0) {
-      throw new RoutingPolicyHasNoProvidersError(policy.id, policy.name);
-    }
+    const resolvedPolicyId =
+      defaultResolution && (!policy || policyIsEmpty) ? null : policy?.id ?? null;
 
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({
@@ -198,14 +223,14 @@ export class PersonalVirtualKeyService {
       principalUserId: userId,
       actorUserId: userId,
       scopes: [{ scopeType: "PROJECT", scopeId: personalProjectId }],
-      routingPolicyId: policy?.id ?? null,
+      routingPolicyId: resolvedPolicyId,
     });
 
     return {
       virtualKey,
       secret,
       baseUrl: this.gatewayBaseUrl,
-      routingPolicyId: policy?.id ?? null,
+      routingPolicyId: resolvedPolicyId,
       id: virtualKey.id,
       label: virtualKey.name,
     };
@@ -284,6 +309,41 @@ export class PersonalVirtualKeyService {
   }
 
   /**
+   * Count ModelProviders that a personal VK at the given personal team /
+   * project would see via scope cascade (PROJECT → TEAM → ORGANIZATION).
+   * Used as the gate for the no-default-policy graceful-fallback path:
+   * if any provider is reachable, mint with routingPolicyId=null instead
+   * of refusing the request. Mirrors the scope predicates in
+   * `eligibleModelProvidersForVk`.
+   */
+  private async countEligibleProviders({
+    organizationId,
+    personalTeamId,
+    personalProjectId,
+  }: {
+    organizationId: string;
+    personalTeamId?: string;
+    personalProjectId: string;
+  }): Promise<number> {
+    const scopePredicates: Array<{
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    }> = [{ scopeType: "ORGANIZATION", scopeId: organizationId }];
+    if (personalTeamId) {
+      scopePredicates.push({ scopeType: "TEAM", scopeId: personalTeamId });
+    }
+    scopePredicates.push({ scopeType: "PROJECT", scopeId: personalProjectId });
+
+    return await this.prisma.modelProvider.count({
+      where: {
+        enabled: true,
+        disabledAt: null,
+        scopes: { some: { OR: scopePredicates } },
+      },
+    });
+  }
+
+  /**
    * Cascade revoke every personal VK belonging to a user.
    * Called from the user-deactivation path (out of scope for this
    * iteration — wiring point exists for follow-up).
@@ -332,18 +392,25 @@ export class PersonalVirtualKeyNotFoundError extends Error {
 }
 
 /**
- * Thrown by `issue()` when the caller relied on default-policy resolution
- * (no `routingPolicyId` argument) and the organisation has no
- * RoutingPolicy with `isDefault=true`. Routes / tRPC handlers should
- * translate this to HTTP 409 with `{ error: "no_default_routing_policy" }`
- * per specs/ai-gateway/governance/personal-keys.feature.
+ * Thrown by `issue()` when the caller relied on default-policy
+ * resolution (no `routingPolicyId` argument) and the organization has
+ * NO ModelProvider reachable from the user's personal team via scope
+ * cascade. Without any eligible provider the gateway would have
+ * nothing to route to, so the mint is refused with a clear
+ * "configure a provider" message. Routes / tRPC handlers translate
+ * this to HTTP 409 with `{ error: "no_eligible_providers" }`.
+ *
+ * Distinct from `RoutingPolicyHasNoProvidersError`: that one fires
+ * when the caller pinned an empty policy explicitly (G34 invariant).
+ * This one fires when no policy was requested AND the cascade is
+ * empty — i.e. the org genuinely has no providers configured yet.
  */
-export class NoDefaultRoutingPolicyError extends Error {
+export class NoEligibleProvidersError extends Error {
   constructor(public readonly organizationId: string) {
     super(
-      `Your organization admin must publish a default routing policy before personal keys can be issued.`,
+      `Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers.`,
     );
-    this.name = "NoDefaultRoutingPolicyError";
+    this.name = "NoEligibleProvidersError";
   }
 }
 

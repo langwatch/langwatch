@@ -58,11 +58,27 @@ Feature: AI Gateway Governance — Personal virtual keys
     And the response is `{ secret, baseUrl, label }` returned exactly once
 
   @bdd @personal-keys @issuance @policy-resolution
-  Scenario: When org has no default RoutingPolicy, personal-key issuance fails with a clear error
+  Scenario: When org has no default RoutingPolicy but has accessible providers, personal-key issuance succeeds with no policy bound
     Given organization "acme" has no RoutingPolicy with isDefault=true
-    When user "jane@acme.com" tries to login via the CLI
+    And at least one ModelProvider scoped at ORGANIZATION "acme" is enabled
+    When user "jane@acme.com" logs in via the CLI device-flow
+    Then a personal VK is minted with `routingPolicyId=null`
+    And the gateway dispatch path uses scope-cascade + `fallbackPriorityGlobal` ordering to pick a provider
+    # Pre-7651d2464 this failed with a generic 409 in the device approve
+    # handler, blocking solo signups + any org that hadn't published a
+    # default routing policy yet. 7651d2464 made the approve tolerate
+    # the empty-policy state but left the wrapper bailing later. The
+    # current behavior: mint succeeds, gateway dispatch falls back to
+    # `fallbackPriorityGlobal` ASC + `createdAt` ASC on eligible MPs
+    # (mirrors `eligibleModelProvidersForVk` when policy is null).
+
+  @bdd @personal-keys @issuance @policy-resolution
+  Scenario: When org has no AI providers at all, personal-key issuance fails with a clear error
+    Given organization "acme" has no RoutingPolicy with isDefault=true
+    And no ModelProvider is reachable from "jane@acme.com"'s personal team via scope cascade
+    When user "jane@acme.com" tries to login via the CLI device-flow
     Then the device-exchange response status is 409
-    And the response body contains `{ "error": "no_default_routing_policy", "message": "Your organization admin must publish a default routing policy before personal keys can be issued." }`
+    And the response body contains `{ "error": "no_eligible_providers", "message": "Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers." }`
     And no personal VK is created
 
   # Behavior is implemented end-to-end: personalVirtualKey.service.ts throws

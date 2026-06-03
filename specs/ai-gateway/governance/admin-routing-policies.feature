@@ -83,10 +83,12 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     Then his personal VK references the org-level "developer-default"
 
   @bdd @routing-policy @hierarchy
-  Scenario: When neither team nor org has a default policy, personal-key issuance fails (see personal-keys.feature)
+  Scenario: When neither team nor org has a default policy but providers exist, issuance succeeds with null policy (see personal-keys.feature)
     Given org "acme" has no isDefault policy at any scope
-    When ben tries to login
-    Then issuance fails with `no_default_routing_policy` (cross-ref personal-keys.feature)
+    And at least one ModelProvider is reachable from ben's personal team via scope cascade
+    When ben completes the device-code flow
+    Then a personal VK is minted with `routingPolicyId: null`
+    And the gateway resolves the eligible-provider chain by fallbackPriorityGlobal ordering
 
   # ---------------------------------------------------------------------------
   # Authorization

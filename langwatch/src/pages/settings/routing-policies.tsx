@@ -376,14 +376,15 @@ function RoutingPoliciesPage() {
                     : "Publish a default policy to unblock end-user keys"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Without an applicable default, {`'langwatch login'`} (and
-                  every personal-key issue path) returns 409{" "}
+                  Without a default, personal keys still mint and the
+                  gateway picks providers in {" "}
                   <Text as="span" fontFamily="mono">
-                    no_default_routing_policy
-                  </Text>
-                  . Start with an Organization default that points at
-                  whichever model providers your team should use, then
-                  override per-team or per-project as needed.
+                    fallbackPriorityGlobal
+                  </Text>{" "}
+                  order — useful as a quick start. Publish an explicit
+                  default to pin a deterministic chain at the
+                  organization level, then override per-team or
+                  per-project as needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
                   <Button
@@ -527,7 +528,7 @@ function RoutingPoliciesPage() {
         }
         message={
           policyToDelete?.isDefault
-            ? "This is the default policy at this scope. Personal-key issue paths and 'langwatch login' will return 409 no_default_routing_policy until another default is published. Virtual keys that resolved through this policy will fail closed at the next request."
+            ? "This is the default policy at this scope. Personal-key issue paths fall back to fallbackPriorityGlobal ordering across all scope-eligible providers until another default is published; existing VKs that resolved through this policy lose the pinned chain and follow the same fallback on the next request."
             : "Virtual keys that explicitly reference this policy will lose the reference and fail closed at the next request. Re-publish or pick another policy on the affected VKs to restore routing."
         }
         confirmLabel="Delete policy"

@@ -38,7 +38,7 @@ import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rb
 import type { Permission } from "~/server/api/rbac";
 import {
   PersonalVirtualKeyService,
-  NoDefaultRoutingPolicyError,
+  NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
@@ -1477,24 +1477,24 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
     });
   } catch (err) {
     if (
-      err instanceof NoDefaultRoutingPolicyError ||
+      err instanceof NoEligibleProvidersError ||
       err instanceof RoutingPolicyHasNoProvidersError
     ) {
-      // Fresh signup / dogfood account / org that hasn't published a
-      // default RoutingPolicy (or whose policy has no providers bound):
-      // log the user in with a device session anyway. The CLI wrapper
-      // mints a personal VK lazily on the first gateway call, surfacing
-      // an actionable error at that point ("no model provider configured
-      // yet, add one at /me Model Providers"). Failing the entire
-      // approve flow here blocked solo devs from ever reaching the
-      // setup screens.
+      // Fresh signup / dogfood account / org with no accessible
+      // providers (or with an explicitly-pinned empty policy): log the
+      // user in with a device session anyway. The /me Model Providers
+      // tile surfaces the actionable "add a provider" CTA; failing the
+      // entire approve flow here blocked solo devs from ever reaching
+      // the setup screens. Post-fix to the no-default-policy graceful
+      // fallback, this branch fires only when there are truly zero
+      // eligible providers via scope cascade.
       logger.info(
         {
           user_code,
           organization_id,
           reason:
-            err instanceof NoDefaultRoutingPolicyError
-              ? "no_default_routing_policy"
+            err instanceof NoEligibleProvidersError
+              ? "no_eligible_providers"
               : "routing_policy_has_no_providers",
         },
         "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",
