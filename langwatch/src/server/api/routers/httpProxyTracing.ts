@@ -6,6 +6,7 @@
  * request/response details while redacting sensitive auth credentials.
  */
 
+import crypto from "node:crypto";
 import { getApp } from "../../app-layer/app";
 import { prisma } from "../../db";
 import type { CustomMetadata, Span } from "../../tracer/types";
