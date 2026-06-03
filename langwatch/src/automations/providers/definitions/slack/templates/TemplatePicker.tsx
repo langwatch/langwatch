@@ -73,45 +73,47 @@ function Card({
 }) {
   const { Wireframe } = option;
   return (
-    <Box
-      as="button"
+    <button
       type="button"
       onClick={onClick}
-      textAlign="left"
-      borderWidth={isSelected ? "2px" : "1px"}
-      borderColor={isSelected ? "border.emphasized" : "border"}
-      borderRadius="md"
-      bg="bg.panel/60"
-      padding={3}
-      transition="border-color 120ms ease"
-      _hover={{ borderColor: "border.emphasized" }}
+      style={{ textAlign: "left", width: "100%" }}
     >
-      <Stack gap={2} align="stretch">
-        <HStack gap={2}>
-          <Text textStyle="md">{option.emoji}</Text>
-          <Text textStyle="sm" fontWeight="medium">
-            {option.displayName}
+      <Box
+        borderWidth={isSelected ? "2px" : "1px"}
+        borderColor={isSelected ? "border.emphasized" : "border"}
+        borderRadius="md"
+        bg="bg.panel/60"
+        padding={3}
+        transition="border-color 120ms ease"
+        _hover={{ borderColor: "border.emphasized" }}
+      >
+        <Stack gap={2} align="stretch">
+          <HStack gap={2}>
+            <Text textStyle="md">{option.emoji}</Text>
+            <Text textStyle="sm" fontWeight="medium">
+              {option.displayName}
+            </Text>
+            {isDefault ? (
+              <Badge size="sm" colorPalette="orange" variant="subtle">
+                Default
+              </Badge>
+            ) : null}
+          </HStack>
+          <Box
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="sm"
+            padding={2}
+            bg="bg.subtle"
+            minHeight="120px"
+          >
+            <Wireframe />
+          </Box>
+          <Text textStyle="xs" color="fg.muted" lineClamp={2}>
+            {option.tagline}
           </Text>
-          {isDefault ? (
-            <Badge size="sm" colorPalette="orange" variant="subtle">
-              Default
-            </Badge>
-          ) : null}
-        </HStack>
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="sm"
-          padding={2}
-          bg="bg.subtle"
-          minHeight="120px"
-        >
-          <Wireframe />
-        </Box>
-        <Text textStyle="xs" color="fg.muted" lineClamp={2}>
-          {option.tagline}
-        </Text>
-      </Stack>
-    </Box>
+        </Stack>
+      </Box>
+    </button>
   );
 }
