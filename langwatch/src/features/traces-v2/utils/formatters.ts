@@ -1,8 +1,12 @@
 import type { Tokens } from "@chakra-ui/react";
 
+const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
+const MS_PER_MONTH = 30 * MS_PER_DAY;
+const MS_PER_YEAR = 365 * MS_PER_DAY;
 
 export function formatRelativeTime(timestamp: number): string {
   const diffMs = Date.now() - timestamp;
@@ -10,6 +14,106 @@ export function formatRelativeTime(timestamp: number): string {
   if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
   if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
   return `${Math.floor(diffMs / MS_PER_DAY)}d`;
+}
+
+/**
+ * Verbose natural-language relative time — "1 minute ago", "2 hours ago",
+ * "3 weeks ago". Used by the SINCE column, which trades compactness for
+ * readability (the compact `formatRelativeTime` stays the format for the
+ * narrow TIME column).
+ */
+export function formatVerboseRelative(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < 0) return "in the future";
+  if (diffMs < MS_PER_MINUTE) return "just now";
+  const pick = (
+    n: number,
+    singular: string,
+  ): string => `${n} ${singular}${n === 1 ? "" : "s"} ago`;
+  if (diffMs < MS_PER_HOUR) {
+    return pick(Math.floor(diffMs / MS_PER_MINUTE), "minute");
+  }
+  if (diffMs < MS_PER_DAY) {
+    return pick(Math.floor(diffMs / MS_PER_HOUR), "hour");
+  }
+  if (diffMs < MS_PER_WEEK) {
+    return pick(Math.floor(diffMs / MS_PER_DAY), "day");
+  }
+  if (diffMs < MS_PER_MONTH) {
+    return pick(Math.floor(diffMs / MS_PER_WEEK), "week");
+  }
+  if (diffMs < MS_PER_YEAR) {
+    return pick(Math.floor(diffMs / MS_PER_MONTH), "month");
+  }
+  return pick(Math.floor(diffMs / MS_PER_YEAR), "year");
+}
+
+/**
+ * Full ISO 8601 timestamp in UTC, e.g. `2026-06-02T13:14:15.123Z`. Used by
+ * the TIMESTAMP column for users who want to copy-paste a precise wall-
+ * clock into log queries / external tools without translating from a
+ * relative string.
+ */
+export function formatISOTimestamp(timestamp: number): string {
+  return new Date(timestamp).toISOString();
+}
+
+/**
+ * Local-time string with the viewer's IANA zone abbreviated (e.g.
+ * `2026-06-02 15:14:15 CEST`). Used inside the TimeHoverCard. Falls back
+ * gracefully on environments without `Intl` (SSR) — returns the bare
+ * locale string.
+ */
+export function formatLocalWithZone(timestamp: number): string {
+  const d = new Date(timestamp);
+  try {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZoneName: "short",
+    });
+    // Intl returns "06/02/2026, 15:14:15 CEST" — reformat to the ISO-ish
+    // shape we use elsewhere for consistency with formatAbsoluteTime.
+    const parts = formatter.formatToParts(d);
+    const lookup: Record<string, string> = {};
+    for (const p of parts) lookup[p.type] = p.value;
+    const ymd = `${lookup.year}-${lookup.month}-${lookup.day}`;
+    const hms = `${lookup.hour}:${lookup.minute}:${lookup.second}`;
+    return `${ymd} ${hms} ${lookup.timeZoneName ?? ""}`.trim();
+  } catch {
+    return d.toLocaleString();
+  }
+}
+
+/**
+ * Resolve the viewer's IANA time zone, e.g. `Europe/Amsterdam`. Returns
+ * `"UTC"` when `Intl` isn't available (server render path).
+ */
+export function resolveViewerTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
+ * Day of week in the viewer's locale, e.g. `Tuesday`. Mirrors what most
+ * dashboards put in the right-rail of a date hover.
+ */
+export function formatDayOfWeek(timestamp: number): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(
+      new Date(timestamp),
+    );
+  } catch {
+    return "";
+  }
 }
 
 /**
