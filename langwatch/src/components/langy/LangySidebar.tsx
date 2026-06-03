@@ -39,6 +39,8 @@ import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/use
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { api } from "~/utils/api";
+import { SetUpLangyModal } from "./SetUpLangyModal";
 import {
   useLangyConversations,
   type LangyConversationSummary,
@@ -418,6 +420,27 @@ function LangyPanel({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // "Set up Langy" modal state + readiness. Langy's chat gate is
+  // getVercelAIModel(projectId) → resolves the DEFAULT role (feature key
+  // prompt.create_default) and 409s when nothing resolves.
+  // getResolvedDefault returns null in exactly that case, so we treat
+  // `data === null` as "not ready" and open the modal instead of failing.
+  const [setupOpen, setSetupOpen] = useState(false);
+  const modelReadinessQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!projectId, refetchOnWindowFocus: true },
+  );
+  const modelReady =
+    modelReadinessQuery.data === undefined
+      ? undefined
+      : modelReadinessQuery.data !== null;
+  // onError closes over the useChat config created once; read readiness via a
+  // ref so the backstop sees the current value, not a stale render's.
+  const modelReadyRef = useRef(modelReady);
+  useEffect(() => {
+    modelReadyRef.current = modelReady;
+  }, [modelReady]);
+
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/langy/chat" }),
     [],
@@ -426,6 +449,13 @@ function LangyPanel({
     transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
+      // Race backstop: if the project has no usable default model, the chat
+      // failed the model gate (409). Open the setup modal instead of a
+      // dead-end toast. (send() intercepts the common, already-loaded case.)
+      if (modelReadyRef.current === false) {
+        setSetupOpen(true);
+        return;
+      }
       toaster.create({
         title: "Langy error",
         description: error.message,
@@ -484,6 +514,12 @@ function LangyPanel({
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
+    // No usable model yet → open the setup modal instead of firing a request
+    // that would 409. Leave the text in the input so it survives setup.
+    if (modelReady === false) {
+      setSetupOpen(true);
+      return;
+    }
     setInput("");
     await sendMessage(
       { role: "user", parts: [{ type: "text", text }] },
@@ -634,6 +670,12 @@ function LangyPanel({
           canSend={!!input.trim() && !isBusy && !!projectId}
         />
       </VStack>
+      <SetUpLangyModal
+        open={setupOpen}
+        projectId={projectId}
+        onClose={() => setSetupOpen(false)}
+        onReady={() => void modelReadinessQuery.refetch()}
+      />
     </Box>
   );
 }
