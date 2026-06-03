@@ -180,8 +180,8 @@ export function useFilterSidebarData() {
     spanAttributeKeys,
     eventAttributeKeys,
   } = useMemo(
-    () => partitionDescriptors(effectiveDescriptors.items),
-    [effectiveDescriptors.items],
+    () => partitionDescriptors(effectiveDescriptors.items, activeFieldSet),
+    [effectiveDescriptors.items, activeFieldSet],
   );
 
   const isSynthetic = effectiveDescriptors.synthetic;
@@ -427,6 +427,7 @@ export function partitionIntoGroups(
 
 function partitionDescriptors(
   descriptors: ReturnType<typeof useTraceFacets>["data"],
+  activeFieldSet: ReadonlySet<string>,
 ) {
   const cats: CategoricalSection[] = [];
   const rngs: RangeSectionData[] = [];
@@ -435,15 +436,14 @@ function partitionDescriptors(
   let eventAttrs: AttributeKey[] = [];
 
   for (const d of descriptors) {
-    if (d.kind === "categorical" && d.topValues.length > 0) {
-      // Empty categorical sections are now hidden. The previous
-      // behaviour also kept any key listed in FACET_DEFAULTS even when
-      // the tenant had zero traces of that type — which is what made
-      // the sidebar feel "noisy on cold projects" (every default key
-      // rendered with empty buckets). Synthetic descriptors injected
-      // by `synthesizeDefaultDescriptors` still pass this gate because
-      // they carry the FACET_DEFAULTS values with `count:0` non-empty
-      // `topValues` arrays, so the pre-discover skeleton is unchanged.
+    // Keep a categorical section mounted when (a) it has buckets to
+    // show OR (b) the AST has an active filter on this field. Without
+    // (b), filtering on a categorical with zero matching distinct
+    // values would drop the section from the sidebar — and the user
+    // would have no way to clear the filter from there. (a) alone was
+    // the previous behaviour, which made cold tenants feel less noisy
+    // but stranded active-but-empty filters.
+    if (d.kind === "categorical" && (d.topValues.length > 0 || activeFieldSet.has(d.key))) {
       cats.push({
         kind: "cat",
         key: d.key,
