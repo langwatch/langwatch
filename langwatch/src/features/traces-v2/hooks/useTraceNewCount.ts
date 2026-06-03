@@ -94,7 +94,22 @@ export function useTraceNewCount(): TraceNewCountResult {
   // the user opted to gate merges behind the floating pill click, so we
   // stay quiet there; the pill itself is the signal.
   const pulseRefresh = useRefreshUIStore((s) => s.pulse);
-  const prevCountRef = useRef(0);
+  // `null` = no baseline yet for the current query identity. Reset
+  // whenever the identity (project / time range / search / since)
+  // changes so a count from one context never gets compared against a
+  // count from another — that comparison can spuriously fire or
+  // suppress the 0→N pulse.
+  const prevCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    prevCountRef.current = null;
+  }, [
+    project?.id,
+    timeRange.from,
+    timeRange.to,
+    timeRange.label,
+    since,
+    queryText,
+  ]);
 
   const query = api.tracesV2.newCount.useQuery(
     {
@@ -141,6 +156,8 @@ export function useTraceNewCount(): TraceNewCountResult {
           data.count > 0 &&
           useSseStatusStore.getState().liveUpdatesMode === "live"
         ) {
+          // First success in a new query context (prev === null) is
+          // baseline only — never pulses.
           pulseRefresh();
         }
       },
