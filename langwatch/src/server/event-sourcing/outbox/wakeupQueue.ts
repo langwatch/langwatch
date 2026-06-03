@@ -3,7 +3,7 @@ import type { EventSourcedQueueDefinition } from "../queues/queue.types";
 /**
  * Wakeup payload sent to the GroupQueue when a row is enqueued (or
  * scheduled for retry). Carries only the routing keys — the variable-
- * size dispatch payload stays in PG. See ADR-023.
+ * size dispatch payload stays in PG. See ADR-026.
  *
  * Constant size means the queue never bloats regardless of how many
  * matches a single trigger produces.
@@ -26,7 +26,7 @@ export interface OutboxWakeup extends Record<string, unknown> {
    */
   groupKey: string;
   /**
-   * Wall-clock score for global ordering — see ADR-023. Defaults to
+   * Wall-clock score for global ordering — see ADR-026. Defaults to
    * the enqueue time but callers may override (e.g. retry scheduling
    * sets it to the nextAttemptAt timestamp).
    */

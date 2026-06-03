@@ -102,7 +102,7 @@ export class OutboxDrainer {
    *
    * `projectId` is derived from `wakeup.groupKey` via
    * `tenantIdFromGroupId` — the producer is contracted to format
-   * groupKey as `${projectId}/...`. See ADR-023.
+   * groupKey as `${projectId}/...`. See ADR-026.
    */
   async handleWakeup(wakeup: OutboxWakeup): Promise<void> {
     const dispatcher = this.dispatchers.get(wakeup.reactorName);
@@ -118,7 +118,7 @@ export class OutboxDrainer {
     if (!projectId) {
       logger.error(
         { reactorName: wakeup.reactorName, groupKey: wakeup.groupKey },
-        "Wakeup groupKey missing `${projectId}/` prefix — dropping (see ADR-023)",
+        "Wakeup groupKey missing <projectId>/ prefix — dropping (see ADR-026)",
       );
       return;
     }
@@ -128,6 +128,10 @@ export class OutboxDrainer {
       const row = await this.outboxService.leaseNext({
         projectId,
         reactorName: wakeup.reactorName,
+        // Lease only within the wakeup's group — a wakeup for one
+        // (trigger, trace) group must not drain another group's
+        // ready rows, even if both share (projectId, reactorName).
+        groupKey: wakeup.groupKey,
         leaseDurationMs: this.leaseDurationMs,
       });
       if (!row) return;

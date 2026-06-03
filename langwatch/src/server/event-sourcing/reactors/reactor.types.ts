@@ -13,7 +13,7 @@ export interface ReactorContext<FoldState = unknown> {
    * True when the event was produced by a stream replay rather than
    * live ingestion. The framework `.withOutbox` wrapper short-circuits
    * `match` on replay to avoid re-firing customer-visible side effects
-   * after outbox rows have aged out of retention — see ADR-024.
+   * after outbox rows have aged out of retention — see ADR-025.
    *
    * `.withReactor` handlers receive the same flag and may inspect it
    * directly if they need replay-specific behavior; most best-effort

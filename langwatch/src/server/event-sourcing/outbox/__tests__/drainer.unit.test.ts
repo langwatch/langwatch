@@ -92,7 +92,7 @@ describe("OutboxDrainer.handleWakeup", () => {
   });
 
   describe("when the wakeup groupKey is missing the `${projectId}/` prefix", () => {
-    it("drops it without leasing (ADR-023 contract)", async () => {
+    it("drops it without leasing (ADR-026 contract)", async () => {
       const dispatcher = vi.fn(async () => undefined);
       drainer.registerDispatcher("alertDispatch", dispatcher);
 
