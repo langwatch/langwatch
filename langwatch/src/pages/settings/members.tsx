@@ -16,6 +16,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
@@ -286,13 +287,21 @@ function MembersList({
           )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
+          {/*
+            Card wraps the table in overflowX="auto" so the row never
+            clips the rightmost ⋮ actions menu on narrow viewports; the
+            cost-center picker keeps its full width (rchaves: do NOT
+            shrink it), and the email column truncates with a hover
+            tooltip via OverflownTextWithTooltip so long synthetic
+            addresses don't push the row width past the viewport.
+          */}
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" size="md" width="full">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
                   {hasOrganizationManagePermission && (
                     <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   )}
@@ -344,7 +353,11 @@ function MembersList({
                           )}
                         </HStack>
                       </Table.Cell>
-                      <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell maxWidth="280px">
+                        <OverflownTextWithTooltip>
+                          {member.user.email}
+                        </OverflownTextWithTooltip>
+                      </Table.Cell>
                       {hasOrganizationManagePermission && (
                         <Table.Cell>
                           <MemberAccessDisplay
