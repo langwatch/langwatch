@@ -6,14 +6,28 @@ import type { DeepPartial } from "~/utils/types";
 import {
   piiRedactionLevelSchema,
   type RecordLogCommandData,
+  type RecordSpanCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  CLAUDE_CODE_EVENT_SCOPE,
+  synthesizeClaudeCodeSpans,
+  type ClaudeCodeLogRecordView,
+} from "./claude-code-log-to-span.synthesizer";
+
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
+  /**
+   * Optional: when supplied, the service synthesizes a gen_ai span
+   * from claude_code.events log records and records it alongside
+   * the raw log. Omit in tests / receivers that only want the raw
+   * log persistence path.
+   */
+  recordSpan?: (data: RecordSpanCommandData) => Promise<void>;
 }
 
 export class LogRequestCollectionService {
@@ -49,6 +63,12 @@ export class LogRequestCollectionService {
         let droppedCount = 0;
         let failedCount = 0;
 
+        const claudeViewsForSynthesis: ClaudeCodeLogRecordView[] = [];
+        const claudeResourceByScope = new Map<
+          string,
+          { resourceAttrs: Record<string, string>; scopeVersion: string | null }
+        >();
+
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
 
@@ -63,6 +83,13 @@ export class LogRequestCollectionService {
               (scopeLog.scope?.name as string | undefined) ?? "";
             const scopeVersion =
               (scopeLog.scope?.version as string | undefined) ?? null;
+
+            if (scopeName === CLAUDE_CODE_EVENT_SCOPE) {
+              claudeResourceByScope.set(scopeName, {
+                resourceAttrs,
+                scopeVersion,
+              });
+            }
 
             for (const logRecord of scopeLog.logRecords) {
               if (!logRecord) {
@@ -111,6 +138,25 @@ export class LogRequestCollectionService {
                   logRecord.attributes,
                 );
 
+                if (
+                  scopeName === CLAUDE_CODE_EVENT_SCOPE &&
+                  this.deps.recordSpan
+                ) {
+                  claudeViewsForSynthesis.push({
+                    scopeName,
+                    attrs: logAttrs,
+                    resourceAttrs,
+                    timeUnixNano: logRecord.timeUnixNano
+                      ? TraceRequestUtils.normalizeOtlpUnixNano(
+                          logRecord.timeUnixNano as
+                            | string
+                            | number
+                            | { low: number; high: number },
+                        )
+                      : null,
+                  });
+                }
+
                 await this.deps.recordLog({
                   tenantId,
                   traceId,
@@ -143,9 +189,54 @@ export class LogRequestCollectionService {
           }
         }
 
+        let synthesizedSpanCount = 0;
+        if (this.deps.recordSpan && claudeViewsForSynthesis.length > 0) {
+          const synthesized = synthesizeClaudeCodeSpans(
+            claudeViewsForSynthesis,
+          );
+          const claudeResource = claudeResourceByScope.get(
+            CLAUDE_CODE_EVENT_SCOPE,
+          );
+          for (const syn of synthesized) {
+            try {
+              await this.deps.recordSpan({
+                tenantId,
+                span: syn,
+                resource: claudeResource?.resourceAttrs
+                  ? {
+                      attributes: Object.entries(
+                        claudeResource.resourceAttrs,
+                      ).map(([key, value]) => ({
+                        key,
+                        value: { stringValue: value },
+                      })),
+                    }
+                  : null,
+                instrumentationScope: {
+                  name: CLAUDE_CODE_EVENT_SCOPE,
+                  version: claudeResource?.scopeVersion ?? null,
+                },
+                piiRedactionLevel:
+                  piiRedactionLevelSchema.parse(piiRedactionLevel),
+                occurredAt: Date.now(),
+              });
+              synthesizedSpanCount++;
+            } catch (error) {
+              this.logger.error(
+                { error, tenantId, traceId: syn.traceId, spanId: syn.spanId },
+                "Error recording synthesized claude_code span",
+              );
+            }
+          }
+        }
+
         span.setAttribute("logs.ingestion.successes", collectedCount);
         span.setAttribute("logs.ingestion.drops", droppedCount);
         span.setAttribute("logs.ingestion.failures", failedCount);
+        span.setAttribute(
+          "logs.ingestion.synthesized_spans",
+          synthesizedSpanCount,
+        );
       },
     );
   }
