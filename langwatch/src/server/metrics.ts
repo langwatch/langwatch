@@ -85,8 +85,7 @@ type JobType =
   | "usage_reporting"
   | "event_sourcing"
   | "scenario"
-  | "anomaly_detection"
-  | "orphan_sweep_chain";
+  | "anomaly_detection";
 
 type JobStatus = "processing" | "completed" | "failed";
 

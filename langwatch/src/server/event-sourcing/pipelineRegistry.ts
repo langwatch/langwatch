@@ -197,7 +197,6 @@ export interface PipelineRegistryDeps {
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
-  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -408,8 +407,6 @@ export class PipelineRegistry {
       ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
       : undefined;
 
-    const retentionOrphanSweepReactor = this.deps.retentionOrphanSweepReactor;
-
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -428,7 +425,6 @@ export class PipelineRegistry {
         gatewayBudgetSyncReactor,
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
-        retentionOrphanSweepReactor,
       }),
     );
 
