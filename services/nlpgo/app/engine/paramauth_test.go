@@ -79,7 +79,7 @@ func TestRedactSecrets(t *testing.T) {
 	})
 
 	t.Run("no-op on empty inputs", func(t *testing.T) {
-		assert.Equal(t, "", redactSecrets("", secrets))
+		assert.Empty(t, redactSecrets("", secrets))
 		assert.Equal(t, "x", redactSecrets("x", nil))
 	})
 }
