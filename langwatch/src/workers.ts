@@ -25,8 +25,14 @@ void verifyRedisReady().then(async () => {
     startIngestionPullerWorker();
     await scheduleIngestionPullers();
     logger.info("ingestion puller worker ready");
+
+    const { startTopicClusteringWorker } = await import(
+      "./server/topicClustering/topicClusteringWorker"
+    );
+    startTopicClusteringWorker();
+    logger.info("topic clustering worker ready");
   } catch (error) {
-    logger.error({ error }, "failed to start ingestion puller worker");
+    logger.error({ error }, "failed to start background workers");
     process.exit(1);
   }
 });

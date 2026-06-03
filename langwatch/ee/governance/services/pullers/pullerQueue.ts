@@ -1,7 +1,7 @@
 import type { ConnectionOptions } from "bullmq";
 
 import { prisma } from "~/server/db";
-import { QueueWithFallback } from "./queueWithFallback";
+import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 

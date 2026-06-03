@@ -379,6 +379,15 @@ export const navigationCommands: Command[] = [
     path: "/settings/annotation-scores",
   },
   {
+    id: "nav-settings-topic-clustering",
+    label: "Topic Clustering",
+    description: "Settings → Topic Clustering",
+    icon: Tags,
+    category: "navigation",
+    keywords: ["topic", "cluster", "group"],
+    path: "/settings/topic-clustering",
+  },
+  {
     id: "nav-settings-usage",
     label: "Usage",
     description: "Settings → Usage",
