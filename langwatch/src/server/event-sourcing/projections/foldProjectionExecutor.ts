@@ -6,6 +6,19 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
 /**
+ * Returns a context carrying the event's occurredAt as a store read hint, or
+ * the original context unchanged when the event has no usable occurredAt.
+ */
+function withOccurredAtHint(
+  context: ProjectionStoreContext,
+  event: Event,
+): ProjectionStoreContext {
+  const occurredAt = (event as Record<string, unknown>).occurredAt;
+  if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
+  return { ...context, occurredAtMs: occurredAt };
+}
+
+/**
  * Executes a fold projection incrementally by applying a single event to existing state.
  *
  * Flow:
@@ -30,7 +43,12 @@ export class FoldProjectionExecutor {
     }
 
     const key = context.key ?? context.aggregateId;
-    let state = await projection.store.get(key, context) ?? projection.init();
+    // Pass the event's occurredAt so a time-partitioned store (e.g. the trace
+    // summary store) can prune its backing-table read to a window around this
+    // time instead of scanning every partition. Best-effort: the store falls
+    // back to an unbounded read when the hint misses.
+    const loadContext = withOccurredAtHint(context, event);
+    let state = await projection.store.get(key, loadContext) ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
     const prevLastOccurred = (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
@@ -119,7 +137,12 @@ export class FoldProjectionExecutor {
     );
 
     const key = context.key ?? context.aggregateId;
-    let state = (await projection.store.get(key, context)) ?? projection.init();
+    // Hint the store with one event's occurredAt (any event in the batch is for
+    // the same aggregate, so it anchors the same partition window).
+    const loadContext = ordered[0]
+      ? withOccurredAtHint(context, ordered[0])
+      : context;
+    let state = (await projection.store.get(key, loadContext)) ?? projection.init();
 
     const prevLastOccurred =
       (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;

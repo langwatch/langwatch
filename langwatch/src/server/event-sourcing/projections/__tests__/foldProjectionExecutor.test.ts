@@ -52,7 +52,12 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 1 });
-      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, context);
+      // store.get receives the event's occurredAt as a read hint; store.store
+      // still gets the original context.
+      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, {
+        ...context,
+        occurredAtMs: 1000000,
+      });
       expect(store.store).toHaveBeenCalledWith({ count: 1 }, context);
     });
   });
@@ -181,7 +186,43 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 11 });
-      expect(store.get).toHaveBeenCalledWith("custom-key-123", context);
+      expect(store.get).toHaveBeenCalledWith("custom-key-123", {
+        ...context,
+        occurredAtMs: 1000000,
+      });
+    });
+
+    it("omits the occurredAt hint when the event has no occurredAt", async () => {
+      const store = createMockFoldProjectionStore<{ count: number }>();
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0 });
+
+      const foldDef = createMockFoldProjectionDefinition("counter", {
+        store,
+        init: () => ({ count: 0 }),
+        apply: (state: { count: number }, _event: Event) => ({
+          count: state.count + 1,
+        }),
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
+      // No usable occurredAt -> the context must be passed through unchanged.
+      (event as { occurredAt?: number }).occurredAt = 0;
+
+      const context: ProjectionStoreContext = {
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        tenantId,
+      };
+
+      await executor.execute(foldDef, event, context);
+
+      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, context);
+      const passedContext = (store.get as ReturnType<typeof vi.fn>).mock
+        .calls[0]![1];
+      expect(passedContext).not.toHaveProperty("occurredAtMs");
     });
   });
 });

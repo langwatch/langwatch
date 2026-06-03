@@ -57,9 +57,18 @@ export class TraceSummaryStore
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {
+    // When the executor knows the processed event's occurredAt, pass it as a
+    // partition-prune hint: trace_summaries is partitioned by toYearWeek
+    // (OccurredAt) and this read otherwise has no time predicate, so it
+    // cold-scans every partition (incl. S3 tier). findByTraceId narrows to a
+    // ±2-day window around the hint and falls back to an unbounded read if the
+    // window misses, so correctness is unchanged.
     return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,
+      context.occurredAtMs !== undefined
+        ? { occurredAtMs: context.occurredAtMs }
+        : undefined,
     );
   }
 }
