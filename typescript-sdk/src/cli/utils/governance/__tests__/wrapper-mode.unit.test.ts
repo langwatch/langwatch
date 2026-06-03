@@ -82,7 +82,7 @@ function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
 describe("resolveWrapperMode", () => {
   describe("when a personal VK is configured", () => {
     it("returns gateway mode with the gateway env vars unchanged", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       const cfg = baseCfg({
         default_personal_vk: { id: "vk1", secret: "lw_vk_secret", prefix: "lw_vk_" },
       });
@@ -101,7 +101,7 @@ describe("resolveWrapperMode", () => {
      * remembering to invoke a separate install command.
      */
     it("falls through to ingestion mode and mints a new binding", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
         {
           id: "tpl_codex",
@@ -137,7 +137,7 @@ describe("resolveWrapperMode", () => {
     });
 
     it("writes the [otel] block to the codex config.toml as a side effect", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
         {
           id: "tpl_codex",
@@ -170,7 +170,7 @@ describe("resolveWrapperMode", () => {
     });
 
     it("rotates the binding when one already exists rather than minting again", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
         {
           id: "tpl_codex",
@@ -215,7 +215,7 @@ describe("resolveWrapperMode", () => {
      * would normally win the auto-pick.
      */
     it("uses ingestion mode and skips the gateway envs", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
         {
           id: "tpl_codex",
@@ -251,7 +251,7 @@ describe("resolveWrapperMode", () => {
 
   describe("when the tool has no ingestion template (e.g. cursor)", () => {
     it("falls back to gateway mode without erroring", async () => {
-      const { resolveWrapperMode } = await import("../wrapper-mode");
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
       const out = await resolveWrapperMode(baseCfg(), "cursor", {
         OPENAI_BASE_URL: "http://gw",
       });

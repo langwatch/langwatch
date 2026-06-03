@@ -127,3 +127,115 @@ export function writeCodexOtelBlock(
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+const GW_BEGIN = "# >>> langwatch gateway begin >>>";
+const GW_END = "# <<< langwatch gateway end <<<";
+
+export interface CodexGatewayBlockInputs {
+  /** Gateway base URL, e.g. https://gateway.langwatch.ai */
+  gatewayUrl: string;
+  /**
+   * Env var name codex should read the API key from. Defaults to
+   * OPENAI_API_KEY because that's the standard codex env. The
+   * wrapper still sets OPENAI_API_KEY to the user's VK before
+   * spawning codex, so this matches the wrapper's env injection
+   * out of the box.
+   */
+  envKey?: string;
+}
+
+export interface CodexGatewayWriteResult {
+  action: CodexOtelWriteAction;
+  path: string;
+  /**
+   * The profile name codex must be invoked with to actually route
+   * through the langwatch provider — e.g. `codex --profile
+   * langwatch-gateway`. Returned so the wrapper doesn't have to
+   * hardcode the name in two places.
+   */
+  profile: string;
+}
+
+const PROFILE_NAME = "langwatch-gateway";
+
+/**
+ * Build the additive [model_providers.langwatch] +
+ * [profiles.langwatch-gateway] block. Codex 0.130+ defaults to
+ * ChatGPT OAuth and ignores OPENAI_API_KEY unless an explicit
+ * model_provider config is selected with `name = "OpenAI"`,
+ * `env_key`, and `wire_api = "responses"` (the "chat" wire_api
+ * is no longer supported per the codex binary strings dump).
+ *
+ * We deliberately write a NEW provider entry + a NEW profile so
+ * the user's existing top-level `model_provider` / default codex
+ * behaviour is untouched. Activation happens via `codex --profile
+ * langwatch-gateway`, set by the wrapper at spawn time.
+ */
+export function buildCodexGatewayBlock(
+  inputs: CodexGatewayBlockInputs,
+): string {
+  const envKey = inputs.envKey ?? "OPENAI_API_KEY";
+  const cleanedBase = inputs.gatewayUrl.replace(/\/+$/, "");
+  const baseUrl = cleanedBase.endsWith("/v1") ? cleanedBase : `${cleanedBase}/v1`;
+  return [
+    GW_BEGIN,
+    `# Managed by 'langwatch codex' (Path A wrapper). Re-running the`,
+    `# wrapper updates this block in place; remove the marker pair`,
+    `# above and below to opt back out.`,
+    `# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
+    `# block doesn't change codex's default model_provider.`,
+    `[model_providers.langwatch]`,
+    `name = "OpenAI"`,
+    `base_url = "${baseUrl}"`,
+    `env_key = "${envKey}"`,
+    `wire_api = "responses"`,
+    ``,
+    `[profiles.${PROFILE_NAME}]`,
+    `model_provider = "langwatch"`,
+    GW_END,
+    "",
+  ].join("\n");
+}
+
+/**
+ * Idempotent merge of the gateway profile block. Same shape as
+ * writeCodexOtelBlock — creates / updates / unchanged. Marker
+ * pair is distinct from the [otel] pair so both blocks can
+ * coexist without colliding (a user on Path A who later flips to
+ * Path B keeps both blocks; only one fires per invocation per
+ * the no-double-trace rule).
+ */
+export function writeCodexGatewayBlock(
+  inputs: CodexGatewayBlockInputs,
+  options: { filePath?: string } = {},
+): CodexGatewayWriteResult {
+  const filePath = options.filePath ?? defaultCodexConfigPath();
+  const block = buildCodexGatewayBlock(inputs);
+
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, block, { mode: 0o600 });
+    return { action: "created", path: filePath, profile: PROFILE_NAME };
+  }
+
+  const prior = fs.readFileSync(filePath, "utf8");
+  const re = new RegExp(
+    `${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
+    "m",
+  );
+  if (re.test(prior)) {
+    const next = prior.replace(re, block);
+    if (next === prior) {
+      return { action: "unchanged", path: filePath, profile: PROFILE_NAME };
+    }
+    fs.writeFileSync(filePath, next, { mode: 0o600 });
+    return { action: "updated", path: filePath, profile: PROFILE_NAME };
+  }
+
+  const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+  fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+  return { action: "updated", path: filePath, profile: PROFILE_NAME };
+}
+
+/** Exported so callers + tests can reference the profile name from one place. */
+export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;

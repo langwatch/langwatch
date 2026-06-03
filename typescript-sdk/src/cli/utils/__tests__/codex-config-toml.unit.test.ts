@@ -5,7 +5,10 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  buildCodexGatewayBlock,
   buildCodexOtelBlock,
+  CODEX_GATEWAY_PROFILE_NAME,
+  writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "../codex-config-toml";
 
@@ -157,5 +160,99 @@ describe("writeCodexOtelBlock", () => {
       expect(contents).toContain(`[tui.model_availability_nux]`);
       expect(contents).toContain(`trust_level = "trusted"`);
     });
+  });
+});
+
+describe("buildCodexGatewayBlock", () => {
+  /**
+   * Codex 0.130+ defers to ChatGPT OAuth unless an explicit
+   * model_provider with name="OpenAI" + env_key + wire_api is
+   * picked. Confirmed by Andre's dogfood at 24d07fc6a where
+   * `langwatch codex` spawned codex but the child ignored
+   * OPENAI_API_KEY and routed to auth.openai.com instead of the
+   * local gateway.
+   */
+  it("emits the langwatch model_provider + gateway profile", () => {
+    const out = buildCodexGatewayBlock({
+      gatewayUrl: "https://gateway.langwatch.ai",
+    });
+    expect(out).toContain("[model_providers.langwatch]");
+    expect(out).toContain(`name = "OpenAI"`);
+    expect(out).toContain(`base_url = "https://gateway.langwatch.ai/v1"`);
+    expect(out).toContain(`env_key = "OPENAI_API_KEY"`);
+    expect(out).toContain(`wire_api = "responses"`);
+    expect(out).toContain(`[profiles.${CODEX_GATEWAY_PROFILE_NAME}]`);
+    expect(out).toContain(`model_provider = "langwatch"`);
+  });
+
+  describe("when the gatewayUrl already ends with /v1", () => {
+    it("does NOT double-append /v1", () => {
+      const out = buildCodexGatewayBlock({
+        gatewayUrl: "http://localhost:5563/v1",
+      });
+      expect(out).toContain(`base_url = "http://localhost:5563/v1"`);
+      expect(out).not.toContain(`/v1/v1`);
+    });
+  });
+
+  describe("when a custom env_key is requested", () => {
+    it("uses it instead of the OPENAI_API_KEY default", () => {
+      const out = buildCodexGatewayBlock({
+        gatewayUrl: "http://gw",
+        envKey: "LANGWATCH_PERSONAL_VK",
+      });
+      expect(out).toContain(`env_key = "LANGWATCH_PERSONAL_VK"`);
+      expect(out).not.toContain(`env_key = "OPENAI_API_KEY"`);
+    });
+  });
+});
+
+describe("writeCodexGatewayBlock", () => {
+  it("does not collide with a pre-existing [otel] marker block", () => {
+    const filePath = path.join(tmp, "config.toml");
+    writeCodexOtelBlock(
+      {
+        endpoint: "http://localhost:5560/api/otel",
+        ingestionToken: "ik-lw-zzz",
+      },
+      { filePath },
+    );
+
+    const result = writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath },
+    );
+    expect(result.action).toBe("updated");
+
+    const contents = fs.readFileSync(filePath, "utf8");
+    // Both bracketed regions should now exist independently.
+    expect(contents).toContain("# >>> langwatch otel begin >>>");
+    expect(contents).toContain("# >>> langwatch gateway begin >>>");
+    expect(contents).toContain("[model_providers.langwatch]");
+    expect(contents).toContain("[otel]");
+  });
+
+  it("returns the langwatch-gateway profile name for the wrapper to pass via --profile", () => {
+    const result = writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath: path.join(tmp, "config.toml") },
+    );
+    expect(result.profile).toBe(CODEX_GATEWAY_PROFILE_NAME);
+  });
+
+  it("idempotently replaces the bracketed region on re-run", () => {
+    const filePath = path.join(tmp, "config.toml");
+    writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath },
+    );
+    const result = writeCodexGatewayBlock(
+      { gatewayUrl: "http://localhost:5563" },
+      { filePath },
+    );
+    expect(result.action).toBe("unchanged");
+    const contents = fs.readFileSync(filePath, "utf8");
+    const beginCount = (contents.match(/langwatch gateway begin/g) ?? []).length;
+    expect(beginCount).toBe(1);
   });
 });

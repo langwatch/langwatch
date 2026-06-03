@@ -24,7 +24,11 @@
  * first-run prompt similar to shell-rc.ts on top.
  */
 
-import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
+import {
+  CODEX_GATEWAY_PROFILE_NAME,
+  writeCodexGatewayBlock,
+  writeCodexOtelBlock,
+} from "@/cli/utils/codex-config-toml";
 
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
@@ -43,11 +47,17 @@ export interface WrapperModeResult {
   /** Env additions to merge into the child process.env. */
   vars: Record<string, string>;
   /**
-   * Path of the codex config.toml that was created / updated. Only
-   * set for codex + ingestion mode; lets callers surface "we wrote
-   * X for you" without re-deriving the path.
+   * Path of the codex config.toml that was created / updated. Set
+   * for both codex Path A (writes [model_providers.langwatch] +
+   * [profiles.langwatch-gateway]) and Path B (writes [otel]).
    */
   codexConfigPath?: string;
+  /**
+   * Extra args to prepend to the child invocation. Used for codex
+   * Path A: `--profile langwatch-gateway` forces the new provider
+   * entry without touching the user's default model_provider.
+   */
+  extraArgs?: string[];
   /** True when the wrapper minted a fresh binding (vs reused an existing). */
   newBindingMinted?: boolean;
 }
@@ -93,6 +103,24 @@ export async function resolveWrapperMode(
           : "ingestion";
 
   if (mode === "gateway") {
+    // Codex 0.130+ defers to ChatGPT OAuth by default and ignores
+    // OPENAI_API_KEY unless the active model_provider is an
+    // explicit env-keyed entry. Write a langwatch provider +
+    // profile to ~/.codex/config.toml and force codex into it via
+    // `--profile`. Other tools (claude/gemini/cursor/opencode)
+    // honour their base-URL+API-key env directly, no toml needed.
+    if (tool === "codex") {
+      const gw = writeCodexGatewayBlock({
+        gatewayUrl: cfg.gateway_url,
+        envKey: "OPENAI_API_KEY",
+      });
+      return {
+        mode,
+        vars: gatewayVars,
+        codexConfigPath: gw.path,
+        extraArgs: ["--profile", gw.profile],
+      };
+    }
     return { mode, vars: gatewayVars };
   }
 
