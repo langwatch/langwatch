@@ -5,6 +5,10 @@ import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
 
 const EMPTY: never[] = [];
+const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
+  facets: EMPTY,
+  pending: true,
+};
 
 export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
@@ -76,8 +80,15 @@ export function useTraceFacets() {
 
   const isFromOtherProject = dataProjectIdRef.current !== projectId;
 
+  // Cold-miss responses come back with `pending: true` and an empty
+  // facets array — treat that as still-loading so the FilterSidebar
+  // keeps rendering the FACET_DEFAULTS skeleton (gated on `isLoading`)
+  // until the SSE-driven invalidation lands the real payload. Without
+  // this, the sidebar would flash empty for the 1–2s ClickHouse scan.
+  const result = isFromOtherProject ? EMPTY_RESULT : (query.data ?? EMPTY_RESULT);
+
   return {
-    data: isFromOtherProject ? EMPTY : (query.data ?? EMPTY),
-    isLoading: query.isLoading || isFromOtherProject,
+    data: result.facets,
+    isLoading: query.isLoading || isFromOtherProject || result.pending,
   };
 }

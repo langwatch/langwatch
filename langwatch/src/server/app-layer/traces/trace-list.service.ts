@@ -106,6 +106,19 @@ interface DiscoverParams {
   timeRange: { from: number; to: number };
 }
 
+export interface DiscoverResult {
+  facets: FacetDescriptor[];
+  /**
+   * True when the cache was cold and a background compute was kicked
+   * off. Callers should treat this as a loading signal — the SSE
+   * `discover_updated` push will land the real values shortly. False
+   * means `facets` is the latest committed payload (possibly stale
+   * within the SWR window, with a background refresh already in
+   * flight).
+   */
+  pending: boolean;
+}
+
 interface FacetValuesParams {
   tenantId: string;
   timeRange: { from: number; to: number };
@@ -291,15 +304,17 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-function discoverCacheKey(params: DiscoverParams): string {
-  const snapped = snapToWindowPreset(params.timeRange);
+function discoverCacheKey(
+  tenantId: string,
+  snapped: ReturnType<typeof snapToWindowPreset>,
+): string {
   // Include the snapped `from` alongside `to` so two requests with
   // different actual spans that happen to land in the same preset
   // label (e.g. a 15-minute window and a 1-hour window both classify
   // as "1h") don't collide on a single cache slot. Without `from` we'd
   // serve the first-computed payload to both viewers; the second
   // viewer's facets would be for a window they aren't looking at.
-  return [params.tenantId, snapped.label, snapped.from, snapped.to].join("|");
+  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
 interface CategoricalFacetDescriptor {
@@ -522,7 +537,7 @@ export class TraceListService {
   /** Per-pod dedup of in-flight background refreshes. */
   private readonly discoverRefreshing = new Set<string>();
 
-  async getDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
+  async getDiscover(params: DiscoverParams): Promise<DiscoverResult> {
     // Snap the requested window to a canonical preset BEFORE the cache
     // lookup so two users on the same tenant + window share a slot even
     // when their (from, to) timestamps differ by sub-minute drift. The
@@ -533,7 +548,7 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: { from: snapped.from, to: snapped.to },
     };
-    const cacheKey = discoverCacheKey(params);
+    const cacheKey = discoverCacheKey(params.tenantId, snapped);
     const cached = await DISCOVER_CACHE.get(cacheKey);
 
     if (cached) {
@@ -545,20 +560,20 @@ export class TraceListService {
       if (Date.now() - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
         this.refreshDiscoverInBackground(snappedParams, cacheKey);
       }
-      return cached.value;
+      return { facets: cached.value, pending: false };
     }
 
-    // Cold miss: return an empty payload IMMEDIATELY + start an async
-    // compute that will hydrate the cache and SSE-broadcast when done.
-    // Caller (`tracesV2.discover` → React Query → `useTraceFacets`)
-    // renders the synthetic FACET_DEFAULTS skeleton while waiting, so
-    // the user never blocks on the 1-2s ClickHouse scan. Trade-off:
-    // first viewer sees an empty sidebar for ~1-2s instead of a
-    // spinner; subsequent viewers within the TTL hit the warm cache.
-    // The discover_updated SSE push fills in the values without the
-    // user having to refresh.
+    // Cold miss: return `pending: true` with an empty facet list + start
+    // an async compute that will hydrate the cache and SSE-broadcast
+    // when done. Caller (`tracesV2.discover` → React Query →
+    // `useTraceFacets`) treats `pending` as a loading signal so the
+    // synthetic FACET_DEFAULTS skeleton renders while we wait, instead
+    // of an empty sidebar. Trade-off: first viewer sees the curated
+    // skeleton for ~1-2s instead of real values; subsequent viewers
+    // within the TTL hit the warm cache. The discover_updated SSE push
+    // flips `pending` to false without the user having to refresh.
     this.refreshDiscoverInBackground(snappedParams, cacheKey);
-    return [];
+    return { facets: [], pending: true };
   }
 
   private refreshDiscoverInBackground(
