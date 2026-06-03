@@ -23,14 +23,43 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
 }));
 
-// Mock scheduleTraceCollectionWithFallback to capture trace data
+// Mock getApp().traces.recordSpan to capture the OTLP span the route records.
 const mockScheduleTrace = vi.fn().mockResolvedValue(undefined);
-vi.mock("~/server/background/workers/collectorWorker", () => ({
-  scheduleTraceCollectionWithFallback: (...args: unknown[]) =>
-    mockScheduleTrace(...args),
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    traces: {
+      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+    },
+  }),
 }));
 
-type CollectorJob = {
+type OtlpAttr = { key: string; value: { stringValue?: string; doubleValue?: number; boolValue?: boolean } };
+type OtlpSpan = {
+  traceId: string;
+  attributes: OtlpAttr[];
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
+  status: { code: number; message?: string };
+};
+type RecordSpanArgs = {
+  tenantId: string;
+  span: OtlpSpan;
+  resource: { attributes: OtlpAttr[] } | null;
+};
+
+function recordSpanArgs(): RecordSpanArgs {
+  return mockScheduleTrace.mock.calls[0]![0] as RecordSpanArgs;
+}
+
+function findAttr(attrs: OtlpAttr[] | undefined, key: string): OtlpAttr["value"] | undefined {
+  return attrs?.find((a) => a.key === key)?.value;
+}
+
+function resourceAttr(key: string): string | undefined {
+  return findAttr(recordSpanArgs().resource?.attributes, key)?.stringValue;
+}
+
+type CollectorJobFacade = {
   projectId: string;
   traceId: string;
   spans: Array<{
@@ -43,11 +72,36 @@ type CollectorJob = {
   customMetadata: Record<string, unknown>;
 };
 
-function getTraceJob(): CollectorJob {
-  return mockScheduleTrace.mock.calls[0]![0] as CollectorJob;
+function getTraceJob(): CollectorJobFacade {
+  const args = recordSpanArgs();
+  const span = args.span;
+  const inputJson = findAttr(span.attributes, "langwatch.input")?.stringValue;
+  const outputJson = findAttr(span.attributes, "langwatch.output")?.stringValue;
+  const hasError = findAttr(span.attributes, "error.has_error")?.boolValue ?? false;
+  const errorMessage = findAttr(span.attributes, "error.message")?.stringValue ?? "";
+  return {
+    projectId: args.tenantId,
+    traceId: span.traceId,
+    spans: [
+      {
+        input: { value: inputJson ? JSON.parse(inputJson).value : undefined },
+        output: { value: outputJson ? JSON.parse(outputJson).value : undefined },
+        error: hasError ? { has_error: true, message: errorMessage } : null,
+        timestamps: {
+          started_at: Math.floor(Number(span.startTimeUnixNano) / 1_000_000),
+          finished_at: Math.floor(Number(span.endTimeUnixNano) / 1_000_000),
+        },
+      },
+    ],
+    reservedTraceMetadata: { user_id: resourceAttr("langwatch.user.id") },
+    customMetadata: {
+      type: resourceAttr("langwatch.metadata.type"),
+      agent_id: resourceAttr("langwatch.metadata.agent_id"),
+    },
+  };
 }
 
-function parseOutputValue(span: CollectorJob["spans"][number]): Record<string, unknown> {
+function parseOutputValue(span: CollectorJobFacade["spans"][number]): Record<string, unknown> {
   const value = span.output?.value;
   return (typeof value === "string" ? JSON.parse(value) : value) as Record<string, unknown>;
 }

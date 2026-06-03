@@ -1,0 +1,99 @@
+import type { ConnectionOptions } from "bullmq";
+import crypto from "crypto";
+import { prisma } from "../db";
+import { connection } from "../redis";
+import { QueueWithFallback } from "~/server/queues/queueWithFallback";
+import {
+  TOPIC_CLUSTERING_QUEUE,
+  runTopicClusteringJob,
+  type TopicClusteringJob,
+} from "./topicClusteringWorker";
+
+export { TOPIC_CLUSTERING_QUEUE };
+
+export const topicClusteringQueue = new QueueWithFallback<
+  TopicClusteringJob,
+  void,
+  string
+>(TOPIC_CLUSTERING_QUEUE.NAME, runTopicClusteringJob, {
+  connection: connection as ConnectionOptions,
+  defaultJobOptions: {
+    backoff: {
+      type: "exponential",
+      delay: 5000,
+    },
+    attempts: 3,
+    removeOnComplete: {
+      age: 0, // immediately remove completed jobs
+    },
+    removeOnFail: {
+      age: 60 * 60 * 24 * 3, // 3 days
+    },
+  },
+});
+
+export const scheduleTopicClustering = async () => {
+  const projects = await prisma.project.findMany({
+    where: { firstMessage: true },
+    select: { id: true },
+  });
+
+  const jobs = projects.map((project) => {
+    const hash = crypto.createHash("sha256");
+    hash.update(project.id);
+    const hashedValue = hash.digest("hex");
+    const hashNumber = parseInt(hashedValue, 16);
+    const distributionHour = hashNumber % 24;
+    const distributionMinute = hashNumber % 60;
+    const yyyymmdd = new Date().toISOString().split("T")[0];
+
+    return {
+      name: TOPIC_CLUSTERING_QUEUE.JOB,
+      data: { project_id: project.id },
+      opts: {
+        jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
+        delay:
+          distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
+      },
+    };
+  });
+
+  await topicClusteringQueue.addBulk(jobs);
+};
+
+export const scheduleTopicClusteringNextPage = async (
+  projectId: string,
+  searchAfter: [number, string],
+) => {
+  const yyyymmdd = new Date().toISOString().split("T")[0];
+
+  await topicClusteringQueue.add(
+    TOPIC_CLUSTERING_QUEUE.JOB,
+    { project_id: projectId, search_after: searchAfter },
+    {
+      jobId: `topic_clustering_${projectId}_${yyyymmdd}_${searchAfter.join(
+        "_",
+      )}`,
+      delay: 1000,
+    },
+  );
+};
+
+export const scheduleTopicClusteringForProject = async (
+  projectId: string,
+  isManualTrigger = false,
+) => {
+  const timestamp = Date.now();
+  const jobIdSuffix = isManualTrigger
+    ? `manual_${timestamp}`
+    : new Date().toISOString().split("T")[0];
+
+  await topicClusteringQueue.add(
+    TOPIC_CLUSTERING_QUEUE.JOB,
+    { project_id: projectId },
+    {
+      jobId: `topic_clustering_${projectId}_${jobIdSuffix}`,
+      delay: 0, // Run immediately for manual triggers
+    },
+  );
+};

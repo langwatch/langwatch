@@ -12,7 +12,7 @@ import {
   OtlpSpanPiiRedactionService,
 } from "../span-pii-redaction.service";
 
-vi.mock("~/server/background/workers/collector/piiCheck", () => ({
+vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
   googleDLPClearPII: vi.fn(),
   PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],

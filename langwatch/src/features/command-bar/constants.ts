@@ -38,6 +38,7 @@ export const iconColors: Record<string, string> = {
   "settings-model-providers": "orange.400",
   "settings-model-costs": "green.300",
   "settings-annotation-scores": "yellow.400",
+  "settings-topic-clustering": "cyan.400",
   "settings-usage": "blue.400",
   "settings-subscription": "pink.400",
   "settings-authentication": "red.400",
