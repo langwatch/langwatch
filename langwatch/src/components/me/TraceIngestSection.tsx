@@ -8,7 +8,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, Check, MousePointer2, Terminal, Users } from "lucide-react";
+import {
+  Bot,
+  Check,
+  Code2,
+  MousePointer2,
+  Sparkles,
+  Terminal,
+  Users,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import {
@@ -57,6 +65,18 @@ const TILE_META: Record<
   cursor: {
     icon: <MousePointer2 size={20} />,
     subtitle: "Cursor IDE telemetry",
+  },
+  codex: {
+    icon: <Code2 size={20} />,
+    subtitle: "OpenAI Codex CLI telemetry",
+  },
+  gemini: {
+    icon: <Sparkles size={20} />,
+    subtitle: "Google Gemini CLI telemetry",
+  },
+  opencode: {
+    icon: <Terminal size={20} />,
+    subtitle: "opencode terminal agent telemetry",
   },
   claude_cowork: {
     icon: <Users size={20} />,

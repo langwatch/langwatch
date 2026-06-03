@@ -3,10 +3,10 @@
 /**
  * Platform-published default IngestionTemplate rows.
  *
- * v1 ships three real templates (claude_code / cursor / claude_cowork),
- * each `organizationId IS NULL` so they appear in every org's catalog.
- * The fourth /me Trace Ingest tile (`raw_otlp_advanced`) is a client-side
- * discovery card — it deep-links to the personal OTLP endpoint panel
+ * v1 ships six real templates (claude_code / cursor / codex / gemini /
+ * opencode / claude_cowork), each `organizationId IS NULL` so they
+ * appear in every org's catalog. The /me Trace Ingest tile
+ * `raw_otlp_advanced` is a client-side discovery card — it deep-links to the personal OTLP endpoint panel
  * and does NOT mint a UserIngestionBinding, so it intentionally has no
  * IngestionTemplate row (see Andre PM call at 348936e4f).
  *
@@ -51,6 +51,36 @@ export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] = [
     description:
       "Connect Cursor's agent telemetry export. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
     iconAsset: "preset:cursor",
+    credentialSchema: null,
+    ottlRules: "",
+  },
+  {
+    slug: "codex",
+    sourceType: "codex",
+    displayName: "Codex",
+    description:
+      "Connect OpenAI Codex CLI to LangWatch. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
+    iconAsset: "preset:codex",
+    credentialSchema: null,
+    ottlRules: "",
+  },
+  {
+    slug: "gemini",
+    sourceType: "gemini",
+    displayName: "Gemini",
+    description:
+      "Connect Google Gemini CLI to LangWatch. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
+    iconAsset: "preset:gemini",
+    credentialSchema: null,
+    ottlRules: "",
+  },
+  {
+    slug: "opencode",
+    sourceType: "opencode",
+    displayName: "opencode",
+    description:
+      "Connect opencode (open-source terminal coding agent) telemetry. Spans emitted via OTEL_*_EXPORTER land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
+    iconAsset: "preset:opencode",
     credentialSchema: null,
     ottlRules: "",
   },

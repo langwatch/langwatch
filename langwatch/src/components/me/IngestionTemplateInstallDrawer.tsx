@@ -30,10 +30,53 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
       base,
+      `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
+    ].join("\n");
+  }
+  if (slug === "codex") {
+    // Codex 0.130+ links the opentelemetry-otlp Rust SDK and reads the
+    // standard OTEL_EXPORTER_OTLP_* env vars, but the actual exporter
+    // is gated on a config.toml entry — "No OTEL exporter enabled in
+    // settings." is the no-op path. Users must add an [otel] block to
+    // ~/.codex/config.toml to activate emission; once active, these
+    // env vars route spans here. The wrapper env injection is a
+    // forward-looking placeholder until codex ships an env-var enable.
+    return [
+      `export OTEL_TRACES_EXPORTER=otlp`,
+      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      base,
+      `export OTEL_RESOURCE_ATTRIBUTES="service.name=codex"`,
+    ].join("\n");
+  }
+  if (slug === "gemini") {
+    // Gemini CLI resolves telemetry from argv > env > settings.json.
+    // Env-var path: GEMINI_TELEMETRY_ENABLED=true + target=local +
+    // GEMINI_TELEMETRY_OTLP_ENDPOINT (falls back to
+    // OTEL_EXPORTER_OTLP_ENDPOINT) + GEMINI_TELEMETRY_OTLP_PROTOCOL=http.
+    // Source: @google/gemini-cli-core dist/src/telemetry/config.js.
+    return [
+      `export GEMINI_TELEMETRY_ENABLED=true`,
+      `export GEMINI_TELEMETRY_TARGET=local`,
+      `export GEMINI_TELEMETRY_OTLP_PROTOCOL=http`,
+      `export OTEL_TRACES_EXPORTER=otlp`,
+      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      base,
+      `export OTEL_RESOURCE_ATTRIBUTES="service.name=gemini-cli"`,
+    ].join("\n");
+  }
+  if (slug === "opencode") {
+    return [
+      `export OTEL_TRACES_EXPORTER=otlp`,
+      `export OTEL_LOGS_EXPORTER=otlp`,
+      `export OTEL_METRICS_EXPORTER=otlp`,
+      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      base,
+      `export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"`,
     ].join("\n");
   }
   return base;
