@@ -404,8 +404,9 @@ export function CodeEditor({
         // unusable for normal typing.
         acceptSuggestionOnCommitCharacter: false,
         // Surface the quick-fix lightbulb whenever our code-action provider
-        // has fixes for the current line's diagnostics.
-        lightbulb: { enabled: "on" as any },
+        // has fixes for the current line's diagnostics. `editor.ShowLightbulbIconMode.On`
+        // is the string-enum value `"on"` — on both code lines and empty lines.
+        lightbulb: { enabled: "on" as editor.ShowLightbulbIconMode },
         // VS Code parity polish: coloured brackets, indent + bracket guides,
         // sticky scroll so `class Code` / `def __call__` stay pinned at the
         // top while reading deep into a method, and a 100-column ruler that
