@@ -34,6 +34,10 @@ overrides:
   # Security: vite WebSocket file read + server.fs.deny bypass (#783/#784)
   "vite@<7.3.2": "7.3.2"
   "vite@>=8.0.0 <8.0.5": "8.0.5"
+  # Supply-chain: pin vite to 8.0.10 — newer patches (e.g. 8.0.16 published
+  # 2026-06-01) haven't aged past the 7-day minimumReleaseAge gate yet, and
+  # range-style overrides target the requested spec, not the resolved version.
+  vite: 8.0.10
   # Security: Next.js DoS with Server Components (#872)
   # next is an unused optional peer dep of better-auth (this is a Vite app)
   "next@>=13.0.0 <15.5.15": "15.5.15"
