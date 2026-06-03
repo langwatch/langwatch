@@ -68,6 +68,11 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
     <Popover.Root
       open={props.open}
       onOpenChange={(e) => props.onOpenChange(e.open)}
+      // lazyMount + unmountOnExit so a closed annotation form is not
+      // sitting in DOM (one per turn × two trigger modes = 2N dead
+      // popovers on a long conversation otherwise).
+      lazyMount
+      unmountOnExit
       positioning={{
         placement: "bottom-end",
         // Flip & shift so the popover stays inside the viewport instead of
@@ -548,6 +553,11 @@ export function ScoreChip({
         setOpen(e.open);
         if (!e.open) commitReason();
       }}
+      // Multiple of these popovers can render per annotation form (one
+      // per score field). Drop them from DOM when closed so the form
+      // stays cheap to keep mounted.
+      lazyMount
+      unmountOnExit
       positioning={{ placement: "bottom-start" }}
     >
       <Popover.Trigger asChild>
