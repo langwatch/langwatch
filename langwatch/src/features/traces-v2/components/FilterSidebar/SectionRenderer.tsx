@@ -132,6 +132,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       }
       onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
     />
   );
 };
