@@ -612,8 +612,9 @@ export const DashboardLayout = ({
     !publicPage &&
     userIsPartOfTeam &&
     isProjectRoute &&
-    isLangwatchStaff(user?.email) &&
-    langyFlagEnabled;
+    // Staff always see Langy; the flag only extends it to non-staff. Mirrors
+    // the server gate in src/server/routes/langy.ts.
+    (isLangwatchStaff(user?.email) || langyFlagEnabled);
 
   return (
     <LangyProvider>
