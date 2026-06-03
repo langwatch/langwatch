@@ -762,9 +762,14 @@ model Trigger {
   // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
   notificationCadence  String        @default("immediate")
-  // Per-trigger trace-readiness debounce in ms (ADR-026). Notify-class
-  // triggers wait this long after the last span before filters re-evaluate
-  // on the settled fold. Persist-class actions dispatch inline and ignore this.
+  // Per-trigger trace-readiness debounce in ms (ADR-026). The column
+  // applies to every action class — a persist row captured before the
+  // trace settles diverges from the trace UI permanently. Today only
+  // notify-class triggers actually read this (they route through the
+  // outbox settle stage); persist-class triggers still dispatch inline
+  // until the persist-side debounce wiring lands. The column default
+  // is set so a future code change can enable persist-side debounce
+  // without a schema migration.
   traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
   customGraphId String?       @unique
