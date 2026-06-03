@@ -60,7 +60,10 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
-import { TraceListService } from "./traces/trace-list.service";
+import {
+  setDiscoverBroadcaster,
+  TraceListService,
+} from "./traces/trace-list.service";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -190,6 +193,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceListService",
   );
+  // Wire the discover-cache → SSE bridge. Module-level setter keeps
+  // the TraceListService constructor lean (the null/test preset below
+  // doesn't need a broadcaster — refreshes that never get an SSE push
+  // still hydrate the cache successfully).
+  setDiscoverBroadcaster((tenantId) => {
+    // Broadcast.event payload is a string by contract — sender + SSE
+    // bridge both deserialise it on the client. Keep it tiny: timestamp
+    // is enough for the client to confirm freshness; the actual payload
+    // ships through the discover query they re-fire on receipt.
+    const payload = JSON.stringify({
+      event: "discover_updated",
+      tenantId,
+      timestamp: Date.now(),
+    });
+    void broadcast.broadcastToTenantRateLimited(
+      tenantId,
+      payload,
+      "discover_updated",
+    );
+  });
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
