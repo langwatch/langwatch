@@ -8,8 +8,8 @@
 
 ADR-022 enforces retention with ClickHouse-native TTL: expired trace rows are
 dropped at merge time. PostgreSQL rows that reference traces by `traceId`
-(`Annotation`, `AnnotationQueueItem`, `PublicShare`, `TriggerSent`) are *not*
-dropped by that TTL, so they can outlive the trace they point at.
+(`Annotation`, `AnnotationQueueItem`, `PublicShare`, `TriggerSent`, `PinnedTrace`)
+are *not* dropped by that TTL, so they can outlive the trace they point at.
 
 ADR-023 added a **per-tenant orphan sweep** to delete those PG rows: an
 ingestion reactor seeded a self-perpetuating BullMQ chain that walked
@@ -53,6 +53,8 @@ indefinitely:
 - `PublicShare` of an expired trace remains (the link resolves to a missing
   trace).
 - `TriggerSent.traceId` keeps pointing at an expired trace.
+- `PinnedTrace` of an expired trace remains — the pin resolves to nothing (the
+  deleted sweep used to remove these; see `specs/data-retention/trace-pinning.feature`).
 
 None of these corrupts data or crosses tenants; they are stale references for
 data the user already let expire. Storage growth is negligible relative to the

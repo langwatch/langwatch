@@ -62,9 +62,9 @@ only mutations we ever issue are retroactive rewrites of the column itself,
 never `DELETE FROM`. The reconciler installs the TTL clause; ClickHouse does
 the work.
 
-**Server-resolved everywhere.** Every authz gate, retroactive value, and
-orphan-cleanup trigger derives its inputs from the server-side cascade. The
-client never supplies a retention value to an enforcement path. An earlier
+**Server-resolved everywhere.** Every authz gate and retroactive value
+derives its inputs from the server-side cascade. The client never supplies a
+retention value to an enforcement path. An earlier
 draft of the retroactive endpoint accepted `newRetentionDays` from the
 client; a reviewer P1 caught that a `project:update` caller could rewrite
 all existing rows to any value without a matching saved rule. The endpoint

@@ -55,5 +55,3 @@ export const PULLER_QUEUE = {
   NAME: makeQueueName("ingestion_puller"),
   JOB: "ingestion_puller",
 } as const;
-
-
