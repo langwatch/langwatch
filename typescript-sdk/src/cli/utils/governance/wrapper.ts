@@ -327,6 +327,11 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       process.stderr.write(probe.message ?? "preflight failed\n");
       process.exit(2);
     }
+    if (modeResult.codexConfigPath) {
+      process.stderr.write(
+        `langwatch: wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
+      );
+    }
   } else {
     // ingestion mode side-effect feedback so the user sees what
     // the wrapper just did on their behalf.
