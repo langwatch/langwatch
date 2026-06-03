@@ -30,6 +30,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
@@ -142,10 +143,15 @@ export function IngestionTemplateInstallDrawer({
 
   // Claude Code only emits OTLP when CLAUDE_CODE_ENABLE_TELEMETRY=1 plus
   // the OTEL_LOGS_EXPORTER + OTEL_METRICS_EXPORTER + OTEL_EXPORTER_OTLP_PROTOCOL
-  // trio. Without those four, Claude Code silently does nothing even with
-  // a valid endpoint + token. Other ingestion sources (cursor, claude_cowork,
-  // raw OTLP) need only the endpoint + bearer header — they enable
-  // telemetry through their own configuration.
+  // trio. Without those, Claude Code silently does nothing even with a valid
+  // endpoint + token. OTEL_TRACES_EXPORTER=otlp is recommended too so any
+  // spans Claude Code does instrument propagate to LangWatch and any logs or
+  // metrics emitted inside a span get correlated; standalone records still
+  // arrive context-less and the receiver synthesizes a stable trace id per
+  // service.instance.id so each session surfaces as one named trace. Other
+  // ingestion sources (cursor, claude_cowork, raw OTLP) need only the
+  // endpoint + bearer header, they enable telemetry through their own
+  // configuration.
   const envVarsSnippet = installResult
     ? buildEnvSnippet(template.slug, installResult.endpoint, renderedToken)
     : "";

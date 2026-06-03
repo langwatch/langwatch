@@ -80,7 +80,6 @@ function makeMetricEvent({
       timeUnixMs: 1700000000000,
       attributes: {},
       resourceAttributes: { "service.name": "claude-code" },
-      piiRedactionLevel: "ESSENTIAL",
     },
     metadata: {},
   };
