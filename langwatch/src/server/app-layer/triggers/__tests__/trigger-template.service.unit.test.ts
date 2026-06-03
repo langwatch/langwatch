@@ -23,7 +23,12 @@ const TRIGGER: DraftIdentity = {
 };
 
 function makeNotifier() {
-  const sentEmails: Array<{ to: string[]; subject: string; html: string }> = [];
+  const sentEmails: Array<{
+    to: string;
+    bcc: string[];
+    subject: string;
+    html: string;
+  }> = [];
   const sentSlack: Array<{ webhook: string; payload: unknown }> = [];
   const notifier: TriggerNotifier = {
     sendEmail: async (args) => {
@@ -93,7 +98,8 @@ describe("TriggerTemplateService", () => {
 
         expect(result.recipientCount).toBe(2);
         expect(sentEmails).toHaveLength(1);
-        expect(sentEmails[0]!.to).toEqual(["a@acme.test", "b@acme.test"]);
+        expect(sentEmails[0]!.to).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/);
+        expect(sentEmails[0]!.bcc).toEqual(["a@acme.test", "b@acme.test"]);
         expect(sentEmails[0]!.subject).toContain(TEST_FIRE_EMAIL_SUBJECT_PREFIX);
         expect(sentEmails[0]!.html).toContain(TEST_FIRE_NOTICE);
       });
