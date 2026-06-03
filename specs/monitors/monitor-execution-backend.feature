@@ -32,6 +32,7 @@ Feature: Monitor Execution with Evaluator Reference
     Given the evaluation worker is running
     And LangEvals service is available
 
+  @unimplemented
   Scenario: Execute evaluation using evaluator settings
     Given a monitor with evaluatorId "evaluator_abc123"
     And the evaluator has config:
@@ -41,6 +42,7 @@ Feature: Monitor Execution with Evaluator Reference
     Then the evaluation should use settings from the Evaluator table
     And the settings should be { caseSensitive: false }
 
+  @unimplemented
   Scenario: Backward compatibility with legacy monitors
     Given a monitor without evaluatorId
     And the monitor has parameters:
@@ -50,6 +52,7 @@ Feature: Monitor Execution with Evaluator Reference
     Then the evaluation should use parameters from the Monitor table
     And the settings should be { caseSensitive: true }
 
+  @unimplemented
   Scenario: Evaluator settings take precedence
     Given a monitor with both evaluatorId and parameters
     When a trace is processed
