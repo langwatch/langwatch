@@ -1,0 +1,14 @@
+id: no-localhost-fallback-tsx
+snapshots:
+  const C = () => { const u = env.URL ?? "http://localhost:3000"; return <a href={u} />; };:
+    labels:
+    - source: env.URL ?? "http://localhost:3000"
+      style: primary
+      start: 28
+      end: 62
+  const C = () => { const u = env.URL ?? `https://localhost:${p}`; return <a href={u} />; };:
+    labels:
+    - source: env.URL ?? `https://localhost:${p}`
+      style: primary
+      start: 28
+      end: 63

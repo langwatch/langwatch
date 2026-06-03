@@ -6,20 +6,25 @@ message: >
 severity: warning
 language: Tsx
 rule:
-  pattern: $F.watch()
+  # Any-arg watch: form.watch(), form.watch("name"), form.watch(["a","b"]).
+  pattern: $F.watch($$$ARGS)
+  # ...where the $F receiver is a parameter of an enclosing function/component
+  # (i.e. `form` was received as a prop), NOT the component's own useForm() var.
+  # stopBy: end is required — the immediate parent of the call is a statement,
+  # so the enclosing function is only reachable by walking all ancestors.
   inside:
+    stopBy: end
     any:
       - kind: arrow_function
-      - kind: function_expression
       - kind: function_declaration
+      - kind: function_expression
+      - kind: method_definition
     has:
       kind: formal_parameters
+      stopBy: end
       has:
-        any:
-          - kind: required_parameter
-            pattern: $F
-          - kind: identifier
-            pattern: $F
+        pattern: $F
+        stopBy: end
 files:
   - "langwatch/src/components/**/*.tsx"
 ignores:

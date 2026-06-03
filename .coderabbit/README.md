@@ -23,8 +23,29 @@ dispatch, so rules that apply to both file types are split into `_ts` /
 All rules `severity: warning` for sprint 1 (phased rollout — promote to
 `error` per-rule once baseline is verifiably clean).
 
-Add new rules by dropping a `.yml` here matching the [ast-grep rule schema](https://ast-grep.github.io/guide/rule-config.html).
-Keep rule IDs unique. Split `_ts` / `_tsx` if the rule applies to both.
+## Testing — every rule is proven by a fixture
+
+`sgconfig.yml` + `rule-tests/` make `ast-grep test` prove each rule actually
+matches real code. This harness exists because #3754 shipped a **dead** rule
+(`no-form-watch-in-child` fired on nothing); "looks right" is not enough.
+
+```bash
+# from .coderabbit/ast-grep/ :
+ast-grep test -c sgconfig.yml -t rule-tests       # all rules must pass
+ast-grep test -c sgconfig.yml -t rule-tests -U    # regenerate snapshots after a rule edit
+```
+
+Each `rule-tests/<id>-test.yml` lists `valid:` (must NOT match) and `invalid:`
+(MUST match) snippets; `rule-tests/__snapshots__/` pins the exact matches.
+`/.github/workflows/coderabbit-config-check.yml` runs this on every PR touching
+the config (pinned ast-grep + `semgrep --validate` + a semgrep match check), so
+a dead or malformed rule fails CI.
+
+**Adding a rule:** drop the `.yml` in `rules/` (matching the
+[ast-grep rule schema](https://ast-grep.github.io/guide/rule-config.html), unique
+id, split `_ts` / `_tsx` if it applies to both), add a `rule-tests/<id>-test.yml`
+with ≥1 `valid` + ≥1 `invalid` snippet, run `ast-grep test … -U` to record the
+snapshot, and commit all of it. No fixture = the rule is unproven.
 
 ## Related
 

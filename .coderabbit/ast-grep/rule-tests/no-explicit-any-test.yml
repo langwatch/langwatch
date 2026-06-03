@@ -1,0 +1,9 @@
+id: no-explicit-any-ts
+valid:
+  - "const x: unknown = readJson();"
+  - "const n: number = 1;"
+  - "function f(a: string, b: number) { return a; }"
+invalid:
+  - "const x: any = readJson();"
+  - "function f(a: any) { return a; }"
+  - "const y = value as any;"
