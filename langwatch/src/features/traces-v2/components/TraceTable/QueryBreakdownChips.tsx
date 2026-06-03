@@ -56,12 +56,26 @@ export function QueryBreakdownChips() {
       if (exprType === "LiteralExpression") {
         const value = String(node.expression.value);
         if (isFielded) {
-          // Fielded predicate — remove via `removeFacet(field, value)`.
-          out.push({
-            id: `f:${fieldName}:${value}:${negated ? "n" : "p"}`,
-            label: `${negated ? "NOT " : ""}${fieldName}:${value}`,
-            remove: () => removeFacet(fieldName, value),
-          });
+          // Fielded with a non-`:` operator is a comparison predicate
+          // (`duration:>1000`, regex, etc.) — `removeFacet` is
+          // value-specific and can't address a comparison, so route
+          // these through `removeField` (whole-field removal) and
+          // surface the operator in the chip label.
+          if (op !== ":") {
+            out.push({
+              id: `c:${fieldName}:${op}:${value}`,
+              label: `${negated ? "NOT " : ""}${fieldName} ${op.slice(1)} ${value}`,
+              remove: () => removeField(fieldName),
+            });
+          } else {
+            // Plain fielded value — remove just this value via
+            // `removeFacet(field, value)`.
+            out.push({
+              id: `f:${fieldName}:${value}:${negated ? "n" : "p"}`,
+              label: `${negated ? "NOT " : ""}${fieldName}:${value}`,
+              remove: () => removeFacet(fieldName, value),
+            });
+          }
         } else {
           // Free-text — single-character ASCII letters/digits are fine
           // (most real queries are bare strings like `refund`); flag

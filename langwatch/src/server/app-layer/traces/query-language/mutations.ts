@@ -246,6 +246,13 @@ export function removeFacetValueFromQuery({
  * single bare token (e.g. "Ω" they typed by accident) without
  * clearing the whole query. `filterAST` collapses any orphaned logical
  * parents so we don't leave stray ANDs/ORs behind.
+ *
+ * Removes only the FIRST matching bare term — a query like
+ * `foo AND foo AND bar` collapses to `foo AND bar` after one removal
+ * (the chip the user clicked), not just `bar`. Without the
+ * single-shot semantics the breakdown UI would silently nuke every
+ * duplicate token in one click, which doesn't match what the user sees
+ * (one chip per occurrence in the breakdown panel).
  */
 export function removeImplicitTermFromQuery({
   currentQuery,
@@ -256,11 +263,15 @@ export function removeImplicitTermFromQuery({
 }): string {
   if (!currentQuery.trim()) return "";
   try {
+    let removed = false;
     const next = filterAST(parse(currentQuery), (node) => {
+      if (removed) return true;
       if (node.type !== "Tag") return true;
       if (node.field.type !== "ImplicitField") return true;
       if (node.expression.type !== "LiteralExpression") return true;
-      return String(node.expression.value) !== value;
+      if (String(node.expression.value) !== value) return true;
+      removed = true;
+      return false;
     });
     return isEmptyAST(next) ? "" : serialize(next);
   } catch {
