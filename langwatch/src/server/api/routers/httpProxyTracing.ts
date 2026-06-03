@@ -9,6 +9,7 @@
 import crypto from "node:crypto";
 import { getApp } from "../../app-layer/app";
 import { prisma } from "../../db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { CustomMetadata, Span } from "../../tracer/types";
 import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
 
@@ -214,9 +215,8 @@ export async function createAgentTestTrace({
     where: { id: projectId },
     select: { id: true, piiRedactionLevel: true },
   });
-  if (!project) {
-    throw new Error(`Project ${projectId} not found`);
-  }
+  const piiRedactionLevel =
+    project?.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
   const resource = CollectorSpanUtils.buildResource({
     reservedTraceMetadata: { user_id: userId },
@@ -225,11 +225,11 @@ export async function createAgentTestTrace({
   });
 
   await getApp().traces.recordSpan({
-    tenantId: project.id,
+    tenantId: projectId,
     span: CollectorSpanUtils.convertSpanToOtlp(span),
     resource,
     instrumentationScope: { name: "langwatch.agent_test" },
-    piiRedactionLevel: project.piiRedactionLevel,
+    piiRedactionLevel,
     occurredAt: now,
   });
 

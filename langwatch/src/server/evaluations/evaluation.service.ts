@@ -288,9 +288,7 @@ export class EvaluationService {
       async () => {
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
-          throw new Error(
-            `ClickHouse client unavailable for project ${projectId}`,
-          );
+          return null;
         }
 
         try {

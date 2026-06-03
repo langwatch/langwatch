@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LLMSpan } from "../../types";
 import { addLLMTokensCount } from "../metrics";
 
-vi.mock("../../../../modelProviders/llmModelCost", () => ({
+vi.mock("../../../modelProviders/llmModelCost", () => ({
   getLLMModelCosts: vi.fn().mockResolvedValue([
     {
       projectId: "",

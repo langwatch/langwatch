@@ -8,7 +8,7 @@ import {
 } from "./metrics";
 
 // Mock the LLM model costs
-vi.mock("../../../modelProviders/llmModelCost", () => ({
+vi.mock("../../modelProviders/llmModelCost", () => ({
   getLLMModelCosts: vi.fn().mockResolvedValue({
     "gpt-5": {
       input_cost_per_1k_tokens: 0.00015,
