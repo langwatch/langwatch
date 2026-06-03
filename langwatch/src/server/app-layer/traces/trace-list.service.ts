@@ -293,7 +293,13 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
 
 function discoverCacheKey(params: DiscoverParams): string {
   const snapped = snapToWindowPreset(params.timeRange);
-  return [params.tenantId, snapped.label, snapped.to].join("|");
+  // Include the snapped `from` alongside `to` so two requests with
+  // different actual spans that happen to land in the same preset
+  // label (e.g. a 15-minute window and a 1-hour window both classify
+  // as "1h") don't collide on a single cache slot. Without `from` we'd
+  // serve the first-computed payload to both viewers; the second
+  // viewer's facets would be for a window they aren't looking at.
+  return [params.tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
 interface CategoricalFacetDescriptor {

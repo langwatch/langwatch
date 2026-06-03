@@ -581,6 +581,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
   const noop = async () => { };
+  // Clear the module-global discover broadcaster so a test app built
+  // after `initializeDefaultApp` doesn't inherit the production
+  // broadcaster's closure (which captured the production
+  // BroadcastService and would fire SSE pushes out of tests). The
+  // null repository's no-op refresh path can still reach the
+  // broadcaster, so leaving the prod callback wired would leak
+  // cross-app callbacks. Tests that want their own broadcaster can
+  // re-register one after `createTestApp` returns.
+  setDiscoverBroadcaster(null);
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
