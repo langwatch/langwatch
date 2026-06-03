@@ -343,15 +343,28 @@ const FILTERABLE_PIN_FIELDS: Record<string, string> = {
 };
 
 /**
+ * Liqe field names are bare identifiers — letters, digits, dots,
+ * underscores, dashes. Customer-defined metadata keys come from
+ * arbitrary OTLP attributes, so a malicious or careless key can contain
+ * spaces, quotes, colons, parens, etc. Injecting an unsafe key as a raw
+ * field name breaks the grammar (the query becomes unparsable, or
+ * worse, targets the wrong field). We restrict to a safe whitelist and
+ * disable the filter affordance when the key can't round-trip.
+ */
+const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
+
+/**
  * Build a Liqe-style fielded query for an auto-pinned metadata value.
- * Escapes embedded quotes + backslashes so values like
- * `tenant="org \"acme\""` stay parseable. Returns null when the value
- * can't be safely round-tripped (empty after escape).
+ * Escapes embedded quotes + backslashes in the value so things like
+ * `tenant="org \"acme\""` stay parseable. Returns null when either the
+ * key can't be safely round-tripped as a bare Liqe field, or the value
+ * collapses to empty after escape.
  */
 function formatMetadataFilterQuery(
   key: string,
   value: string,
 ): string | null {
+  if (!SAFE_METADATA_KEY_RE.test(key)) return null;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   if (!escaped) return null;
   return `${key}:"${escaped}"`;

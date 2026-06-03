@@ -234,8 +234,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   having to wrap themselves.
                 */}
                 <PeerCursorOverlay
-                  anchor={trace ? `trace:${trace.traceId}:drawer` : null}
-                  enabled={!!trace}
+                  anchor={`trace:${trace.traceId}:drawer`}
+                  enabled
                   containerRef={paneContainerRef}
                 >
                 <Flex

@@ -306,7 +306,19 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               flexShrink={0}
               opacity={0}
               _groupHover={{ opacity: 0.55 }}
+              // Keyboard users tab onto the hide button just like mouse
+              // users hover the group — surface the affordance the same
+              // way for both so the section-hide action isn't mouse-only.
+              _groupFocusWithin={{ opacity: 0.55 }}
               _hover={{ opacity: 1, color: "fg", bg: "bg.muted" }}
+              _focusVisible={{
+                opacity: 1,
+                color: "fg",
+                bg: "bg.muted",
+                outline: "2px solid",
+                outlineColor: "blue.focusRing",
+                outlineOffset: "1px",
+              }}
               transition="opacity 120ms ease, color 120ms ease"
               onClick={(e) => {
                 e.stopPropagation();

@@ -307,7 +307,22 @@ export function TreeRow({
               borderRadius="xs"
               color={isPinned ? "fg" : "fg.subtle"}
               opacity={isPinned || isHovered ? 1 : 0}
+              // Make the button unfocusable + non-interactive while it's
+              // visually hidden. Without this, keyboard users tab onto
+              // an invisible control and the row's navigation flow
+              // breaks (the focus lands somewhere with no visible
+              // target). The hover-revealed pin re-enters tab order
+              // automatically once the row is hovered or already
+              // pinned.
+              pointerEvents={isPinned || isHovered ? "auto" : "none"}
+              tabIndex={isPinned || isHovered ? 0 : -1}
+              aria-hidden={!isPinned && !isHovered}
               _hover={{ bg: "bg.emphasized", color: "fg" }}
+              _focusVisible={{
+                opacity: 1,
+                bg: "bg.emphasized",
+                color: "fg",
+              }}
               transition="opacity 0.1s ease, color 0.1s ease"
               cursor="pointer"
               onClick={(e) => {
