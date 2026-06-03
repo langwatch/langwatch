@@ -152,7 +152,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Enables the Langy in-product assistant. Staff-only gate is layered on top via isLangwatchStaff(); flag off = hidden for everyone including staff.",
+      "Opens the Langy in-product assistant to non-staff. LangWatch staff (isLangwatchStaff()) always have access regardless of this flag; flipping it on extends Langy to the targeted non-staff users.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
