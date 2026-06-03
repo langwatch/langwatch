@@ -25,7 +25,6 @@
  */
 
 import {
-  CODEX_GATEWAY_PROFILE_NAME,
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "@/cli/utils/codex-config-toml";
