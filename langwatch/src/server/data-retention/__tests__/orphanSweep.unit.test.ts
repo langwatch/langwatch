@@ -199,6 +199,65 @@ describe("OrphanSweepService", () => {
       expect(await cursorStore.load("project-1")).toBeUndefined();
     });
   });
+
+  describe("filterOrphanedTraceIds()", () => {
+    it("partitions the input into existing and orphaned by ClickHouse presence", async () => {
+      const service = new OrphanSweepService(
+        {} as any,
+        async () =>
+          ({
+            query: vi.fn().mockResolvedValue({
+              json: async () => [{ TraceId: "live" }],
+            }),
+          }) as any,
+      );
+
+      const result = await service.filterOrphanedTraceIds({
+        projectId: "project-1",
+        traceIds: ["live", "missing"],
+      });
+
+      expect(result.existing).toEqual(["live"]);
+      expect(result.orphaned).toEqual(["missing"]);
+    });
+
+    it("checks existence without FINAL (avoids the heavy replacing-merge OOM)", async () => {
+      const query = vi
+        .fn()
+        .mockResolvedValue({ json: async () => [] });
+      const service = new OrphanSweepService(
+        {} as any,
+        async () => ({ query }) as any,
+      );
+
+      await service.filterOrphanedTraceIds({
+        projectId: "project-1",
+        traceIds: ["a", "b"],
+      });
+
+      const sql: string = query.mock.calls[0]![0].query;
+      expect(sql).not.toMatch(/FINAL/);
+      expect(sql).toMatch(/SELECT DISTINCT TraceId/);
+    });
+
+    it("treats every id as existing when ClickHouse is unavailable (fail-safe, never deletes)", async () => {
+      const service = new OrphanSweepService(
+        {} as any,
+        async () =>
+          ({
+            query: vi.fn().mockRejectedValue(new Error("CH down")),
+          }) as any,
+      );
+
+      const result = await service.filterOrphanedTraceIds({
+        projectId: "project-1",
+        traceIds: ["a", "b"],
+      });
+
+      expect(result.existing).toEqual(["a", "b"]);
+      expect(result.orphaned).toEqual([]);
+    });
+  });
 });
 
 describe("createRetentionOrphanSweepReactor()", () => {

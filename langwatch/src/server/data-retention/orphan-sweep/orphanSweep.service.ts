@@ -45,10 +45,21 @@ export class OrphanSweepService {
 
     try {
       const client = await this.resolveClickHouseClient(projectId);
+      // This is purely an existence check: which of `traceIds` have at least one
+      // row in trace_summaries. trace_summaries is ReplacingMergeTree(UpdatedAt)
+      // with no soft-delete column, so FINAL only collapses duplicate versions —
+      // it never makes a TraceId appear or disappear. But FINAL forces a
+      // cross-partition replacing-merge (buffering merge state across every
+      // weekly partition that holds the tenant's data); run thousands of times a
+      // day by the sweep across many projects concurrently, that collectively
+      // exhausted the server memory limit (MEMORY_LIMIT_EXCEEDED in prod). The
+      // merge is pointless for an existence check, so drop FINAL and dedup the
+      // key with DISTINCT: the (TenantId, TraceId) sort key lets this read just
+      // the TraceId column for the matched keys, with no merge state.
       const result = await client.query({
         query: `
-          SELECT TraceId
-          FROM trace_summaries FINAL
+          SELECT DISTINCT TraceId
+          FROM trace_summaries
           WHERE TenantId = {tenantId:String} AND TraceId IN {traceIds:Array(String)}
         `,
         query_params: { tenantId: projectId, traceIds },
