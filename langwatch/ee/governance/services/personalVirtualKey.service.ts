@@ -188,11 +188,19 @@ export class PersonalVirtualKeyService {
     // When the caller pinned an explicit routingPolicyId, the empty-
     // policy invariant from G34 still applies — they asked for THIS
     // policy and we refuse to silently substitute a different shape.
-    const defaultResolution = routingPolicyId === undefined;
+    // Both "no policy id provided" (undefined → default-resolution) and
+    // "no policy requested" (explicit null) collapse into the same
+    // mint-with-null-policy branch — they both end up with a VK whose
+    // routingPolicyId is null and rely on the gateway's cascade
+    // ordering. Either way we still owe the caller the no-provider
+    // guard, otherwise an empty org could mint a broken VK by passing
+    // `routingPolicyId: null` explicitly.
+    const noPolicyRequested =
+      routingPolicyId === undefined || routingPolicyId === null;
     const policyIsEmpty =
       !!policy && extractModelProviderIds(policy).length === 0;
 
-    if (defaultResolution && (!policy || policyIsEmpty)) {
+    if (noPolicyRequested && (!policy || policyIsEmpty)) {
       const eligibleCount = await this.countEligibleProviders({
         organizationId,
         personalTeamId,
@@ -202,10 +210,6 @@ export class PersonalVirtualKeyService {
         throw new NoEligibleProvidersError(organizationId);
       }
       // Fall through with policy = null (gateway uses cascade order).
-      // Important: clear `policy` so the create call below writes
-      // routingPolicyId: null instead of the stale empty-default.
-      // The local rebind is fine — `policy` is only read by the
-      // `policy?.id` accessors after this point.
     } else if (policyIsEmpty) {
       // Caller pinned an empty policy explicitly — preserve the
       // validate-before-mint contract from G34.
@@ -213,7 +217,7 @@ export class PersonalVirtualKeyService {
     }
 
     const resolvedPolicyId =
-      defaultResolution && (!policy || policyIsEmpty) ? null : policy?.id ?? null;
+      noPolicyRequested && (!policy || policyIsEmpty) ? null : policy?.id ?? null;
 
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({

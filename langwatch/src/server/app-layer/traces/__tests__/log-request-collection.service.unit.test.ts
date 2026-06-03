@@ -78,7 +78,7 @@ describe("LogRequestCollectionService", () => {
               resource: { attributes: [] },
               scopeLogs: [
                 {
-                  scope: { name: "test", version: null },
+                  scope: { name: "test", version: undefined },
                   logRecords: [
                     {
                       timeUnixNano: "1700000000000000000",
@@ -117,7 +117,7 @@ describe("LogRequestCollectionService", () => {
               resource: { attributes: [] },
               scopeLogs: [
                 {
-                  scope: { name: "test", version: null },
+                  scope: { name: "test", version: undefined },
                   logRecords: [
                     {
                       timeUnixNano: "1700000000000000000",

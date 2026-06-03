@@ -89,7 +89,7 @@ describe("MetricRequestCollectionService", () => {
               resource: { attributes: [] },
               scopeMetrics: [
                 {
-                  scope: { name: "test", version: null },
+                  scope: { name: "test", version: undefined },
                   metrics: [
                     {
                       name: "claude_code.messages.total",
