@@ -175,11 +175,25 @@ const openTelemetryTraceRequestToTraceForCollection = (
         );
         const otelTrace = cloneDeep(otelTrace_);
 
+        // Collect OTLP resource attributes (shared by every span in the
+        // request). Reserved keys (tag.tags -> labels, langwatch.thread.id ->
+        // thread_id, ...) are hoisted to reserved trace metadata exactly as
+        // they are from span attributes — Langy's opencode OTel plugin sets
+        // them on the resource, so this is what makes its traces land labeled
+        // "langy" and grouped by conversation. Everything else stays custom.
         const customMetadata: Record<string, any> = {};
+        const resourceReservedSource: Record<string, any> = {};
         for (const resourceSpan of otelTrace.resourceSpans ?? []) {
           for (const attribute of resourceSpan?.resource?.attributes ?? []) {
-            if (attribute?.key) {
-              customMetadata[attribute.key] = attribute?.value?.stringValue;
+            if (!attribute?.key) continue;
+            const value = attribute?.value?.stringValue;
+            if (
+              attribute.key in openTelemetryToLangWatchMetadataMapping &&
+              value != null
+            ) {
+              resourceReservedSource[attribute.key] = value;
+            } else {
+              customMetadata[attribute.key] = value;
             }
           }
         }
@@ -191,6 +205,35 @@ const openTelemetryTraceRequestToTraceForCollection = (
           reservedTraceMetadata: {},
           customMetadata,
         };
+
+        if (Object.keys(resourceReservedSource).length > 0) {
+          // tag.tags maps to labels (string[]); a resource attribute carries
+          // it as a single string (OTEL_RESOURCE_ATTRIBUTES can't express
+          // arrays), so coerce to an array before the reserved schema
+          // validates it.
+          if (typeof resourceReservedSource["tag.tags"] === "string") {
+            resourceReservedSource["tag.tags"] = resourceReservedSource[
+              "tag.tags"
+            ]
+              .split(",")
+              .map((tag: string) => tag.trim())
+              .filter(Boolean);
+          }
+          try {
+            const { reservedTraceMetadata, customMetadata: extraCustom } =
+              extractReservedAndCustomMetadata(
+                applyMappingsToMetadata(resourceReservedSource),
+              );
+            trace.reservedTraceMetadata = reservedTraceMetadata;
+            // Any reserved-source key the schema didn't claim falls back to
+            // custom metadata rather than being dropped.
+            Object.assign(trace.customMetadata, extraCustom);
+          } catch {
+            // Defensive: never let a malformed resource attribute break
+            // ingestion — keep the raw values as custom metadata.
+            Object.assign(trace.customMetadata, resourceReservedSource);
+          }
+        }
 
         for (const resourceSpan of otelTrace.resourceSpans ?? []) {
           for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {

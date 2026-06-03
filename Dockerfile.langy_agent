@@ -14,6 +14,11 @@ FROM ubuntu:24.04
 # in lockstep with a tested release rather than tracking `latest`.
 ARG LANGWATCH_CLI_VERSION=0.31.0
 ARG LANGWATCH_MCP_VERSION=0.10.1
+# opencode has no native OpenTelemetry export, so the per-session worker loads
+# this opencode plugin to emit session/llm/tool spans over OTLP into the user's
+# LangWatch project. Pinned; opencode auto-loads it by name from the per-worker
+# config (server.js). See specs/assistant/langy-otel-tracing.feature.
+ARG OPENCODE_OTEL_PLUGIN_VERSION=1.0.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates unzip build-essential python3 \
@@ -32,9 +37,16 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
 
 # CLI (`langwatch`) + MCP server (`langwatch-mcp-server`) from npm. Replaces
 # the old locally-`pnpm pack`'d tarballs so the image builds reproducibly in
-# CI with no host-side build step.
+# CI with no host-side build step. The opencode OTel plugin is installed here
+# too so the pinned version is present in the image (and the build fails fast
+# if the version is bad) rather than relying solely on opencode's runtime fetch.
 RUN npm install -g "langwatch@${LANGWATCH_CLI_VERSION}" \
-    "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}"
+    "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}" \
+    "@devtheops/opencode-plugin-otel@${OPENCODE_OTEL_PLUGIN_VERSION}"
+
+# Surface the pinned plugin version to the manager (server.js) so each
+# per-worker opencode config requests the exact same version opencode loads.
+ENV OPENCODE_OTEL_PLUGIN_VERSION=${OPENCODE_OTEL_PLUGIN_VERSION}
 
 COPY services/langy-agent/entrypoint.sh /entrypoint.sh
 COPY services/langy-agent/server.js /server.js
