@@ -56,7 +56,7 @@ export function buildCodexOtelBlock(inputs: CodexOtelBlockInputs): string {
   // var so a reader of config.toml can audit the wiring.
   return [
     BEGIN,
-    `# Managed by 'langwatch ingestion install codex'. Re-running the`,
+    `# Managed by 'langwatch ingest install codex'. Re-running the`,
     `# command updates this block in place; remove the marker pair`,
     `# above and below to opt back out.`,
     `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,

@@ -130,7 +130,7 @@ async function login(page) {
         ["settings/governance/anomaly-rules", "16-admin-anomaly-rules"],
       ]) {
         try {
-          await page.goto(`${BASE}/${slug}`, { waitUntil: "domcontentloaded", timeout: 45_000, timeout: 15_000 });
+          await page.goto(`${BASE}/${slug}`, { waitUntil: "domcontentloaded", timeout: 15_000 });
           await page.waitForTimeout(700);
           await shot(page, file);
         } catch (e) {

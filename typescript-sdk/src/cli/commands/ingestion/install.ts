@@ -11,7 +11,7 @@ import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 
 /**
- * `langwatch ingestion install <tool>` — Path B activation flow.
+ * `langwatch ingest install <tool>` — Path B activation flow.
  *
  * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
  * Installs the user's IngestionTemplate binding, prints the OTLP

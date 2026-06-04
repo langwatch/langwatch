@@ -56,7 +56,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     // user pastes nothing manual; the export block is shown for the
     // env-only path (CI, devcontainers, agents).
     return [
-      `# Run once: langwatch ingestion install codex`,
+      `# Run once: langwatch ingest install codex`,
       `# (writes the [otel] block to ~/.codex/config.toml automatically)`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
