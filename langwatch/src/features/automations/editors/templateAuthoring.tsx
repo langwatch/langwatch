@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef } from "react";
 import * as React from "react";
 import { SiSlack } from "react-icons/si";
 import dynamic from "~/utils/compat/next-dynamic";
-import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -75,13 +74,6 @@ export function FieldHeader({
         </Button>
       )}
     </HStack>
-  );
-}
-
-function defineMonokai(monaco: Monaco) {
-  monaco.editor.defineTheme(
-    "monokai",
-    monokaiTheme as Parameters<typeof monaco.editor.defineTheme>[1],
   );
 }
 
@@ -183,7 +175,7 @@ export function LiquidEditor({
       borderRadius="md"
       overflow="hidden"
       height={height}
-      background={theme === "monokai" ? "#272822" : "white"}
+      background={theme === "vs-dark" ? "#1e1e1e" : "white"}
     >
       <MonacoEditor
         height="100%"
@@ -191,7 +183,6 @@ export function LiquidEditor({
         value={value}
         theme={theme}
         beforeMount={(monaco: Monaco) => {
-          defineMonokai(monaco);
           registerLiquidLanguage(monaco, variables);
         }}
         onMount={onMount}

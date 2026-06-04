@@ -5,7 +5,6 @@ import dynamic from "~/utils/compat/next-dynamic";
 import { Switch } from "~/components/ui/switch";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
@@ -212,7 +211,7 @@ export function FiltersSecondaryDrawer({
             borderRadius="md"
             overflow="hidden"
             height="500px"
-            background={theme === "monokai" ? "#272822" : "white"}
+            background={theme === "vs-dark" ? "#1e1e1e" : "white"}
           >
             <MonacoEditor
               height="100%"
@@ -221,10 +220,6 @@ export function FiltersSecondaryDrawer({
               value={code}
               theme={theme}
               beforeMount={(monaco: Monaco) => {
-                monaco.editor.defineTheme(
-                  "monokai",
-                  monokaiTheme as Parameters<typeof monaco.editor.defineTheme>[1],
-                );
                 registerJsonSchema(
                   monaco,
                   CONDITIONS_MODEL_URI,
