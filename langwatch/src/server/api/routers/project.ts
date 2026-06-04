@@ -38,6 +38,7 @@ import {
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
+import { provisionLangyVirtualKey } from "~/server/services/langy/LangyCredentialService";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -238,6 +239,27 @@ export const projectRouter = createTRPCRouter({
           extra: {
             projectId: project.id,
             context: "provisionLangyApiKey:project.create",
+          },
+        });
+      }
+
+      // Best-effort: mint Langy's gateway virtual key so it shows up in the
+      // user's /virtual-keys list from day 1 (configurable model + fallback
+      // chain + spend tracking like any other VK). Same best-effort contract
+      // as the API key: failure here doesn't block project creation; the
+      // credential service re-attempts on first /chat call.
+      try {
+        await provisionLangyVirtualKey({
+          prisma,
+          projectId: project.id,
+          organizationId: input.organizationId,
+          actorUserId: userId,
+        });
+      } catch (error) {
+        captureException(error, {
+          extra: {
+            projectId: project.id,
+            context: "provisionLangyVirtualKey:project.create",
           },
         });
       }

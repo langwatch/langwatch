@@ -8,8 +8,90 @@ import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
 /**
  * Name under which the auto-provisioned Langy VK secret is stored in
  * ProjectSecret. One row per project.
+ *
+ * Exported so callers that surface "this is the Langy VK" UI (e.g. the
+ * gateway/virtual-keys page) and the backfill reconciler can detect the
+ * auto-provisioned key without reinventing the name string.
  */
-const LANGY_VK_SECRET_NAME = "langy_vk_secret";
+export const LANGY_VK_SECRET_NAME = "langy_vk_secret";
+
+/**
+ * Display name the VK row carries in the gateway/virtual-keys list. Exported
+ * for UI heuristics ("is this row the auto-managed Langy VK?").
+ */
+export const LANGY_VK_DISPLAY_NAME = "Langy";
+
+/**
+ * Idempotently provision a Langy VirtualKey for a project + persist its
+ * secret to ProjectSecret. Exported so project.create can call it eagerly
+ * (so users see the VK in /virtual-keys from day 1) AND the credential
+ * service can still self-heal on first chat. Returns the VK secret token.
+ *
+ * Safe to call multiple times for the same project — the ProjectSecret
+ * unique constraint on (projectId, name) plus race-loser retry guarantees
+ * one stored secret per project. Orphan VK rows from lost races are
+ * acceptable (#4275 v1; cleanup is an admin concern).
+ */
+export async function provisionLangyVirtualKey(args: {
+  prisma: PrismaClient;
+  projectId: string;
+  organizationId: string;
+  actorUserId: string;
+}): Promise<string> {
+  const { prisma, projectId, organizationId, actorUserId } = args;
+
+  // findFirst (not findUnique-by-projectId_name): the guarded prisma client's
+  // multitenancy middleware doesn't recognize the compound key and throws.
+  const existing = await prisma.projectSecret.findFirst({
+    where: { projectId, name: LANGY_VK_SECRET_NAME },
+    select: { encryptedValue: true },
+  });
+  if (existing) {
+    return decrypt(existing.encryptedValue);
+  }
+
+  // GatewayProviderCredential was removed in iter 110 — VKs route through the
+  // project's ModelProviders. The /chat route's model gate handles "no model
+  // configured" with a 409 before we get here, so we don't validate here.
+  const virtualKeyService = VirtualKeyService.create(prisma);
+  const created = await virtualKeyService.create({
+    organizationId,
+    name: LANGY_VK_DISPLAY_NAME,
+    description:
+      "Auto-provisioned virtual key for the Langy in-product assistant.",
+    principalUserId: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+    actorUserId,
+  });
+
+  try {
+    await prisma.projectSecret.create({
+      data: {
+        projectId,
+        name: LANGY_VK_SECRET_NAME,
+        encryptedValue: encrypt(created.secret),
+        createdById: actorUserId,
+        updatedById: actorUserId,
+      },
+    });
+    return created.secret;
+  } catch (error) {
+    // Race: another caller (e.g. concurrent /chat + eager project.create)
+    // provisioned + stored first. Our just-created VK is now an orphan but
+    // does no harm. Read the winner's secret and return that.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const winner = await prisma.projectSecret.findFirst({
+        where: { projectId, name: LANGY_VK_SECRET_NAME },
+        select: { encryptedValue: true },
+      });
+      if (winner) return decrypt(winner.encryptedValue);
+    }
+    throw error;
+  }
+}
 
 /**
  * Thrown when credential resolution can't complete — missing project,
@@ -115,71 +197,16 @@ export class LangyCredentialService {
     };
   }
 
-  private async getOrProvisionVirtualKey({
-    projectId,
-    organizationId,
-    actorUserId,
-  }: {
+  private async getOrProvisionVirtualKey(args: {
     projectId: string;
     organizationId: string;
     actorUserId: string;
   }): Promise<string> {
-    // findFirst with a plain `projectId` (not findUnique-by-`projectId_name`):
-    // the guarded prisma client's multitenancy middleware doesn't recognize the
-    // `projectId_name` compound key and throws. ProjectSecret is unique on
-    // (projectId, name), so this is still a single-row read.
-    const existing = await this.prisma.projectSecret.findFirst({
-      where: { projectId, name: LANGY_VK_SECRET_NAME },
-      select: { encryptedValue: true },
+    // Delegates to the standalone helper so /chat-time self-healing and the
+    // eager project.create path share one implementation.
+    return provisionLangyVirtualKey({
+      prisma: this.prisma,
+      ...args,
     });
-    if (existing) {
-      return decrypt(existing.encryptedValue);
-    }
-
-    // GatewayProviderCredential was removed in iter 110 — virtual keys are now
-    // scoped to a project and route through that project's ModelProviders, so
-    // there's no provider-credential row to look up or bind here. The /chat
-    // route already guards model availability via getVercelAIModel before we
-    // reach provisioning, so a project without a configured model fails there
-    // with a clear 409 rather than here.
-    const created = await this.virtualKeyService.create({
-      organizationId,
-      name: "Langy",
-      description:
-        "Auto-provisioned virtual key for the Langy in-product assistant.",
-      principalUserId: null,
-      scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      actorUserId,
-    });
-
-    try {
-      await this.prisma.projectSecret.create({
-        data: {
-          projectId,
-          name: LANGY_VK_SECRET_NAME,
-          encryptedValue: encrypt(created.secret),
-          createdById: actorUserId,
-          updatedById: actorUserId,
-        },
-      });
-      return created.secret;
-    } catch (error) {
-      // Race: another /chat request for the same project provisioned + stored
-      // first. The VK we just created is now an orphan (no ProjectSecret row
-      // points at it), but it does no harm — we read the winner's secret and
-      // return that. The orphan is acceptable for v1; an admin can clean it
-      // up via the gateway UI if it ever matters.
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const winner = await this.prisma.projectSecret.findFirst({
-          where: { projectId, name: LANGY_VK_SECRET_NAME },
-          select: { encryptedValue: true },
-        });
-        if (winner) return decrypt(winner.encryptedValue);
-      }
-      throw error;
-    }
   }
 }
