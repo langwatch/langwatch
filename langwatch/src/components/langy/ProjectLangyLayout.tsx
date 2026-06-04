@@ -79,7 +79,7 @@ function useShowLangy(): boolean {
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === OrganizationUserRole.ADMIN;
 
-  return userIsPartOfTeam && isLangwatchStaff(user?.email) && langyFlagEnabled;
+  return userIsPartOfTeam;
 }
 
 /**
