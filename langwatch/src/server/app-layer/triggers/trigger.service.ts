@@ -56,10 +56,7 @@ export class TriggerService {
     return this.repo.isSendClaimed(params);
   }
 
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
+  async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     return this.repo.updateLastRunAt(triggerId, projectId);
   }
 

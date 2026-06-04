@@ -73,8 +73,8 @@ export class NullTriggerRepository implements TriggerRepository {
     return false;
   }
 
-  async updateLastRunAt(
-    _triggerId: string,
-    _projectId: string,
-  ): Promise<void> {}
+  async updateLastRunAt(_triggerId: string, _projectId: string): Promise<void> {
+    // no-op: NullTriggerRepository is the in-memory fallback used by tests
+    // and processes that don't write trigger metadata.
+  }
 }

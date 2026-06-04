@@ -1,7 +1,7 @@
 import { TriggerAction } from "@prisma/client";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import {
   buildPreconditionTraceDataFromFoldState,
@@ -11,23 +11,23 @@ import {
   triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import type { Trace } from "~/server/tracer/types";
+import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
-import { DispatchError, isDispatchError } from "./dispatchError";
-import type { DerivedTraceEvent } from "../pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   computeScheduledFor,
   NOTIFY_TRIGGER_ACTIONS,
 } from "../pipelines/shared/triggerActionDispatch";
+import type { DerivedTraceEvent } from "../pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
+import { DispatchError, isDispatchError } from "./dispatchError";
 import {
-  TRIGGER_NOTIFY_REACTOR_NAME,
   type CadenceStagePayload,
   type OutboxJob,
   type SettleStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
 } from "./payload";
 
 const logger = createLogger("langwatch:outbox:dispatcher");
@@ -48,10 +48,7 @@ export interface OutboxDispatcherDeps {
     occurredAtMs?: number;
     foldVersion?: number;
   }) => Promise<DerivedTraceEvent[]>;
-  traceById: (
-    projectId: string,
-    traceId: string,
-  ) => Promise<Trace | undefined>;
+  traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   /**
    * Late-bound — settle stage's match-confirmed branch calls this to
    * re-enqueue as `cadence`. The queue ref is filled in by `buildOutboxRuntime`
@@ -407,9 +404,7 @@ async function handleCadenceBatch(
         projectId,
         triggerId,
         error:
-          lastRunErr instanceof Error
-            ? lastRunErr.message
-            : String(lastRunErr),
+          lastRunErr instanceof Error ? lastRunErr.message : String(lastRunErr),
       },
       "updateLastRunAt failed post-dispatch — swallowing to avoid double-send on retry",
     );

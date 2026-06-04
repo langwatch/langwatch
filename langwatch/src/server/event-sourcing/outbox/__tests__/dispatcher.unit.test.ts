@@ -2,11 +2,11 @@ import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { createOutboxDispatcher } from "../dispatcher";
 import { DispatchError } from "../dispatchError";
+import { createOutboxDispatcher } from "../dispatcher";
 import {
-  TRIGGER_NOTIFY_REACTOR_NAME,
   type CadenceStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
 } from "../payload";
 
 vi.mock("~/utils/logger/server", () => ({
@@ -161,7 +161,9 @@ describe("createOutboxDispatcher cadence stage", () => {
       deps.triggers.claimSend.mockRejectedValueOnce(new Error("PG down"));
       const dispatcher = createOutboxDispatcher(deps);
 
-      await expect(dispatcher.process(makeCadencePayload())).resolves.toBeUndefined();
+      await expect(
+        dispatcher.process(makeCadencePayload()),
+      ).resolves.toBeUndefined();
 
       expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
       expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);

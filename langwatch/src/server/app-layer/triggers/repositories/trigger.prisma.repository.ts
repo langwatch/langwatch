@@ -4,10 +4,7 @@ import {
   type NotificationCadence,
 } from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
-import type {
-  TriggerRepository,
-  TriggerSummary,
-} from "./trigger.repository";
+import type { TriggerRepository, TriggerSummary } from "./trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -73,10 +70,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
     return existing !== null;
   }
 
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
+  async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },
