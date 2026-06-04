@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { CodexExtractor } from "../codex";
-import { createLogExtractorContext } from "./_testHelpers";
+import {
+  createExtractorContext,
+  createLogExtractorContext,
+} from "./_testHelpers";
 
 const SCOPE = "openai.codex"; // scope-agnostic; gating is on event.name
 
@@ -121,9 +124,90 @@ describe("CodexExtractor.applyLog", () => {
     });
   });
 
-  it("span-side apply is a no-op", () => {
-    const extractor = new CodexExtractor();
-    expect(extractor.id).toBe("codex");
-    expect(typeof extractor.apply).toBe("function");
+  describe("CodexExtractor.apply (span side)", () => {
+    it("lifts codex.turn.token_usage.* + model + turn.id off the codex_cli_rs session_task.turn span", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "codex.turn.token_usage.output_tokens": "6",
+          "codex.turn.token_usage.cached_input_tokens": "10112",
+          "codex.turn.token_usage.total_tokens": "14371",
+          "codex.turn.reasoning_effort": "high",
+          "turn.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({
+        "langwatch.model": "gpt-5.5",
+        "langwatch.input_tokens": "14365",
+        "langwatch.output_tokens": "6",
+        "langwatch.cache_read_tokens": "10112",
+        "langwatch.thread.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
+      });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+
+    it("is a no-op for codex_cli_rs spans other than session_task.turn", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "turn_id": "abc",
+        },
+        {
+          name: "run_sampling_request",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op for non-codex scopes (Path A gen_ai.* spans are GenAIExtractor's lane)", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.request.model": "gpt-5.5",
+          "gen_ai.usage.input_tokens": "100",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: {
+            name: "@langwatch/aigateway",
+            version: null,
+          },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalled();
+    });
+
+    it("lifts only present fields", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.model": "gpt-5.5" });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
   });
 });

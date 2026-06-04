@@ -1,8 +1,10 @@
 /**
  * Codex Extractor
  *
- * Handles: OpenAI Codex's native OpenTelemetry log records. Codex
- * emits three event types this extractor claims on the log side:
+ * Handles: OpenAI Codex's native OpenTelemetry log records AND its
+ * Rust-CLI native spans (scope `codex_cli_rs`).
+ *
+ * On the LOG side, Codex emits three event types this extractor claims:
  *
  * - `codex.sse_event`: the cost-bearing turn event with model + token
  *   counts + conversation.id + user.email. Codex does NOT emit a cost
@@ -14,11 +16,25 @@
  * - `codex.user_prompt`: carries the user's prompt text, which the
  *   trace summary lifts onto langwatch.input.
  *
- * Detection: attributes["event.name"] starts with "codex.". Codex
- * doesn't pin its scope name in a stable way across releases, so we
- * gate on event.name (matches the bespoke extractCodexSseEventMetrics
- * + extractCodexConversationStartMetrics + codex.user_prompt branch
- * in extractIOFromLogRecord that this class replaces).
+ * Log-side detection: attributes["event.name"] starts with "codex.".
+ * Codex doesn't pin its log scope name in a stable way across releases,
+ * so we gate on event.name (matches the bespoke
+ * extractCodexSseEventMetrics + extractCodexConversationStartMetrics +
+ * codex.user_prompt branch in extractIOFromLogRecord this class replaces).
+ *
+ * On the SPAN side, codex 0.137+ emits native spans under scope
+ * `codex_cli_rs` to /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).
+ * The `session_task.turn` span carries the full per-turn metadata as
+ * codex-namespaced attributes:
+ *   - model
+ *   - codex.turn.token_usage.input_tokens / output_tokens
+ *   - codex.turn.token_usage.cached_input_tokens (a.k.a. cache_read)
+ *   - codex.turn.token_usage.total_tokens
+ *   - turn.id (a.k.a. thread / turn identifier)
+ * This extractor lifts those to langwatch.* canonical so the trace
+ * summary fold mirrors them to the top-level columns and the
+ * receiver-side pricing lookup computes cost (codex never emits cost
+ * on the wire).
  *
  * Canonical attributes produced (only when the corresponding wire
  * field is present):
@@ -26,12 +42,9 @@
  * - langwatch.input_tokens
  * - langwatch.output_tokens
  * - langwatch.cache_read_tokens
- * - langwatch.thread.id (from conversation.id)
+ * - langwatch.thread.id (from conversation.id OR turn.id)
  * - langwatch.principal.email (from user.email)
  * - langwatch.input (from codex.user_prompt prompt)
- *
- * Span-side `apply()` is a no-op — Path A traffic flows through the
- * gateway and emits gen_ai.* attributes that GenAIExtractor handles.
  */
 
 import type {
@@ -41,6 +54,8 @@ import type {
 } from "./_types";
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
+const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
+const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 const asNumber = (raw: unknown): number | null => {
   if (raw === undefined || raw === null || raw === "") return null;
@@ -59,9 +74,51 @@ const asString = (raw: unknown): string | null =>
 export class CodexExtractor implements CanonicalAttributesExtractor {
   readonly id = "codex";
 
-  apply(_ctx: ExtractorContext): void {
+  apply(ctx: ExtractorContext): void {
     // Path A codex traffic flows through the gateway as gen_ai.*
-    // spans; GenAIExtractor handles that side. Nothing to do here.
+    // spans; GenAIExtractor handles that side and emits canonical
+    // attributes. This branch covers Path B native spans from the
+    // Rust CLI (scope `codex_cli_rs`), where the per-turn
+    // `session_task.turn` span carries codex-namespaced attributes
+    // that won't match GenAIExtractor's gen_ai.* gates.
+    if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
+    if (ctx.span.name !== CODEX_TURN_SPAN_NAME) return;
+
+    const { attrs } = ctx.bag;
+    const model = asString(attrs.take("model"));
+    const inputTokens = asNumber(
+      attrs.take("codex.turn.token_usage.input_tokens"),
+    );
+    const outputTokens = asNumber(
+      attrs.take("codex.turn.token_usage.output_tokens"),
+    );
+    const cacheReadTokens = asNumber(
+      attrs.take("codex.turn.token_usage.cached_input_tokens"),
+    );
+    const turnId = asString(attrs.take("turn.id"));
+
+    let fired = false;
+    if (model !== null) {
+      ctx.setAttr("langwatch.model", model);
+      fired = true;
+    }
+    if (inputTokens !== null) {
+      ctx.setAttr("langwatch.input_tokens", String(inputTokens));
+      fired = true;
+    }
+    if (outputTokens !== null) {
+      ctx.setAttr("langwatch.output_tokens", String(outputTokens));
+      fired = true;
+    }
+    if (cacheReadTokens !== null) {
+      ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
+      fired = true;
+    }
+    if (turnId !== null) {
+      ctx.setAttrIfAbsent("langwatch.thread.id", turnId);
+      fired = true;
+    }
+    if (fired) ctx.recordRule("codex/session_task.turn");
   }
 
   applyLog(ctx: LogExtractorContext): void {
