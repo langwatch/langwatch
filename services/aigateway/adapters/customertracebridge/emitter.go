@@ -1,8 +1,10 @@
 package customertracebridge
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -434,34 +436,34 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
-	streamed := looksLikeSSE(body)
+	// The streamed-body extractors below walk the response via
+	// walkStreamEvents, which handles both wire framings the trace
+	// accumulator can hold: SSE `data: …` lines (raw-framed providers
+	// like Anthropic messages and Gemini passthrough) AND bare
+	// concatenated JSON objects (OpenAI Responses + Chat, whose Bifrost
+	// adapter decodes the upstream stream and re-emits objects the
+	// gateway only re-frames with `data:` at the client edge). Try the
+	// stream extractor first for every type, then fall back to the
+	// single-object JSON shape for non-streamed (sync) responses.
 	switch reqType {
 	case domain.RequestTypeChat:
-		if streamed {
-			if out := openAIChatOutputFromSSE(body); out != "" {
-				return out
-			}
+		if out := openAIChatOutputFromSSE(body); out != "" {
+			return out
 		}
 		return openAIChatOutputFromJSON(body)
 	case domain.RequestTypeMessages:
-		if streamed {
-			if out := anthropicOutputFromSSE(body); out != "" {
-				return out
-			}
+		if out := anthropicOutputFromSSE(body); out != "" {
+			return out
 		}
 		return anthropicOutputFromJSON(body)
 	case domain.RequestTypeResponses:
-		if streamed {
-			if out := responsesOutputFromSSE(body); out != "" {
-				return out
-			}
+		if out := responsesOutputFromSSE(body); out != "" {
+			return out
 		}
 		return responsesOutputFromJSON(body)
 	case domain.RequestTypePassthrough:
-		if streamed {
-			if out := geminiOutputFromSSE(body); out != "" {
-				return out
-			}
+		if out := geminiOutputFromSSE(body); out != "" {
+			return out
 		}
 		return geminiOutputFromJSON(body)
 	default:
@@ -518,7 +520,7 @@ func openAIChatOutputFromJSON(body []byte) string {
 // trace cell; we only need the assistant text.
 func openAIChatOutputFromSSE(body []byte) string {
 	var text strings.Builder
-	walkSSEData(body, func(data []byte) {
+	walkStreamEvents(body, func(data []byte) {
 		delta := gjson.GetBytes(data, "choices.0.delta.content")
 		if delta.Exists() && delta.Type == gjson.String {
 			text.WriteString(delta.String())
@@ -546,7 +548,7 @@ func anthropicOutputFromJSON(body []byte) string {
 // assistant said.
 func anthropicOutputFromSSE(body []byte) string {
 	var text strings.Builder
-	walkSSEData(body, func(data []byte) {
+	walkStreamEvents(body, func(data []byte) {
 		eventType := gjson.GetBytes(data, "type").String()
 		if eventType != "content_block_delta" {
 			return
@@ -605,7 +607,7 @@ func responsesOutputFromJSON(body []byte) string {
 func responsesOutputFromSSE(body []byte) string {
 	var completedSnapshot string
 	var deltas strings.Builder
-	walkSSEData(body, func(data []byte) {
+	walkStreamEvents(body, func(data []byte) {
 		t := gjson.GetBytes(data, "type").String()
 		switch t {
 		case "response.completed":
@@ -646,7 +648,7 @@ func geminiOutputFromJSON(body []byte) string {
 // turn is the in-order concatenation across all chunks.
 func geminiOutputFromSSE(body []byte) string {
 	var text strings.Builder
-	walkSSEData(body, func(data []byte) {
+	walkStreamEvents(body, func(data []byte) {
 		parts := gjson.GetBytes(data, "candidates.0.content.parts")
 		if !parts.Exists() || !parts.IsArray() {
 			return
@@ -662,6 +664,52 @@ func geminiOutputFromSSE(body []byte) string {
 		return ""
 	}
 	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+}
+
+// walkStreamEvents yields each per-event JSON payload from a streamed
+// response body regardless of how the trace accumulator captured it.
+//
+// The accumulator (traceStreamWrapper) stores the pre-client-framing
+// chunks, and those arrive in two shapes depending on the provider's
+// Bifrost adapter:
+//   - SSE-framed `data: {…}\n\n` lines — raw-framed providers (Anthropic
+//     messages, Gemini passthrough) whose chunks already carry the wire
+//     framing, forwarded verbatim to the client.
+//   - bare concatenated `{…}{…}` JSON objects — OpenAI Responses + Chat,
+//     whose adapter decodes the upstream stream and re-emits objects; the
+//     gateway only wraps them in `data:` at the client edge (writeSSE), so
+//     the captured body has no framing at all.
+//
+// Dispatching on looksLikeSSE lets every per-event extractor consume both
+// shapes uniformly. Without this, a bare-object responses body fails the
+// SSE check, is handed to the single-object JSON extractor, which reads
+// only the first object (`response.created`, no `output`) and returns "".
+func walkStreamEvents(body []byte, fn func(data []byte)) {
+	if looksLikeSSE(body) {
+		walkSSEData(body, fn)
+		return
+	}
+	walkConcatenatedJSON(body, fn)
+}
+
+// walkConcatenatedJSON invokes fn with each top-level JSON value in a
+// buffer of adjacent (un-separated) objects, e.g. the bare event stream
+// `{"type":"response.created"}{"type":"response.output_text.delta"}…`.
+// json.Decoder reads successive values from one reader, so a stream of
+// concatenated objects decodes one at a time. A decode error (EOF, or a
+// final object truncated at the 8 MiB body cap) ends the walk best-effort
+// with whatever was parsed so far.
+func walkConcatenatedJSON(body []byte, fn func(obj []byte)) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	for {
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return
+		}
+		if len(raw) > 0 {
+			fn(raw)
+		}
+	}
 }
 
 // walkSSEData iterates every `data: …` line in the body, invoking fn
