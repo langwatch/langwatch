@@ -4,9 +4,9 @@ description: See what you spend per session, which models you hit, how many toke
 sidebarTitle: Track your Claude Code usage
 ---
 
-Claude Code does not show you a per-session cost number. The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs.
+The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs. Without that, you can't debug your own agent.
 
-This guide wires Claude Code up so all of that lands somewhere you can browse:
+This guide wires Claude Code up so all of that lands on LangWatch, where you can browse:
 
 - Cost per session and per turn
 - Model used per turn, including silent fallbacks
