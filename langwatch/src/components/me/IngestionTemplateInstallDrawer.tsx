@@ -32,18 +32,31 @@ export function buildEnvSnippet(
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
+    // Four claude-code OTel unlock knobs, all ON (rchaves
+    // "collect all humanly possible"):
+    //   USER_PROMPTS       lifts user prompt text onto user_prompt
+    //   TOOL_DETAILS       lifts tool metadata onto tool_decision/result
+    //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
+    //                      file paths) onto tool_decision/result so
+    //                      the trace shows WHAT the tool did
+    //   RAW_API_BODIES     emits api_request_body + api_response_body
+    //                      events carrying the FULL JSON of every API
+    //                      call: system prompts, rolling message
+    //                      history, assistant response text +
+    //                      reasoning, tool_use blocks. Only OTel
+    //                      surface that carries assistant text. The
+    //                      langwatch receiver caps oversized bodies
+    //                      to keep the CH merge ceiling safe.
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-      // Required so user_prompt events include the prompt body
-      // attribute the receiver-side fold lift reads as
-      // langwatch.input. Without it, /me/traces renders with
-      // empty input text even though tokens + model land
-      // correctly.
       `export OTEL_LOG_USER_PROMPTS=1`,
+      `export OTEL_LOG_TOOL_DETAILS=1`,
+      `export OTEL_LOG_TOOL_CONTENT=1`,
+      `export OTEL_LOG_RAW_API_BODIES=1`,
       base,
       `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
     ].join("\n");

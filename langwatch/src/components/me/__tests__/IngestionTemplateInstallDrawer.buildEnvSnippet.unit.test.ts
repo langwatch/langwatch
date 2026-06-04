@@ -32,6 +32,28 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export OTEL_EXPORTER_OTLP_PROTOCOL=http/json");
     });
 
+    // claude-code 2.x emits four OTEL_LOG_* unlock knobs. Each is
+    // load-bearing for a distinct slice of the trace surface:
+    //   USER_PROMPTS       lifts user prompt text onto user_prompt events
+    //   TOOL_DETAILS       lifts tool_input/tool_parameters attrs (Bash
+    //                      command, Edit diff, file paths) onto
+    //                      tool_decision + tool_result events. Without
+    //                      it the receiver gets only sizes-in-bytes.
+    //   TOOL_CONTENT       traces-only + beta tracing — no-op for claude
+    //                      2.x logs path today, set as forward-compat
+    //   RAW_API_BODIES     emits api_request_body + api_response_body
+    //                      events. THIS is the only OTel surface that
+    //                      carries the assistant response text.
+    // Dropping any of USER_PROMPTS / TOOL_DETAILS / RAW_API_BODIES
+    // silently regresses content visibility in /me/traces. Pin all
+    // four here.
+    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", () => {
+      expect(snippet).toContain("export OTEL_LOG_USER_PROMPTS=1");
+      expect(snippet).toContain("export OTEL_LOG_TOOL_DETAILS=1");
+      expect(snippet).toContain("export OTEL_LOG_TOOL_CONTENT=1");
+      expect(snippet).toContain("export OTEL_LOG_RAW_API_BODIES=1");
+    });
+
     it("interpolates the endpoint and token", () => {
       expect(snippet).toContain(`OTEL_EXPORTER_OTLP_ENDPOINT="${ENDPOINT}"`);
       expect(snippet).toContain(

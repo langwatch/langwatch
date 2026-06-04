@@ -294,6 +294,79 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when claude resolves to ingestion mode", () => {
+    /**
+     * claude-code 2.x has four documented OTEL_LOG_* unlock knobs
+     * (code.claude.com/docs/en/monitoring-usage). Without them the
+     * OTel wire is metadata-only — tokens, cost, durations, tool
+     * sizes-in-bytes — and assistant response text + tool I/O text
+     * are silently absent (quadruple-proven dead end before we
+     * found these). The four knobs:
+     *
+     *   OTEL_LOG_USER_PROMPTS=1   lifts user prompt text onto
+     *                             user_prompt events
+     *   OTEL_LOG_TOOL_DETAILS=1   lifts tool_input/tool_parameters
+     *                             attrs (Bash command, Edit diff,
+     *                             file paths) onto tool_decision +
+     *                             tool_result so the trace shows
+     *                             WHAT the tool did
+     *   OTEL_LOG_TOOL_CONTENT=1   traces-only + beta tracing —
+     *                             no-op for claude 2.x logs path
+     *                             today, set as forward-compat
+     *   OTEL_LOG_RAW_API_BODIES=1 emits api_request_body +
+     *                             api_response_body events
+     *                             carrying the FULL JSON of every
+     *                             API call (system prompts +
+     *                             message history + assistant
+     *                             text + tool_use blocks). THIS
+     *                             is the only OTel surface that
+     *                             carries assistant response text.
+     *
+     * Dropping any of USER_PROMPTS / TOOL_DETAILS / RAW_API_BODIES
+     * silently regresses content visibility. Pin all four here so
+     * a refactor can't quietly undo the unlock.
+     */
+    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: "tpl_claude",
+          slug: "claude_code",
+          source_type: "claude_code",
+          display_name: "Claude Code",
+          description: null,
+          icon_asset: null,
+          credential_schema: null,
+          ottl_rules: "",
+          platform_published: true,
+          enabled: true,
+          organization_id: null,
+        },
+      ]);
+      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
+        user_ingestion_binding: { id: "b_c", template_id: "tpl_claude" },
+        binding_access_token: "ik-lw-claude-test-token",
+      });
+
+      const cfg = baseCfg({ tool_mode: { claude: "ingestion" } });
+      const out = await resolveWrapperMode(cfg, "claude", {});
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.vars.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
+      expect(out.vars.OTEL_LOG_USER_PROMPTS).toBe("1");
+      expect(out.vars.OTEL_LOG_TOOL_DETAILS).toBe("1");
+      expect(out.vars.OTEL_LOG_TOOL_CONTENT).toBe("1");
+      expect(out.vars.OTEL_LOG_RAW_API_BODIES).toBe("1");
+      expect(out.vars.OTEL_TRACES_EXPORTER).toBe("otlp");
+      expect(out.vars.OTEL_LOGS_EXPORTER).toBe("otlp");
+      expect(out.vars.OTEL_METRICS_EXPORTER).toBe("otlp");
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "Authorization=Bearer ik-lw-claude-test-token",
+      );
+    });
+  });
+
   describe("when gemini resolves to ingestion mode", () => {
     /**
      * gemini-cli 0.46-preview only emits OTLP traces + log records when

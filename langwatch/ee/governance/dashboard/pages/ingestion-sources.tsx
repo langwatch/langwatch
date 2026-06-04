@@ -1349,6 +1349,14 @@ function SecretModal({
   // by the OpenInference extractor so the UI groups the session as one thread.
   // Pre-build the shell export block so admins paste once instead of stitching
   // seven lines off the docs page.
+  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
+  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
+  // metadata-only — tokens, cost, durations, tool sizes-in-bytes —
+  // and user prompt text, assistant response text, and tool I/O
+  // content are silently absent. With them on, langwatch.input +
+  // langwatch.output lift verbatim from claude's api_request +
+  // api_response_body events. Payload risk is bounded by claude's
+  // 60KB inline cap + the langwatch receiver content cap.
   const claudeCodeEnvBlock = useMemo(() => {
     if (!isClaudeCode || !details) return "";
     return [
@@ -1357,6 +1365,10 @@ function SecretModal({
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      `export OTEL_LOG_USER_PROMPTS=1`,
+      `export OTEL_LOG_TOOL_DETAILS=1`,
+      `export OTEL_LOG_TOOL_CONTENT=1`,
+      `export OTEL_LOG_RAW_API_BODIES=1`,
       `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
       `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
     ].join("\n");

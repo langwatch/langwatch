@@ -195,10 +195,26 @@ function buildEnvBlock(
     case "claude_code":
       return [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-        // Without OTEL_LOG_USER_PROMPTS=1 claude code redacts the
-        // prompt body, leaving /me/traces with empty input. Mirror
-        // the wrapper + drawer + docs which all set this.
+        // Four claude-code OTel unlock knobs (all ON, collect-everything):
+        //   OTEL_LOG_USER_PROMPTS=1     lifts user prompt text onto user_prompt events
+        //   OTEL_LOG_TOOL_DETAILS=1     lifts tool metadata expansion onto tool_* events
+        //   OTEL_LOG_TOOL_CONTENT=1     lifts tool_input (Bash command, Edit diff, file
+        //                               paths) onto tool_decision + tool_result so the
+        //                               trace shows WHAT the tool did
+        //   OTEL_LOG_RAW_API_BODIES=1   emits api_request_body + api_response_body
+        //                               events carrying the FULL JSON of every claude
+        //                               API call: system prompts, rolling message
+        //                               history, assistant response text + reasoning,
+        //                               tool_use blocks. THIS is the only OTel surface
+        //                               that carries assistant text. May include PII /
+        //                               secrets a user pasted into a prompt; payloads
+        //                               can grow large turn-over-turn — the langwatch
+        //                               receiver caps oversized bodies before they
+        //                               reach storage to keep the CH merge ceiling safe.
         `export OTEL_LOG_USER_PROMPTS=1`,
+        `export OTEL_LOG_TOOL_DETAILS=1`,
+        `export OTEL_LOG_TOOL_CONTENT=1`,
+        `export OTEL_LOG_RAW_API_BODIES=1`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
