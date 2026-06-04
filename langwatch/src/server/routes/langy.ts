@@ -14,8 +14,9 @@
  *                                              conversations for a project.
  *   GET    /langy/memory/export              — GDPR export of conversations.
  *
- * Every route is gated by `isLangwatchStaff(email)` AND
- * `release_langy_enabled` (see the middleware below).
+ * Access: LangWatch staff always have Langy. For everyone else it is gated by
+ * `release_langy_enabled`, which is the lever for opening Langy beyond staff
+ * (see the middleware below). Staff therefore bypass the flag entirely.
  */
 import {
   createUIMessageStream,
@@ -129,12 +130,13 @@ const secured = createServiceApp({ basePath: "/api" });
 
 secured.hono.use("/langy/*", async (c, next) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
-  if (!isLangwatchStaff(session?.user?.email)) {
-    return c.json({ error: "Langy is not available for your account" }, 403);
-  }
-  const enabled = await featureFlagService.isEnabled("release_langy_enabled", {
-    distinctId: session?.user?.id ?? "",
-  });
+  // Staff always have Langy; the flag only opens it to non-staff. The `||`
+  // short-circuits for staff, so the flag is never read for them.
+  const enabled =
+    isLangwatchStaff(session?.user?.email) ||
+    (await featureFlagService.isEnabled("release_langy_enabled", {
+      distinctId: session?.user?.id ?? "",
+    }));
   if (!enabled) {
     return c.json({ error: "Langy is not currently enabled" }, 403);
   }

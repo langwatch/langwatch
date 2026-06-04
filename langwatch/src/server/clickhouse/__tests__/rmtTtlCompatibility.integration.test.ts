@@ -110,6 +110,40 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
     expect(indefiniteRow?._retention_days).toBe(0);
   });
 
+  // Regression: a retention anchor on a Nullable(DateTime) column makes CH reject
+  // MODIFY TTL with BAD_TTL_EXPRESSION (code 450), which crashed the prod app
+  // pod's clickhouse:migrate step on the first deploy of the retention feature
+  // because evaluation_runs.ScheduledAt was Nullable. This locks in the
+  // non-null-anchor rule.
+  it("rejects MODIFY TTL when the anchor column is Nullable(DateTime)", async () => {
+    const NULLABLE_TABLE = "test_rmt_ttl_nullable_anchor";
+    await client.command({
+      query: `CREATE TABLE IF NOT EXISTS ${database}.${NULLABLE_TABLE} (
+        TenantId String,
+        TraceId String,
+        ScheduledAt Nullable(DateTime64(3)),
+        UpdatedAt DateTime64(3),
+        _retention_days UInt16 DEFAULT 0
+      ) ENGINE = ReplacingMergeTree(UpdatedAt)
+      PARTITION BY toYearWeek(UpdatedAt)
+      ORDER BY (TenantId, TraceId)`,
+    });
+
+    try {
+      await expect(
+        client.command({
+          query: `ALTER TABLE ${database}.${NULLABLE_TABLE} MODIFY TTL
+            IF(_retention_days > 0, toDateTime(ScheduledAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
+            SETTINGS materialize_ttl_after_modify = 0`,
+        }),
+      ).rejects.toMatchObject({ code: "450" });
+    } finally {
+      await client.command({
+        query: `DROP TABLE IF EXISTS ${database}.${NULLABLE_TABLE}`,
+      });
+    }
+  });
+
   it("handles mixed-tenant partitions correctly", async () => {
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000);
 

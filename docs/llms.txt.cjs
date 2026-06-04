@@ -227,8 +227,13 @@ function processImports(content, filePath) {
     modifiedContent = modifiedContent.replace(componentRegex, imports[componentName]);
   });
 
-  // Remove import statements
-  modifiedContent = modifiedContent.replace(importRegex, '');
+  // Remove import statements, but only outside fenced code blocks — default
+  // imports like `import scenario from "@langwatch/scenario"` are valid example
+  // code and must survive inside ```code``` fences.
+  modifiedContent = modifiedContent
+    .split(/(```[\s\S]*?```)/g)
+    .map((segment) => (segment.startsWith('```') ? segment : segment.replace(importRegex, '')))
+    .join('');
 
   // Replace <Tab title="X"> with ### X
   modifiedContent = modifiedContent.replace(/<Tab\s+title="([^"]+)">/g, '### $1\n');

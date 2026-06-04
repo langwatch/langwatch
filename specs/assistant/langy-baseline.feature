@@ -48,6 +48,29 @@ Feature: Langy in-product AI assistant — baseline (v1)
     Then the request is rejected with a 403
 
   # ============================================================================
+  # Access and rollout gating
+  # Covered by src/server/routes/__tests__/langy-route-auth.test.ts
+  # ============================================================================
+
+  Scenario: Staff always have Langy regardless of rollout
+    Given I am a LangWatch staff member
+    And Langy has not been rolled out beyond staff
+    When I send a message to Langy in project "demo"
+    Then the request is not rejected by the rollout gate
+
+  Scenario: Non-staff without rollout are blocked
+    Given I am not a LangWatch staff member
+    And Langy has not been rolled out to my account
+    When I send a message to Langy in project "demo"
+    Then the request is rejected with a 403
+
+  Scenario: Rollout opens Langy to non-staff
+    Given I am not a LangWatch staff member
+    And Langy has been rolled out to my account
+    When I send a message to Langy in project "demo"
+    Then the request is not rejected by the rollout gate
+
+  # ============================================================================
   # Read-only tools (information retrieval)
   # ============================================================================
 
