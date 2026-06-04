@@ -21,30 +21,14 @@ Claude Code supports OpenTelemetry (OTel) traces for monitoring and observabilit
 Configure Claude Code to send telemetry to LangWatch using environment variables:
 
 ```bash
-# 1. Enable telemetry
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
-
-# 2. Configure OTLP exporters
-#    Claude Code 2.1.x emits its cost-bearing api_request and user_prompt
-#    events as OTLP LOG records (not spans), and emits periodic usage
-#    metrics. LangWatch's receiver synthesizes a trace per Claude Code
-#    session from the logs and lifts cost / tokens / model onto it.
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
-
-# 3. Required so user_prompt events ship the prompt body — the
-#    receiver reads it as langwatch.input on the synthesized trace.
 export OTEL_LOG_USER_PROMPTS=1
-
-# 4. Set OTLP protocol and endpoint
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-
-# 5. Set authentication headers
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
-
-# 6. Run Claude Code
 claude
 ```
 

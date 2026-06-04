@@ -52,14 +52,11 @@ describe("envForTool", () => {
 
   // Verified empirically against gemini-cli 0.46-preview: the binary
   // reads GOOGLE_GEMINI_BASE_URL, NOT the previous GOOGLE_GENAI_API_BASE
-  // guess. POSTs `{BASE}/v1beta/models/{m}:generateContent`, prepending
-  // the API version itself. The base must therefore be the bare gateway
-  // URL with no `/v1beta` suffix; appending one doubles the prefix to
-  // `/v1beta/v1beta/` and the gateway 404s the routing call (which
-  // surfaces on the cli side as "Unexpected end of JSON input").
-  it("gemini → GOOGLE_GEMINI_BASE_URL=$gw (no /v1beta suffix) + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
+  // guess. POSTs `{BASE}/models/{m}:generateContent`, so the base must
+  // resolve to the gateway's `/v1beta` passthrough route.
+  it("gemini → GOOGLE_GEMINI_BASE_URL=$gw/v1beta + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
     const env = envForTool(cfg, "gemini").vars;
-    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com");
+    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com/v1beta");
     expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
     expect(env.GOOGLE_API_KEY).toBe("lw_vk_test_x");
     expect(env.GOOGLE_GENAI_API_BASE).toBeUndefined();
