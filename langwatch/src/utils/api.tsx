@@ -29,13 +29,16 @@ import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
   extractMissingModelInfo,
+  extractProviderDisabledInfo,
   markAsHandledByLicenseHandler,
   markAsHandledByLiteMemberHandler,
   markAsHandledByMissingModelHandler,
+  markAsHandledByProviderDisabledHandler,
 } from "./trpcError";
 import {
   showAiCallFailedToast,
   showMissingModelToast,
+  showProviderDisabledToast,
 } from "../components/MissingModelToast";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { extractAiCallFailedInfo } from "./trpcError";
@@ -126,6 +129,40 @@ function createTRPCLinks() {
   ];
 }
 
+/**
+ * Returns the `onSwapToAlternate` callback the provider-disabled toast
+ * needs — but only when the swap is actually performable from this
+ * client:
+ *   1. The disabled scope is "project" — clearing team/org defaults
+ *      requires team/org-level permission this user may not have.
+ *   2. The cascade has an alternate, and that alternate's provider is
+ *      currently enabled, so the swap actually unblocks the feature
+ *      instead of trading one disabled provider for another.
+ *
+ * When either check fails, returns `undefined` so the toast falls back
+ * to its "Open settings" deep-link variant — still actionable, just not
+ * one-click.
+ *
+ * The toast doesn't cache the AI failure, so we don't need to manually
+ * invalidate after swapping — the user's next AI action re-resolves
+ * the cascade and picks the now-reachable alternate.
+ */
+function providerDisabledSwapHandler(
+  info: ReturnType<typeof extractProviderDisabledInfo>,
+): (() => Promise<void>) | undefined {
+  if (!info) return undefined;
+  if (info.resolvedScope !== "project") return undefined;
+  if (!info.alternate?.providerEnabled) return undefined;
+  return async () => {
+    await trpcClient.modelProviders.setFeatureOverrideForScope.mutate({
+      scopeType: "PROJECT",
+      scopeId: info.projectId,
+      featureKey: info.featureKey,
+      model: null,
+    });
+  };
+}
+
 function createQueryClientConfig() {
   return {
     /**
@@ -188,6 +225,23 @@ function createQueryClientConfig() {
         if (aiFailedInfo) {
           showAiCallFailedToast(aiFailedInfo);
         }
+        // Cascade DID resolve, but the chosen model's provider is
+        // disabled. Open a toast offering a one-click swap to the
+        // parent-scope default (when there is one) — the swap calls
+        // back into modelProviders.setFeatureOverrideForScope to clear
+        // the disabled-scope key so the next resolve falls through.
+        const providerDisabledInfo = extractProviderDisabledInfo(error);
+        if (providerDisabledInfo) {
+          if (error instanceof Error) {
+            markAsHandledByProviderDisabledHandler(error);
+          }
+          showProviderDisabledToast({
+            ...providerDisabledInfo,
+            onSwapToAlternate: providerDisabledSwapHandler(
+              providerDisabledInfo,
+            ),
+          });
+        }
         // Non-license/non-restriction errors bubble up to component-level handlers
       },
     }),
@@ -214,6 +268,18 @@ function createQueryClientConfig() {
         const aiFailedInfo = extractAiCallFailedInfo(error);
         if (aiFailedInfo) {
           showAiCallFailedToast(aiFailedInfo);
+        }
+        const providerDisabledInfo = extractProviderDisabledInfo(error);
+        if (providerDisabledInfo) {
+          if (error instanceof Error) {
+            markAsHandledByProviderDisabledHandler(error);
+          }
+          showProviderDisabledToast({
+            ...providerDisabledInfo,
+            onSwapToAlternate: providerDisabledSwapHandler(
+              providerDisabledInfo,
+            ),
+          });
         }
       },
     }),

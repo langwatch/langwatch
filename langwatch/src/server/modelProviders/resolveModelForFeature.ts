@@ -258,3 +258,56 @@ export async function resolveModelForFeature(
     ctx.projectId,
   );
 }
+
+/**
+ * Walk the cascade for `featureKey` while skipping any tier at or above
+ * `skipFromTier` — used by `getVercelAIModel` to suggest the
+ * cascade-next candidate when the chosen one's provider is disabled.
+ * Returns `null` when no further candidate exists (the disabled tier was
+ * the only configured one).
+ *
+ * Distinct from `resolveModelForFeature` so the swap-suggestion path
+ * doesn't pay the throw + catch overhead of the primary resolver, and
+ * so the "alternate" walk can't itself raise ModelNotConfiguredError
+ * (we already know the primary tier resolved — `null` is fine).
+ */
+export async function findAlternateBelowScope(
+  featureKey: string,
+  ctx: Ctx,
+  skipFromTier: Exclude<ResolutionScope, null>,
+): Promise<Resolution | null> {
+  const feature = featureByKey(featureKey);
+  if (!feature) return null;
+
+  const chain = await loadScopeChain(ctx.prisma, ctx.projectId);
+  const configs = await loadConfigsForChain(ctx.prisma, chain);
+
+  const skipIndex = TIER_ORDER.indexOf(skipFromTier);
+  if (skipIndex < 0) return null;
+  const tiersBelow = TIER_ORDER.slice(skipIndex + 1);
+
+  for (const tier of tiersBelow) {
+    const tierConfigs = configs.filter((c) => tierForConfig(c, chain) === tier);
+    if (tierConfigs.length === 0) continue;
+    tierConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    for (const c of tierConfigs) {
+      const value = readKey(c.config, feature.key);
+      if (value) {
+        const expanded = expandLatestAlias(value);
+        if (isLatestAlias(value) && expanded === value) continue;
+        return { model: expanded, source: "feature_override", scope: tier, feature };
+      }
+    }
+    for (const c of tierConfigs) {
+      const value = readKey(c.config, feature.role);
+      if (value) {
+        const expanded = expandLatestAlias(value);
+        if (isLatestAlias(value) && expanded === value) continue;
+        return { model: expanded, source: "role_default", scope: tier, feature };
+      }
+    }
+  }
+
+  return null;
+}
