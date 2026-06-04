@@ -38,6 +38,7 @@ import {
   listUserIngestionBindings,
   rotateUserIngestionBindingToken,
 } from "./cli-api";
+import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 export type WrapperMode = "gateway" | "ingestion";
 
@@ -92,6 +93,15 @@ export async function resolveWrapperMode(
 ): Promise<WrapperModeResult> {
   const persistedMode = cfg.tool_mode?.[tool];
   const hasVk = !!cfg.default_personal_vk?.secret;
+  const policy = resolvePlatformToolPolicy(tool);
+
+  if (!policy.allowVk && !policy.allowOtelDirect) {
+    throw new GovernanceCliError(
+      403,
+      "tool_disabled",
+      `Tool '${tool}' is disabled in the platform policy (both gateway and direct OTLP paths off). Ask your org admin to enable allow_vk or allow_otel_direct.`,
+    );
+  }
 
   // EFFECTIVE mode rules:
   //   persisted="gateway"   -> gateway (even if VK absent; preflight surfaces the gap)
@@ -99,7 +109,12 @@ export async function resolveWrapperMode(
   //   persisted="ask" / unset:
   //     hasVk -> gateway (no surprise: VK users keep current behavior)
   //     no VK -> ingestion (auto-install Path B; closes the "$5 VPS" scenario)
-  const mode: WrapperMode =
+  //
+  // Platform policy then GATES the resolved mode:
+  //   - mode=gateway + !allowVk -> downgrade to ingestion (if allowed) or error
+  //   - mode=ingestion + !allowOtelDirect -> error (no automatic upgrade
+  //     to gateway since the user explicitly opted in or has no VK)
+  let mode: WrapperMode =
     persistedMode === "gateway"
       ? "gateway"
       : persistedMode === "ingestion"
@@ -107,6 +122,18 @@ export async function resolveWrapperMode(
         : hasVk
           ? "gateway"
           : "ingestion";
+
+  // Symmetric fall-back: when the resolved mode is disabled but the
+  // OTHER mode is allowed, swap into it rather than throwing. Lets
+  // cursor (allowVk=true, allowOtelDirect=false) keep working via
+  // gateway when no VK is yet configured (preflight surfaces the
+  // missing VK separately, same as before this gate existed).
+  if (mode === "gateway" && !policy.allowVk) {
+    mode = "ingestion";
+  }
+  if (mode === "ingestion" && !policy.allowOtelDirect) {
+    mode = "gateway";
+  }
 
   if (mode === "gateway") {
     // Codex 0.130+ defers to ChatGPT OAuth by default and ignores
