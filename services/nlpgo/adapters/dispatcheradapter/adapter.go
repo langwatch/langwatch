@@ -186,6 +186,14 @@ func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 		// credential layout as OpenAI but a different ProviderID so the
 		// gateway-side custom-→-openai mapping logic stays applicable.
 		return openAICred(ic.Custom), nil
+	case "langwatch_noai":
+		// Local-dev fake LLM. Bifrost has it registered as a CustomProvider
+		// on top of OpenAI with a statically-configured BaseURL pulled from
+		// LANGWATCH_NOAI_BASE_URL; no per-request credentials.
+		return domain.Credential{
+			ID:         inlineCredentialID(domain.ProviderID("langwatch_noai")),
+			ProviderID: domain.ProviderID("langwatch_noai"),
+		}, nil
 	case "":
 		return domain.Credential{}, errors.New("dispatcheradapter: provider is required in inline credentials")
 	default:

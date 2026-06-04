@@ -17,6 +17,7 @@ import {
 } from "./modelProvider.repository";
 import {
   getProviderModelOptions,
+  isProviderVisible,
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
@@ -744,6 +745,7 @@ export class ModelProviderService {
     return Object.fromEntries(
       Object.entries(modelProviders)
         .filter(([_, modelProvider]) => modelProvider.enabledSince)
+        .filter(([_, modelProvider]) => isProviderVisible(modelProvider))
         .map(([providerKey, modelProvider]) => {
           // Auto-enable from host env vars only when running in SaaS mode.
           // In SaaS, the platform's `ANTHROPIC_API_KEY` (etc.) is the

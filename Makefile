@@ -1,7 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
-.PHONY: _dev-up-deprecation-warning
+.PHONY: _dev-up-deprecation-warning noai aigateway
 
 # Surface every target — boxd-* are pulled in via include below.
 help:
@@ -90,6 +90,16 @@ service:
 		eval "$$_snap" && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
+
+# Shortcut for the NoAI fake LLM (services/noai). Dev only — runs on
+# :5577, speaks /v1/chat/completions and /v1/responses with deterministic
+# responses keyed off the requested langwatch_noai/* model id.
+noai:
+	@$(MAKE) service svc=noai
+
+# Shortcut for the AI Gateway (services/aigateway). Dev only.
+aigateway:
+	@$(MAKE) service svc=aigateway
 
 # Run a Go service with live reload on file changes.
 # Usage: make service-watch svc=aigateway

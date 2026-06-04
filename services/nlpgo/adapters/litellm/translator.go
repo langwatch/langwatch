@@ -93,6 +93,12 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Provider: "custom",
 			Custom:   pickStrings(params, "api_key", "api_base"),
 		}, nil
+	case "langwatch_noai":
+		// The noai fake LLM is keyless and its BaseURL is configured
+		// statically in the gateway (LANGWATCH_NOAI_BASE_URL). The wire
+		// payload carries no credentials — the provider name alone tells
+		// the gateway to route to its registered Bifrost CustomProvider.
+		return InlineCredentials{Provider: "langwatch_noai"}, nil
 	case "":
 		return InlineCredentials{}, errors.New("provider is required")
 	default:

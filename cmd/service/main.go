@@ -13,6 +13,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
+	noai "github.com/langwatch/langwatch/services/noai/cmd"
 )
 
 // Version is set via ldflags at build time.
@@ -24,6 +25,7 @@ type ServiceBoot func(ctx context.Context, args []string) error
 var services = map[string]ServiceBoot{
 	"aigateway": aigateway.Root,
 	"nlpgo":     nlpgo.Root,
+	"noai":      noai.Root,
 }
 
 func main() {

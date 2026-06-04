@@ -670,11 +670,44 @@ func credentialFromContext(ctx context.Context) domain.Credential {
 // account implements bfschemas.Account for multi-tenant credential dispatch.
 type account struct{}
 
+// providerLangwatchNoai is the Bifrost provider key for the local-dev
+// `langwatch_noai` fake LLM. It's registered as a CustomProvider on top
+// of Bifrost's OpenAI provider client, with its BaseURL pulled from
+// `LANGWATCH_NOAI_BASE_URL` (default localhost:5577). The provider is
+// only registered when that env var is set, so production gateways
+// never carry it.
+const providerLangwatchNoai bfschemas.ModelProvider = "langwatch_noai"
+
+// langwatchNoaiBaseURL returns the URL the fake LLM service listens on,
+// falling back to the documented dev default. Returns "" when noai
+// support should be disabled (handled by the caller).
+func langwatchNoaiBaseURL() string {
+	if v := os.Getenv("LANGWATCH_NOAI_BASE_URL"); v != "" {
+		return v
+	}
+	// In production this env var is never set (the TS-side provider is
+	// `devOnly`), so we only fall back in development-style processes
+	// that haven't bothered to set it.
+	if os.Getenv("ENVIRONMENT") == "production" {
+		return ""
+	}
+	return "http://localhost:5577"
+}
+
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
-	return bfschemas.StandardProviders, nil
+	providers := append([]bfschemas.ModelProvider{}, bfschemas.StandardProviders...)
+	if langwatchNoaiBaseURL() != "" {
+		providers = append(providers, providerLangwatchNoai)
+	}
+	return providers, nil
 }
 
 func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.ModelProvider) ([]bfschemas.Key, error) {
+	if provider == providerLangwatchNoai {
+		// Keyless. Bifrost still expects a Key with a non-empty ID; the
+		// value is ignored by the noai server.
+		return []bfschemas.Key{{ID: "langwatch-noai", Name: "langwatch-noai", Weight: 1}}, nil
+	}
 	cred := credentialFromContext(ctx)
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
@@ -695,6 +728,17 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		cfg.ProxyConfig = &bfschemas.ProxyConfig{
 			Type: bfschemas.HTTPProxy,
 			URL:  proxyURL,
+		}
+	}
+	if provider == providerLangwatchNoai {
+		base := langwatchNoaiBaseURL()
+		if base == "" {
+			return nil, fmt.Errorf("langwatch_noai provider not configured (LANGWATCH_NOAI_BASE_URL unset)")
+		}
+		cfg.NetworkConfig = bfschemas.NetworkConfig{BaseURL: base}
+		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
+			BaseProviderType: bfschemas.OpenAI,
+			IsKeyLess:        true,
 		}
 	}
 	cfg.CheckAndSetDefaults()

@@ -47,6 +47,22 @@ type ModelProviderDefinition = {
    * truth for which fields render the muted "optional" affordance.
    */
   optionalKeys?: string[];
+  /**
+   * When true, this provider is filtered out of seeding and the UI in
+   * production environments (NODE_ENV === "production"). Used for the
+   * local-dev `langwatch_noai` fake provider, which is backed by a
+   * service that only runs in development.
+   */
+  devOnly?: boolean;
+};
+
+/**
+ * Returns true if the provider should be visible in this runtime.
+ * `devOnly` providers are hidden when NODE_ENV is "production".
+ */
+export const isProviderVisible = (def: ModelProviderDefinition): boolean => {
+  if (!def.devOnly) return true;
+  return process.env.NODE_ENV !== "production";
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -389,6 +405,24 @@ export const modelProviders = {
       VOYAGE_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2026-05-18"),
+  },
+  langwatch_noai: {
+    name: "LangWatch NoAI (Local Dev)",
+    type: "llm",
+    // The noai service is OpenAI-compatible and ignores credentials, but
+    // the rest of the plumbing assumes every provider names an api-key
+    // env var. We point at a recognisable unused name; the schema below
+    // is empty so prepareLitellmParams never sets params.api_key.
+    apiKey: "LANGWATCH_NOAI_API_KEY",
+    endpointKey: "LANGWATCH_NOAI_BASE_URL",
+    keysSchema: z.object({
+      LANGWATCH_NOAI_BASE_URL: z.string().nullable().optional(),
+    }),
+    optionalKeys: ["LANGWATCH_NOAI_BASE_URL"],
+    enabledSince: new Date("2026-06-04"),
+    devOnly: true,
+    blurb:
+      "Static, deterministic fake LLM for local development. Backed by the local `noai` service (services/noai). Speaks OpenAI /v1/chat/completions and /v1/responses; echoes text-on-text and audio-on-audio. Hidden in production.",
   },
   azure_safety: {
     name: "Azure Safety",

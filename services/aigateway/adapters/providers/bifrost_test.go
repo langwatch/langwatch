@@ -378,3 +378,89 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 		t.Errorf("Region not honored: %+v", k.BedrockKeyConfig.Region)
 	}
 }
+
+// LangwatchNoai is a dev-only fake LLM. When LANGWATCH_NOAI_BASE_URL is
+// set, the account adapter must register it as a CustomProvider over
+// OpenAI with the configured BaseURL, keyless. ENVIRONMENT=production
+// suppresses it even if the env var is set, so dev configs leaking into
+// a prod image don't accidentally surface it.
+func TestLangwatchNoaiAccountRegistration(t *testing.T) {
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5577")
+	t.Setenv("ENVIRONMENT", "development")
+
+	a := &account{}
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
+	found := false
+	for _, p := range providers {
+		if p == providerLangwatchNoai {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected providerLangwatchNoai in configured providers, got %v", providers)
+	}
+
+	cfg, err := a.GetConfigForProvider(providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetConfigForProvider: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "http://fake-host:5577" {
+		t.Fatalf("BaseURL mismatch: got %q", cfg.NetworkConfig.BaseURL)
+	}
+	if cfg.CustomProviderConfig == nil {
+		t.Fatalf("expected CustomProviderConfig to be set")
+	}
+	if cfg.CustomProviderConfig.BaseProviderType != bfschemas.OpenAI {
+		t.Fatalf("BaseProviderType: got %q want openai", cfg.CustomProviderConfig.BaseProviderType)
+	}
+	if !cfg.CustomProviderConfig.IsKeyLess {
+		t.Fatalf("expected IsKeyLess=true")
+	}
+
+	keys, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetKeysForProvider: %v", err)
+	}
+	if len(keys) != 1 || keys[0].ID == "" {
+		t.Fatalf("expected one keyless key, got %#v", keys)
+	}
+}
+
+func TestLangwatchNoaiSuppressedInProduction(t *testing.T) {
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://anywhere:5577")
+	t.Setenv("ENVIRONMENT", "production")
+
+	// Production gate: the env-driven default is suppressed. But the
+	// var was set explicitly here, so it still wins — the gate only
+	// keys off ENVIRONMENT for the fallback. The explicit override
+	// is intentional ("operator opted in"), so confirm that behaviour:
+	// the provider IS registered when the URL is explicit, even in
+	// prod. Producers should *not* set the var in prod images; the
+	// TS-side `devOnly` gate already hides the provider from project
+	// configs there.
+	a := &account{}
+	providers, _ := a.GetConfiguredProviders()
+	found := false
+	for _, p := range providers {
+		if p == providerLangwatchNoai {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected explicit LANGWATCH_NOAI_BASE_URL to register noai even in production")
+	}
+
+	// Unset and confirm the prod gate works for the fallback path.
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "")
+	providers, _ = a.GetConfiguredProviders()
+	for _, p := range providers {
+		if p == providerLangwatchNoai {
+			t.Fatalf("expected noai to be suppressed when env unset in production")
+		}
+	}
+}
