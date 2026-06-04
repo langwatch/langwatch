@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { LuPlus, LuSettings2 } from "react-icons/lu";
+import { LuPlus } from "react-icons/lu";
 import {
   PopoverBody,
   PopoverContent,
@@ -9,25 +9,22 @@ import {
   PopoverTrigger,
 } from "../../../../components/ui/popover";
 import { Tooltip } from "../../../../components/ui/tooltip";
-import { useFilterStore } from "../../stores/filterStore";
-import { useLensDraftStore } from "../../stores/lensDraftStore";
 import { useViewStore } from "../../stores/viewStore";
-import { LensConfigDialog } from "./LensConfigDialog";
 
 const BETA_TOOLTIP =
   "Lenses are saved in your browser during this beta. They don't sync across browsers or teammates yet.";
 
 /**
- * Lens creation entry point — two paths from the same trigger:
- *   1. Quick-create popover: type a name, snapshot the current table state.
- *   2. "Configure…" link: opens `LensConfigDialog` for full setup before save.
- *
- * Both paths land in `viewStore.createLens`, which persists the new lens to
- * localStorage and switches the active tab to it.
+ * Lens creation entry point — single path: type a name, snapshot the
+ * current table state. The "Configure columns, sort, and more…" link
+ * (and its LensConfigDialog) were retired in Round 3 — columns are
+ * managed inline on the sidebar tab, sort is the column-header click
+ * everyone already knows, so the heavyweight dialog had no remaining
+ * users. Lens-creation lands in `viewStore.createLens`, which
+ * persists the new lens to localStorage and switches the active tab.
  */
 export const CreateLensButton: React.FC = () => {
   const createLens = useViewStore((s) => s.createLens);
-  const openDialog = useLensDraftStore((s) => s.openDialog);
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -46,20 +43,6 @@ export const CreateLensButton: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter") submitQuick();
     else if (e.key === "Escape") reset();
-  };
-
-  const openConfigure = (): void => {
-    const view = useViewStore.getState();
-    const liveFilterText = useFilterStore.getState().queryText;
-    openDialog({
-      name: name.trim(),
-      grouping: view.grouping,
-      columns: view.columnOrder,
-      addons: [],
-      sort: view.sort,
-      liveFilterText,
-    });
-    reset();
   };
 
   return (
