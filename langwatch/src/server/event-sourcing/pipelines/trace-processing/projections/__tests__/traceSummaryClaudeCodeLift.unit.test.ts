@@ -118,7 +118,11 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       );
     });
 
-    it("does NOT touch langwatch.* keys when the record is user_prompt", () => {
+    it("does NOT touch cost/tokens/model langwatch.* keys when the record is user_prompt", () => {
+      // user_prompt events carry the prompt text + session.id but
+      // NO model/cost/tokens (those are on api_request). The fold
+      // must keep those fields untouched even though it DOES lift
+      // langwatch.input + langwatch.thread.id off the same record.
       const projection = makeProjection();
       const state = createInitState();
       const ev = makeClaudeApiRequestEvent({
@@ -132,6 +136,32 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
       expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
       expect(after.attributes["langwatch.model"]).toBeUndefined();
+      // The prompt itself + thread id DO land via the user_prompt lift.
+      expect(after.attributes["langwatch.input"]).toBe("What is 2+2?");
+      expect(after.attributes["langwatch.thread.id"]).toBe("s");
+      // ComputedInput on the trace summary picks up the user prompt.
+      expect(after.computedInput).toBe("What is 2+2?");
+    });
+
+    it("ignores `prompt` on non-user_prompt claude_code events (subagent pollution guard)", () => {
+      // Reported on PR #4544 v2-drawer screenshot: the trace input was
+      // showing "env" instead of the user's real prompt. Root cause:
+      // a tool/subagent emitted a record with `prompt:"env"` (a Bash
+      // tool subagent's shell command) and the fold accepted it as a
+      // valid trace input because it only gated on the claude_code
+      // scope, not on event.name.
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({
+        "session.id": "s",
+        prompt: "env",
+      });
+      ev.data.attributes["event.name"] = "tool_call";
+      ev.data.body = "claude_code.tool_call";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.computedInput).toBe(state.computedInput);
+      expect(after.attributes["langwatch.input"]).toBeUndefined();
     });
   });
 

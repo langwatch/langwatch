@@ -45,10 +45,29 @@ describe("ClaudeCodeExtractor.applyLog", () => {
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
-  it("returns no-op for a non-api_request event in claude_code scope", () => {
+  it("lifts the user-typed prompt onto langwatch.input from a user_prompt event", () => {
+    // claude-code 2.x only emits the `prompt` attribute when
+    // OTEL_LOG_USER_PROMPTS=1 is in the env. The langwatch wrapper
+    // sets that by default for claude, so this is the standard path.
     const ctx = createLogExtractorContext(SCOPE, {
       "event.name": "user_prompt",
-      prompt: "hello",
+      prompt: "Reply EXACTLY this token and nothing else: PONG-X",
+      "session.id": "sess_user_prompt",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({
+      "langwatch.input": "Reply EXACTLY this token and nothing else: PONG-X",
+      "langwatch.thread.id": "sess_user_prompt",
+    });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/user_prompt");
+  });
+
+  it("returns no-op for an unknown event in claude_code scope", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "tool_decision",
+      tool_name: "Bash",
     });
 
     new ClaudeCodeExtractor().applyLog(ctx);

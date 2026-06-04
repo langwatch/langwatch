@@ -72,9 +72,19 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
   }
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
-    const prompt = data.attributes.prompt;
-    if (prompt && typeof prompt === "string") {
-      return { input: prompt, output: null };
+    // Gate on event.name === "user_prompt" specifically. Without this
+    // gate ANY claude_code log record with a `prompt` attribute wins,
+    // including internal subagent calls (e.g. a Bash tool subagent
+    // emitting `prompt:"env"`) which pollute the trace input with the
+    // shell command instead of the user's real prompt. The
+    // OTEL_LOG_USER_PROMPTS=1 env (set by the langwatch wrapper) is
+    // what gets the user prompt onto the wire — and it lands on the
+    // user_prompt event, never on tool/subagent events.
+    if (data.attributes["event.name"] === "user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (prompt && typeof prompt === "string") {
+        return { input: prompt, output: null };
+      }
     }
   }
 

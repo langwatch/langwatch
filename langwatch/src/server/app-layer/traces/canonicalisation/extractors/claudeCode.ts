@@ -2,26 +2,38 @@
  * Claude Code Extractor
  *
  * Handles: Anthropic Claude Code's native OpenTelemetry log records
- * (scope `com.anthropic.claude_code.events`). Lifts the cost-bearing
- * `api_request` event onto canonical `langwatch.*` attributes so the
- * trace summary renders the same shape as a real gen_ai span.
+ * (scope `com.anthropic.claude_code.events`). Lifts cost-bearing
+ * `api_request` events AND the user-typed `user_prompt` event onto
+ * canonical `langwatch.*` attributes so the trace summary renders
+ * the same shape as a real gen_ai span.
  *
  * Detection: log record scope matches CLAUDE_CODE_SCOPE_NAMES and
- *            attributes["event.name"] === "api_request".
+ *            attributes["event.name"] in { "api_request",
+ *            "user_prompt" }.
  *
  * Canonical attributes produced (when present on the wire):
- * - langwatch.model
- * - langwatch.cost.usd
- * - langwatch.input_tokens
- * - langwatch.output_tokens
- * - langwatch.cache_read_tokens
- * - langwatch.cache_creation_tokens
- * - langwatch.thread.id (from session.id)
+ * - langwatch.model               (api_request)
+ * - langwatch.cost.usd            (api_request)
+ * - langwatch.input_tokens        (api_request)
+ * - langwatch.output_tokens       (api_request)
+ * - langwatch.cache_read_tokens   (api_request)
+ * - langwatch.cache_creation_tokens (api_request)
+ * - langwatch.thread.id           (api_request OR user_prompt — from session.id)
+ * - langwatch.input               (user_prompt — from `prompt` attr,
+ *                                  only when OTEL_LOG_USER_PROMPTS=1
+ *                                  is set, which the langwatch wrapper
+ *                                  does by default for claude)
  *
  * Span-side `apply()` is a no-op — Claude Code Path A traffic flows
  * through the gateway and emits gen_ai.* attributes that the
  * GenAIExtractor handles. This extractor is the Path B (OTLP-from-
  * Claude-Code) counterpart, living on the log side.
+ *
+ * Output text gap: Claude Code 2.x does NOT emit the assistant
+ * response body on its api_request event (only model + tokens +
+ * cost + duration). The response is rendered to the user's terminal
+ * but never serialised on the OTel wire. This is a true vendor
+ * limit upstream of this extractor.
  */
 
 import type {
@@ -59,8 +71,18 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   applyLog(ctx: LogExtractorContext): void {
     if (!CLAUDE_CODE_SCOPE_NAMES.has(ctx.bag.scopeName)) return;
     const eventName = ctx.bag.attrs.get("event.name");
-    if (eventName !== "api_request") return;
 
+    if (eventName === "api_request") {
+      this.liftApiRequest(ctx);
+      return;
+    }
+    if (eventName === "user_prompt") {
+      this.liftUserPrompt(ctx);
+      return;
+    }
+  }
+
+  private liftApiRequest(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const costUsd = asNumber(ctx.bag.attrs.take("cost_usd"));
     const inputTokens = asNumber(ctx.bag.attrs.take("input_tokens"));
@@ -105,5 +127,21 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
     }
 
     if (fired) ctx.recordRule("claude-code/api_request");
+  }
+
+  private liftUserPrompt(ctx: LogExtractorContext): void {
+    const prompt = asString(ctx.bag.attrs.take("prompt"));
+    const sessionId = asString(ctx.bag.attrs.get("session.id"));
+
+    let fired = false;
+    if (prompt !== null) {
+      ctx.setAttr("langwatch.input", prompt);
+      fired = true;
+    }
+    if (sessionId !== null) {
+      ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
+      fired = true;
+    }
+    if (fired) ctx.recordRule("claude-code/user_prompt");
   }
 }
