@@ -47,6 +47,7 @@
  * - langwatch.input (from codex.user_prompt prompt)
  */
 
+import { ATTR_KEYS } from "./_constants";
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,
@@ -81,6 +82,15 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // Rust CLI (scope `codex_cli_rs`), where the per-turn
     // `session_task.turn` span carries codex-namespaced attributes
     // that won't match GenAIExtractor's gen_ai.* gates.
+    //
+    // Output target is the gen_ai.* OTel semconv (not langwatch.*),
+    // because the trace-summary fold's SpanCostService.extractModelsFromSpan
+    // + extractTokenMetrics read gen_ai.{request,response}.model and
+    // gen_ai.usage.{input,output}_tokens. Writing langwatch.* would lift
+    // attrs onto the span but leave Models=[] + TotalCost=NULL on the
+    // trace summary — that's the log-record path's convention, not the
+    // span path's. Mastra + Vercel + the rest of the extractors all
+    // target gen_ai.* on the span side.
     if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) return;
 
@@ -99,23 +109,27 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     let fired = false;
     if (model !== null) {
-      ctx.setAttr("langwatch.model", model);
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model);
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model);
       fired = true;
     }
     if (inputTokens !== null) {
-      ctx.setAttr("langwatch.input_tokens", String(inputTokens));
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, inputTokens);
       fired = true;
     }
     if (outputTokens !== null) {
-      ctx.setAttr("langwatch.output_tokens", String(outputTokens));
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outputTokens);
       fired = true;
     }
     if (cacheReadTokens !== null) {
-      ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        cacheReadTokens,
+      );
       fired = true;
     }
     if (turnId !== null) {
-      ctx.setAttrIfAbsent("langwatch.thread.id", turnId);
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, turnId);
       fired = true;
     }
     if (fired) ctx.recordRule("codex/session_task.turn");

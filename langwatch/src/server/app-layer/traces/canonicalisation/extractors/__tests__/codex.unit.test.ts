@@ -145,11 +145,12 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out).toEqual({
-        "langwatch.model": "gpt-5.5",
-        "langwatch.input_tokens": "14365",
-        "langwatch.output_tokens": "6",
-        "langwatch.cache_read_tokens": "10112",
-        "langwatch.thread.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
+        "gen_ai.request.model": "gpt-5.5",
+        "gen_ai.response.model": "gpt-5.5",
+        "gen_ai.usage.input_tokens": 14365,
+        "gen_ai.usage.output_tokens": 6,
+        "gen_ai.usage.cache_read.input_tokens": 10112,
+        "gen_ai.conversation.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
       });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
     });
@@ -206,7 +207,10 @@ describe("CodexExtractor.applyLog", () => {
 
       new CodexExtractor().apply(ctx);
 
-      expect(ctx.out).toEqual({ "langwatch.model": "gpt-5.5" });
+      expect(ctx.out).toEqual({
+        "gen_ai.request.model": "gpt-5.5",
+        "gen_ai.response.model": "gpt-5.5",
+      });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
     });
   });
