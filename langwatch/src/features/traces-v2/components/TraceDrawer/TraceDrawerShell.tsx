@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
@@ -12,14 +13,13 @@ import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { useShikiAdapter } from "./markdownView/shikiAdapter";
-import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
 import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
-import { TraceAccordions } from "./traceAccordions";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
+import { TraceAccordions } from "./traceAccordions";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
 
 export interface TraceV2DrawerShellProps {
@@ -238,68 +238,77 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   enabled
                   containerRef={paneContainerRef}
                 >
-                <Flex
-                  ref={paneContainerRef}
-                  flex={1}
-                  minHeight={0}
-                  minWidth={0}
-                  direction="column"
-                  bg={{ base: "bg.surface", _dark: "bg.panel" }}
-                  opacity={headerQuery.isFetching ? 0.55 : 1}
-                  transition="opacity 120ms ease-out"
-                >
-                  <ScenarioRoleProvider
-                    isScenario={
-                      !!(
-                        trace.scenarioRunId ??
-                        trace.attributes["scenario.run_id"]
-                      )
-                    }
+                  {/*
+                  `height="100%"` (not `flex={1}`) because PeerCursorOverlay
+                  wraps its children in a `position: relative` Box that
+                  isn't a flex container, so `flex: 1` is inert here — the
+                  Flex would collapse to content height, which broke the
+                  Summary tab's scroll (content overflowed the clipped
+                  drawer body) and the Trace tab's PanelGroup (percentages
+                  resolved against 0px → rendered empty).
+                */}
+                  <Flex
+                    ref={paneContainerRef}
+                    height="100%"
+                    minHeight={0}
+                    minWidth={0}
+                    direction="column"
+                    bg={{ base: "bg.surface", _dark: "bg.panel" }}
+                    opacity={headerQuery.isFetching ? 0.55 : 1}
+                    transition="opacity 120ms ease-out"
                   >
-                    {viewMode === "conversation" && trace.conversationId ? (
-                      <IsolatedErrorBoundary
-                        scope="Couldn't render conversation view"
-                        resetKeys={[trace.conversationId, trace.traceId]}
-                      >
-                        <Box flex={1} minHeight={0} overflow="auto">
-                          <ConversationView
-                            conversationId={trace.conversationId}
-                            currentTraceId={trace.traceId}
-                          />
-                        </Box>
-                      </IsolatedErrorBoundary>
-                    ) : viewMode === "summary" ? (
-                      // Summary mode: render the trace-scope accordion stack
-                      // full-bleed (I/O, metadata, evals, events, exceptions
-                      // — whatever the current `TraceSummaryAccordions`
-                      // composes for `activeTab="summary"`). Reuses the
-                      // existing TraceAccordions surface so all the focus
-                      // behaviour (header-chip jumps, exception pulses) keeps
-                      // working without a parallel implementation.
-                      <IsolatedErrorBoundary
-                        scope="Couldn't render trace summary"
-                        resetKeys={[trace.traceId]}
-                      >
-                        <Box flex={1} minHeight={0} overflow="auto">
-                          <TraceAccordions
-                            trace={trace}
-                            spans={spanTree}
-                            selectedSpan={null}
-                            activeTab="summary"
-                          />
-                        </Box>
-                      </IsolatedErrorBoundary>
-                    ) : (
-                      <PaneLayout
-                        trace={trace}
-                        spans={spanTree}
-                        selectedSpan={selectedSpan}
-                        spansLoading={spanTreeQuery.isLoading}
-                        layout={layout}
-                      />
-                    )}
-                  </ScenarioRoleProvider>
-                </Flex>
+                    <ScenarioRoleProvider
+                      isScenario={
+                        !!(
+                          trace.scenarioRunId ??
+                          trace.attributes["scenario.run_id"]
+                        )
+                      }
+                    >
+                      {viewMode === "conversation" && trace.conversationId ? (
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render conversation view"
+                          resetKeys={[trace.conversationId, trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0} overflow="auto">
+                            <ConversationView
+                              conversationId={trace.conversationId}
+                              currentTraceId={trace.traceId}
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : viewMode === "summary" ? (
+                        // Summary mode: render the trace-scope accordion stack
+                        // full-bleed (I/O, metadata, evals, events, exceptions
+                        // — whatever the current `TraceSummaryAccordions`
+                        // composes for `activeTab="summary"`). Reuses the
+                        // existing TraceAccordions surface so all the focus
+                        // behaviour (header-chip jumps, exception pulses) keeps
+                        // working without a parallel implementation.
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render trace summary"
+                          resetKeys={[trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0} overflow="auto">
+                            <TraceAccordions
+                              trace={trace}
+                              spans={spanTree}
+                              selectedSpan={null}
+                              activeTab="summary"
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : (
+                        <PaneLayout
+                          trace={trace}
+                          spans={spanTree}
+                          selectedSpan={selectedSpan}
+                          spansLoading={spanTreeQuery.isLoading}
+                          layout={layout}
+                        />
+                      )}
+                    </ScenarioRoleProvider>
+                  </Flex>
                 </PeerCursorOverlay>
               </>
             )}

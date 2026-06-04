@@ -19,8 +19,8 @@ import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
-import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useAutoOpenSections } from "./sectionPresence";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
@@ -60,10 +60,16 @@ export function SpanAccordions({
     if (hasError && hasIO) list.push("exceptions");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
-    // Scope chip lives in the span header — no dedicated section needed.
+    // Instrumentation scope used to be a chip pinned to the right of
+    // the SpanTabBar. Operator feedback: it took up tab-row real estate
+    // for a piece of metadata most users glance at once and ignore.
+    // Folded back into the accordion stack here — collapsed by default
+    // unless the span actually reports a scope, so it's quiet when
+    // empty and reachable when needed.
+    if (hasScope) list.push("scope");
     list.push("events");
     return list;
-  }, [hasError, hasIO, hasPrompt]);
+  }, [hasError, hasIO, hasPrompt, hasScope]);
 
   // Same rule as the trace summary view: only auto-expand Attributes when
   // the span itself has attributes — resource-only is rarely interesting
@@ -110,13 +116,6 @@ export function SpanAccordions({
           </Text>
         </HStack>
       )}
-      {/*
-        The instrumentation-scope chip lives in the SpanTabBar's
-        rightSlot now — rendering it here too duplicated it directly
-        below the tab row, which read as visual noise on every span
-        detail. The tab-bar chip already covers the same trace-level
-        attribution; nothing else to add here.
-      */}
       {glow ? (
         <SectionFocusGlow
           key={glow.nonce}

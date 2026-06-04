@@ -121,14 +121,17 @@ export function useTraceFreshness() {
       const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
 
-      void trpcUtils.tracesV2.spanTree.invalidate({
-        projectId,
-        traceId: openTraceId,
-      });
-      void trpcUtils.tracesV2.spanDetail.invalidate({
-        projectId,
-        traceId: openTraceId,
-      });
+      // Invalidate every per-trace query that changes shape when a new
+      // span lands — keeps the cache push-fresh so the per-hook
+      // refetchInterval can stay off while SSE is connected. The key
+      // is scoped to `projectId` + `traceId` so only the open trace
+      // is invalidated, not the entire CSR cache.
+      const key = { projectId, traceId: openTraceId };
+      void trpcUtils.tracesV2.spanTree.invalidate(key);
+      void trpcUtils.tracesV2.spanDetail.invalidate(key);
+      void trpcUtils.tracesV2.spanLangwatchSignals.invalidate(key);
+      void trpcUtils.tracesV2.traceEvents.invalidate(key);
+      void trpcUtils.tracesV2.resourceInfo.invalidate(key);
     },
     [trpcUtils, project?.id],
   );
@@ -136,9 +139,7 @@ export function useTraceFreshness() {
   // Honour the operator's "live updates" preference — when disabled,
   // skip subscribing and force the connection state to disconnected so
   // the toolbar indicator reads correctly.
-  const liveUpdatesEnabled = useSseStatusStore(
-    (s) => s.liveUpdatesEnabled,
-  );
+  const liveUpdatesEnabled = useSseStatusStore((s) => s.liveUpdatesEnabled);
 
   const { connectionState, lastEventAt } = useTraceUpdateListener({
     projectId: project?.id ?? "",

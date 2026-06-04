@@ -1,13 +1,11 @@
 import { Box } from "@chakra-ui/react";
 import { memo } from "react";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { useTraceResources } from "../../../hooks/useTraceResources";
-import { ScopeChip } from "../ScopeChip";
 import { SpanTabBar } from "../SpanTabBar";
 import { TraceAccordions } from "../traceAccordions";
 
@@ -53,7 +51,6 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const collapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
-  const resources = useTraceResources(trace.traceId);
 
   return (
     <Box
@@ -84,7 +81,6 @@ export const SpanDetailPane = memo(function SpanDetailPane({
         >
           <SpanTabBar
             spanTree={spans}
-            rightSlot={<ScopeChip scope={resources.scope} />}
             collapsePosition={layout === "horizontal" ? "leading" : "trailing"}
           />
         </IsolatedErrorBoundary>
@@ -118,4 +114,3 @@ export const SpanDetailPane = memo(function SpanDetailPane({
     </Box>
   );
 });
-
