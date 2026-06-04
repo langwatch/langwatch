@@ -57,6 +57,22 @@ export class PrismaTriggerRepository implements TriggerRepository {
     return result.count === 1;
   }
 
+  async isSendClaimed({
+    triggerId,
+    traceId,
+    projectId,
+  }: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    const existing = await this.prisma.triggerSent.findFirst({
+      where: { triggerId, traceId, projectId },
+      select: { id: true },
+    });
+    return existing !== null;
+  }
+
   async updateLastRunAt(
     triggerId: string,
     projectId: string,

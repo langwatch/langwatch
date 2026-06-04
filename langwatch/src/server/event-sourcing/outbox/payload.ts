@@ -13,8 +13,9 @@
  *   TTL) keyed on `(projectId, triggerId, traceId)`, so subsequent
  *   spans on the same trace reset the timer and carry the latest fold.
  *   When TTL elapses without a new event, the process callback loads
- *   fresh fold, runs filters, claims `TriggerSent`, and — on match —
- *   re-enqueues as a `cadence` job.
+ *   fresh fold, runs filters, and — on match — re-enqueues as a
+ *   `cadence` job. The `TriggerSent` at-most-once gate is owned by the
+ *   cadence stage (read pre-dispatch, written post-dispatch).
  * - **cadence**: per-trigger. Carries one matched (trigger, trace)
  *   pair. Delay snaps to the next wall-clock cadence boundary; the
  *   queue's `processBatch` + `coalesceMaxBatch` groups every cadence

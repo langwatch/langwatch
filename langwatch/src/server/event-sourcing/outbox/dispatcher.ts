@@ -113,9 +113,12 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
 
 /**
  * Settle stage: trace has been quiet for `traceDebounceMs`. Re-read
- * the fold, re-run filters against the now-settled state, claim
- * `TriggerSent` if it matches, and re-enqueue as cadence so the
- * digest window can coalesce.
+ * the fold, re-run filters against the now-settled state, and
+ * re-enqueue as cadence so the digest window can coalesce.
+ *
+ * The `TriggerSent` at-most-once gate is owned entirely by
+ * `handleCadenceBatch` (read pre-dispatch, written post-dispatch), so
+ * settle does no claiming itself.
  */
 async function handleSettle(
   deps: OutboxDispatcherDeps,
@@ -183,13 +186,12 @@ async function handleSettle(
     return;
   }
 
-  // The `TriggerSent` claim moved into `handleCadenceBatch` (below) so
-  // that claim + dispatch share a single retry boundary. Claiming here
-  // and then losing the cadence enqueue to a Redis blip would commit
-  // the claim while the cadence row never lands — replays would see
-  // claim=false and silently drop the notification. Settle now just
-  // re-enqueues; cadence claims-then-dispatches, so a failed dispatch
-  // retries with the row already in place.
+  // No claim here. Settle just re-enqueues — the at-most-once gate is
+  // owned by `handleCadenceBatch`, which reads `isSendClaimed` before
+  // dispatch and writes `claimSend` after success. Committing the claim
+  // pre-dispatch (here or in cadence) breaks outbox retry semantics: a
+  // retryable provider failure on the first cadence attempt would see
+  // claim=true on retry and silently no-op the resend.
   const cadencePayload: CadenceStagePayload = {
     stage: "cadence",
     projectId,
@@ -255,28 +257,38 @@ async function handleCadenceBatch(
     });
   }
 
-  // Claim each (trigger, trace) pair against `TriggerSent` before
-  // composing the digest. The claim is the at-most-once gate; settle
-  // re-enqueues are idempotent at the queue level only by collapsing on
-  // the digest boundary, so a (trigger, trace) pair may legitimately
-  // appear twice in the batch (settle retry after a Redis blip). Both
-  // duplicate-within-batch and prior-dispatch cases are eliminated
-  // here: the first claim wins, every later attempt at the same
-  // (trigger, trace) gets dropped.
+  // Decide which (trigger, trace) pairs need a real dispatch. Two
+  // suppressors run before the provider call:
+  //
+  // 1. In-batch dedup via `seenTraceIds`. Settle re-enqueues are
+  //    idempotent at the queue level only by collapsing on the digest
+  //    boundary, so a (trigger, trace) pair may legitimately appear
+  //    twice in the batch (settle retry after a Redis blip).
+  // 2. Cross-batch dedup via the read-only `isSendClaimed` check —
+  //    suppresses pairs already dispatched by an earlier cadence batch
+  //    (or the inline evaluation reactor) so we don't re-send.
+  //
+  // Crucially, the actual `claimSend` write is deferred to AFTER a
+  // successful provider call. Writing the at-most-once gate pre-
+  // dispatch defeats outbox retry: a retryable provider failure on
+  // the first attempt would see claim=true on retry and silently
+  // no-op the resend, recording the notification as sent while
+  // nothing actually went out.
   const params = (trigger.actionParams ?? {}) as ActionParams;
-  const claimedPayloads: CadenceStagePayload[] = [];
+  const candidatePayloads: CadenceStagePayload[] = [];
   const seenTraceIds = new Set<string>();
   for (const p of payloads) {
     if (seenTraceIds.has(p.match.traceId)) continue;
     seenTraceIds.add(p.match.traceId);
-    const claimed = await deps.triggers.claimSend({
+    const alreadySent = await deps.triggers.isSendClaimed({
       triggerId,
       traceId: p.match.traceId,
       projectId,
     });
-    if (claimed) claimedPayloads.push(p);
+    if (alreadySent) continue;
+    candidatePayloads.push(p);
   }
-  if (claimedPayloads.length === 0) {
+  if (candidatePayloads.length === 0) {
     logger.debug(
       { projectId, triggerId, batchSize: payloads.length },
       "Cadence batch fully suppressed by prior TriggerSent claims — no dispatch",
@@ -285,7 +297,7 @@ async function handleCadenceBatch(
   }
 
   const triggerData = await Promise.all(
-    claimedPayloads.map(async (p) => {
+    candidatePayloads.map(async (p) => {
       const fullTrace =
         (await deps.traceById(projectId, p.match.traceId)) ??
         ({ trace_id: p.match.traceId } as Trace);
@@ -344,6 +356,42 @@ async function handleCadenceBatch(
     throw error;
   }
 
+  // Post-dispatch: write `TriggerSent` for each (trigger, trace) so a
+  // future settle re-enqueue for the same pair is suppressed by the
+  // pre-dispatch `isSendClaimed` check above. Best-effort: a failure
+  // here cannot throw, because the provider call has already succeeded
+  // and re-throwing would let the outbox retry the dispatch and double-
+  // send. `claimSend` is INSERT IGNORE, so racing workers see `false`
+  // and that is also fine — the pair landed somewhere.
+  for (const p of candidatePayloads) {
+    try {
+      await deps.triggers.claimSend({
+        triggerId,
+        traceId: p.match.traceId,
+        projectId,
+      });
+    } catch (claimErr) {
+      logger.warn(
+        {
+          projectId,
+          triggerId,
+          traceId: p.match.traceId,
+          error:
+            claimErr instanceof Error ? claimErr.message : String(claimErr),
+        },
+        "claimSend failed post-dispatch — swallowing to avoid double-send on retry",
+      );
+      captureException(claimErr, {
+        extra: {
+          projectId,
+          triggerId,
+          traceId: p.match.traceId,
+          phase: "claimSend-post-dispatch",
+        },
+      });
+    }
+  }
+
   // `updateLastRunAt` is a soft-state cosmetic for the operator UI
   // (last-fired column on the trigger list). The provider-side send
   // above has already happened; if this write fails we MUST NOT throw,
@@ -374,7 +422,7 @@ async function handleCadenceBatch(
       triggerId,
       action: trigger.action,
       cadence: trigger.notificationCadence,
-      digestSize: claimedPayloads.length,
+      digestSize: candidatePayloads.length,
     },
     "Outbox cadence digest dispatched",
   );

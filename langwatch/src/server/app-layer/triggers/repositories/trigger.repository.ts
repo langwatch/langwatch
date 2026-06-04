@@ -35,6 +35,19 @@ export interface TriggerRepository {
     projectId: string;
   }): Promise<boolean>;
 
+  /**
+   * Read-only existence check for a (triggerId, traceId) claim. Used by
+   * the outbox cadence dispatcher to suppress re-emits across batches
+   * without committing the at-most-once gate before the provider call
+   * returns — claiming pre-dispatch would let a retryable provider
+   * failure permanently no-op the retry.
+   */
+  isSendClaimed(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean>;
+
   /** Updates the trigger's lastRunAt timestamp. */
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
 }
@@ -50,6 +63,14 @@ export class NullTriggerRepository implements TriggerRepository {
     projectId: string;
   }): Promise<boolean> {
     return true;
+  }
+
+  async isSendClaimed(_params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return false;
   }
 
   async updateLastRunAt(

@@ -95,6 +95,15 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
       And the next retry is scheduled per exponential backoff
       And lastError records the error message
 
+    Scenario: A retryable provider failure on first cadence attempt actually resends on retry
+      Given a cadence batch has been built for one matching (trigger, trace) pair
+      And no prior TriggerSent claim exists for that pair
+      When the first dispatch attempt's provider call raises a retryable DispatchError
+      Then no TriggerSent claim is committed for the pair on the first attempt
+      And the failure propagates so the outbox schedules a retry
+      And on the second attempt the provider call fires again rather than silently no-opping
+      And only after a successful provider call is TriggerSent claimed for the pair
+
     Scenario: Non-retryable failure marks the row "dead"
       Given a row being dispatched
       When the dispatch endpoint raises a non-retryable DispatchError
