@@ -216,6 +216,11 @@ function buildOtelEnvBlock(
         OTEL_LOGS_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        // Without this, Claude Code 2.1.x redacts the `prompt` attr on
+        // its user_prompt event — the receiver-side fold has no input
+        // text to lift into langwatch.input.value, so /me/traces shows
+        // empty input even though tokens + model land correctly.
+        OTEL_LOG_USER_PROMPTS: "1",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
       };

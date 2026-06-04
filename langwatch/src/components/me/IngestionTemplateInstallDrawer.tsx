@@ -38,6 +38,12 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      // Required so user_prompt events include the prompt body
+      // attribute the receiver-side fold lift reads as
+      // langwatch.input. Without it, /me/traces renders with
+      // empty input text even though tokens + model land
+      // correctly.
+      `export OTEL_LOG_USER_PROMPTS=1`,
       base,
       `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
     ].join("\n");
