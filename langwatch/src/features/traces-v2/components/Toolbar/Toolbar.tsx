@@ -1,9 +1,8 @@
 import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Bookmark, Compass, Download, Search, Tent } from "lucide-react";
+import { Bookmark, Compass, Download, Tent } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
-import { useFindStore } from "../../stores/findStore";
 import { useViewStore } from "../../stores/viewStore";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
@@ -20,9 +19,6 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
-  const findIsOpen = useFindStore((s) => s.isOpen);
-  const openFind = useFindStore((s) => s.open);
-  const closeFind = useFindStore((s) => s.close);
   // Tour entry point — the toolbar's only onboarding affordance. The
   // What's-new dialog used to live next to this button; it retired
   // when the tour outro absorbed its content (release notes,
@@ -114,23 +110,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
         <ColumnsDropdown />
         <GroupingSelector />
         <DensityToggle />
+        {/* Toolbar Find button retired in Round 3 — Find is bound to
+            ⌘/Ctrl+F, exactly where users expect it. The discoverability
+            hint moved underneath the search bar so first-time users
+            still learn the shortcut without a permanent toolbar icon
+            taking up scarce horizontal room. */}
         <ToolbarDivider />
-        <Tooltip
-          content="Search within currently loaded traces"
-          positioning={{ placement: "bottom" }}
-        >
-          <IconButton
-            size="xs"
-            variant={findIsOpen ? "subtle" : "ghost"}
-            onClick={() => (findIsOpen ? closeFind() : openFind())}
-            aria-label="Find in loaded traces"
-            aria-pressed={findIsOpen}
-          >
-            <Icon boxSize={3.5}>
-              <Search />
-            </Icon>
-          </IconButton>
-        </Tooltip>
         {onExportAll && (
           <Tooltip
             content="Export the current view to CSV or JSON"

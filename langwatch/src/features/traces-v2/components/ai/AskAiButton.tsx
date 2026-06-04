@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import NextLink from "~/utils/compat/next-link";
@@ -14,6 +15,23 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { aiBrandPalette } from "./aiBrandPalette";
+
+// Slow, breathing halo that cycles through the brand palette so the
+// Ask AI affordance reads as alive without becoming a flashing
+// distraction. Each step blends two of the three palette stops so the
+// shadow drifts between orange / pink / violet over a 6s cycle.
+const aiGlowPulse = keyframes`
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 ${aiBrandPalette[0]}33,
+      0 1px 4px ${aiBrandPalette[2]}55;
+  }
+  50% {
+    box-shadow:
+      0 0 14px 2px ${aiBrandPalette[1]}66,
+      0 1px 4px ${aiBrandPalette[2]}55;
+  }
+`;
 
 interface AskAiButtonProps {
   onClick: () => void;
@@ -60,6 +78,12 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       bg="transparent"
       boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
       _dark={{ boxShadow: "0 1px 4px rgba(168,85,247,0.18)" }}
+      // Live "AI breathing" halo — only when motion is allowed. The
+      // reduced-motion variant keeps the static shadow above so the
+      // button still reads as a brand surface without the pulse.
+      animation={
+        reduceMotion ? undefined : `${aiGlowPulse} 6s ease-in-out infinite`
+      }
       _hover={{ filter: "brightness(1.08)" }}
       // The popover trigger handles activation via aria-expanded — disabling
       // the button would block the popover from opening on click. Instead

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
@@ -283,54 +283,13 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               </Icon>
             </Button>
           </Collapsible.Trigger>
-          {onHide && (
-            // Hover-revealed × removes this section from the user's
-            // sidebar (writes `explicitlyHidden` in
-            // facetVisibilityStore). Renders as a SIBLING of the
-            // Collapsible.Trigger button instead of nested inside it
-            // — nested <button>s are invalid HTML and React flags
-            // them as hydration errors. The hover-reveal still works
-            // because the visibility cue is on the parent `[role=group]`
-            // VStack, which is `data-group`'d.
-            <Box
-              as="button"
-              aria-label={hideLabel}
-              title={hideLabel}
-              width="16px"
-              height="16px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              borderRadius="sm"
-              color="fg.subtle"
-              flexShrink={0}
-              opacity={0}
-              _groupHover={{ opacity: 0.55 }}
-              // Keyboard users tab onto the hide button just like mouse
-              // users hover the group — surface the affordance the same
-              // way for both so the section-hide action isn't mouse-only.
-              _groupFocusWithin={{ opacity: 0.55 }}
-              _hover={{ opacity: 1, color: "fg", bg: "bg.muted" }}
-              _focusVisible={{
-                opacity: 1,
-                color: "fg",
-                bg: "bg.muted",
-                outline: "2px solid",
-                outlineColor: "blue.focusRing",
-                outlineOffset: "1px",
-              }}
-              transition="opacity 120ms ease, color 120ms ease"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onHide();
-              }}
-            >
-              <Icon boxSize="10px">
-                <X />
-              </Icon>
-            </Box>
-          )}
+          {/* Per-section hover-X retired in Round 3 — removing a section
+              is now done exclusively from the FacetManagerPopover.
+              The inline X cluttered every section header for an action
+              users rarely took and made the row feel "destructable"
+              when most clicks were just trying to collapse / expand
+              the section. `onHide` is still threaded through so the
+              popover can drive the same store action. */}
         </HStack>
 
         {pinnedContent && (

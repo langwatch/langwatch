@@ -213,7 +213,17 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
           // `overflowX: "hidden"`. The 2px gutter on each side keeps
           // the focused state legible without pulling the input far
           // away from the rest of the section's content.
-          <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5}>
+          // paddingY mirrors paddingX so the focus ring has the same
+          // 2px gutter top and bottom. Without it the ring's bottom
+          // edge was clipped by the next sibling block (the
+          // facetWindow rows) once the input gained focus.
+          <VStack
+            gap={0.5}
+            align="stretch"
+            marginTop={1}
+            paddingX={0.5}
+            paddingY={0.5}
+          >
             <Input
               size="xs"
               placeholder="Search or press Enter to apply…"

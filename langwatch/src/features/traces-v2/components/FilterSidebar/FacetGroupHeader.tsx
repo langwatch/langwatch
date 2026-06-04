@@ -1,15 +1,8 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import type React from "react";
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
 
 interface FacetGroupHeaderProps {
   /** Sortable id — convention is `__group:<groupId>`. */
@@ -153,66 +146,13 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
             title={`${label} group has filters applied`}
           />
         )}
-        {/* Trailing "+ Add facet" menu — only renders when there are
-            facets the backend has data for but the current view is
-            hiding (density default or explicit hide). Lets the user
-            re-introduce a section without flipping the global density
-            switch or going into settings. The menu is a thin
-            single-column list of facet labels; selecting one calls
-            `onAddFacet(key)` which writes to the per-user visibility
-            store. */}
-        {hiddenKeys.length > 0 && onAddFacet && (
-          <Box marginLeft="auto" flexShrink={0}>
-            <MenuRoot>
-              <Tooltip
-                content={`Add a hidden ${label.toLowerCase()} facet`}
-                positioning={{ placement: "top" }}
-                openDelay={400}
-              >
-                <MenuTrigger asChild>
-                  <Box
-                    as="button"
-                    // Bumped 18 → 22px and dropped the opacity dim so the
-                    // hidden-facet picker is actually discoverable. The
-                    // dimmed 18px button was the audit's "I can't find
-                    // how to add the facet back" surface — common case
-                    // for users on Comfortable density who need a
-                    // specific tag the curated set doesn't include.
-                    width="22px"
-                    height="22px"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    borderRadius="sm"
-                    color="fg.muted"
-                    _hover={{ color: "fg", bg: "bg.muted" }}
-                    aria-label={`Add a hidden ${label.toLowerCase()} facet`}
-                    transition="color 100ms ease, background 100ms ease"
-                  >
-                    <Icon boxSize={3.5}>
-                      <Plus />
-                    </Icon>
-                  </Box>
-                </MenuTrigger>
-              </Tooltip>
-              <MenuContent
-                minWidth="180px"
-                maxHeight="320px"
-                overflowY="auto"
-              >
-                {hiddenKeys.map(({ key, label: itemLabel }) => (
-                  <MenuItem
-                    key={key}
-                    value={key}
-                    onClick={() => onAddFacet(key)}
-                  >
-                    <Text textStyle="xs">{itemLabel}</Text>
-                  </MenuItem>
-                ))}
-              </MenuContent>
-            </MenuRoot>
-          </Box>
-        )}
+        {/* Per-group "+ Add facet" menu retired in Round 3 — adding a
+            hidden facet back is now done exclusively from the
+            FacetManagerPopover (the kebab on the sidebar shell). The
+            inline "+" cluttered every group header for an action users
+            took rarely; `hiddenKeys` / `onAddFacet` props are still
+            threaded through for the popover to drive the same store
+            action. */}
       </HStack>
       {children}
     </Box>

@@ -673,13 +673,22 @@ function SpanTab({
 }
 
 function SpanTypeBadge({ type }: { type: string }) {
-  const palette = SPAN_TYPE_PALETTE[type] ?? "gray";
+  // Span types in the catalog (llm / tool / agent / …) keep the
+  // `subtle` colour-tinted look so they read as the curated palette
+  // the rest of the drawer uses. Anything outside the catalog (the
+  // raw OTel SpanKind values "CLIENT", "SERVER", "INTERNAL",
+  // "PRODUCER", "CONSUMER" that come through unmapped, plus future
+  // custom types) falls through to a bordered `outline` variant on
+  // the gray palette so it stays readable in dark mode — the prior
+  // `subtle` + `gray` combination painted gray.fg on top of
+  // gray.subtle which collapsed to a dark-on-dark blob in dark theme.
+  const mappedPalette = SPAN_TYPE_PALETTE[type];
   const label = type === "llm" || type === "rag" ? type.toUpperCase() : type;
   return (
     <Badge
       size="sm"
-      variant="subtle"
-      colorPalette={palette}
+      variant={mappedPalette ? "subtle" : "outline"}
+      colorPalette={mappedPalette ?? "gray"}
       flexShrink={0}
       borderRadius="md"
       fontWeight="medium"

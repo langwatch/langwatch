@@ -125,15 +125,14 @@ export const CreateLensButton: React.FC = () => {
                   Create
                 </Button>
               </HStack>
-              <Button
-                size="xs"
-                variant="ghost"
-                justifyContent="flex-start"
-                onClick={openConfigure}
-              >
-                <LuSettings2 />
-                <Text marginLeft={1}>Configure columns, sort, and more…</Text>
-              </Button>
+              {/* "Configure columns, sort, and more…" link retired in
+                  Round 3 — the full-screen dialog was overkill for
+                  lens creation. Columns are managed inline now (drag-
+                  reorder right on the sidebar tab), sort is the
+                  column-header click everyone already knows, and the
+                  rest of the dialog's fields (grouping, filter text,
+                  addons) are exposed elsewhere. The lens-name popover
+                  is the only step that's still distinct. */}
               <Text fontSize="2xs" color="fg.subtle" lineHeight="1.4">
                 Saved locally during beta. Won't sync across browsers yet.
               </Text>
@@ -143,18 +142,6 @@ export const CreateLensButton: React.FC = () => {
           </PopoverRoot>
         </Box>
       </Tooltip>
-
-      <LensConfigDialog
-        onCreate={(input) => {
-          createLens(input.name, {
-            columns: input.columns,
-            addons: input.addons,
-            grouping: input.grouping,
-            sort: input.sort,
-            filterText: input.filterText,
-          });
-        }}
-      />
     </>
   );
 };
