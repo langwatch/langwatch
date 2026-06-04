@@ -2,6 +2,21 @@ import type { SystemStyleObject } from "@chakra-ui/react";
 
 export type FacetValueState = "neutral" | "include" | "exclude";
 
+/**
+ * Per-value aggregates the evaluator facet attaches so its sidebar
+ * drilldown can render verdict pills + score range inline without
+ * firing a second query per evaluator. Other facets leave this absent.
+ */
+export interface FacetItemAggregates {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+  scoreMin: number | null;
+  scoreMax: number | null;
+  hasScore: boolean;
+  hasLabel: boolean;
+}
+
 export interface FacetItem {
   value: string;
   label: string;
@@ -21,6 +36,8 @@ export interface FacetItem {
    * as "no matches" rather than "loading."
    */
   synthetic?: boolean;
+  /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
+  aggregates?: FacetItemAggregates;
 }
 
 export interface AttributeKey {

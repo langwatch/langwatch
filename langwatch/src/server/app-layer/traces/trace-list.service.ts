@@ -321,12 +321,33 @@ function discoverCacheKey(
   return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
+/**
+ * Per-value result aggregates carried by the evaluator facet so the
+ * sidebar inline-drilldown can render verdict pills, score-range
+ * sliders, and hasLabel discriminators without firing a second query
+ * per evaluator. Absent on other facets where it's not meaningful.
+ */
+export interface EvaluatorValueAggregates {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+  scoreMin: number | null;
+  scoreMax: number | null;
+  hasScore: boolean;
+  hasLabel: boolean;
+}
+
 interface CategoricalFacetDescriptor {
   key: string;
   kind: "categorical";
   label: string;
   group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topValues: { value: string; label?: string; count: number }[];
+  topValues: {
+    value: string;
+    label?: string;
+    count: number;
+    aggregates?: EvaluatorValueAggregates;
+  }[];
   totalDistinct: number;
 }
 
