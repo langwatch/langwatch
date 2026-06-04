@@ -109,6 +109,15 @@ interface FacetManagerPopoverProps {
   onHide: (key: string) => void;
   /** Drop all overrides — sidebar returns to density default. */
   onResetAll: () => void;
+  /**
+   * Optional controlled-open prop. When set, the popover ignores its
+   * internal `open` state and mirrors the caller's value (and reports
+   * changes via `onOpenChange`). Used by the floating Configure CTA so
+   * both the sidebar icon and the bottom-anchored button drive the
+   * same popover.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -140,8 +149,20 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
   onShow,
   onHide,
   onResetAll,
+  open: controlledOpen,
+  onOpenChange,
 }) => {
-  const [open, setOpen] = useState(false);
+  // Controlled-or-uncontrolled hybrid: when the caller passes `open`
+  // we treat it as the source of truth (so the floating Configure CTA
+  // can drive the same popover the header icon drives). Without it,
+  // the popover keeps its own local state — the original behaviour for
+  // sidebar-only consumers.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [query, setQuery] = useState("");
 
   const normalisedQuery = query.trim().toLowerCase();

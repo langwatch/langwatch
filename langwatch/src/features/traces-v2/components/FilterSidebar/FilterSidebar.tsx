@@ -55,6 +55,8 @@ export const FilterSidebar: React.FC = () => {
   // all (the expand affordance sits on the table footer's pagination
   // row). So this component is only ever mounted in the expanded path.
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const facetManagerOpen = useUIStore((s) => s.facetManagerOpen);
+  const setFacetManagerOpen = useUIStore((s) => s.setFacetManagerOpen);
 
   const {
     ast,
@@ -289,6 +291,8 @@ export const FilterSidebar: React.FC = () => {
           onShow={showFacet}
           onHide={hideFacet}
           onResetAll={resetAllFacets}
+          open={facetManagerOpen}
+          onOpenChange={setFacetManagerOpen}
         />
         <Tooltip
           positioning={{ placement: "bottom" }}
