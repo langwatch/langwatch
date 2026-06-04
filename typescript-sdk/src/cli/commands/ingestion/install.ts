@@ -210,7 +210,11 @@ function buildEnvBlock(
       return [
         `export GEMINI_TELEMETRY_ENABLED=true`,
         `export GEMINI_TELEMETRY_TARGET=local`,
+        `export GEMINI_TELEMETRY_USE_COLLECTOR=true`,
+        `export GEMINI_TELEMETRY_TRACES_ENABLED=true`,
         `export GEMINI_TELEMETRY_OTLP_PROTOCOL=http`,
+        `export GEMINI_TELEMETRY_OTLP_ENDPOINT="${endpoint}"`,
+        `export GEMINI_TELEMETRY_LOG_PROMPTS=true`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
         ...base,

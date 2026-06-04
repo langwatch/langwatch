@@ -65,15 +65,20 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     ].join("\n");
   }
   if (slug === "gemini") {
-    // Gemini CLI resolves telemetry from argv > env > settings.json.
-    // Env-var path: GEMINI_TELEMETRY_ENABLED=true + target=local +
-    // GEMINI_TELEMETRY_OTLP_ENDPOINT (falls back to
-    // OTEL_EXPORTER_OTLP_ENDPOINT) + GEMINI_TELEMETRY_OTLP_PROTOCOL=http.
-    // Source: @google/gemini-cli-core dist/src/telemetry/config.js.
+    // gemini-cli 0.46 telemetry resolver only accepts target ∈ {local, gcp}.
+    // OTLP forwarding goes through target=local + useCollector=true (in-process
+    // exporters wired to OTLP via @opentelemetry/exporter-trace-otlp-http +
+    // exporter-logs-otlp-http). traces=true enables detailed attribute spans
+    // and logPrompts=true embeds the user prompt text so the receiver-side
+    // fold has something to lift onto langwatch.input.
     return [
       `export GEMINI_TELEMETRY_ENABLED=true`,
       `export GEMINI_TELEMETRY_TARGET=local`,
+      `export GEMINI_TELEMETRY_USE_COLLECTOR=true`,
+      `export GEMINI_TELEMETRY_TRACES_ENABLED=true`,
       `export GEMINI_TELEMETRY_OTLP_PROTOCOL=http`,
+      `export GEMINI_TELEMETRY_OTLP_ENDPOINT="${endpoint}"`,
+      `export GEMINI_TELEMETRY_LOG_PROMPTS=true`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
       base,

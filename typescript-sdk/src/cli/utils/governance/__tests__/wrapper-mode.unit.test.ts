@@ -293,4 +293,72 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.OPENAI_BASE_URL).toBe("http://gw");
     });
   });
+
+  describe("when gemini resolves to ingestion mode", () => {
+    /**
+     * gemini-cli 0.46-preview only emits OTLP traces + log records when
+     * a specific combination of env knobs is set. Each one is load-bearing:
+     *
+     *   GEMINI_TELEMETRY_ENABLED=true        — master switch
+     *   GEMINI_TELEMETRY_TARGET=local        — `otlp` is rejected at runtime
+     *                                          (the schema docstring is a lie,
+     *                                          parseTelemetryTargetValue accepts
+     *                                          only local|gcp)
+     *   GEMINI_TELEMETRY_USE_COLLECTOR=true  — pairs with target=local to route
+     *                                          through OTLP HTTP exporters
+     *                                          instead of the SDK default
+     *                                          (console/no-op) exporters
+     *   GEMINI_TELEMETRY_TRACES_ENABLED=true — captures detailed attribute
+     *                                          spans (without it the api_request
+     *                                          span has no attrs, no model lift)
+     *   GEMINI_TELEMETRY_OTLP_ENDPOINT       — explicit endpoint; the env-fallback
+     *                                          to OTEL_EXPORTER_OTLP_ENDPOINT
+     *                                          worked in some bundle revisions
+     *                                          and not others, so set it explicitly
+     *   GEMINI_TELEMETRY_LOG_PROMPTS=true    — embeds the user prompt text in
+     *                                          the user_prompt event so the
+     *                                          receiver lifts it to langwatch.input
+     *
+     * Dropping ANY of these silently kills the OTLP path. This test locks the
+     * 6-knob requirement so a refactor can't quietly regress to "metrics only".
+     */
+    it("sets all 6 gemini telemetry knobs required for OTLP traces + log records", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: "tpl_gemini",
+          slug: "gemini",
+          source_type: "gemini",
+          display_name: "Gemini",
+          description: null,
+          icon_asset: null,
+          credential_schema: null,
+          ottl_rules: "",
+          platform_published: true,
+          enabled: true,
+          organization_id: null,
+        },
+      ]);
+      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
+        user_ingestion_binding: { id: "b_g", template_id: "tpl_gemini" },
+        binding_access_token: "ik-lw-gemini-test-token",
+      });
+
+      const cfg = baseCfg({ tool_mode: { gemini: "ingestion" } });
+      const out = await resolveWrapperMode(cfg, "gemini", {});
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.vars.GEMINI_TELEMETRY_ENABLED).toBe("true");
+      expect(out.vars.GEMINI_TELEMETRY_TARGET).toBe("local");
+      expect(out.vars.GEMINI_TELEMETRY_USE_COLLECTOR).toBe("true");
+      expect(out.vars.GEMINI_TELEMETRY_TRACES_ENABLED).toBe("true");
+      expect(out.vars.GEMINI_TELEMETRY_OTLP_PROTOCOL).toBe("http");
+      expect(out.vars.GEMINI_TELEMETRY_OTLP_ENDPOINT).toMatch(/\/api\/otel$/);
+      expect(out.vars.GEMINI_TELEMETRY_LOG_PROMPTS).toBe("true");
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "Authorization=Bearer ik-lw-gemini-test-token",
+      );
+    });
+  });
 });

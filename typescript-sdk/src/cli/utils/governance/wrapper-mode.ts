@@ -286,10 +286,31 @@ function buildOtelEnvBlock(
         OTEL_RESOURCE_ATTRIBUTES: "service.name=codex",
       };
     case "gemini":
+      // gemini-cli 0.46 telemetry resolver (packages/core/dist/src/telemetry/config.js):
+      //   target ∈ {local, gcp} — NOT otlp. The JSON-schema doc string
+      //   mentions otlp as an "example", but the runtime validator
+      //   (parseTelemetryTargetValue) only accepts local|gcp; passing
+      //   otlp throws FatalConfigError at startup.
+      //   To forward spans + log records to our OTLP endpoint we use
+      //   `local` (in-process exporters) + `useCollector=true` which
+      //   routes through @opentelemetry/exporter-trace-otlp-http +
+      //   exporter-logs-otlp-http to GEMINI_TELEMETRY_OTLP_ENDPOINT
+      //   (falls back to OTEL_EXPORTER_OTLP_ENDPOINT).
+      //   `traces=true` enables the detail-attribute span path so the
+      //   user prompt + tool calls land as span attributes (not just
+      //   token counts).
+      //   `logPrompts=true` is what makes gemini-cli embed the actual
+      //   user prompt text in the user_prompt event — without it the
+      //   receiver-side fold has no input text to lift onto
+      //   langwatch.input.value, same class as claude-code.
       return {
         GEMINI_TELEMETRY_ENABLED: "true",
         GEMINI_TELEMETRY_TARGET: "local",
+        GEMINI_TELEMETRY_USE_COLLECTOR: "true",
+        GEMINI_TELEMETRY_TRACES_ENABLED: "true",
         GEMINI_TELEMETRY_OTLP_PROTOCOL: "http",
+        GEMINI_TELEMETRY_OTLP_ENDPOINT: endpoint,
+        GEMINI_TELEMETRY_LOG_PROMPTS: "true",
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
         ...base,
