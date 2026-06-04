@@ -60,7 +60,7 @@ This credential never leaves LangWatch. The Virtual Key you mint next is what Cl
 After saving the credential, the drawer mints a Virtual Key for you (prefix `vk-lw-`) and shows it once.
 
 <Frame caption="The Anthropic provider drawer after a Virtual Key is issued. Copy the vk-lw- value once; the langwatch CLI will reuse it automatically once you log in.">
-  ![Virtual Key issued](/images/ai-governance/post-bypass/04-me-configure-vk-minted.png)
+  ![Virtual Key issued](/images/ai-governance/post-bypass/36-vk-rotated-secret-reveal.png)
 </Frame>
 
 <Warning>The secret half of the Virtual Key is shown once. If you lose it, re-mint from the same tile.</Warning>
@@ -188,11 +188,11 @@ The two paths land on the same surface. The differences below all live on `/me`.
 
 ### Add anomaly rules (admin scope)
 
-Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. Solo users on a personal org have admin scope by default; head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
+Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. Solo users on a personal org have admin scope by default, so head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
 
 ### Add other assistants
 
-`langwatch <tool>` is wired for the other supported assistants on the same two-path logic. Virtual Key on file routes through the gateway; no key falls back to OTLP ingestion.
+`langwatch <tool>` is wired for the other supported assistants on the same two-path logic: Virtual Key on file = gateway, no key = OTLP ingestion.
 
 | Command | Path 1 (Virtual Key on file) | Path 2 (no key) |
 |---|---|---|
@@ -211,7 +211,7 @@ For self-hosted (`npx @langwatch/server`), data never leaves your machine. The P
 
 ## Troubleshooting
 
-**Nothing in Recent activity after 30 seconds.** Confirm the wrapper actually spawned `claude` with the right env. In a new shell run `langwatch claude env` (the wrapper prints the env block it would inject, without spawning). The block should include either gateway envs (`ANTHROPIC_BASE_URL` for Path 1) or OTLP envs (`CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_EXPORTER_OTLP_ENDPOINT` for Path 2).
+**Nothing in Recent activity after 30 seconds.** Confirm `~/.langwatch/config.json` has a `default_personal_vk` field (Path 1) or that the wrapper printed an `ik-lw-` token mint line on the first run (Path 2). If neither is true, re-run `langwatch login --device` and then `langwatch claude` once before inspecting `/me`. `langwatch init-shell` prints the eval-able shell snippet showing exactly which env vars the wrapper would inject if you want to inspect them directly.
 
 **401 from the gateway (Path 1).** Your Virtual Key on `~/.langwatch/config.json` may have rotated. Run `langwatch login --device` again, or re-mint the Virtual Key from `/me` → Model providers and re-run `langwatch login`.
 
