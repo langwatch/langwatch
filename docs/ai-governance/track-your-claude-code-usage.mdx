@@ -37,7 +37,7 @@ npx @langwatch/server
 
 The CLI bootstraps Postgres, ClickHouse, Redis, and the app on `http://localhost:5560`. Open it in your browser, sign up with email + password, and you land on `/me`.
 
-<Frame caption="The /me personal portal landing page after signup. Empty state — no traces yet, no spend, no models. This is where both paths drop you off.">
+<Frame caption="The /me personal portal landing page after signup. Empty state, no traces yet, no spend, no models. This is where both paths drop you off.">
   ![/me empty landing](/images/ai-governance/post-bypass/01-me-portal.png)
 </Frame>
 
@@ -115,7 +115,7 @@ Open **Traces** in the sidebar for the per-request detail. Every Claude Code tur
   ![Path 1 trace detail](/images/ai-governance/cli-flow/07-trace-detail-pong-via-gateway.png)
 </Frame>
 
-Done — every future `langwatch claude` session writes to the same `/me`. Skip to [What's next](#whats-next).
+Done. Every future `langwatch claude` session writes to the same `/me`. Skip to [What's next](#whats-next).
 
 ## Path 2: Claude plan
 
@@ -151,7 +151,7 @@ Because no Virtual Key is present in your config, the wrapper auto-installs a pe
 
 You keep paying Anthropic flat. Your Claude Code session keeps using your Claude Max plan. LangWatch reads the OTel log records Claude Code emits (model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cost_usd, prompt body) and renders them on `/me`.
 
-<Frame caption="A `langwatch claude` session running under the Claude plan path. Same wrapper UX as Path 1 — the difference is the wrapper switched to OTLP ingestion mode automatically because no Virtual Key was on file.">
+<Frame caption="A `langwatch claude` session running under the Claude plan path. Same wrapper UX as Path 1; the difference is the wrapper switched to OTLP ingestion mode automatically because no Virtual Key was on file.">
   ![langwatch claude tmux path 2](/images/ai-governance/cli-flow/08-tmux-claude-pathb-otel-real.png)
 </Frame>
 
@@ -173,7 +173,7 @@ Open **Traces** in the sidebar for the per-request detail.
   ![Path 2 trace detail](/images/ai-governance/post-bypass/14-claude-pathb-trace-detail-storegate-fix.png)
 </Frame>
 
-<Info>Claude Code 2.1.x does not emit the assistant's response text in OTel — only token counts. The input prompt and full cost / token breakdown render in `/me/traces`; the output text stays empty until Anthropic ships it on their OTel emission.</Info>
+<Info>Claude Code 2.1.x does not emit the assistant's response text in OTel, only token counts. The input prompt and full cost / token breakdown render in `/me/traces`; the output text stays empty until Anthropic ships it on their OTel emission.</Info>
 
 ## What's next
 
@@ -188,11 +188,11 @@ The two paths land on the same surface. The differences below all live on `/me`.
 
 ### Add anomaly rules (admin scope)
 
-Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. Solo users on a personal org have admin scope by default — head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
+Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. Solo users on a personal org have admin scope by default; head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
 
 ### Add other assistants
 
-`langwatch <tool>` is wired for the other supported assistants on the same two-path logic — Virtual Key on file = gateway, no key = OTLP ingestion.
+`langwatch <tool>` is wired for the other supported assistants on the same two-path logic. Virtual Key on file routes through the gateway; no key falls back to OTLP ingestion.
 
 | Command | Path 1 (Virtual Key on file) | Path 2 (no key) |
 |---|---|---|
