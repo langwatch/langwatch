@@ -76,14 +76,17 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
     case "gemini":
       // gemini-cli 0.46-preview honours `GOOGLE_GEMINI_BASE_URL`
       // (verified empirically in the bundled binary). It POSTs to
-      // `{BASE}/models/{model}:generateContent` so the base must
-      // resolve to a `/v1beta` path on the gateway, which terminates
-      // the gemini-native passthrough route. `GOOGLE_GENAI_API_BASE`
-      // is NOT read by gemini-cli — it was a guess that silently
-      // no-op'd in earlier wrapper revisions.
+      // `{BASE}/v1beta/models/{model}:generateContent`, prepending
+      // the `/v1beta/` itself. The base must therefore be the bare
+      // gateway URL without the API version suffix; an earlier guess
+      // of `${gw}/v1beta` doubled the prefix to `/v1beta/v1beta/` and
+      // the gateway 404'd the routing call, surfacing as
+      // "Unexpected end of JSON input" on the cli side.
+      // `GOOGLE_GENAI_API_BASE` is NOT read by gemini-cli (separate
+      // guess that silently no-op'd in earlier wrapper revisions).
       return {
         vars: {
-          GOOGLE_GEMINI_BASE_URL: `${gw}/v1beta`,
+          GOOGLE_GEMINI_BASE_URL: gw,
           GEMINI_API_KEY: auth,
           GOOGLE_API_KEY: auth,
         },

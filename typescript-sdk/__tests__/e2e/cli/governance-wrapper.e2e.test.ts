@@ -496,8 +496,7 @@ describe("governance CLI wrappers — e2e", () => {
     // TypeScript from collapsing the union into plain `string`.
     // "url" = exact match against `gwUrl`.
     // "url+v1" = `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend /v1 itself).
-    // "url+v1beta" = `${gwUrl}/v1beta` (gemini-cli expects the suffix in the base).
-    type ExpectedValue = "url" | "url+v1" | "url+v1beta" | (string & {});
+    type ExpectedValue = "url" | "url+v1" | (string & {});
     describe.each([
       {
         tool: "claude",
@@ -537,9 +536,12 @@ describe("governance CLI wrappers — e2e", () => {
         mustNotInject: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY"],
       },
       {
+        // gemini-cli 0.46 appends `/v1beta/models/...` itself, so the
+        // base must be bare (gwUrl) — appending /v1beta in the wrapper
+        // would double the prefix and the gateway 404s the routing call.
         tool: "gemini",
         expected: {
-          GOOGLE_GEMINI_BASE_URL: "url+v1beta" as ExpectedValue,
+          GOOGLE_GEMINI_BASE_URL: "url" as ExpectedValue,
           GOOGLE_API_KEY: TEST_VK,
           GEMINI_API_KEY: TEST_VK,
         },
@@ -559,8 +561,6 @@ describe("governance CLI wrappers — e2e", () => {
               expect(env[k]).toBe(gwUrl);
             } else if (want === "url+v1") {
               expect(env[k]).toBe(`${gwUrl}/v1`);
-            } else if (want === "url+v1beta") {
-              expect(env[k]).toBe(`${gwUrl}/v1beta`);
             } else {
               expect(env[k]).toBe(want);
             }
