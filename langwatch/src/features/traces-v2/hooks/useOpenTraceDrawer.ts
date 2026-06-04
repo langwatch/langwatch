@@ -199,10 +199,7 @@ export function useOpenTraceDrawer() {
       // second even though we already had the row data. Prefetch is a
       // no-op when the query is already cached, and tRPC dedupes the
       // matching React Query subscription that the drawer mounts.
-      if (
-        project?.id &&
-        !isPreviewTraceId(trace.traceId)
-      ) {
+      if (project?.id && !isPreviewTraceId(trace.traceId)) {
         const projectId = project.id;
         void utils.tracesV2.spanTree.prefetch(
           { projectId, traceId: trace.traceId, occurredAtMs: trace.timestamp },

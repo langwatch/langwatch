@@ -163,15 +163,15 @@ describe("drawerStore pane controls", () => {
         useDrawerStore.getState().selectSpan("span-abc");
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
         useDrawerStore.getState().togglePaneCollapsed("spanDetail");
-        expect(
-          useDrawerStore.getState().paneState.spanDetail.collapsed,
-        ).toBe(true);
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
+          true,
+        );
         // Collapse alone must NOT touch the selection.
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
         useDrawerStore.getState().togglePaneCollapsed("spanDetail");
-        expect(
-          useDrawerStore.getState().paneState.spanDetail.collapsed,
-        ).toBe(false);
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
+          false,
+        );
         expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
       });
     });

@@ -66,10 +66,7 @@ export interface PaneState {
   maximizedWithinGroup: boolean;
 }
 
-export type PaneId =
-  | "conversationContext"
-  | "visualization"
-  | "spanDetail";
+export type PaneId = "conversationContext" | "visualization" | "spanDetail";
 
 interface DrawerState extends DrawerUrlState {
   isOpen: boolean;
@@ -174,9 +171,7 @@ function isVizTab(value: string | null): value is VizTab {
   // "flame" and "spanlist" used to be valid here; URLs from before the
   // redesign carrying those values just fall through to the default
   // (waterfall) when the guard returns false.
-  return (
-    value === "waterfall" || value === "topology" || value === "sequence"
-  );
+  return value === "waterfall" || value === "topology" || value === "sequence";
 }
 
 // `isDrawerTab` retired alongside `activeTab` — the SpanDetailPane body
@@ -272,10 +267,10 @@ function readInitialFromURL(): InitialFromURL {
     // who prefer Summary keep landing on Summary across traces.
     const viewMode: DrawerViewMode = isViewMode(mode)
       ? mode
-      : loadLastViewMode() ?? "summary";
+      : (loadLastViewMode() ?? "summary");
     const vizTab: VizTab = isVizTab(vizRaw)
       ? vizRaw
-      : loadLastVizTab() ?? "waterfall";
+      : (loadLastVizTab() ?? "waterfall");
     const pinnedSpanIds = parsePinnedSpansParam(pinnedRaw);
 
     return {
@@ -313,12 +308,17 @@ export function parsePinnedSpansParam(raw: string | null): string[] {
 }
 
 /** Inverse of {@link parsePinnedSpansParam} — serialises for the URL. */
-export function serializePinnedSpansParam(ids: readonly string[]): string | undefined {
+export function serializePinnedSpansParam(
+  ids: readonly string[],
+): string | undefined {
   if (ids.length === 0) return undefined;
   return ids.slice(0, MAX_PINNED_SPANS).join(",");
 }
 
-function arraysShallowEqual(a: readonly string[], b: readonly string[]): boolean {
+function arraysShallowEqual(
+  a: readonly string[],
+  b: readonly string[],
+): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -425,8 +425,7 @@ function readPaneStateFromStorage(): Record<PaneId, PaneState> {
     return {
       conversationContext:
         parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
-      visualization:
-        parsed.visualization ?? DEFAULT_PANE_STATE.visualization,
+      visualization: parsed.visualization ?? DEFAULT_PANE_STATE.visualization,
       spanDetail: parsed.spanDetail ?? DEFAULT_PANE_STATE.spanDetail,
     };
   } catch {
@@ -535,8 +534,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
       if (isAtSnap) {
         const restore =
-          s.preMaximizeWidthPx ??
-          Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
+          s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
         persistWidth(restore);
         return {
           widthPx: restore,
@@ -587,8 +585,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         (acc, key) => {
           acc[key] = {
             ...s.paneState[key],
-            maximizedWithinGroup:
-              key === id ? !currentlyMaximized : false,
+            maximizedWithinGroup: key === id ? !currentlyMaximized : false,
             collapsed: key === id ? false : s.paneState[key].collapsed,
           };
           return acc;

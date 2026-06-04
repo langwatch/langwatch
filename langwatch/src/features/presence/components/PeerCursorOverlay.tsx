@@ -2,7 +2,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
-import { usePeerCursors, type PeerCursor } from "../hooks/usePeerCursors";
+import { type PeerCursor, usePeerCursors } from "../hooks/usePeerCursors";
 import { usePresenceFeatureEnabled } from "../hooks/usePresenceFeatureEnabled";
 import {
   presenceUserColor,
@@ -37,7 +37,8 @@ export function PeerCursorOverlay({
   const { enabled: featureEnabled } = usePresenceFeatureEnabled();
   const effectivelyEnabled = enabled && featureEnabled;
   const internalRef = useRef<HTMLDivElement | null>(null);
-  const ref = (containerRef ?? internalRef) as React.RefObject<HTMLDivElement | null>;
+  const ref = (containerRef ??
+    internalRef) as React.RefObject<HTMLDivElement | null>;
 
   useCursorBroadcast({
     projectId,
@@ -131,4 +132,3 @@ function CursorArrow({ color }: { color: string }) {
     </svg>
   );
 }
-

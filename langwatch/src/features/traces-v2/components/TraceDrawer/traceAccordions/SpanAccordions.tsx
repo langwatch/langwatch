@@ -19,8 +19,8 @@ import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
-import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useAutoOpenSections } from "./sectionPresence";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 

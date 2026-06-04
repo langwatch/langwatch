@@ -7,6 +7,12 @@
  * need to use are documented accordingly near the end.
  */
 
+import {
+  trace as otelTrace,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+} from "@opentelemetry/api";
 import type { inferParser } from "@trpc/server";
 import {
   initTRPC,
@@ -16,36 +22,31 @@ import {
   TRPCError,
 } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import {
-  SpanKind,
-  SpanStatusCode,
-  trace as otelTrace,
-  type Span,
-} from "@opentelemetry/api";
+
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
 interface CreateNextContextOptions {
   req: any;
   res: any;
 }
+
+import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { DomainError } from "~/server/app-layer/domain-error";
+import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { DomainError } from "~/server/app-layer/domain-error";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
-import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import type { OrganizationUserRole } from "@prisma/client";
-import type { PermissionMiddleware } from "./rbac";
-import type { OpsScope } from "./rbac";
+import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -181,8 +182,7 @@ export function errorFormatterForTesting({
     ...shape,
     data: {
       ...shape.data,
-      zodError:
-        error.cause instanceof ZodError ? error.cause.flatten() : null,
+      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause: missingModelCause ?? aiCallFailedCause ?? limitInfo,
       domainError,
     },
@@ -371,9 +371,7 @@ const auditLogMutations = t.middleware(
 
     let result = await next();
 
-    const target = result.ok
-      ? deriveAuditTarget(path, result.data)
-      : {};
+    const target = result.ok ? deriveAuditTarget(path, result.data) : {};
 
     await auditLog({
       userId: ctx.session.user.id,
@@ -411,49 +409,45 @@ function recordSpanError(span: Span, error: unknown): void {
   span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
 }
 
-export const tracerMiddleware = t.middleware(
-  async ({ path, type, next }) => {
-    const tracer = otelTrace.getTracer("langwatch:trpc");
-    const spanName = `trpc.${path}`;
+export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
+  const tracer = otelTrace.getTracer("langwatch:trpc");
+  const spanName = `trpc.${path}`;
 
-    // For silenced routes (presence heartbeats, SSE subscription
-    // messages) we want zero spans on the happy path — they otherwise
-    // drown out the trace surface — but failures still need a span so
-    // real errors stay visible. Capture the start time before `next()`
-    // so the error span's duration matches the actual call.
-    if (isSilencedCall(path, type)) {
-      const startTime = Date.now();
+  // For silenced routes (presence heartbeats, SSE subscription
+  // messages) we want zero spans on the happy path — they otherwise
+  // drown out the trace surface — but failures still need a span so
+  // real errors stay visible. Capture the start time before `next()`
+  // so the error span's duration matches the actual call.
+  if (isSilencedCall(path, type)) {
+    const startTime = Date.now();
+    const result = await next();
+    if (result.ok) return result;
+
+    const span = tracer.startSpan(spanName, {
+      kind: SpanKind.SERVER,
+      startTime,
+      attributes: spanAttributes(path, type),
+    });
+    recordSpanError(span, result.error);
+    span.end();
+    return result;
+  }
+
+  return tracer.startActiveSpan(
+    spanName,
+    { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+    async (span) => {
+      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+      // returned as { ok: false, error } result objects — NOT thrown.
       const result = await next();
-      if (result.ok) return result;
-
-      const span = tracer.startSpan(spanName, {
-        kind: SpanKind.SERVER,
-        startTime,
-        attributes: spanAttributes(path, type),
-      });
-      recordSpanError(span, result.error);
+      if (!result.ok) recordSpanError(span, result.error);
       span.end();
       return result;
-    }
+    },
+  );
+});
 
-    return tracer.startActiveSpan(
-      spanName,
-      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-      async (span) => {
-        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-        // returned as { ok: false, error } result objects — NOT thrown.
-        const result = await next();
-        if (!result.ok) recordSpanError(span, result.error);
-        span.end();
-        return result;
-      },
-    );
-  },
-);
-
-function domainErrorToTRPCCode(
-  error: DomainError,
-): TRPCError["code"] {
+function domainErrorToTRPCCode(error: DomainError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
@@ -548,7 +542,10 @@ export function handleTrpcCallLogging({
     logData.statusCode = resolvedStatus;
 
     // Include domain error kind in log data for structured filtering
-    if (result.error instanceof TRPCError && result.error.cause instanceof DomainError) {
+    if (
+      result.error instanceof TRPCError &&
+      result.error.cause instanceof DomainError
+    ) {
       logData.domainErrorKind = result.error.cause.kind;
     }
 
@@ -591,8 +588,9 @@ function isSilencedCall(path: string, type: string): boolean {
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);

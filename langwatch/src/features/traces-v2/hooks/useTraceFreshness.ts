@@ -153,9 +153,7 @@ export function useTraceFreshness() {
   // Honour the operator's "live updates" preference — when disabled,
   // skip subscribing and force the connection state to disconnected so
   // the toolbar indicator reads correctly.
-  const liveUpdatesEnabled = useSseStatusStore(
-    (s) => s.liveUpdatesEnabled,
-  );
+  const liveUpdatesEnabled = useSseStatusStore((s) => s.liveUpdatesEnabled);
 
   const { connectionState, lastEventAt } = useTraceUpdateListener({
     projectId: project?.id ?? "",
