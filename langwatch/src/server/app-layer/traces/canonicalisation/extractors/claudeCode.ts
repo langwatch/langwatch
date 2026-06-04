@@ -39,6 +39,8 @@
  * + RAW_API_BODIES) so this lift covers every cost-bearing turn.
  */
 
+import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,
@@ -224,5 +226,12 @@ export function extractAssistantTextFromResponseBody(
     parts.push(block.text);
   }
   if (parts.length === 0) return null;
-  return parts.join("\n\n");
+  // Defence-in-depth payload-size guard. claude-code 2.x caps each
+  // api_response_body inline at ~60KB upstream, and the log
+  // command-level cap (capOversizedLogRecord, alexis) bounds the
+  // stored body before redaction/fold. This second cap bounds the
+  // ComputedOutput / langwatch.output value specifically, in case
+  // a future claude release lifts the 60KB inline cap or a different
+  // emitter ships an api_response_body without one.
+  return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
 }
