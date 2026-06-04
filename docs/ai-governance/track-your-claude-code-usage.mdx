@@ -79,7 +79,7 @@ On `/me`, scroll to the **Trace Ingest** section. You will see a few tiles, one 
   ![Claude Code install drawer](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
 </Frame>
 
-In the drawer, click **Use this template**. LangWatch creates a personal binding for the template, generates a one-time access token (prefix `ik-lw-`), and applies the OTLP shape rules that turn Claude Code's raw spans into LangWatch's canonical `gen_ai.*` cost/token/model fields.
+In the drawer, click **Use this template**. LangWatch creates a personal binding for the template and generates a one-time access token (prefix `ik-lw-`). Claude Code is one of the platform-known tools, so the receiver already has hardcoded extractors that lift its log records into the canonical `gen_ai.*` cost / token / model / input fields — no admin OTTL setup, no per-org configuration.
 
 <Warning>The token is shown once. Copy it before closing the drawer. If you lose it, rotate it from the same tile and re-do the env block.</Warning>
 
@@ -89,9 +89,13 @@ The drawer shows a shell block that looks like this:
 
 ```bash
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+# Claude Code 2.1.x redacts the prompt body by default; this flag
+# lets it ship so /me/traces can show your input text.
+export OTEL_LOG_USER_PROMPTS=1
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<the-token-you-just-copied>"
 ```
@@ -109,7 +113,9 @@ claude
 > Refactor src/auth/login.ts to use the new session API
 ```
 
-Claude Code emits one OTLP span per `api_request` event plus a periodic `claude_code.cost.usage` metric. Both stream through your OTLP endpoint into the LangWatch ingestion source.
+Claude Code emits its `api_request` event (with model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd) and a paired `user_prompt` event (with your prompt text) as OTLP log records, plus a periodic `claude_code.cost.usage` metric. LangWatch synthesizes a trace per Claude Code session, groups every turn under it, and renders the cost / token / model / input on the trace summary.
+
+Note: Anthropic does not emit the assistant's response text in OTel as of Claude Code 2.1.x — only token counts. The input prompt and full cost / token breakdown render in `/me/traces`; the output text shows empty until anthropic resumes emitting it.
 
 ### A4. Verify it landed
 
