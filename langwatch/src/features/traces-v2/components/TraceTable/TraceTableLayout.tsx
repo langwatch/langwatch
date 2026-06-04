@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
+import { ColumnEducationDialog } from "./ColumnEducationDialog";
 import { FloatingConfigureCta } from "./FloatingConfigureCta";
 import { NewTracesScrollUpIndicator } from "./NewTracesScrollUpIndicator";
 import { Pagination } from "./Pagination";
@@ -72,6 +73,7 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
       <RefreshProgressBar />
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />
       <FloatingConfigureCta />
+      <ColumnEducationDialog />
       <Pagination totalHits={totalHits} isLoading={isLoading} />
     </Flex>
   );

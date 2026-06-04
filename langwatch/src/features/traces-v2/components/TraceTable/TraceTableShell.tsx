@@ -8,6 +8,10 @@ import {
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
+import {
+  COLUMN_DRAG_THRESHOLD_PX,
+  useColumnEducationStore,
+} from "../../stores/columnEducationStore";
 import { ColumnResizeGrip } from "./ColumnResizeGrip";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
@@ -153,6 +157,49 @@ function HeaderCell<T>({
   isStickyFirst,
 }: HeaderCellProps<T>): React.ReactElement {
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
+  // Open the one-off education dialog the first time the user tries
+  // to drag a header to reorder it. v2 doesn't support native drag-
+  // reorder (yet), so without the dialog the drag attempt silently
+  // does nothing and operators walk away thinking "you can't change
+  // the columns" — they can, just from the Columns dropdown / floating
+  // Configure CTA, which the dialog points at. After the user
+  // dismisses with "Don't show again", `hasDismissed` in
+  // `columnEducationStore` flips true and the handler short-circuits.
+  const openEducation = useColumnEducationStore((s) => s.open);
+  const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
+  const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+    if (educationDismissed) return;
+    // Skip drags that originate on the resize grip — that's a
+    // legitimate sizing gesture; surfacing the reorder dialog there
+    // would be infuriating.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("[data-column-resize-grip]")) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (dx * dx + dy * dy >= COLUMN_DRAG_THRESHOLD_PX ** 2) {
+        openEducation();
+        cleanup();
+      }
+    };
+    const onUp = () => cleanup();
+    const cleanup = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  const onHeaderDoubleClick = () => {
+    // Double-click is the other common "I'm trying to do something to
+    // this header" gesture — treat it the same as a drag attempt for
+    // the education path so users who instinctively double-tap also
+    // see the dialog.
+    if (educationDismissed) return;
+    openEducation();
+  };
   const size = header.column.getSize();
   const declaredSize = header.column.columnDef.size;
   // Flex columns declare a sentinel `size` (9999) to absorb leftover
@@ -217,6 +264,8 @@ function HeaderCell<T>({
       // replacing it.
       paddingX={2}
       paddingY={1}
+      onMouseDown={onHeaderMouseDown}
+      onDoubleClick={onHeaderDoubleClick}
     >
       {canSort ? (
         <SortableHeaderButton
