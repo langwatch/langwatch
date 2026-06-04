@@ -235,25 +235,24 @@ export const FilterSidebar: React.FC = () => {
         groups={orAnalysis.groups}
         containerRef={scrollAreaRef}
       />
-      {/* Header bar — owns the close affordance in a flex row instead
-          of an absolutely-positioned overlay. The previous overlay sat
-          at top:6 / right:6 with z-index:2 and visibly overlapped the
-          first group's heading ("TRACE") because both lived in the
-          same ~24px-tall band on the right edge. Putting the close
-          button in its own row keeps the math obvious: the scrollable
-          area below starts AFTER the header bar, so there's no overlap
-          to reason about. Padding-y matches the group header so
-          the close icon's vertical center aligns with the heading
-          baseline that appears just below it. */}
+      {/* Manage-facets + collapse-sidebar buttons float in the
+          top-right corner instead of claiming a dedicated 28px row.
+          Audit feedback was that the dedicated row read as "wasted
+          space at the top of the sidebar"; floating it lets the
+          first section's title appear at the very top of the rail.
+          Both buttons have their own bg-tinted backdrop so they
+          stay legible over the section header text behind them. */}
       <HStack
+        position="absolute"
+        top={1}
+        right={1}
         gap={1}
-        paddingX={2}
-        paddingY={1.5}
-        height="28px"
         align="center"
-        justify="flex-end"
-        flexShrink={0}
-        borderBottomWidth="0"
+        zIndex={3}
+        bg={{ base: "bg.surface/90", _dark: "bg.panel/90" }}
+        backdropFilter="blur(6px)"
+        borderRadius="md"
+        paddingX={1}
       >
         <FacetManagerPopover
           orderedKeysAll={orderedKeysAll}

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, SlidersHorizontal } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
@@ -58,6 +58,18 @@ interface SidebarSectionProps {
    */
   orPeers?: readonly string[];
   /**
+   * When provided, a small "sliders" toggle renders just before the
+   * chevron in the section header. The handle's coloured-active style
+   * mirrors `open`; clicks call `onToggle`. Used by FacetSection to
+   * reveal the typed-value filter input only on demand — replaces the
+   * always-visible search row that took up a fixed slice of every
+   * section's vertical real estate.
+   */
+  searchToggleProps?: {
+    open: boolean;
+    onToggle: () => void;
+  };
+  /**
    * Content rendered between the header and the collapsible — always
    * visible, even when the section is collapsed. Used by FacetSection
    * to keep active values (and OR-group members) visible at all
@@ -85,6 +97,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   onShiftToggle,
   orGroupId,
   orPeers,
+  searchToggleProps,
   pinnedContent,
   children,
 }) => {
@@ -273,16 +286,70 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                 )}
                 {activeIndicator}
               </HStack>
-              <Icon
-                color="fg.subtle"
-                boxSize="12px"
-                mr={2}
-                _hover={{ fill: "fg" }}
-              >
-                {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
-              </Icon>
             </Button>
           </Collapsible.Trigger>
+          {/* The chevron and filter toggle render as siblings of the
+              Collapsible.Trigger (not inside it) so the filter button
+              can sit between them without its clicks bubbling through
+              to collapse the section. The chevron is a small button
+              that mirrors the trigger's open state and forwards to
+              the same handler. */}
+          {searchToggleProps && (
+            <Box
+              as="button"
+              type="button"
+              aria-label={
+                searchToggleProps.open
+                  ? `Hide ${title} search`
+                  : `Search ${title} values`
+              }
+              aria-pressed={searchToggleProps.open}
+              width="16px"
+              height="16px"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              borderRadius="sm"
+              color={searchToggleProps.open ? "fg" : "fg.subtle"}
+              bg={searchToggleProps.open ? "bg.muted" : undefined}
+              flexShrink={0}
+              _hover={{ color: "fg", bg: "bg.muted" }}
+              transition="background 100ms ease, color 100ms ease"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                searchToggleProps.onToggle();
+              }}
+            >
+              <Icon boxSize="11px">
+                <SlidersHorizontal />
+              </Icon>
+            </Box>
+          )}
+          <Box
+            as="button"
+            type="button"
+            aria-label={effectiveOpen ? `Collapse ${title}` : `Expand ${title}`}
+            width="16px"
+            height="16px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            color="fg.subtle"
+            flexShrink={0}
+            marginRight={2}
+            _hover={{ color: "fg" }}
+            transition="color 100ms ease"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleOpenChange(!effectiveOpen);
+            }}
+          >
+            <Icon boxSize="12px">
+              {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
+            </Icon>
+          </Box>
           {/* Per-section hover-X retired in Round 3 — removing a section
               is now done exclusively from the FacetManagerPopover.
               The inline X cluttered every section header for an action

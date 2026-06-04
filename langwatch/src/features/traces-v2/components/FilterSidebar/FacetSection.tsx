@@ -1,7 +1,7 @@
 import { Badge, Box, Button, Input, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import type React from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import {
   AUTO_EXPAND_THRESHOLD,
@@ -54,6 +54,23 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // The typed-value filter is hidden by default; the SidebarSection
+  // header shows a sliders icon that reveals (and auto-focuses) the
+  // input. Audit feedback was that the always-on input took ~32px
+  // off every section's vertical real estate for an affordance most
+  // operators only reach for on long-tail values. We keep it
+  // *available* (one click) but stop spending the space.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+  // When the user types something then closes the search, reset the
+  // query so reopening the search doesn't surprise them with a stale
+  // filter from a previous session.
+  useEffect(() => {
+    if (!searchOpen) setSearchQuery("");
+  }, [searchOpen]);
 
   const handleToggle = useCallback(
     (value: string, options?: { modifierKey?: boolean }) =>
@@ -129,6 +146,14 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       hideLabel={`Hide ${title}`}
       orGroupId={orGroupId}
       orPeers={orPeers}
+      searchToggleProps={
+        items.length > 0
+          ? {
+              open: searchOpen,
+              onToggle: () => setSearchOpen((prev) => !prev),
+            }
+          : undefined
+      }
       valueCount={items.length}
       hasActive={activeCount > 0}
       pinnedContent={
@@ -198,15 +223,14 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
           />
         )}
 
-        {/* Search is unconditional. The threshold-gated version (only
-            shown when ≥10 items) hid Enter-to-apply behind cardinality
-            — but the typed-value filter is exactly what users reach
-            for on SHORT enumerated sections too (e.g. typing a custom
-            error string into a `errorMessage` section that returned
-            no top values, typing a one-off topic). Always on; the
-            placeholder doubles as a hint that the typed value
-            applies on Enter. */}
-        {items.length > 0 && (
+        {/* Typed-value filter — revealed only when the user clicks the
+            sliders icon in the section header (searchToggleProps).
+            Audit feedback was that the always-on input took ~32px off
+            every section's vertical real estate for an affordance most
+            operators only reach for on long-tail values. The toggle
+            keeps it one click away; reopening auto-focuses the Input
+            so the user can start typing immediately. */}
+        {items.length > 0 && searchOpen && (
           // Inset paddingX so the Input's 2px focus ring has room to
           // render — without it, the ring's left/right edges were
           // clipped by the sidebar scroll container's
@@ -225,6 +249,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             paddingY={0.5}
           >
             <Input
+              ref={searchInputRef}
               size="xs"
               placeholder="Search or press Enter to apply…"
               value={searchQuery}
