@@ -368,10 +368,15 @@ export async function listIngestionTemplates(
   cfg: GovernanceConfig,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow[]> {
+  // Device-session adapter route — the public REST at
+  // /api/governance/ingestion-templates is mounted under createProjectApp
+  // and rejects Bearer access tokens with 401. wrapper-mode's auto-install
+  // flow has to work with the device-session cfg.access_token, so call the
+  // mirror route under /api/auth/cli/governance/* which accepts lw_at_*.
   const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
     cfg,
     "GET",
-    "/api/governance/ingestion-templates",
+    "/api/auth/cli/governance/ingestion-templates",
     options,
   );
   return body.ingestion_templates;
@@ -477,9 +482,15 @@ export async function listUserIngestionBindings(
   cfg: GovernanceConfig,
   options: CliApiOptions = {},
 ): Promise<UserIngestionBindingRow[]> {
+  // Device-session adapter route — see listIngestionTemplates above.
   const body = await requestREST<{
     user_ingestion_bindings: UserIngestionBindingRow[];
-  }>(cfg, "GET", "/api/governance/user-ingestion-bindings", options);
+  }>(
+    cfg,
+    "GET",
+    "/api/auth/cli/governance/user-ingestion-bindings",
+    options,
+  );
   return body.user_ingestion_bindings;
 }
 
@@ -494,7 +505,7 @@ export async function installUserIngestionBinding(
   return requestREST(
     cfg,
     "POST",
-    "/api/governance/user-ingestion-bindings",
+    "/api/auth/cli/governance/user-ingestion-bindings",
     { ...options, body: { template_id: templateId }, mutating: true },
   );
 }
@@ -523,7 +534,7 @@ export async function rotateUserIngestionBindingToken(
   return requestREST(
     cfg,
     "POST",
-    `/api/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}/rotate`,
+    `/api/auth/cli/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}/rotate`,
     { ...options, mutating: true },
   );
 }

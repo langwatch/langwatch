@@ -27,7 +27,6 @@ function claudeCodeEvent(
   scope = "com.anthropic.claude_code.events",
 ): LogRecordReceivedEventData {
   return {
-    tenantId: "project_test",
     traceId: "t1",
     spanId: "s1",
     timeUnixMs: 1700000000000,
@@ -38,7 +37,7 @@ function claudeCodeEvent(
     resourceAttributes: { "service.name": "claude-code" },
     scopeName: scope,
     scopeVersion: "2.1.162",
-    occurredAt: 1700000000000,
+    piiRedactionLevel: "DISABLED",
   };
 }
 
