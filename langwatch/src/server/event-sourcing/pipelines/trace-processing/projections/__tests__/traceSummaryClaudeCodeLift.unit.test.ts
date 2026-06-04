@@ -181,6 +181,75 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
     });
 
+    it("does NOT fold a generate_session_title api_response_body into ComputedOutput (utility-call guard)", () => {
+      // Reported on PR #4544: claude emits api_response_body for its
+      // non-conversational utility calls too. The session-title generator
+      // ships its title as a {"title":"..."} JSON text block. Because the
+      // fold's ComputedOutput is last-write-wins, an unfiltered title
+      // clobbers the assistant's real reply — the trace headline output
+      // showed `{"title":"Execute bash command and verify output"}` instead
+      // of the answer. The query_source gate skips it.
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.attributes = {
+        "event.name": "api_response_body",
+        query_source: "generate_session_title",
+        "session.id": "sess_title",
+        body: JSON.stringify({
+          content: [
+            { type: "text", text: '{"title":"Execute bash command"}' },
+          ],
+        }),
+      };
+      ev.data.body = "claude_code.api_response_body";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.computedOutput).toBe(state.computedOutput);
+      expect(after.attributes["langwatch.output"]).toBeUndefined();
+      // thread.id correlation is still lifted so the trace stays stitched.
+      expect(after.attributes["langwatch.thread.id"]).toBe("sess_title");
+    });
+
+    it("does NOT fold a prompt_suggestion api_response_body into ComputedOutput (autosuggest guard)", () => {
+      // The greyed-out autosuggest of the next thing the user might type
+      // also rides on api_response_body. Skipping it stops a throwaway
+      // suggestion (e.g. "run ls /tmp again") from overwriting the reply.
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.attributes = {
+        "event.name": "api_response_body",
+        query_source: "prompt_suggestion",
+        body: JSON.stringify({
+          content: [{ type: "text", text: "run ls /tmp again" }],
+        }),
+      };
+      ev.data.body = "claude_code.api_response_body";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.computedOutput).toBe(state.computedOutput);
+      expect(after.attributes["langwatch.output"]).toBeUndefined();
+    });
+
+    it("DOES fold a repl_main_thread api_response_body into ComputedOutput (the real conversation)", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.attributes = {
+        "event.name": "api_response_body",
+        query_source: "repl_main_thread",
+        body: JSON.stringify({
+          content: [{ type: "text", text: "I see three entries." }],
+        }),
+      };
+      ev.data.body = "claude_code.api_response_body";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.computedOutput).toBe("I see three entries.");
+      expect(after.attributes["langwatch.output"]).toBe("I see three entries.");
+    });
+
     it("ignores `prompt` on non-user_prompt claude_code events (subagent pollution guard)", () => {
       // Reported on PR #4544 v2-drawer screenshot: the trace input was
       // showing "env" instead of the user's real prompt. Root cause:

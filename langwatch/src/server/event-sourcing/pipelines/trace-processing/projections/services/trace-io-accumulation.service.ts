@@ -1,4 +1,7 @@
-import { extractAssistantTextFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import {
+  extractAssistantTextFromResponseBody,
+  isConversationalQuerySource,
+} from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -93,7 +96,23 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
     // `body.content[]` where `type === "text"`. We extract the
     // concatenated text and return it as ComputedOutput so trace
     // summaries render real assistant replies instead of NULL.
-    if (data.attributes["event.name"] === "api_response_body") {
+    //
+    // Gate on query_source: claude emits api_response_body for its
+    // non-conversational utility calls too (prompt_suggestion autosuggest,
+    // generate_session_title), whose text is NOT the assistant's reply.
+    // Because ComputedOutput is last-write-wins, an unfiltered title or
+    // autosuggest clobbers the real reply — so only lift from genuine
+    // conversation turns. This mirrors the gate in claudeCode.ts's
+    // liftApiResponseBody (the canonical span path); both reuse the same
+    // isConversationalQuerySource allowlist so the two output paths agree.
+    if (
+      data.attributes["event.name"] === "api_response_body" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
       const responseText = extractAssistantTextFromResponseBody(
         data.attributes.body,
       );

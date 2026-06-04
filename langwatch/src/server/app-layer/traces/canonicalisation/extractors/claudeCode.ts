@@ -78,7 +78,18 @@ const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
   "repl_main_thread",
 ]);
 
-const isConversationalQuerySource = (querySource: string | null): boolean =>
+/**
+ * True when an `api_response_body` came from a genuine conversation turn whose
+ * text is the assistant's reply to the user — as opposed to a non-conversational
+ * utility call (see CONVERSATIONAL_QUERY_SOURCES). An absent query_source is
+ * treated as conversational for backwards-compat. Exported so the trace-io
+ * accumulation projection (which lifts ComputedOutput directly from
+ * api_response_body, a second path) reuses this exact gate instead of
+ * duplicating the allowlist.
+ */
+export const isConversationalQuerySource = (
+  querySource: string | null,
+): boolean =>
   querySource === null || CONVERSATIONAL_QUERY_SOURCES.has(querySource);
 
 const asNumber = (raw: unknown): number | null => {
