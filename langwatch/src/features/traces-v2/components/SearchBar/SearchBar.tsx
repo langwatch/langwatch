@@ -383,44 +383,9 @@ export const SearchBar: React.FC = () => {
           />
         </Flex>
       )}
-      {!aiMode && <FindHint />}
     </Box>
   );
 };
-
-/**
- * Tiny ⌘F/Ctrl+F hint that lives under the search bar. Replaced the
- * dedicated "Find" icon button on the toolbar — Find is bound to the
- * universal shortcut already, but the icon was the only way new users
- * discovered it. Surface the shortcut next to the structured-filter
- * bar so it reads as "this bar filters the server-side dataset; ⌘F
- * scans the rows you've already loaded".
- */
-const FindHint: React.FC = () => (
-  <Flex
-    align="center"
-    gap={1}
-    paddingX={3}
-    paddingY={0.5}
-    borderBottomWidth="1px"
-    borderColor="border.subtle"
-    bg="bg.surface"
-  >
-    <chakra.span
-      color="fg.subtle"
-      fontSize="2xs"
-      lineHeight="1.2"
-      display="inline-flex"
-      alignItems="center"
-      gap={1}
-    >
-      Press
-      <Kbd>{MOD_KEY_SYMBOL}</Kbd>
-      <Kbd>F</Kbd>
-      to find within the loaded results.
-    </chakra.span>
-  </Flex>
-);
 
 const IS_MAC =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);

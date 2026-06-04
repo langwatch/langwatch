@@ -4,7 +4,6 @@ import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
-import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import {
   useSseStatusStore,
   type LiveUpdatesMode,
@@ -35,8 +34,7 @@ export const LiveIndicator: React.FC = () => {
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
-  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
-  const refresh = useTraceListRefresh();
+  const { refresh, isRefreshing } = useTraceListRefresh();
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
   // exist) but the user is in charge of when to pull them in. In `live`
@@ -93,10 +91,21 @@ export const LiveIndicator: React.FC = () => {
       >
         <IconButton
           aria-label="Refresh traces"
-          variant="ghost"
+          variant={isRefreshing ? "subtle" : "ghost"}
+          // Blue while the fetch is in flight so the operator gets
+          // both motion (the spinning icon) and a colour change as
+          // feedback that their click took effect. Stays on for the
+          // full duration of the fetch — `isRefreshing` is sourced
+          // from React-Query's in-flight count, not a fixed timer,
+          // so it doesn't clear mid-load on slow projects.
+          colorPalette={isRefreshing ? "blue" : undefined}
           size="xs"
           onClick={refresh}
-          disabled={isRefreshing}
+          // We don't actually disable the button — `useTraceListRefresh`
+          // debounces internally and cancels prior in-flight calls, so
+          // a mid-fetch click is a no-op that costs nothing. Disabling
+          // would also kill the affordance for someone who *wants* to
+          // re-kick a stalled fetch.
           css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
         >
           <RefreshCw size={12} />
