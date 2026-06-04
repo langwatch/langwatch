@@ -180,6 +180,7 @@ function isVizTab(value: string | null): value is VizTab {
  * landing on Summary as they navigate between traces.
  */
 const LAST_VIEW_MODE_STORAGE_KEY = "langwatch:traces-v2:drawer-last-mode:v1";
+const LAST_VIZ_TAB_STORAGE_KEY = "langwatch:traces-v2:drawer-last-viz:v1";
 
 function loadLastViewMode(): DrawerViewMode | null {
   if (typeof window === "undefined") return null;
@@ -195,6 +196,25 @@ function persistLastViewMode(mode: DrawerViewMode): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(LAST_VIEW_MODE_STORAGE_KEY, mode);
+  } catch {
+    // storage may be full / disabled
+  }
+}
+
+function loadLastVizTab(): VizTab | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LAST_VIZ_TAB_STORAGE_KEY);
+    return raw && isVizTab(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistLastVizTab(tab: VizTab): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LAST_VIZ_TAB_STORAGE_KEY, tab);
   } catch {
     // storage may be full / disabled
   }
@@ -242,7 +262,9 @@ function readInitialFromURL(): InitialFromURL {
     const viewMode: DrawerViewMode = isViewMode(mode)
       ? mode
       : loadLastViewMode() ?? "summary";
-    const vizTab: VizTab = isVizTab(vizRaw) ? vizRaw : "waterfall";
+    const vizTab: VizTab = isVizTab(vizRaw)
+      ? vizRaw
+      : loadLastVizTab() ?? "waterfall";
     const pinnedSpanIds = parsePinnedSpansParam(pinnedRaw);
 
     return {
@@ -478,7 +500,10 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     persistLastViewMode(mode);
     set({ viewMode: mode });
   },
-  setVizTab: (tab) => set({ vizTab: tab }),
+  setVizTab: (tab) => {
+    persistLastVizTab(tab);
+    set({ vizTab: tab });
+  },
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
 
@@ -529,14 +554,12 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         },
       };
       persistPaneState(next);
-      // Hiding the span-detail pane clears the current selection so the
-      // next span click feels like opening a fresh detail view (which
-      // also auto-reopens the pane via `selectSpan`).
-      const stateUpdate: Partial<DrawerState> = { paneState: next };
-      if (id === "spanDetail" && !wasCollapsed) {
-        stateUpdate.selectedSpanId = null;
-      }
-      return stateUpdate;
+      // Selection is preserved across collapse/uncollapse — operator
+      // feedback: hiding the pane and showing it again should land on
+      // the same span they were inspecting, not blank the selection.
+      // (Selection still clears via explicit `clearSpan` and the X
+      // affordance in the SpanTabBar.)
+      return { paneState: next };
     }),
 
   togglePaneMaximized: (id) =>

@@ -192,6 +192,35 @@ export function useOpenTraceDrawer() {
           }
         }
       }
+      // Kick off the heavier per-trace fetches in parallel with the
+      // route change so the waterfall + header render against real data
+      // by the time the drawer has finished mounting — operator feedback
+      // was that the trace tab sat on the loading skeleton for ~half a
+      // second even though we already had the row data. Prefetch is a
+      // no-op when the query is already cached, and tRPC dedupes the
+      // matching React Query subscription that the drawer mounts.
+      if (
+        project?.id &&
+        !isPreviewTraceId(trace.traceId)
+      ) {
+        const projectId = project.id;
+        void utils.tracesV2.spanTree.prefetch(
+          { projectId, traceId: trace.traceId, occurredAtMs: trace.timestamp },
+          { staleTime: 300_000 },
+        );
+        void utils.tracesV2.spanLangwatchSignals.prefetch(
+          { projectId, traceId: trace.traceId, occurredAtMs: trace.timestamp },
+          { staleTime: 300_000 },
+        );
+        void utils.tracesV2.traceEvents.prefetch(
+          { projectId, traceId: trace.traceId, occurredAtMs: trace.timestamp },
+          { staleTime: 300_000 },
+        );
+        void utils.tracesV2.resourceInfo.prefetch(
+          { projectId, traceId: trace.traceId },
+          { staleTime: 300_000 },
+        );
+      }
       // Push into the store before route change so drawer hooks render
       // with the right traceId/occurredAtMs on the very next frame.
       useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
