@@ -1072,11 +1072,11 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// non-final chunk omits usageMetadata; we keep the last
 			// non-zero values seen so the iterator's Usage() reports
 			// the FINAL token totals at stream close.
-			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			parser := it.parseUsage
 			if parser == nil {
 				parser = parseGeminiPassthroughUsage
 			}
+			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if u, ok := parser(chunk.BifrostPassthroughResponse.Body); ok {
 				// Merge — Anthropic streams emit prompt+cache tokens
 				// once on `message_start` and a stream of output token
