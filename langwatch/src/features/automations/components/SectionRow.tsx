@@ -24,6 +24,7 @@ export function SectionRow({
   return (
     <Box
       role="button"
+      aria-disabled={disabled}
       tabIndex={disabled ? -1 : 0}
       width="full"
       textAlign="left"

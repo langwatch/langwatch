@@ -76,6 +76,8 @@ function Card({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={isSelected}
+      aria-label={`Use ${option.displayName} template`}
       style={{ textAlign: "left", width: "100%" }}
     >
       <Box

@@ -21,7 +21,7 @@ const CADENCE_OPTIONS = NOTIFICATION_CADENCES.map((value) => ({
 }));
 
 /**
- * Per-trigger digest cadence (ADR-025). Notify actions only — the cadence
+ * Per-trigger digest cadence (ADR-026). Notify actions only — the cadence
  * secondary drawer gates this on `isNotifyAction`, so no internal gate.
  * The router silently coerces persist-action cadence writes to "immediate",
  * so the value can sit dormant in the draft while a user is type-switching.

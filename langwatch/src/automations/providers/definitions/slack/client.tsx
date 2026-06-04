@@ -99,8 +99,8 @@ function SlackConfigForm({
     : slice.template.value;
   const slackPreview = ctx.preview;
   const variables = useMemo(
-    () => filterVariablesForCadence(ctx.variables, "immediate"),
-    [ctx.variables],
+    () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
+    [ctx.variables, ctx.cadenceMode],
   );
 
   return (

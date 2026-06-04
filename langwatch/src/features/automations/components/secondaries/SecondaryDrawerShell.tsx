@@ -51,7 +51,12 @@ export function SecondaryDrawerShell({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full" gap={3}>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Back"
+              onClick={onClose}
+            >
               <ArrowLeft size={16} />
             </Button>
             <Heading size="md">{title}</Heading>

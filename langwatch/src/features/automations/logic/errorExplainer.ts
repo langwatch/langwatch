@@ -14,11 +14,31 @@ export interface DomainErrorShape {
 
 /** Reads `error.data.domainError` from any tRPC client error, returning null
  *  when the cause was not one of our domain errors (e.g. an infrastructure
- *  failure or a Zod parse error). */
+ *  failure or a Zod parse error). Validates the shape before returning so a
+ *  malformed payload can't crash `explainDomainError` on `domain.meta.*`
+ *  access — the helper trusts `unknown` input and a misconfigured server
+ *  shouldn't take the UI with it. */
 export function readDomainError(err: unknown): DomainErrorShape | null {
-  const data = (err as { data?: { domainError?: DomainErrorShape | null } })
-    ?.data;
-  return data?.domainError ?? null;
+  const candidate = (err as { data?: { domainError?: unknown } })?.data
+    ?.domainError;
+  if (!candidate || typeof candidate !== "object") return null;
+
+  const value = candidate as {
+    kind?: unknown;
+    meta?: unknown;
+    httpStatus?: unknown;
+  };
+  if (typeof value.kind !== "string") return null;
+  if (typeof value.httpStatus !== "number") return null;
+
+  return {
+    kind: value.kind,
+    httpStatus: value.httpStatus,
+    meta:
+      value.meta && typeof value.meta === "object"
+        ? (value.meta as Record<string, unknown>)
+        : {},
+  };
 }
 
 export interface DomainErrorExplanation {

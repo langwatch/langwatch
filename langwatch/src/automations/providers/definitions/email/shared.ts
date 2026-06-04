@@ -9,7 +9,9 @@ import type { PreviewEnvelope, SharedDef } from "../../types";
 export const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const emailActionParamsSchema = z.object({
-  members: z.array(z.string().regex(EMAIL_RX, "Invalid email address")),
+  members: z
+    .array(z.string().regex(EMAIL_RX, "Invalid email address"))
+    .min(1, "Add at least one recipient."),
 });
 
 export type EmailActionParams = z.infer<typeof emailActionParamsSchema>;

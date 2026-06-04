@@ -256,10 +256,10 @@ A single `.withReactor(..., { durable: true })` flag would force the API to acce
 ## References
 
 - ADR-007 — Event sourcing architecture (the framework this extends)
-- [ADR-026](./023-per-trigger-dispatch-timing.md) — Per-trigger cadence + trace-readiness debounce (timing knobs that ride this substrate)
-- [ADR-024](./024-liquid-templates-for-trigger-notifications.md) — Liquid templates (what `dispatch` renders for notify reactors)
-- [ADR-027](./025-typed-dispatcherror-contract.md) — `DispatchError` contract dispatch handlers throw
-- [ADR-026](./026-automation-operator-surfaces.md) — Authoring drawer + dispatch-health view that operators see
+- [ADR-026](./026-per-trigger-dispatch-timing.md) — Per-trigger cadence + trace-readiness debounce (timing knobs that ride this substrate)
+- [ADR-028](./028-liquid-templates-for-trigger-notifications.md) — Liquid templates (what `dispatch` renders for notify reactors)
+- [ADR-027](./027-typed-dispatcherror-contract.md) — `DispatchError` contract dispatch handlers throw
+- [ADR-029](./029-automation-operator-surfaces.md) — Authoring drawer + dispatch-health view that operators see
 - [ADR-014 (Skynet BullMQ removal)](./014-skynet-bullmq-removal.md) — why we're not reintroducing it
 - `src/server/event-sourcing/queues/groupQueue/` — the queue implementation
 - `src/server/event-sourcing/queues/queue.types.ts` — `EventSourcedQueueDefinition`, `DeduplicationConfig`

@@ -129,10 +129,16 @@ export function AutomationDrawer({
     { triggerId: automationId ?? "", projectId },
     { enabled: !!automationId && !!projectId },
   );
+  // Gate hydration to the FIRST successful read per automationId. tRPC's
+  // background refetch (window-focus, query invalidation) would otherwise
+  // re-fire this effect mid-session and overwrite unsaved edits with the
+  // last-saved row.
+  const hydratedFromServerFor = useRef<string | null>(null);
   useEffect(() => {
     if (!automationId) return;
     const row = triggerQuery.data;
     if (!row) return;
+    if (hydratedFromServerFor.current === automationId) return;
     const action = row.action as TriggerAction;
     const provider = CLIENT_PROVIDERS[action];
     // `Trigger.filters` is persisted as a JSON string via `JSON.stringify`, but a
@@ -190,6 +196,7 @@ export function AutomationDrawer({
       },
     };
     hydrate(next);
+    hydratedFromServerFor.current = automationId;
   }, [triggerQuery.data, automationId, hydrate]);
 
   // Build the example TemplateContext the preview pane (and autocomplete)

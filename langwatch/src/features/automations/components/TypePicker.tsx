@@ -110,6 +110,7 @@ function TypeCard({
   return (
     <Box
       as="button"
+      type="button"
       textAlign="left"
       padding={3}
       borderRadius="md"

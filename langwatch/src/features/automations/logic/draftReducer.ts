@@ -37,11 +37,11 @@ export interface AutomationDraft {
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
-  /** Per-trigger digest cadence (ADR-025). Ignored at storage and dispatch
+  /** Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch
    *  time for persist actions, so the draft value can sit dormant while the
    *  user is type-switching. */
   notificationCadence: NotificationCadence;
-  /** Per-trigger trace-readiness debounce in ms (ADR-030). The settle stage
+  /** Per-trigger trace-readiness debounce in ms (ADR-026). The settle stage
    *  holds the trace this long before re-evaluating filters; only meaningful
    *  for notify actions (persist actions ignore it). */
   traceDebounceMs: number;

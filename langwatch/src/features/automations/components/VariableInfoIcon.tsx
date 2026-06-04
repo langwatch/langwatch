@@ -22,11 +22,16 @@ export function VariableInfoIcon({
     <HoverCard.Root openDelay={150} closeDelay={120}>
       <HoverCard.Trigger asChild>
         <Box
-          as="span"
+          as="button"
+          type="button"
+          aria-label="Show available variables"
           color="fg.muted"
           cursor="help"
           display="inline-flex"
           alignItems="center"
+          bg="transparent"
+          border="none"
+          p={0}
           _hover={{ color: "fg" }}
         >
           <Info size={13} />

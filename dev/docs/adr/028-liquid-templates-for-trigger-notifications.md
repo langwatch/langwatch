@@ -145,13 +145,13 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
   - Slack preview: in-app renderer for the allowlist + "Open in Slack Block Kit Builder" deep-link.
   - Preview uses real recent-match data when available, synthetic stub otherwise.
 - **Performance budget.** 100-match digest × Liquid render × Markdown render × sanitize is ~50–200ms in Node. Acceptable for a worker. `p-limit` 10 prevents a slow render from starving siblings.
-- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: the operator activity tab (ADR-026) surfaces "rendered with N missing variables: [list]" so authors learn about typos without dispatch failures.
+- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: the operator activity tab (ADR-029) surfaces "rendered with N missing variables: [list]" so authors learn about typos without dispatch failures.
 - **Future work, deferred until customer ask**: template versioning, partials/includes (`{% include %}`), per-project default templates, interactive Block Kit support, daily/weekly digest cadences.
 
 ## References
 
-- [ADR-022](./022-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
-- [ADR-023](./023-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
-- [ADR-026](./026-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
+- [ADR-025](./025-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
+- [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
+- [ADR-029](./029-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)
 - `marked` — Markdown → HTML for email body
