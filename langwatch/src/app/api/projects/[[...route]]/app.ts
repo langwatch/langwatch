@@ -3,6 +3,7 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import {
+  DestinationTeamNotFoundError,
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -45,6 +46,7 @@ const updateProjectSchema = z.object({
   language: z.string().optional(),
   framework: z.string().optional(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
+  teamId: z.string().min(1).optional(),
 });
 
 function validationHook(
@@ -238,11 +240,15 @@ secured
             ...(body.piiRedactionLevel !== undefined && {
               piiRedactionLevel: body.piiRedactionLevel,
             }),
+            ...(body.teamId !== undefined && { teamId: body.teamId }),
           },
         });
       } catch (error) {
         if (error instanceof ProjectNotFoundError) {
           throw new NotFoundError("Project not found");
+        }
+        if (error instanceof DestinationTeamNotFoundError) {
+          throw new BadRequestError(error.message);
         }
         throw error;
       }
