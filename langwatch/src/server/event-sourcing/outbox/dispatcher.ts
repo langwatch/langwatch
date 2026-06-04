@@ -318,6 +318,7 @@ async function handleCadenceBatch(
           triggerEmails: params.members ?? [],
           triggerData,
           triggerName: trigger.name,
+          triggerId,
           projectSlug: project.slug,
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",

@@ -8,12 +8,14 @@ import { render } from "@react-email/render";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
-import { sendEmail } from "./emailSender";
+import { computeDefaultFrom, sendEmail } from "./emailSender";
+import { buildTriggerNoReplyAddress } from "./triggerNoReply";
 
 export const sendTriggerEmail = async ({
   triggerEmails,
   triggerData,
   triggerName,
+  triggerId,
   projectSlug,
   triggerType,
   triggerMessage,
@@ -21,6 +23,9 @@ export const sendTriggerEmail = async ({
   triggerEmails: string[];
   triggerData: TriggerData[];
   triggerName: string;
+  /** Stable identifier of the trigger that produced this notification. Used
+   *  to derive the per-trigger no-reply local part — see `triggerNoReply.ts`. */
+  triggerId: string;
   projectSlug: string;
   triggerType: AlertType | null;
   triggerMessage: string;
@@ -68,8 +73,13 @@ export const sendTriggerEmail = async ({
   }
 
   try {
+    const noReplyTo = buildTriggerNoReplyAddress({
+      defaultFrom: computeDefaultFrom(),
+      triggerId,
+    });
     await sendEmail({
-      to: triggerEmails,
+      to: noReplyTo,
+      bcc: triggerEmails,
       subject: `${
         triggerType ? `(${triggerType}) ` : ""
       }Trigger - ${triggerName}`,

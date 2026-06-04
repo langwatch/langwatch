@@ -4,9 +4,15 @@ import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 
-const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn() }));
+const { sendEmailMock, computeDefaultFromMock } = vi.hoisted(() => ({
+  sendEmailMock: vi.fn(),
+  computeDefaultFromMock: vi.fn(() => "LangWatch <contact@langwatch.ai>"),
+}));
 
-vi.mock("../emailSender", () => ({ sendEmail: sendEmailMock }));
+vi.mock("../emailSender", () => ({
+  sendEmail: sendEmailMock,
+  computeDefaultFrom: computeDefaultFromMock,
+}));
 
 import { sendTriggerEmail } from "../triggerEmail";
 
@@ -22,9 +28,10 @@ const triggerData: TriggerData[] = [
 
 function callEmail() {
   return sendTriggerEmail({
-    triggerEmails: ["user@example.com"],
+    triggerEmails: ["user@example.com", "other@example.com"],
     triggerData,
     triggerName: "Quality Alert",
+    triggerId: "trigger_test123",
     projectSlug: "demo",
     triggerType: AlertType.WARNING,
     triggerMessage: "",
@@ -40,6 +47,18 @@ describe("sendTriggerEmail", () => {
     it("returns without raising", async () => {
       sendEmailMock.mockResolvedValue(undefined);
       await expect(callEmail()).resolves.toBeUndefined();
+    });
+
+    it("routes recipients as BCC and uses a hashed no-reply To", async () => {
+      sendEmailMock.mockResolvedValue(undefined);
+      await callEmail();
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      const args = sendEmailMock.mock.calls[0]![0] as {
+        to: string;
+        bcc: string[];
+      };
+      expect(args.to).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/);
+      expect(args.bcc).toEqual(["user@example.com", "other@example.com"]);
     });
   });
 

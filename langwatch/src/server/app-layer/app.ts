@@ -20,6 +20,7 @@ export class App {
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
+  readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -51,6 +52,7 @@ export class App {
     this.config = deps.config;
     this.experiments = deps.experiments;
     this.triggers = deps.triggers;
+    this.triggerTemplates = deps.triggerTemplates;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;

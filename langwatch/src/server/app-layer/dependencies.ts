@@ -33,6 +33,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
+import type { TriggerTemplateService } from "./triggers/trigger-template.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { ShareService } from "./share/share.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
@@ -85,6 +86,7 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
+  triggerTemplates: TriggerTemplateService;
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;

@@ -1,0 +1,49 @@
+{%- capture _see_all_url -%}
+{{ project.url }}/messages?startDate={{ digest.windowStart | url_encode }}&endDate={{ digest.windowEnd | url_encode }}
+{%- endcapture -%}
+{%- capture _window_label -%}
+{%- if digest.windowStart -%}{{ digest.windowStart | date: "%H:%M" }}–{{ digest.windowEnd | date: "%H:%M %Z" }}{%- endif -%}
+{%- endcapture -%}
+{%- capture _summary -%}
+*{{ digest.count }}* match{% if digest.count != 1 %}es{% endif %}{% if _window_label != "" %} · {{ _window_label }}{% endif %}
+{%- endcapture -%}
+{%- assign _sliced = matches | slice: 0, 6 -%}
+{%- assign _groups = _sliced | group_by: "evaluation.evaluatorName" -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📊 " | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] }
+  {%- for g in _groups -%}
+  ,{ "type": "divider" }
+  {%- capture _grp -%}
+*{{ g.name | default: "Other" }}* · {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
+  {%- endcapture -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _grp | json }} }] }
+    {%- for m in g.items -%}
+    {%- capture _title -%}
+{% if m.evaluation.score != null %}`{{ m.evaluation.score }}` {% endif %}*{{ m.trace.metadata.model | default: "trace" }}* · <{{ m.trace.url }}|`{{ m.trace.id | truncate: 12 }}` ↗>
+    {%- endcapture -%}
+    ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _title | json }} } }
+      {%- if m.trace.input != "" -%}
+      {%- capture _md_i -%}
+## User
+{{ m.trace.input | truncate: 600 }}
+      {%- endcapture -%}
+      ,{ "type": "markdown", "text": {{ _md_i | json }} }
+      {%- endif -%}
+      {%- if m.trace.output != "" -%}
+      {%- capture _md_o -%}
+## Assistant
+{{ m.trace.output | truncate: 600 }}
+      {%- endcapture -%}
+      ,{ "type": "markdown", "text": {{ _md_o | json }} }
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- if digest.count > 6 -%}
+  ,{ "type": "divider" }
+  {%- capture _more -%}
+<{{ _see_all_url }}|See all {{ digest.count }} matches in LangWatch ↗>
+  {%- endcapture -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _more | json }} }] }
+  {%- endif -%}
+]
