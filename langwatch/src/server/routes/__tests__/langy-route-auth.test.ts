@@ -1,15 +1,14 @@
 /**
  * @vitest-environment node
  *
- * @see specs/assistant/langy-baseline.feature — Access and rollout gating
+ * Anti-regression for the Langy access-gate removal (#4558): the route used to
+ * gate non-staff behind `release_langy_enabled`, returning 403 with the literal
+ * "Langy is not currently enabled" when the flag was off. That gate is gone;
+ * Langy ships unconditionally to any authenticated session. These tests pin
+ * that contract so a re-introduction of the staff/flag gate would fail loudly.
  *
- * Binds the Langy access contract:
- *   - LangWatch staff always reach Langy, even with the rollout flag OFF.
- *   - Non-staff are blocked unless the rollout flag is on for them.
- *
- * The flag is the lever for opening Langy beyond staff; it can never lock
- * staff out. A future re-introduction of a hard "staff AND flag" gate would
- * fail the staff scenario here.
+ * The downstream handler still 500s in this env (no DB), which is fine — the
+ * gate is what's under test, not the handler.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,11 +24,9 @@ vi.mock("~/server/featureFlag", () => ({
   },
 }));
 
-// The 403 the access middleware emits when neither staff nor rollout lets the
-// caller through. Pass-through cases assert the answer is NOT this string —
-// downstream handler errors (no DB in this env) are fine; only the gate is
-// under test here.
-const GATE_BLOCKED = "Langy is not currently enabled";
+// The 403 string the old access middleware emitted. Must never reappear in any
+// response — its presence means the gate has crept back.
+const REMOVED_GATE_MESSAGE = "Langy is not currently enabled";
 
 async function requestLangy() {
   const { app } = await import("../langy");
@@ -39,57 +36,52 @@ async function requestLangy() {
   );
 }
 
-describe("Langy access gating", () => {
+describe("Langy access (post-#4558: no staff or rollout gate)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("when the user is LangWatch staff", () => {
-    describe("and Langy has not been rolled out beyond staff", () => {
-      it("is not blocked by the rollout gate", async () => {
-        getServerAuthSession.mockResolvedValue({
-          user: { email: "dev@langwatch.ai", id: "u1" },
-        });
-        isEnabled.mockResolvedValue(false);
-
-        const res = await requestLangy();
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-
-        expect(body.error).not.toBe(GATE_BLOCKED);
-        // Staff must never trigger the flag lookup at all.
-        expect(isEnabled).not.toHaveBeenCalled();
+    it("reaches the handler regardless of the rollout flag", async () => {
+      getServerAuthSession.mockResolvedValue({
+        user: { email: "dev@langwatch.ai", id: "u1" },
       });
+      isEnabled.mockResolvedValue(false);
+
+      const res = await requestLangy();
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+      expect(body.error).not.toBe(REMOVED_GATE_MESSAGE);
+      // The removed gate is the only thing that ever called isEnabled here.
+      expect(isEnabled).not.toHaveBeenCalled();
     });
   });
 
   describe("when the user is not staff", () => {
-    describe("and Langy has not been rolled out to them", () => {
-      it("is rejected with a 403", async () => {
-        getServerAuthSession.mockResolvedValue({
-          user: { email: "user@acme.com", id: "u2" },
-        });
-        isEnabled.mockResolvedValue(false);
-
-        const res = await requestLangy();
-
-        expect(res.status).toBe(403);
-        const body = (await res.json()) as { error?: string };
-        expect(body.error).toBe(GATE_BLOCKED);
+    it("reaches the handler with the rollout flag OFF", async () => {
+      getServerAuthSession.mockResolvedValue({
+        user: { email: "user@acme.com", id: "u2" },
       });
+      isEnabled.mockResolvedValue(false);
+
+      const res = await requestLangy();
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+      expect(body.error).not.toBe(REMOVED_GATE_MESSAGE);
+      expect(isEnabled).not.toHaveBeenCalled();
     });
 
-    describe("and Langy has been rolled out to them", () => {
-      it("is not blocked by the rollout gate", async () => {
-        getServerAuthSession.mockResolvedValue({
-          user: { email: "user@acme.com", id: "u3" },
-        });
-        isEnabled.mockResolvedValue(true);
-
-        const res = await requestLangy();
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-
-        expect(body.error).not.toBe(GATE_BLOCKED);
+    it("reaches the handler with the rollout flag ON", async () => {
+      getServerAuthSession.mockResolvedValue({
+        user: { email: "user@acme.com", id: "u3" },
       });
+      isEnabled.mockResolvedValue(true);
+
+      const res = await requestLangy();
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+      expect(body.error).not.toBe(REMOVED_GATE_MESSAGE);
+      expect(isEnabled).not.toHaveBeenCalled();
     });
   });
 });
