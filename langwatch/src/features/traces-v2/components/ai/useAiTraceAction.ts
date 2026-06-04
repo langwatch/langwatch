@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -25,7 +26,7 @@ interface UseAiTraceActionOptions {
 interface UseAiTraceActionResult {
   submit: (prompt: string) => void;
   isPending: boolean;
-  error: string | null;
+  error: AiActionError | null;
   /** Resets the error state — call from the prompt input's `onPromptChange`. */
   clearError: () => void;
 }
@@ -53,7 +54,7 @@ export function useAiTraceAction({
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
   const createLens = useViewStore((s) => s.createLens);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AiActionError | null>(null);
   // Track the prompt across the async boundary so onSuccess can save it
   // alongside the model's response — no plumbing through the mutation
   // result, which is keyed off the server reply only.
@@ -111,7 +112,11 @@ export function useAiTraceAction({
     },
     onError: (e) => {
       if (cancelledRef.current) return;
-      setError(e.message);
+      // tRPC-layer failures (network blip, ModelNotConfiguredError, etc.)
+      // arrive here with a string message. Wrap them in the same
+      // structured shape the server returns for handled failures so the
+      // composer renders a single error path.
+      setError({ code: "unknown", message: e.message });
     },
   });
 

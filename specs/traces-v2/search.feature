@@ -1041,6 +1041,51 @@ Rule: AI query composer (Ask AI)
     Then a primer popover points the user at /settings/model-providers
     And AI mode is not entered
 
+  # The system prompts that drive `generateTraceQueryFromPrompt` and
+  # `generateTraceAction` were rewritten in Round 3 with explicit
+  # prompt-engineering structure: clear identity, action-kind decision
+  # tree, field-discipline guardrail, no-time-clauses rule, anti-
+  # patterns, and few-shot examples covering the common shapes (single
+  # field, multi-field AND, value-side OR, NOT, ranges, free text, save
+  # phrasing, ambiguous → empty). The contract surface is unchanged —
+  # these scenarios pin behaviour the new prompt is supposed to enforce.
+
+  Rule: AI translation honours the field catalog
+    The model never invents fields that aren't in the dynamic catalog
+    sent in the system prompt, and never injects time clauses (those
+    are owned by the time-range selector outside the query).
+
+    Background:
+      Given the user is authenticated with "traces:view" permission
+      And the project has traces
+
+    Scenario: Unknown attribute is dropped, not invented
+      When the user asks "show me traces with `vendor_tier:gold`"
+      And `vendor_tier` is not in the field catalog
+      Then the AI returns a query that does NOT contain `vendor_tier`
+      And the AI either omits the concept or returns an empty query
+
+    Scenario: Time clauses are not emitted
+      When the user asks "errors in the last hour"
+      Then the AI returns `status:error` (or equivalent)
+      And the query contains no time-related field (no `timestamp`, no `occurredAt`, etc.)
+
+    Scenario: Save phrasing routes to create_lens
+      When the user asks "save this view as Failing GPT-4"
+      Then the AI returns kind `create_lens`
+      And the lens name is "Failing GPT-4" in Title Case
+      And the query is the filter implied by the request
+
+    Scenario: Filter phrasing routes to apply_query
+      When the user asks "show errors"
+      Then the AI returns kind `apply_query`
+      And the query is the filter implied by the request
+
+    Scenario: Vague request returns an empty query
+      When the user asks "the good ones"
+      Then the AI returns kind `apply_query` with an empty query string
+      And the caller treats it as a no-op (the operator sees a gentle "couldn't translate" hint, not a hallucinated filter)
+
   # The composer previously surfaced one of two static strings ("AI
   # couldn't generate a query…" / "AI's reply didn't match the trace
   # query syntax…") regardless of what actually failed. Both hid the
