@@ -171,8 +171,13 @@ export async function resolveWrapperMode(
 
   let codexConfigPath: string | undefined;
   if (tool === "codex") {
+    // codex's OTLP/HTTP exporter sends every signal to the configured
+    // endpoint verbatim — it does NOT append `/v1/traces` the way the
+    // OTel SDKs in Node/Python/Go do. Spell the trace-signal suffix
+    // out here so the POST lands on the real handler. codex only
+    // emits traces today (no logs/metrics), so one suffix suffices.
     const result = writeCodexOtelBlock({
-      endpoint,
+      endpoint: `${endpoint}/v1/traces`,
       ingestionToken: token,
       environment: cfg.organization?.slug ?? "langwatch",
     });
