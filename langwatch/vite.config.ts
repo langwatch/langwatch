@@ -201,6 +201,14 @@ export default defineConfig({
         "**/coverage/**",
         "**/server.log",
       ],
+      // Docker-on-macOS bind mounts don't surface inotify events reliably,
+      // so Vite's default fs.watch sits silent on edits made from the host.
+      // Polling at 250ms is the standard workaround and HMR fires
+      // immediately. Native macOS / Linux hosts opt out via
+      // `LANGWATCH_VITE_NO_POLLING=1` to dodge the CPU tax.
+      ...(process.env.LANGWATCH_VITE_NO_POLLING === "1"
+        ? {}
+        : { usePolling: true, interval: 250 }),
     },
     // Frontend port (default 5560, configurable via PORT env var)
     host: true,
