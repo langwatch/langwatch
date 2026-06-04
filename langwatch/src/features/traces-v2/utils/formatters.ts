@@ -138,6 +138,25 @@ export function formatRelativeTimeAgo(timestamp: number): string {
   return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
 }
 
+/**
+ * Compact absolute-time form for inline use in the TIME / SINCE cells
+ * when the column is in "Sum" mode. Local time, drops the year for
+ * recent traces. Examples: "Jun 4 18:32", "Jun 4 2025 18:32".
+ */
+export function formatCompactAbsolute(timestamp: number): string {
+  const d = new Date(timestamp);
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const month = d.toLocaleString(undefined, { month: "short" });
+  const day = d.getDate();
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${month} ${day} ${hh}:${mm}`;
+  }
+  return `${month} ${day} ${d.getFullYear()} ${hh}:${mm}`;
+}
+
 export function formatAbsoluteTime(timestamp: number): string {
   // Render in UTC and tag the suffix so engineers reading a trace can
   // line up timestamps against their server logs without doing the TZ
