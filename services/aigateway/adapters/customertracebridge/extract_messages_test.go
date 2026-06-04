@@ -22,7 +22,7 @@ import (
 func TestExtractInputMessages_RequestTypeResponses_stringInput(t *testing.T) {
 	body := []byte(`{"input":"hello world","model":"gpt-5.5"}`)
 	got := extractInputMessages(body, domain.RequestTypeResponses)
-	assert.Equal(t, `[{"role":"user","content":"hello world"}]`, got)
+	assert.JSONEq(t, `[{"role":"user","content":"hello world"}]`, got)
 }
 
 func TestExtractInputMessages_RequestTypeResponses_arrayInput(t *testing.T) {
@@ -34,7 +34,7 @@ func TestExtractInputMessages_RequestTypeResponses_arrayInput(t *testing.T) {
 		"model":"gpt-5.5"
 	}`)
 	got := extractInputMessages(body, domain.RequestTypeResponses)
-	require.NotEqual(t, "", got, "responses array input must flatten to messages")
+	require.NotEmpty(t, got, "responses array input must flatten to messages")
 	assert.Contains(t, got, `"role":"system"`)
 	assert.Contains(t, got, `"role":"user"`)
 	assert.Contains(t, got, `Refactor my auth middleware.`)
@@ -42,7 +42,7 @@ func TestExtractInputMessages_RequestTypeResponses_arrayInput(t *testing.T) {
 
 func TestExtractInputMessages_RequestTypeResponses_missing(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.5"}`)
-	assert.Equal(t, "", extractInputMessages(body, domain.RequestTypeResponses))
+	assert.Empty(t, extractInputMessages(body, domain.RequestTypeResponses))
 }
 
 func TestExtractOutputMessages_RequestTypeResponses_syncJSON(t *testing.T) {
@@ -53,7 +53,7 @@ func TestExtractOutputMessages_RequestTypeResponses_syncJSON(t *testing.T) {
 		"model":"gpt-5.5"
 	}`)
 	got := extractOutputMessages(body, domain.RequestTypeResponses)
-	assert.Equal(t, `[{"role":"assistant","content":"PONG"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_completed(t *testing.T) {
@@ -73,7 +73,7 @@ func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_completed(t *te
 	}, "\n"))
 	got := extractOutputMessages(body, domain.RequestTypeResponses)
 	// Prefer the completed snapshot's final shape — must match the sync case verbatim.
-	assert.Equal(t, `[{"role":"assistant","content":"PONG"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_deltasOnly(t *testing.T) {
@@ -88,7 +88,7 @@ func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_deltasOnly(t *t
 		``,
 	}, "\n"))
 	got := extractOutputMessages(body, domain.RequestTypeResponses)
-	assert.Equal(t, `[{"role":"assistant","content":"PONG"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeMessages_streamingSSE(t *testing.T) {
@@ -114,7 +114,7 @@ func TestExtractOutputMessages_RequestTypeMessages_streamingSSE(t *testing.T) {
 		``,
 	}, "\n"))
 	got := extractOutputMessages(body, domain.RequestTypeMessages)
-	assert.Equal(t, `[{"role":"assistant","content":[{"type":"text","text":"PONG"}]}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":[{"type":"text","text":"PONG"}]}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeChat_streamingSSE(t *testing.T) {
@@ -130,7 +130,7 @@ func TestExtractOutputMessages_RequestTypeChat_streamingSSE(t *testing.T) {
 		``,
 	}, "\n"))
 	got := extractOutputMessages(body, domain.RequestTypeChat)
-	assert.Equal(t, `[{"role":"assistant","content":"PONG"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypePassthrough_geminiStreamingSSE(t *testing.T) {
@@ -144,7 +144,7 @@ func TestExtractOutputMessages_RequestTypePassthrough_geminiStreamingSSE(t *test
 		``,
 	}, "\n"))
 	got := extractOutputMessages(body, domain.RequestTypePassthrough)
-	assert.Equal(t, `[{"role":"assistant","content":"PONG"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_emptyBody_returnsEmpty(t *testing.T) {
@@ -154,8 +154,8 @@ func TestExtractOutputMessages_emptyBody_returnsEmpty(t *testing.T) {
 		domain.RequestTypeResponses,
 		domain.RequestTypePassthrough,
 	} {
-		assert.Equal(t, "", extractOutputMessages(nil, rt), "rt=%s", rt)
-		assert.Equal(t, "", extractOutputMessages([]byte{}, rt), "rt=%s", rt)
+		assert.Empty(t, extractOutputMessages(nil, rt), "rt=%s", rt)
+		assert.Empty(t, extractOutputMessages([]byte{}, rt), "rt=%s", rt)
 	}
 }
 
@@ -165,19 +165,19 @@ func TestExtractOutputMessages_RequestTypeMessages_syncJSON_unchanged(t *testing
 	// walker don't reshape under the swap.
 	body := []byte(`{"content":[{"type":"text","text":"hello"}],"role":"assistant"}`)
 	got := extractOutputMessages(body, domain.RequestTypeMessages)
-	assert.Equal(t, `[{"role":"assistant","content":[{"type":"text","text":"hello"}]}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":[{"type":"text","text":"hello"}]}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeChat_syncJSON_unchanged(t *testing.T) {
 	body := []byte(`{"choices":[{"message":{"role":"assistant","content":"hello"}}]}`)
 	got := extractOutputMessages(body, domain.RequestTypeChat)
-	assert.Equal(t, `[{"role":"assistant","content":"hello"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"hello"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypePassthrough_syncJSON_unchanged(t *testing.T) {
 	body := []byte(`{"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}`)
 	got := extractOutputMessages(body, domain.RequestTypePassthrough)
-	assert.Equal(t, `[{"role":"assistant","content":"hello"}]`, got)
+	assert.JSONEq(t, `[{"role":"assistant","content":"hello"}]`, got)
 }
 
 func TestWalkSSEData_skipsDoneAndComments(t *testing.T) {

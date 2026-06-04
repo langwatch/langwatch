@@ -71,7 +71,7 @@ func TestTraceStreamWrapper_CapsBodyAtResponseBodyCap(t *testing.T) {
 		_ = wrapper.Chunk()
 	}
 	captured.WaitForEnd(t)
-	assert.Equal(t, responseBodyCap, len(captured.params.ResponseBody),
+	assert.Len(t, captured.params.ResponseBody, responseBodyCap,
 		"accumulator must clamp to responseBodyCap")
 }
 
@@ -94,7 +94,7 @@ func TestTraceStreamWrapper_AccumulatorCapsCumulativeChunks(t *testing.T) {
 		_ = wrapper.Chunk()
 	}
 	captured.WaitForEnd(t)
-	assert.Equal(t, responseBodyCap, len(captured.params.ResponseBody))
+	assert.Len(t, captured.params.ResponseBody, responseBodyCap)
 	// First (responseBodyCap-100) bytes are 'a', remaining 100 are 'b'.
 	assert.Equal(t, byte('a'), captured.params.ResponseBody[0])
 	assert.Equal(t, byte('b'), captured.params.ResponseBody[responseBodyCap-1])
