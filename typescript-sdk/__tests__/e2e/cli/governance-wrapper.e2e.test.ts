@@ -190,6 +190,11 @@ async function startFakeControlPlane(): Promise<{
  *     with header `Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}`.
  *   - "post-openai": POSTs to ${OPENAI_BASE_URL}/v1/chat/completions
  *     with header `Authorization: Bearer ${OPENAI_API_KEY}`.
+ *   - "post-openai-no-v1": POSTs to ${OPENAI_BASE_URL}/chat/completions
+ *     (no `/v1` prepended). Mimics the Vercel AI SDK used by opencode,
+ *     which expects the base URL to already include `/v1`. The wrapper
+ *     supplies `OPENAI_BASE_URL=${gw}/v1` for opencode so the gateway
+ *     still sees the request at `/v1/chat/completions`.
  *   - "exit-code:<n>": exits with code n (transparency check).
  */
 function writeToolStub(name: string, mode: string): void {
@@ -197,7 +202,7 @@ function writeToolStub(name: string, mode: string): void {
   let body = "#!/bin/bash\nset -e\n";
   if (mode === "echo-env") {
     body +=
-      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GENAI_API_BASE GEMINI_API_KEY; do\n' +
+      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n' +
       '  printf "%s=%s\\n" "$var" "${!var:-}"\n' +
       'done\n';
   } else if (mode === "post-anthropic") {
@@ -212,6 +217,12 @@ function writeToolStub(name: string, mode: string): void {
       '-H "content-type: application/json" ' +
       '-d \'{"model":"gpt-test","messages":[]}\' ' +
       '"${OPENAI_BASE_URL}/v1/chat/completions" > /dev/null\n';
+  } else if (mode === "post-openai-no-v1") {
+    body +=
+      'curl -s -X POST -H "Authorization: Bearer ${OPENAI_API_KEY}" ' +
+      '-H "content-type: application/json" ' +
+      '-d \'{"model":"gpt-test","messages":[]}\' ' +
+      '"${OPENAI_BASE_URL}/chat/completions" > /dev/null\n';
   } else if (mode.startsWith("exit-code:")) {
     const code = mode.slice("exit-code:".length);
     body += `exit ${code}\n`;
@@ -483,7 +494,10 @@ describe("governance CLI wrappers — e2e", () => {
     // `"url"` is a sentinel meaning "expect bare gateway URL (no suffix)";
     // any other string is a literal expected value. The `& {}` brand keeps
     // TypeScript from collapsing the union into plain `string`.
-    type ExpectedValue = "url" | (string & {});
+    // "url" = exact match against `gwUrl`.
+    // "url+v1" = `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend /v1 itself).
+    // "url+v1beta" = `${gwUrl}/v1beta` (gemini-cli expects the suffix in the base).
+    type ExpectedValue = "url" | "url+v1" | "url+v1beta" | (string & {});
     describe.each([
       {
         tool: "claude",
@@ -491,7 +505,7 @@ describe("governance CLI wrappers — e2e", () => {
           ANTHROPIC_BASE_URL: "url" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
         },
-        mustNotInject: ["OPENAI_BASE_URL", "GOOGLE_GENAI_API_BASE"],
+        mustNotInject: ["OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"],
       },
       {
         tool: "codex",
@@ -499,17 +513,18 @@ describe("governance CLI wrappers — e2e", () => {
           OPENAI_BASE_URL: "url" as ExpectedValue,
           OPENAI_API_KEY: TEST_VK,
         },
-        mustNotInject: ["ANTHROPIC_BASE_URL", "GOOGLE_GENAI_API_BASE"],
+        mustNotInject: ["ANTHROPIC_BASE_URL", "GOOGLE_GEMINI_BASE_URL"],
       },
       {
         tool: "opencode",
         expected: {
-          OPENAI_BASE_URL: "url" as ExpectedValue,
+          OPENAI_BASE_URL: "url+v1" as ExpectedValue,
           OPENAI_API_KEY: TEST_VK,
-          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
+          ANTHROPIC_BASE_URL: "url+v1" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
+          ANTHROPIC_API_KEY: TEST_VK,
         },
-        mustNotInject: ["GOOGLE_GENAI_API_BASE", "GEMINI_API_KEY"],
+        mustNotInject: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY"],
       },
       {
         tool: "cursor",
@@ -519,12 +534,13 @@ describe("governance CLI wrappers — e2e", () => {
           ANTHROPIC_BASE_URL: "url" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
         },
-        mustNotInject: ["GOOGLE_GENAI_API_BASE", "GEMINI_API_KEY"],
+        mustNotInject: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY"],
       },
       {
         tool: "gemini",
         expected: {
-          GOOGLE_GENAI_API_BASE: "url" as ExpectedValue,
+          GOOGLE_GEMINI_BASE_URL: "url+v1beta" as ExpectedValue,
+          GOOGLE_API_KEY: TEST_VK,
           GEMINI_API_KEY: TEST_VK,
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
@@ -541,6 +557,10 @@ describe("governance CLI wrappers — e2e", () => {
           for (const [k, want] of Object.entries(expected)) {
             if (want === "url") {
               expect(env[k]).toBe(gwUrl);
+            } else if (want === "url+v1") {
+              expect(env[k]).toBe(`${gwUrl}/v1`);
+            } else if (want === "url+v1beta") {
+              expect(env[k]).toBe(`${gwUrl}/v1beta`);
             } else {
               expect(env[k]).toBe(want);
             }
@@ -583,9 +603,13 @@ describe("governance CLI wrappers — e2e", () => {
     });
 
     describe("when wrapped opencode POSTs through OpenAI-compatible env vars", () => {
+      // The wrapper supplies OPENAI_BASE_URL=${gw}/v1 for opencode because
+      // the Vercel AI SDK opencode uses does NOT prepend /v1 itself (unlike
+      // codex). The stub mode mirrors that — it posts to ${OPENAI_BASE_URL}
+      // /chat/completions, so the gateway still sees /v1/chat/completions.
       it("the fake gateway records the request at /v1/chat/completions with Bearer VK", async () => {
         writeLoggedInConfig();
-        writeToolStub("opencode", "post-openai");
+        writeToolStub("opencode", "post-openai-no-v1");
         const res = await runCli(["opencode"]);
         expect(res.status).toBe(0);
         const posts = recordedGwRequests.filter((r) => r.method === "POST");
