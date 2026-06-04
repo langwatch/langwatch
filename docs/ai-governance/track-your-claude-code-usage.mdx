@@ -130,7 +130,7 @@ Same browser approval as Path 1; no API key needed.
 langwatch claude
 ```
 
-Because no Virtual Key is on file, the wrapper mints a personal ingestion token (`ik-lw-...`), sets `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOG_USER_PROMPTS=1` (so prompts are not redacted), and the rest of the OTLP env block. Your Claude Code session keeps using your Max plan unchanged. LangWatch reads the OTel log records Claude Code emits and renders them.
+Your Claude Code session keeps using your Max plan unchanged. LangWatch reads the OTel log records Claude Code emits and renders them.
 
 <Frame caption="Interactive Claude Code session under the subscription path. Same wrapper, no API key.">
   ![langwatch claude tmux path 2](/images/ai-governance/cli-flow/08-tmux-claude-pathb-otel-real.png)
