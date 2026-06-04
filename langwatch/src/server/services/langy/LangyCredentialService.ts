@@ -4,6 +4,9 @@ import { Prisma } from "@prisma/client";
 import { encrypt, decrypt } from "~/utils/encryption";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:langy:credential");
 
 /**
  * Name under which the auto-provisioned Langy VK secret is stored in
@@ -36,9 +39,14 @@ export async function provisionLangyVirtualKey(args: {
   prisma: PrismaClient;
   projectId: string;
   organizationId: string;
-  actorUserId: string;
-}): Promise<string> {
-  const { prisma, projectId, organizationId, actorUserId } = args;
+  /**
+   * The user the VK creation is attributed to. Required at runtime (project
+   * creation / first-chat self-heal). Optional in the backfill path — we
+   * fall back to the org's first admin, same shape as the API key backfill.
+   */
+  actorUserId?: string | null;
+}): Promise<string | null> {
+  const { prisma, projectId, organizationId } = args;
 
   // findFirst (not findUnique-by-projectId_name): the guarded prisma client's
   // multitenancy middleware doesn't recognize the compound key and throws.
@@ -48,6 +56,22 @@ export async function provisionLangyVirtualKey(args: {
   });
   if (existing) {
     return decrypt(existing.encryptedValue);
+  }
+
+  // ProjectSecret + VirtualKey audit fields require a user. When the caller
+  // doesn't have one (backfill), fall back to the org's first admin — same
+  // resolution the API key backfill uses (langyApiKey.ts:resolveCreatorId).
+  const actorUserId = await resolveActorUserId(
+    prisma,
+    organizationId,
+    args.actorUserId ?? null,
+  );
+  if (!actorUserId) {
+    logger.warn(
+      { projectId },
+      "no user to attribute the Langy VK to; skipping — credential service will self-heal on first chat once a user signs in",
+    );
+    return null;
   }
 
   // GatewayProviderCredential was removed in iter 110 — VKs route through the
@@ -203,10 +227,94 @@ export class LangyCredentialService {
     actorUserId: string;
   }): Promise<string> {
     // Delegates to the standalone helper so /chat-time self-healing and the
-    // eager project.create path share one implementation.
-    return provisionLangyVirtualKey({
+    // eager project.create path share one implementation. At chat time we
+    // always have an authenticated user, so the helper's null fallback path
+    // is unreachable here — assert non-null to satisfy the caller's type.
+    const secret = await provisionLangyVirtualKey({
       prisma: this.prisma,
       ...args,
     });
+    if (!secret) {
+      throw new LangyCredentialResolutionError(
+        "Failed to provision Langy virtual key — no actor user could be resolved.",
+      );
+    }
+    return secret;
   }
+}
+
+async function resolveActorUserId(
+  prisma: PrismaClient,
+  organizationId: string,
+  explicit: string | null,
+): Promise<string | null> {
+  if (explicit) return explicit;
+  const admin = await prisma.organizationUser.findFirst({
+    where: { organizationId, role: "ADMIN" },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true },
+  });
+  return admin?.userId ?? null;
+}
+
+/**
+ * Idempotently provision a Langy VK for every application project that
+ * doesn't already have one. Called from `scripts/backfill-langy-virtual-keys.ts`.
+ * Mirrors the shape of `backfillLangyApiKeys` for symmetry.
+ */
+export async function backfillLangyVirtualKeys(
+  prisma: PrismaClient,
+  { dryRun = false }: { dryRun?: boolean } = {},
+): Promise<{ provisioned: number; skipped: number; failed: number }> {
+  // Only real user workspaces — hidden internal_governance routing projects
+  // are not user-facing and must never receive a Langy VK.
+  const projects = await prisma.project.findMany({
+    where: { kind: "application" },
+    select: { id: true, team: { select: { organizationId: true } } },
+  });
+
+  let provisioned = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const project of projects) {
+    const existing = await prisma.projectSecret.findFirst({
+      where: { projectId: project.id, name: LANGY_VK_SECRET_NAME },
+      select: { id: true },
+    });
+    if (existing) {
+      skipped++;
+      continue;
+    }
+    if (dryRun) {
+      provisioned++;
+      continue;
+    }
+    try {
+      const secret = await provisionLangyVirtualKey({
+        prisma,
+        projectId: project.id,
+        organizationId: project.team.organizationId,
+      });
+      if (secret) {
+        provisioned++;
+      } else {
+        // No admin to attribute the VK to — counted as skipped, not failed.
+        // First chat with a real user will heal this.
+        skipped++;
+      }
+    } catch (err) {
+      failed++;
+      logger.error(
+        { err, projectId: project.id },
+        "failed to backfill Langy VK for project",
+      );
+    }
+  }
+
+  logger.info(
+    { provisioned, skipped, failed, dryRun },
+    "Langy VK backfill complete",
+  );
+  return { provisioned, skipped, failed };
 }
