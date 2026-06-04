@@ -1,34 +1,33 @@
 ---
 title: Track your Claude Code usage
-description: See what you spend per session, which models you hit, how many tokens are cached, and the full prompt + response trail. Two paths, depending on whether you pay Anthropic per token or on a Claude Max / Pro plan.
+description: A solo-developer walkthrough. Sign up for LangWatch (or run it locally), connect your Claude Code, see your own spend, set a personal budget. Two paths depending on whether you pay Anthropic with a pay-per-token API key or a Claude Max / Pro subscription plan.
 sidebarTitle: Track your Claude Code usage
 ---
 
-Claude Code does not show you a per-session cost number. The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs.
-
-This guide wires Claude Code up so all of that lands somewhere you can browse:
-
-- Cost per session and per turn
-- Model used per turn, including silent fallbacks
-- Cache writes vs cache reads (Anthropic prompt caching is ~12x cheaper on reads, so the split matters)
-- Full prompt body, with the redaction off so you can audit what you actually sent
-- Trace tree of tool calls, latencies, and durations
-- Export to CSV or to OTLP, so you can replay sessions or feed them into your own analysis
+This is the version of LangWatch for one person tracking one Claude Code seat. No org rollout, no IT admin. You sign up, you wire Claude Code, you see your own spend on `/me`.
 
 How you pay Anthropic decides which path you walk:
 
 | Your setup | Path | Jump to |
 |---|---|---|
-| Pay-per-token Anthropic API key | API key (every call routes through a local gateway) | [Path 1](#path-1-api-key) |
-| Claude Max or Pro subscription (5x / 20x) | Subscription (read Claude Code's own OpenTelemetry output) | [Path 2](#path-2-claude-plan) |
+| Pay-per-token Anthropic API key | API key path (gateway with spend control) | [Path 1: API key](#path-1-api-key) |
+| Claude Max / Pro subscription (5x or 20x) | Subscription path (OTLP ingestion, no key required) | [Path 2: Claude plan](#path-2-claude-plan) |
 
-Both end with the same dashboard. Pick whichever matches how you pay; if you have both, do Path 1 first and add Path 2 on top.
+If you have both, wire the API key path first then add the subscription path on top. Both write to the same `/me` page.
 
-## Step 0: Get LangWatch
+When you finish you will have:
+
+- A LangWatch project bound to your account.
+- Claude Code wired to LangWatch through a single command (`langwatch claude`).
+- A live `/me` dashboard showing your monthly spend, request count, most-used model, and per-tool cost breakdown.
+
+<Info>**Pairs with:** [Personal AI Tools Portal](/ai-governance/personal-portal/overview) (the `/me` page you will be living on).</Info>
+
+## Step 0: Get LangWatch (both paths)
 
 Pick one and stop on `/me`:
 
-**SaaS (fastest).** Sign up at [app.langwatch.ai](https://app.langwatch.ai). You land on `/me`.
+**SaaS (fastest).** Sign up at [app.langwatch.ai](https://app.langwatch.ai). The onboarding flow creates a personal organization, a workspace, and a project. You land on `/me` ready to go.
 
 **Self-hosted (one command).**
 
@@ -36,27 +35,39 @@ Pick one and stop on `/me`:
 npx @langwatch/server
 ```
 
-That bootstraps Postgres, ClickHouse, Redis, and the app on `http://localhost:5560`. Open it, sign up with email and password.
+The CLI bootstraps Postgres, ClickHouse, Redis, and the app on `http://localhost:5560`. Open it in your browser, sign up with email + password, and you land on `/me`.
 
-<Frame caption="The /me page after sign-up. Empty so far. That changes once Claude Code starts emitting.">
+<Frame caption="The /me personal portal landing page after signup. Empty state, no traces yet, no spend, no models. This is where both paths drop you off.">
   ![/me empty landing](/images/ai-governance/post-bypass/01-me-portal.png)
 </Frame>
 
 ## Path 1: API key
 
-You hold an Anthropic API key and pay per request. This path routes every Claude Code call through a local gateway that holds your key, captures the full request and response server-side, and writes a trace. Cost numbers come straight from Anthropic's response.
+You pay Anthropic per request with an API key. You want full server-side capture of every Claude Code call, exact cost per request, and the ability to block calls when you cross a budget.
 
-### 1.1 Paste your Anthropic key
+This path routes every Claude Code request through the LangWatch AI Gateway. LangWatch holds your Anthropic key, swaps it in at request time, captures the full request and response server-side, and writes a trace.
 
-On `/me`, find **Model providers**, click the **Anthropic** tile, paste your `sk-ant-` key. The drawer mints a Virtual Key (prefix `vk-lw-`) that Claude Code will use; LangWatch holds the real Anthropic key.
+### 1.1 Add your Anthropic credential
 
-<Frame caption="Anthropic provider drawer with the Virtual Key just issued. The vk-lw- is what Claude Code talks to. The sk-ant- stays on the LangWatch side.">
+On `/me`, scroll to **Model providers (issue your own virtual key)**. Click the **Anthropic** tile to open the provider drawer, then paste your Anthropic API key.
+
+<Frame caption="The Model providers section of /me. Click the Anthropic tile to open the provider drawer.">
+  ![Model providers section](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
+</Frame>
+
+This credential never leaves LangWatch. The Virtual Key you mint next is what Claude Code will see; LangWatch holds the upstream key.
+
+After saving the credential, the drawer mints a Virtual Key for you (prefix `vk-lw-`) and shows it once.
+
+<Frame caption="The Anthropic provider drawer after a Virtual Key is issued. Copy the vk-lw- value once; the langwatch CLI will reuse it automatically once you log in.">
   ![Virtual Key issued](/images/ai-governance/post-bypass/36-vk-rotated-secret-reveal.png)
 </Frame>
 
-<Warning>The full Virtual Key value is shown once. If you lose it, re-mint from the same tile.</Warning>
+<Warning>The secret half of the Virtual Key is shown once. If you lose it, re-mint from the same tile.</Warning>
 
-### 1.2 Install the CLI
+### 1.2 Install the LangWatch CLI
+
+In your terminal:
 
 ```bash
 npm install -g langwatch
@@ -68,51 +79,51 @@ npm install -g langwatch
 langwatch login --device
 ```
 
-Browser opens with an approval code. Approve it. The CLI caches your refresh token and your default Virtual Key at `~/.langwatch/config.json`.
+A browser tab opens at LangWatch with a one-time approval code. Click **Approve**; the CLI receives a long-lived refresh token plus your default Virtual Key, saved at `~/.langwatch/config.json`.
 
-<Frame caption="`langwatch login --device` pairs the CLI with your account.">
+<Frame caption="The terminal flow for `langwatch login --device`. Browser approval pairs the CLI with your account and binds your default Virtual Key.">
   ![langwatch login device flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
 </Frame>
 
-### 1.4 Run Claude Code through the wrapper
+### 1.4 Run Claude Code through LangWatch
 
 ```bash
 langwatch claude
 ```
 
-That spawns Claude Code with `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` set so every request goes through the gateway. UX is identical to `claude` on its own: same REPL, same keybinds, same agent loop.
+The wrapper detects your Virtual Key, sets `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` on the spawned `claude` process, and hands off the terminal to Claude Code as normal. Every API call from this session routes through the gateway and lands as a trace on `/me`.
 
-<Frame caption="Interactive Claude Code session via the wrapper. The wrapper injects the gateway env and gets out of the way.">
+<Frame caption="A `langwatch claude` session in tmux. The wrapper injects the gateway env, then spawns claude with stdio inherited so the experience is identical to vanilla claude code.">
   ![langwatch claude tmux](/images/ai-governance/cli-flow/06-tmux-langwatch-claude-real.png)
 </Frame>
 
-### 1.5 Open `/me`
+### 1.5 See the trace on /me
 
-Within a few seconds:
+Refresh `/me`. Within seconds you should see:
 
-- **Spent this month** has a number.
-- **Recent activity** has a row per Claude Code turn, with model, tokens, dollar cost.
-- **By tool** breaks down spend per model.
+- A non-zero number in **Spent this month**.
+- A row in **Recent activity** with the model, token counts, and dollar cost.
+- A model breakdown under **By tool**.
 
-<Frame caption="My Usage panel after one Claude Code session. Exact cost per call, per-model breakdown, daily spend.">
+<Frame caption="My Usage panel populated by a Claude Code session routed through the gateway. Exact cost per call, per-model breakdown, daily spend chart.">
   ![My Usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
 </Frame>
 
-Click **Traces** in the sidebar for the per-request view. Each turn lands as a `gen_ai.*` span with prompt, response, model, tokens, and dollar cost.
+Open **Traces** in the sidebar for the per-request detail. Every Claude Code turn shows as a `gen_ai.*` span with prompts, responses, latency, and cost.
 
-<Frame caption="Trace detail for one Claude Code turn through the gateway. Prompt and response inline, tokens split between cache_creation and cache_read, exact cost.">
+<Frame caption="Trace detail for a single Claude Code turn captured through the gateway. Prompt, assistant response, model, tokens, cache_creation / cache_read split, and the exact dollar cost.">
   ![Path 1 trace detail](/images/ai-governance/cli-flow/07-trace-detail-pong-via-gateway.png)
 </Frame>
 
-That is the loop. Every future `langwatch claude` session writes here. Skip to [What you can do with this](#what-you-can-do-with-this).
+Done. Every future `langwatch claude` session writes to the same `/me`. Skip to [What's next](#whats-next).
 
 ## Path 2: Claude plan
 
-You pay Anthropic flat per month on a Max or Pro plan. The Anthropic Console only shows a monthly total, no per-call breakdown. The only way to see per-call detail is to capture Claude Code's own OpenTelemetry output and let LangWatch render it.
+You pay Anthropic flat per month and have a Claude Max seat (5x or 20x). Anthropic does not give you per-request cost from their billing surface; the only way to see your actual usage is to capture Claude Code's own OpenTelemetry emissions and let LangWatch normalise them.
 
-You do not need a Virtual Key for this path. The wrapper detects that no API key is on file and falls back to OTLP ingestion automatically.
+This path does not require a Virtual Key. The `langwatch claude` wrapper falls back to OTLP ingestion, mints a personal ingestion binding under the hood, and wires the OTLP env block onto the spawned `claude` process.
 
-### 2.1 Install the CLI
+### 2.1 Install the LangWatch CLI
 
 ```bash
 npm install -g langwatch
@@ -124,94 +135,88 @@ npm install -g langwatch
 langwatch login --device
 ```
 
-Same browser approval as Path 1; no API key needed.
+Same flow as Path 1: browser approval pairs the CLI with your account.
 
-<Frame caption="`langwatch login --device` paired with your account.">
+<Frame caption="The terminal flow for `langwatch login --device`. No API key needed for Path 2; the CLI just needs your LangWatch identity.">
   ![langwatch login device flow](/images/ai-governance/cli-flow/01-cli-login-device-flow.png)
 </Frame>
 
-### 2.3 Run Claude Code through the wrapper
+### 2.3 Run Claude Code through LangWatch
 
 ```bash
 langwatch claude
 ```
 
-Because no Virtual Key is on file, the wrapper mints a personal ingestion token (`ik-lw-...`), sets `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOG_USER_PROMPTS=1` (so prompts are not redacted), and the rest of the OTLP env block. Your Claude Code session keeps using your Max plan unchanged. LangWatch reads the OTel log records Claude Code emits and renders them.
+Because no Virtual Key is present in your config, the wrapper auto-installs a personal Claude Code ingestion binding on your behalf, mints a one-time `ik-lw-` token, sets the OTLP env block (`CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOG_USER_PROMPTS`, `OTEL_EXPORTER_OTLP_*`) on the spawned process, and hands off the terminal.
 
-<Frame caption="Interactive Claude Code session under the subscription path. Same wrapper, no API key.">
+You keep paying Anthropic flat. Your Claude Code session keeps using your Claude Max plan. LangWatch reads the OTel log records Claude Code emits (model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cost_usd, prompt body) and renders them on `/me`.
+
+<Frame caption="A `langwatch claude` session running under the Claude plan path. Same wrapper UX as Path 1; the difference is the wrapper switched to OTLP ingestion mode automatically because no Virtual Key was on file.">
   ![langwatch claude tmux path 2](/images/ai-governance/cli-flow/08-tmux-claude-pathb-otel-real.png)
 </Frame>
 
-### 2.4 Open `/me`
+### 2.4 See the trace on /me
 
-Within ~30 seconds of your first turn:
+Refresh `/me`. Within 30 seconds:
 
-- **Spent this month** has a number from Claude Code's own `cost_usd` field.
-- **Recent activity** has a row per turn.
-- **By tool** shows the model breakdown.
+- A non-zero number in **Spent this month** (computed from Claude Code's own `cost_usd` field).
+- A row in **Recent activity** per Claude Code turn.
+- A model breakdown under **By tool**.
 
-<Frame caption="My Usage panel populated under the subscription path. Same surface as Path 1; the cost number comes from Claude Code's own usage event.">
+<Frame caption="My Usage panel populated by a Claude plan session. Same surface as Path 1; the cost number comes from Claude Code's own usage event rather than from the gateway.">
   ![My Usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
 </Frame>
 
-<Frame caption="Trace detail under the subscription path. Model, input tokens, output tokens, cache_creation_tokens, cache_read_tokens, cost_usd, and the prompt body all rendered from Claude Code's OTel log records.">
+Open **Traces** in the sidebar for the per-request detail.
+
+<Frame caption="Trace detail for a Claude plan session. Model, tokens, cache_creation_tokens, cache_read_tokens, cost_usd, and prompt body all rendered from Claude Code's OTel log records.">
   ![Path 2 trace detail](/images/ai-governance/post-bypass/14-claude-pathb-trace-detail-storegate-fix.png)
 </Frame>
 
-<Info>Claude Code 2.1.x does not emit the assistant's response text on OpenTelemetry, only token counts. Input prompt, model, tokens, cache split, and cost render fine; the output text column stays empty until Anthropic ships that field.</Info>
+<Info>Claude Code 2.1.x does not emit the assistant's response text in OTel, only token counts. The input prompt and full cost / token breakdown render in `/me/traces`; the output text stays empty until Anthropic ships it on their OTel emission.</Info>
 
-## What you can do with this
+## What's next
 
-Whichever path you walked, the data is now sitting on `/me` and `/traces`. Some things you can do with it that Claude Code does not give you on its own:
-
-### Find expensive sessions
-
-`/me` sorts your recent activity by cost. Click into a trace to see exactly what was sent. Useful when one session burns through an unexpected amount of context.
-
-### Audit cache hit ratio
-
-The trace metadata includes `cache_creation_tokens` and `cache_read_tokens` separately. Anthropic prompt caching reads at roughly 0.1x and writes at roughly 1.25x of the regular input rate, so the split is the difference between expensive and cheap turns. If your cache_read ratio is low, your prompts are probably changing the cacheable prefix between turns.
-
-### See what the agent actually sent
-
-`OTEL_LOG_USER_PROMPTS=1` (which the wrapper sets for you) keeps prompt bodies un-redacted, so you can read every prompt the agent issued, including the long system prompt and any tool definitions it injected.
+The two paths land on the same surface. The differences below all live on `/me`.
 
 ### Set a personal budget
 
-`/me` → **Settings** → **Personal budget**. Set a monthly cap.
+`/me` → **Settings** → **Personal budget**. Set a monthly dollar cap.
 
-- **Path 1**: the gateway enforces it. Requests fail with `budget_exceeded` once you cross.
-- **Path 2**: alerts at 80% and 100%. Claude Code calls keep flowing; Anthropic does not let the receiver gate them.
+- **Path 1 (API key)**: the gateway enforces the cap. Requests fail with `budget_exceeded` once you cross.
+- **Path 2 (Claude plan)**: you get an alert at 80% and 100%. The actual Claude Code calls keep flowing; Anthropic does not give the receiver a way to gate them.
 
-### Export
+### Add anomaly rules (admin scope)
 
-`/traces` → **Export** dumps to CSV or to an OTLP endpoint you control. Useful when you want to take everything off LangWatch and pipe it into your own analysis.
+Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. Solo users on a personal org have admin scope by default, so head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
 
-### Use the same wrapper for other CLIs
+### Add other assistants
 
-Same pattern works for the other agent CLIs you might be running. The wrapper picks gateway vs OTLP ingestion based on whether a Virtual Key is on file.
+`langwatch <tool>` is wired for the other supported assistants on the same two-path logic: Virtual Key on file = gateway, no key = OTLP ingestion.
 
-| Command | With Virtual Key | Without Virtual Key |
+| Command | Path 1 (Virtual Key on file) | Path 2 (no key) |
 |---|---|---|
-| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `OTEL_LOG_USER_PROMPTS` |
-| `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via `[otel]` block in `~/.codex/config.toml` |
-| `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP (gen_ai.* native) |
-| `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP (opencode 1.14 emits structural spans only; tokens / model / cost wait on upstream `gen_ai.*` adoption) |
+| `langwatch claude` | Routes via gateway with `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP ingestion via `CLAUDE_CODE_ENABLE_TELEMETRY` + `OTEL_LOG_USER_PROMPTS` |
+| `langwatch codex` | Routes via gateway with `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP ingestion via `[otel]` block written to `~/.codex/config.toml` |
+| `langwatch gemini` | Routes via gateway with `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP ingestion (gen_ai.* native) |
+| `langwatch opencode` | Routes via gateway with both `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP ingestion; opencode 1.14 emits structural spans only (no `gen_ai.*` attrs yet, vendor upstream gap) |
+
+The two paths are mutually exclusive per session per tool. The wrapper picks one for you based on whether a Virtual Key is present.
 
 ## Privacy
 
-Everything you mint here is scoped to your personal project. If you signed in via a shared org workspace, switch to your personal workspace before running `langwatch login` so the wrapper binds to the right account; the workspace picker is at the top of the sidebar.
+Everything you mint here is scoped to your personal project. If you signed in to LangWatch via a shared org workspace, switch to your personal workspace before running `langwatch login` so the wrapper binds to the right account; the workspace picker is at the top of the sidebar.
 
-For self-hosted (`npx @langwatch/server`), nothing leaves your machine. Postgres, ClickHouse, and Redis all bind to localhost.
+For self-hosted (`npx @langwatch/server`), data never leaves your machine. The Postgres, ClickHouse, and Redis containers all bind to localhost.
 
 ## Troubleshooting
 
-**Nothing in Recent activity after 30 seconds.** Confirm the wrapper spawned with the right env. Open `~/.langwatch/config.json`: Path 1 needs a `default_personal_vk` block, Path 2 needs the wrapper to have printed an `ik-lw-` token on first run. If neither shows up, re-run `langwatch login --device` and then `langwatch claude` again. `langwatch init-shell` prints the eval-able shell snippet showing exactly which env vars the wrapper injects.
+**Nothing in Recent activity after 30 seconds.** Confirm `~/.langwatch/config.json` has a `default_personal_vk` field (Path 1) or that the wrapper printed an `ik-lw-` token mint line on the first run (Path 2). If neither is true, re-run `langwatch login --device` and then `langwatch claude` once before inspecting `/me`. `langwatch init-shell` prints the eval-able shell snippet showing exactly which env vars the wrapper would inject if you want to inspect them directly.
 
-**401 from the gateway (Path 1).** Your Virtual Key probably rotated. Re-run `langwatch login --device` or re-mint the Virtual Key from `/me` → Model providers.
+**401 from the gateway (Path 1).** Your Virtual Key on `~/.langwatch/config.json` may have rotated. Run `langwatch login --device` again, or re-mint the Virtual Key from `/me` → Model providers and re-run `langwatch login`.
 
-**Cost shows $0 even though traces land (Path 2).** Model alias in the span does not match a current entry in LangWatch's cost catalog. Check `gen_ai.request.model` on the span; current-gen identifiers (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`) match. Legacy aliases (`claude-3-5-sonnet-20241022`) silently return NULL cost.
+**Cost shows $0 even though traces land (Path 2).** The model alias in the span does not match a current entry in LangWatch's cost catalog. Check the span's `gen_ai.request.model` attribute and confirm it is a current-gen identifier (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`). Legacy aliases (`claude-3-5-sonnet-20241022`) silently produce NULL cost.
 
-**Self-hosted: app starts but `/me` is empty.** You probably signed up with the wrong provider. `npx @langwatch/server` only enables email + password by default. Sign up with that.
+**Self-hosted: app starts but `/me` is empty.** Make sure you signed up with email + password (the SaaS SSO providers are disabled by default in `npx @langwatch/server`). If you signed up but the page is blank, check `docker logs` on the langwatch container for migration errors.
 
-For deeper failure modes see [CLI debug](/ai-governance/cli-debug) and [Ingestion Templates](/ai-governance/ingestion-templates).
+For deeper failure modes see [CLI debug](/ai-governance/cli-debug) and the [Ingestion Templates reference](/ai-governance/ingestion-templates).

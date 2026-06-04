@@ -39,6 +39,7 @@ import {
   listUserIngestionBindings,
   rotateUserIngestionBindingToken,
 } from "./cli-api";
+import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 export type WrapperMode = "gateway" | "ingestion";
@@ -137,6 +138,9 @@ export async function resolveWrapperMode(
   }
 
   if (mode === "gateway") {
+    if (tool === "gemini") {
+      warnIfGeminiOAuthSelected();
+    }
     // Codex 0.130+ defers to ChatGPT OAuth by default and ignores
     // OPENAI_API_KEY unless the active model_provider is an
     // explicit env-keyed entry. Write a langwatch provider +
