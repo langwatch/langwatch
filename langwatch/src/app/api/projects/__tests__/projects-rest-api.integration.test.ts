@@ -405,7 +405,9 @@ describe("Feature: Projects REST API", () => {
       });
 
       it("does not update name when team validation fails (atomic)", async () => {
-        const beforeName = (await api.get(`/api/projects/${projectToMove.id}`).then(r => r.json())).name;
+        const beforeRes = await api.get(`/api/projects/${projectToMove.id}`);
+        const beforeBody = await beforeRes.json();
+        const beforeName = beforeBody.name;
 
         const res = await api.patch(`/api/projects/${projectToMove.id}`, {
           name: "Should Not Persist",
