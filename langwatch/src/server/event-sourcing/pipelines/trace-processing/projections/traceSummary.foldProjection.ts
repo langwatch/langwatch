@@ -47,10 +47,7 @@ import {
   TraceNameResolutionService,
   shouldOverrideOutput,
   extractIOFromLogRecord,
-  extractClaudeCodeApiRequestMetrics,
-  extractCodexSseEventMetrics,
-  extractCodexConversationStartMetrics,
-  extractGenAiLogMetrics,
+  liftCanonicalAttributesFromLogRecord,
   OUTPUT_SOURCE,
 } from "./services";
 
@@ -365,120 +362,17 @@ export class TraceSummaryFoldProjection
       }
     }
 
-    // Lift cost / tokens / model off a claude_code.api_request
-    // event onto the canonical langwatch.* attributes so the trace
-    // renders the same shape as a real gen_ai span. Stored as
-    // strings on attributes (matches how every other lift writes
-    // here). The four numeric tokens are intentionally lifted to
-    // distinct keys; conflating cache_creation vs cache_read would
-    // mis-bill at the trace-summary layer.
-    const cc = extractClaudeCodeApiRequestMetrics(event.data);
-    if (cc !== null) {
-      if (cc.model !== null) {
-        mergedAttributes["langwatch.model"] = cc.model;
-      }
-      if (cc.costUsd !== null) {
-        mergedAttributes["langwatch.cost.usd"] = String(cc.costUsd);
-      }
-      if (cc.inputTokens !== null) {
-        mergedAttributes["langwatch.input_tokens"] = String(cc.inputTokens);
-      }
-      if (cc.outputTokens !== null) {
-        mergedAttributes["langwatch.output_tokens"] = String(cc.outputTokens);
-      }
-      if (cc.cacheReadTokens !== null) {
-        mergedAttributes["langwatch.cache_read_tokens"] = String(
-          cc.cacheReadTokens,
-        );
-      }
-      if (cc.cacheCreationTokens !== null) {
-        mergedAttributes["langwatch.cache_creation_tokens"] = String(
-          cc.cacheCreationTokens,
-        );
-      }
-      const sessionId = event.data.attributes["session.id"];
-      if (typeof sessionId === "string" && sessionId.length > 0) {
-        mergedAttributes["langwatch.thread.id"] = sessionId;
-      }
-    }
-
-    // Codex equivalent of the claude_code lift: codex.sse_event carries
-    // model + token counts + thread.id + principal; codex.conversation_starts
-    // carries model + principal at conversation creation. No cost field on
-    // the wire — receiver-side model-pricing lookup downstream fills
-    // langwatch.cost.usd from (model, tokens). Distinct gating on event.name
-    // so claude/gemini events pass through untouched.
-    const codexSse = extractCodexSseEventMetrics(event.data);
-    if (codexSse !== null) {
-      if (codexSse.model !== null) {
-        mergedAttributes["langwatch.model"] = codexSse.model;
-      }
-      if (codexSse.inputTokens !== null) {
-        mergedAttributes["langwatch.input_tokens"] = String(
-          codexSse.inputTokens,
-        );
-      }
-      if (codexSse.outputTokens !== null) {
-        mergedAttributes["langwatch.output_tokens"] = String(
-          codexSse.outputTokens,
-        );
-      }
-      if (codexSse.cacheReadTokens !== null) {
-        mergedAttributes["langwatch.cache_read_tokens"] = String(
-          codexSse.cacheReadTokens,
-        );
-      }
-      if (codexSse.threadId !== null) {
-        mergedAttributes["langwatch.thread.id"] = codexSse.threadId;
-      }
-      if (codexSse.principalEmail !== null) {
-        mergedAttributes["langwatch.principal.email"] = codexSse.principalEmail;
-      }
-    }
-    const codexStart = extractCodexConversationStartMetrics(event.data);
-    if (codexStart !== null) {
-      if (codexStart.model !== null) {
-        mergedAttributes["langwatch.model"] = codexStart.model;
-      }
-      if (codexStart.principalEmail !== null) {
-        mergedAttributes["langwatch.principal.email"] =
-          codexStart.principalEmail;
-      }
-    }
-
-    // Defensive belt-and-suspenders mirror of gen_ai.* canonical
-    // attributes onto langwatch.*. Gemini CLI 0.32+ emits these on
-    // log records; the OpenInferenceExtractor handles the span path
-    // but not all log records run through it. Gated on field presence
-    // rather than a scope/event-name match so any caller emitting
-    // OTel GenAI semconv on logs (custom emitters, future SDKs) benefits.
-    const genAi = extractGenAiLogMetrics(event.data);
-    if (genAi !== null) {
-      if (genAi.model !== null) {
-        mergedAttributes["langwatch.model"] = genAi.model;
-      }
-      if (genAi.inputTokens !== null) {
-        mergedAttributes["langwatch.input_tokens"] = String(genAi.inputTokens);
-      }
-      if (genAi.outputTokens !== null) {
-        mergedAttributes["langwatch.output_tokens"] = String(
-          genAi.outputTokens,
-        );
-      }
-      if (genAi.cacheReadTokens !== null) {
-        mergedAttributes["langwatch.cache_read_tokens"] = String(
-          genAi.cacheReadTokens,
-        );
-      }
-      if (genAi.threadId !== null) {
-        mergedAttributes["langwatch.thread.id"] = genAi.threadId;
-      }
-      if (genAi.inputMessages !== null) {
-        mergedAttributes["langwatch.input"] = genAi.inputMessages;
-      }
-      if (genAi.outputMessages !== null) {
-        mergedAttributes["langwatch.output"] = genAi.outputMessages;
-      }
+    // Run the canonical extractor registry against this log record.
+    // Each extractor (ClaudeCode, Codex, GenAI, SpringAI) claims its
+    // own scope/event-name surface and lifts model / cost / tokens /
+    // cache / thread.id onto canonical langwatch.* keys. Adding a new
+    // platform tool is a one-line addition to the registry plus a new
+    // extractor class under canonicalisation/extractors/. The lifts
+    // are merged into mergedAttributes here so reserved + log_count
+    // keys set above remain intact.
+    const liftedAttrs = liftCanonicalAttributesFromLogRecord(event.data);
+    for (const [key, value] of Object.entries(liftedAttrs)) {
+      mergedAttributes[key] = value as string;
     }
 
     return {
