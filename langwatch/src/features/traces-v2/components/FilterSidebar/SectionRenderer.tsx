@@ -42,6 +42,16 @@ interface SectionRendererProps {
    * the sidebar. Threaded into the section components which surface
    * the affordance in their headers. */
   onHide?: () => void;
+  /**
+   * Drag handle props from the surrounding sortable wrapper. With the
+   * group-of-groups removed, individual sections are now the unit
+   * users drag to reorder the sidebar — every section becomes its own
+   * sortable. The SidebarSection header renders a GripVertical handle
+   * the moment this prop is set; without it the handle stays hidden
+   * so non-sortable consumers (popover preview, etc.) don't render a
+   * dead affordance.
+   */
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 export const SectionRenderer: React.FC<SectionRendererProps> = ({
@@ -57,6 +67,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
   orGroupId,
   orPeers,
   orMemberValues,
+  dragHandleProps,
 }) => {
   const icon = getFacetIcon({ key: section.key, group: section.group });
 
@@ -80,6 +91,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onToggle={toggleFacet}
         onShiftToggle={onShiftToggle}
         onHide={onHide}
+        dragHandleProps={dragHandleProps}
         noneRow={noneRow}
         orGroupId={orGroupId}
         orPeers={orPeers}
@@ -104,6 +116,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
         onHide={onHide}
+        dragHandleProps={dragHandleProps}
         orGroupId={orGroupId}
         orPeers={orPeers}
       />
@@ -133,6 +146,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
       onShiftToggle={onShiftToggle}
       onHide={onHide}
+      dragHandleProps={dragHandleProps}
     />
   );
 };

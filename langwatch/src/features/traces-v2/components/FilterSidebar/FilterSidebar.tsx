@@ -16,21 +16,11 @@ import {
 } from "@dnd-kit/sortable";
 import { PanelLeftClose } from "lucide-react";
 import type React from "react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  FIELD_NAMES,
-  SEARCH_FIELDS,
-} from "~/server/app-layer/traces/query-language/metadata";
-import {
-  getFacetValues,
-  getRangeValue,
-} from "~/server/app-layer/traces/query-language/queries";
 import { useUIStore } from "../../stores/uiStore";
-import { getFacetGroupId } from "./constants";
-import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
 import {
@@ -39,13 +29,7 @@ import {
 } from "./OrConnectorOverlay";
 import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import { SectionRenderer } from "./SectionRenderer";
-
-const GROUP_ID_PREFIX = "__group:";
-const groupSortableId = (id: string): string => `${GROUP_ID_PREFIX}${id}`;
-const isGroupSortableId = (id: string): boolean =>
-  id.startsWith(GROUP_ID_PREFIX);
-const groupIdFromSortableId = (id: string): string =>
-  id.slice(GROUP_ID_PREFIX.length);
+import { SortableSection } from "./SortableSection";
 
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
@@ -67,13 +51,11 @@ export const FilterSidebar: React.FC = () => {
     facetsLoading,
     descriptors,
     orderedKeys,
-    orderedGroups,
-    hiddenByGroup,
     sectionByKey,
     toggleFacet,
     setRange,
     removeRange,
-    setGroupOrder,
+    setSectionOrder,
     setAllSectionsOpen,
     orAnalysis,
     showFacet,
@@ -83,38 +65,9 @@ export const FilterSidebar: React.FC = () => {
     isSectionVisibleForDensity,
   } = useFilterSidebarData();
 
-  const groupSortableIds = useMemo(
-    () => orderedGroups.map((g) => groupSortableId(g.id)),
-    [orderedGroups],
-  );
-
   // Ref to the inner scroll container so OrConnectorOverlay can read
   // FacetRow positions and re-measure on scroll/resize.
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-
-  // A group is "modified" when at least one of its sections has an active
-  // filter in the working AST. We walk every known SEARCH_FIELD (not just
-  // sections present in the current discover response) so the dot still
-  // lights when a filter has been applied to a section that hasn't
-  // rendered yet — e.g. a query bar typed `selectedPrompt:foo` before any
-  // matching trace has come back.
-  const modifiedGroupIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const field of FIELD_NAMES) {
-      const meta = SEARCH_FIELDS[field];
-      if (!meta?.hasSidebar || !meta.facetField) continue;
-      const groupId = getFacetGroupId(meta.facetField);
-      if (!groupId) continue;
-      if (set.has(groupId)) continue;
-      if (meta.valueType === "range") {
-        if (getRangeValue(ast, field) !== null) set.add(groupId);
-      } else if (meta.valueType === "categorical") {
-        const { include, exclude } = getFacetValues(ast, field);
-        if (include.length + exclude.length > 0) set.add(groupId);
-      }
-    }
-    return set;
-  }, [ast]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -125,24 +78,38 @@ export const FilterSidebar: React.FC = () => {
     }),
   );
 
-  // Only the group headers are reorderable. Sections inside a group sit in
-  // their registry order — letting users shuffle them turned out to be more
-  // confusing than useful (everyone's sidebar looked subtly different).
+  // With group-of-groups gone, individual sections are the unit users
+  // drag. The flat-list reorder writes through to `setSectionOrder`,
+  // which `useFilterSidebarData` reads alongside the registry order to
+  // compute the next render's `orderedKeys`. Sections that aren't
+  // currently visible (filtered out by density) keep their place in the
+  // saved order — we only reorder among the visible keys, then merge
+  // the result with any non-visible ones still in the stored order.
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
       if (!over || active.id === over.id) return;
-      const activeId = String(active.id);
-      const overId = String(over.id);
-      if (!isGroupSortableId(activeId) || !isGroupSortableId(overId)) return;
-      const oldIndex = groupSortableIds.indexOf(activeId);
-      const newIndex = groupSortableIds.indexOf(overId);
+      const oldIndex = orderedKeys.indexOf(String(active.id));
+      const newIndex = orderedKeys.indexOf(String(over.id));
       if (oldIndex < 0 || newIndex < 0) return;
-      const reordered = arrayMove(groupSortableIds, oldIndex, newIndex).map(
-        groupIdFromSortableId,
-      );
-      setGroupOrder(reordered);
+      const reorderedVisible = arrayMove(orderedKeys, oldIndex, newIndex);
+      // Preserve any hidden keys' relative positions: walk the full
+      // saved order, replacing the visible-key slots with the new
+      // sequence in turn. Keys that weren't in the saved order yet get
+      // appended at the end.
+      const visibleSet = new Set(reorderedVisible);
+      const next: string[] = [];
+      const visibleQueue = [...reorderedVisible];
+      for (const key of orderedKeysAll) {
+        if (visibleSet.has(key)) {
+          const nextVisible = visibleQueue.shift();
+          if (nextVisible) next.push(nextVisible);
+        } else {
+          next.push(key);
+        }
+      }
+      setSectionOrder(next);
     },
-    [groupSortableIds, setGroupOrder],
+    [orderedKeys, orderedKeysAll, setSectionOrder],
   );
 
   const handleShiftToggle = useCallback(
@@ -151,7 +118,10 @@ export const FilterSidebar: React.FC = () => {
   );
 
   const renderSection = useCallback(
-    (key: string) => {
+    (
+      key: string,
+      dragHandleProps?: React.HTMLAttributes<HTMLDivElement>,
+    ) => {
       const section = sectionByKey.get(key);
       if (!section) return null;
       return (
@@ -173,6 +143,7 @@ export const FilterSidebar: React.FC = () => {
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
             onHide={() => hideFacet(key)}
+            dragHandleProps={dragHandleProps}
             // INTENTIONAL: `fieldToGroupIds` includes same-field OR groups
             // (e.g. `status:error OR status:warning`), so a same-field OR
             // query gets the full visual treatment — colored ring on rows,
@@ -333,31 +304,24 @@ export const FilterSidebar: React.FC = () => {
         {showSkeleton ? (
           <FilterSidebarSkeleton />
         ) : (
+          // Flat list — no Trace/Subjects/Evaluators/Metrics/Prompts
+          // headings between sections. Grouping still exists in the
+          // FacetManagerPopover for "browse what's available"; the
+          // sidebar itself reads as one continuous, drag-reorderable
+          // column of facets.
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={groupSortableIds}
+              items={orderedKeys}
               strategy={verticalListSortingStrategy}
             >
-              {orderedGroups.map((group) => (
-                <IsolatedErrorBoundary
-                  key={group.id}
-                  scope={`Couldn't render the ${group.label} filter group`}
-                  resetKeys={[group.id]}
-                >
-                  <FacetGroupHeader
-                    id={groupSortableId(group.id)}
-                    label={group.label}
-                    isModified={modifiedGroupIds.has(group.id)}
-                    hiddenKeys={hiddenByGroup[group.id]}
-                    onAddFacet={showFacet}
-                  >
-                    {group.keys.map(renderSection)}
-                  </FacetGroupHeader>
-                </IsolatedErrorBoundary>
+              {orderedKeys.map((key) => (
+                <SortableSection key={key} id={key}>
+                  {(dragHandleProps) => renderSection(key, dragHandleProps)}
+                </SortableSection>
               ))}
             </SortableContext>
           </DndContext>
