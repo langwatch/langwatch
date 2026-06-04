@@ -4,6 +4,8 @@ import type {
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { parseJsonStringValues } from "../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
+  ClaudeCodeExtractor,
+  CodexExtractor,
   FallbackExtractor,
   GenAIExtractor,
   HaystackExtractor,
@@ -12,6 +14,7 @@ import {
   LogfireExtractor,
   MastraExtractor,
   OpenInferenceExtractor,
+  SpringAIExtractor,
   StrandsExtractor,
   TraceloopExtractor,
   VercelExtractor,
@@ -37,6 +40,14 @@ export class CanonicalizeSpanAttributesService {
     new OpenInferenceExtractor(),
     new TraceloopExtractor(),
     new VercelExtractor(),
+    // ClaudeCode + Codex + SpringAI register here too so their span-side
+    // `apply()` runs on Path B emitters that ship native spans (codex
+    // 0.137+ Rust CLI under scope `codex_cli_rs`, future ClaudeCode/
+    // Spring observation spans). Today the latter two are no-ops on
+    // spans; CodexExtractor lifts session_task.turn into gen_ai.*.
+    new ClaudeCodeExtractor(),
+    new CodexExtractor(),
+    new SpringAIExtractor(),
     new StrandsExtractor(),
     new LogfireExtractor(),
     new HaystackExtractor(),
