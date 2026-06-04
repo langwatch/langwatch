@@ -160,6 +160,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
   }
 
   describe("when a new project is created", () => {
+    /** @scenario "Creating a project provisions a dedicated Langy key" */
     it("provisions a dedicated Langy key that is a service key", async () => {
       const project = await createProjectViaApi("Provisions Langy Key");
 
@@ -191,6 +192,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
       expect(keys[0]!.lookupId).not.toBe(project.apiKey);
     });
 
+    /** @scenario "The Langy key is scoped to only its own project" */
     it("scopes the Langy key to only its own project", async () => {
       const project = await createProjectViaApi("Project Scoped");
 
@@ -208,6 +210,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
       }
     });
 
+    /** @scenario "The Langy key grants only the access Langy needs" */
     it("grants least-privilege (no organization-level admin)", async () => {
       const project = await createProjectViaApi("Least Privilege");
 
@@ -229,6 +232,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
   });
 
   describe("when backfilling existing projects", () => {
+    /** @scenario "Existing projects without a Langy key are backfilled" */
     it("provisions a Langy key for a project that has none", async () => {
       const project = await createLegacyProject("Backfill Target");
       expect(await findLangyKeys(project.id)).toHaveLength(0);
@@ -238,6 +242,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
       expect(await findLangyKeys(project.id)).toHaveLength(1);
     });
 
+    /** @scenario "Backfill does not create duplicates" */
     it("does not create duplicates when run again", async () => {
       const project = await createLegacyProject("Idempotent Backfill");
 
