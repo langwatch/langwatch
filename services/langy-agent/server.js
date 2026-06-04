@@ -50,6 +50,15 @@ const REAPER_INTERVAL_MS = 30_000;
 const SESSIONS_ROOT = "/workspace/sessions";
 const MAX_BODY_BYTES = 1_000_000; // 1MB — cap /chat body to avoid memory exhaustion.
 
+// opencode has no native OpenTelemetry export, so each worker loads this
+// opencode plugin to emit session/llm/tool spans over OTLP. Version is pinned
+// by the Dockerfile (OPENCODE_OTEL_PLUGIN_VERSION) so the version opencode
+// loads matches the one baked into the image; the literal default keeps the
+// manager runnable outside the image.
+const OPENCODE_OTEL_PLUGIN = `@devtheops/opencode-plugin-otel@${
+  process.env.OPENCODE_OTEL_PLUGIN_VERSION || "1.0.0"
+}`;
+
 if (!INTERNAL_SECRET) {
   console.error("fatal: LANGY_INTERNAL_SECRET is required");
   process.exit(1);
@@ -128,6 +137,9 @@ function setupWorkerHome(workerHome, credentials) {
   const config = {
     $schema: "https://opencode.ai/config.json",
     model: "openai/gpt-5-mini",
+    // OTel plugin: opencode auto-loads it by name and exports spans using the
+    // OPENCODE_OTLP_* env injected at spawn time (see spawnWorker).
+    plugin: [OPENCODE_OTEL_PLUGIN],
     mcp: {
       langwatch: {
         type: "local",
@@ -319,6 +331,22 @@ async function spawnWorker(conversationId, credentials) {
         OPENAI_API_KEY: credentials.llmVirtualKey,
         LANGWATCH_API_KEY: credentials.langwatchApiKey,
         LANGWATCH_ENDPOINT: credentials.langwatchEndpoint,
+        // OTel export (consumed by the opencode OTel plugin, not opencode
+        // itself). The plugin appends "/v1/traces" to the endpoint, so we point
+        // it at the "/api/otel" base — LangWatch ingests at /api/otel/v1/traces.
+        // http/protobuf is what that endpoint accepts; auth is the dedicated
+        // Langy key as a Bearer token (resolves its own project, no X-Project-Id
+        // needed). tag.tags=langy becomes the trace label and the conversation
+        // id groups the chat's turns as one thread. conversationId is charset-
+        // validated upstream, so it is safe in the comma/= delimited value.
+        OPENCODE_ENABLE_TELEMETRY: "1",
+        OPENCODE_OTLP_ENDPOINT: `${credentials.langwatchEndpoint.replace(
+          /\/+$/,
+          "",
+        )}/api/otel`,
+        OPENCODE_OTLP_PROTOCOL: "http/protobuf",
+        OPENCODE_OTLP_HEADERS: `Authorization=Bearer ${credentials.langwatchApiKey}`,
+        OPENCODE_RESOURCE_ATTRIBUTES: `tag.tags=langy,service.name=langy-agent,langwatch.thread.id=${conversationId}`,
       },
       cwd: workerHome,
       stdio: ["ignore", "inherit", "inherit"],

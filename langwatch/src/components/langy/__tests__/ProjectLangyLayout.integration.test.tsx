@@ -152,18 +152,21 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
-  describe("given the visibility gate is not satisfied", () => {
-    it("does not render Langy when the feature flag is off", () => {
+  // #4558 dropped the staff + rollout-flag visibility gate; Langy is shown to
+  // every team member regardless of those inputs. These pin that contract so
+  // re-introducing either gate would fail loudly.
+  describe("given the staff / rollout-flag gates were removed in #4558", () => {
+    it("renders Langy for a team member even when the rollout flag is off", () => {
       gate.flagEnabled = false;
       renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
-      expect(drawer()).toBeNull();
+      expect(drawer()).not.toBeNull();
     });
 
-    it("does not render Langy for non-staff users", () => {
+    it("renders Langy for a non-staff team member", () => {
       gate.staff = false;
       renderAt("/demo/traces");
-      expect(drawer()).toBeNull();
+      expect(drawer()).not.toBeNull();
     });
   });
 });
