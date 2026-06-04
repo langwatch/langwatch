@@ -225,7 +225,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
                   </StructuredOutputDisplay>
                 )}
               </DeletableMessage>
-              {!isStreaming && (
+              {!isStreaming && !isError && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
             </>
