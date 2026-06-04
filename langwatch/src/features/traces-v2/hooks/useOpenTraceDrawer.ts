@@ -217,7 +217,11 @@ export function useOpenTraceDrawer() {
           { staleTime: 300_000 },
         );
         void utils.tracesV2.resourceInfo.prefetch(
-          { projectId, traceId: trace.traceId },
+          {
+            projectId,
+            traceId: trace.traceId,
+            occurredAtMs: trace.timestamp,
+          },
           { staleTime: 300_000 },
         );
       }
@@ -227,9 +231,11 @@ export function useOpenTraceDrawer() {
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
       // teaches, and the only one we want demos / videos / first
-      // impressions to land on.
+      // impressions to land on. Use the transient setter so this
+      // programmatic override does NOT clobber the operator's
+      // persisted preference for normal traces.
       if (isPreviewTraceId(trace.traceId)) {
-        useDrawerStore.getState().setVizTab("waterfall");
+        useDrawerStore.getState().setVizTabTransient("waterfall");
       }
       openDrawer("traceV2Details", {
         traceId: trace.traceId,

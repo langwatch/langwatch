@@ -155,6 +155,36 @@ describe("drawerStore pane controls", () => {
       });
     });
   });
+
+  /** @scenario Span-detail collapse round-trip preserves the selection */
+  describe("given a selected span", () => {
+    describe("when togglePaneCollapsed(spanDetail) fires twice", () => {
+      it("keeps selectedSpanId so re-opening lands on the same span", () => {
+        useDrawerStore.getState().selectSpan("span-abc");
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+        useDrawerStore.getState().togglePaneCollapsed("spanDetail");
+        expect(
+          useDrawerStore.getState().paneState.spanDetail.collapsed,
+        ).toBe(true);
+        // Collapse alone must NOT touch the selection.
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+        useDrawerStore.getState().togglePaneCollapsed("spanDetail");
+        expect(
+          useDrawerStore.getState().paneState.spanDetail.collapsed,
+        ).toBe(false);
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+      });
+    });
+
+    describe("when clearSpan fires", () => {
+      it("still clears the selection (the explicit close path)", () => {
+        useDrawerStore.getState().selectSpan("span-xyz");
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-xyz");
+        useDrawerStore.getState().clearSpan();
+        expect(useDrawerStore.getState().selectedSpanId).toBeNull();
+      });
+    });
+  });
 });
 
 // `setWidthPx(null)` after init reads the unwritten storage key as

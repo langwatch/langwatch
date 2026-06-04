@@ -117,7 +117,18 @@ interface DrawerState extends DrawerUrlState {
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
   setViewMode: (mode: DrawerViewMode) => void;
+  /**
+   * Persist the operator's chosen viz tab AND apply it. Use for any
+   * UI-initiated change (tab click, keyboard shortcut, overflow menu).
+   */
   setVizTab: (tab: VizTab) => void;
+  /**
+   * Apply a viz tab without writing to localStorage. Use for programmatic
+   * one-off forcing (e.g. preview/onboarding traces always landing on
+   * the waterfall) so the operator's remembered preference isn't
+   * clobbered the next time they open a normal trace.
+   */
+  setVizTabTransient: (tab: VizTab) => void;
   setMaximized: (value: boolean) => void;
   toggleMaximized: () => void;
   setWidthPx: (px: number | null) => void;
@@ -475,11 +486,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   selectSpan: (spanId) =>
     set((s) => {
-      // Selecting a span always reopens the detail pane — when the user
-      // explicitly hides it, the selection is cleared, so any subsequent
-      // span click reads as "open detail for this span", not "reselect
-      // an existing one". This makes the hide/reopen flow round-trip
-      // cleanly via span clicks alone.
+      // Selecting a span always reopens the detail pane. Collapsing
+      // the pane no longer clears the selection (see
+      // `togglePaneCollapsed`), so re-opening the pane lands on the
+      // same span the operator last inspected; clicking a new span
+      // updates the selection and re-expands the pane in one step.
       const next: Partial<DrawerState> = { selectedSpanId: spanId };
       if (s.paneState.spanDetail.collapsed) {
         const updatedPanes: Record<PaneId, PaneState> = {
@@ -504,6 +515,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     persistLastVizTab(tab);
     set({ vizTab: tab });
   },
+  setVizTabTransient: (tab) => set({ vizTab: tab }),
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
 

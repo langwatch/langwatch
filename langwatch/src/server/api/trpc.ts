@@ -393,11 +393,39 @@ const auditLogMutations = t.middleware(
 
 export const tracerMiddleware = t.middleware(
   async ({ path, type, next }) => {
-    // Skip tracing for high-frequency, low-signal routes (presence
-    // heartbeats) — they otherwise dominate the trace surface and
-    // make real spans hard to find.
-    if (isSilencedCall(path, type)) {
-      return next();
+    const silenced = isSilencedCall(path, type);
+
+    // Fast-path: for silenced routes (presence heartbeats, SSE
+    // subscription messages) we skip span creation on success — those
+    // are the high-frequency calls that drown out the trace surface.
+    // On failure we still want a span so real errors stay visible
+    // (and we own the timing so the span duration matches the call).
+    if (silenced) {
+      const start = Date.now();
+      const result = await next();
+      if (result.ok) return result;
+
+      const { trace, SpanKind, SpanStatusCode } = await import(
+        "@opentelemetry/api"
+      );
+      const tracer = trace.getTracer("langwatch:trpc");
+      const span = tracer.startSpan(`trpc.${path}`, {
+        kind: SpanKind.SERVER,
+        startTime: start,
+        attributes: {
+          "rpc.system": "trpc",
+          "rpc.method": path,
+          "rpc.type": type,
+        },
+      });
+      const err = result.error;
+      span.recordException(err instanceof Error ? err : new Error(String(err)));
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      span.end();
+      return result;
     }
 
     const { trace, SpanKind, SpanStatusCode } = await import(
