@@ -49,6 +49,15 @@ Rule: Time range selector
     When the user reloads or navigates back to the Observe page
     Then the time range selector displays "7d"
 
+  # The trigger sits inside the toolbar strip alongside Spans, Model,
+  # Group-by, etc. — earlier it was rendered with `size="sm"` while all
+  # siblings were `size="xs"`, which made it visibly taller and broke
+  # the strip's horizontal rhythm. Match the sibling size; the verbose
+  # label keeps its weight via paddingX.
+  Scenario: Time range trigger height matches other toolbar items
+    When the Observe page loads
+    Then the time range trigger renders at the same height as the surrounding toolbar buttons
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SEARCH BAR LAYOUT AND BEHAVIOR
@@ -85,6 +94,31 @@ Rule: Search bar layout and behavior
     When the user types "@status:err" without pressing Enter
     Then the trace table does not update
     And only autocomplete suggestions update live
+
+  # Pasting a multi-line error message used to create one Paragraph node
+  # per line, growing the editor vertically until it pushed the rest of
+  # the page below the viewport (the editor's `whiteSpace: nowrap` only
+  # affected inline wrap, not paragraph stacking). Paste now flattens
+  # newlines/tabs into spaces and caps the inserted text at 2000 chars.
+  # A CSS `max-height` on the editor is the defense-in-depth in case
+  # another path bypasses the sanitizer.
+
+  Scenario: Pasting a multi-line string collapses newlines into spaces
+    Given the search bar is empty and focused
+    When the user pastes a multi-line error stack trace
+    Then the inserted content has no newlines or tabs
+    And the search bar height does not exceed its `max-height` cap
+
+  Scenario: Pasting an extremely long single line is capped
+    Given the search bar is empty and focused
+    When the user pastes 10 KB of unbroken text
+    Then only the first 2000 characters are inserted
+    And the bar layout remains intact (no overlap with the page header)
+
+  Scenario: Pasted content with no whitespace scrolls horizontally
+    Given the search bar contains a 1500-char unbreakable token
+    Then the editor scrolls horizontally within its bounds
+    And the rest of the page is not pushed off-screen
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1006,6 +1040,80 @@ Rule: AI query composer (Ask AI)
     When the user clicks the Ask AI button
     Then a primer popover points the user at /settings/model-providers
     And AI mode is not entered
+
+  # The composer previously surfaced one of two static strings ("AI
+  # couldn't generate a query…" / "AI's reply didn't match the trace
+  # query syntax…") regardless of what actually failed. Both hid the
+  # provider/model/HTTP context the operator needed to act on. The
+  # backend now curates the provider exception into a typed
+  # `AiActionError` with `code`, a polished `message`, and a `details`
+  # block. The composer renders `message` as the inline pill; clicking
+  # the pill opens a popover with the structured fields. Stack traces
+  # never cross the wire.
+
+  Scenario: Provider error surfaces a curated headline and details
+    Given the AI search request fails with a 429 from the provider
+    When the composer receives the error
+    Then the pill reads "Provider returned 429: <reason>" with a red tint
+    And clicking the pill opens a popover showing Status, Provider, Model, and Reason rows
+
+  Scenario: Validation error surfaces the last failed query
+    Given the model returned three queries in a row that all failed to parse
+    When the composer receives the error
+    Then the pill reads "AI's reply didn't match the trace query syntax. Try rephrasing."
+    And the details popover shows the parse error and the last produced query
+
+  Scenario: Unknown error degrades to message-only
+    Given a tRPC-layer error reaches the composer with no `details` payload
+    When the composer renders the error
+    Then the pill shows the message as a tooltip on hover (no expand affordance)
+    And no popover opens on click
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CHIP LABELS WITH HOVER-TO-ID
+# ─────────────────────────────────────────────────────────────────────────────
+# Filter chips render the human-readable name of the value (evaluator
+# name, topic name, etc.) on top of the underlying id. Hovering the chip
+# fades the label out so the operator can see (and copy) the id. The
+# query language is unchanged — the document still holds the id, search
+# matching is still id-only. Names exist for discovery and reading
+# comfort only.
+
+Rule: Chip labels overlay the id by default, reveal on hover
+  When a facet returns a `label` for a topValue, the chip paints that
+  label on top of the id and reveals the id on hover.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with an evaluator named "Policy Check"
+
+  Scenario: Evaluator chip reads as the evaluator name
+    Given the search bar contains "@evaluator:eval_abc123"
+    Then the chip's visible text reads "Policy Check"
+    And the underlying document text is still "@evaluator:eval_abc123"
+
+  Scenario: Hovering the chip reveals the id
+    Given the search bar contains "@evaluator:eval_abc123"
+    When the user hovers the chip
+    Then the label overlay fades out
+    And the chip reads "@evaluator:eval_abc123"
+
+  Scenario: A label equal to the id renders without overlay
+    Given the search bar contains "@status:error"
+    Then no label overlay is rendered (the id is already human-readable)
+    And the chip just reads "@status:error"
+
+  Scenario: Typed query language matches only the id
+    When the user types "policy check" (the evaluator's label) into the search bar
+    Then no autocomplete row matches it
+    And the query is treated as free text — not as a filter on @evaluator
+
+  Scenario: Labels become available after facets land
+    Given the chips render before the discover query completes
+    When the facets payload arrives
+    Then the chips that have a label receive their overlay
+    And no other state (cursor, selection, scroll) is disturbed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
