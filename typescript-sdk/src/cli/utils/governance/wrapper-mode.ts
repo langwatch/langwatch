@@ -39,6 +39,7 @@ import {
   listUserIngestionBindings,
   rotateUserIngestionBindingToken,
 } from "./cli-api";
+import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 export type WrapperMode = "gateway" | "ingestion";
@@ -137,6 +138,15 @@ export async function resolveWrapperMode(
   }
 
   if (mode === "gateway") {
+    // gemini-cli 0.46 prefers cached OAuth over GOOGLE_API_KEY /
+    // GEMINI_API_KEY when ~/.gemini/settings.json marks
+    // security.auth.selectedType="gemini-oauth". The gateway-side env
+    // vars the wrapper sets are silently ignored in that case, so
+    // surface a one-line warning on stderr telling the user how to
+    // flip the marker. Non-blocking by design.
+    if (tool === "gemini") {
+      warnIfGeminiOAuthSelected();
+    }
     // Codex 0.130+ defers to ChatGPT OAuth by default and ignores
     // OPENAI_API_KEY unless the active model_provider is an
     // explicit env-keyed entry. Write a langwatch provider +
