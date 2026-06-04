@@ -13,7 +13,7 @@ This guide wires Claude Code up so all of that lands on LangWatch, where you can
 - Cache writes vs cache reads (cached prompts are 10x cheaper, so you can adjust your setup to maximize it)
 - Full prompt body
 - Trace tree of tool calls, latencies, and durations
-- **Use LangWatch MCP to have your agent automatically self-improving by inspecting its own traces**
+- **Have your agent automatically self-improve by inspecting its own traces, via [LangWatch skills](https://langwatch.ai/docs/skills/directory) or [MCP](https://langwatch.ai/docs/integration/mcp)**
 
 How you pay Anthropic decides which path you walk:
 
@@ -160,7 +160,7 @@ Whichever path you walked, the data is now sitting on `/me` and `/traces`. Some 
 
 ### Find expensive sessions
 
-`/me` sorts your recent activity by cost. Click into a trace to see exactly what was sent. Useful when one session burns through an unexpected amount of context.
+`/traces` is the right surface for this: filter by cost, sort, drill into any session to see exactly what was sent and what came back. Useful when one session burns through an unexpected amount of context, or when you want to audit a whole day of agent activity.
 
 ### Audit cache hit ratio
 
@@ -168,7 +168,7 @@ The trace metadata includes `cache_creation_tokens` and `cache_read_tokens` sepa
 
 ### See what the agent actually sent
 
-`OTEL_LOG_USER_PROMPTS=1` (which the wrapper sets for you) keeps prompt bodies un-redacted, so you can read every prompt the agent issued, including the long system prompt and any tool definitions it injected.
+You can read every prompt the agent issued, including the long system prompt and any tool definitions it injected.
 
 ### Set a personal budget
 
@@ -177,9 +177,9 @@ The trace metadata includes `cache_creation_tokens` and `cache_read_tokens` sepa
 - **Path 1**: the gateway enforces it. Requests fail with `budget_exceeded` once you cross.
 - **Path 2**: alerts at 80% and 100%. Claude Code calls keep flowing; Anthropic does not let the receiver gate them.
 
-### Export
+### Have the agent improve itself off its own traces
 
-`/traces` → **Export** dumps to CSV or to an OTLP endpoint you control. Useful when you want to take everything off LangWatch and pipe it into your own analysis.
+Point Claude Code (or any agent) at LangWatch's [skills directory](https://langwatch.ai/docs/skills/directory) so it can reach into its own past traces, find where it wasted tokens or made the wrong call, and update its own behaviour. The [LangWatch MCP](https://langwatch.ai/docs/integration/mcp) does the same thing through the MCP protocol.
 
 ### Use the same wrapper for other CLIs
 
