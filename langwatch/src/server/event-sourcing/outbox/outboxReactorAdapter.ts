@@ -49,6 +49,13 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
     name: definition.name,
     options: definition.options,
     async handle(event: E, context: ReactorContext<FoldState>) {
+      // Replay short-circuit (ADR-025 / `specs/event-sourcing/reactor-outbox-dispatch.feature`).
+      // When the runtime is replaying historical events, the audit row
+      // for this match may have aged out of retention, so the live
+      // dispatch path would re-fire customer-visible side effects.
+      // `decide()` itself is cheap, but the settle enqueue + audit
+      // INSERT + downstream cadence are not — skip the whole branch.
+      if (context.isReplay) return;
       const requests = await definition.decide(event, context);
       if (requests.length === 0) return;
 

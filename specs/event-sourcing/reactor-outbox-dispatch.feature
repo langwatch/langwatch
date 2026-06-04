@@ -12,10 +12,12 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
   Two reactors evaluate user-defined alert triggers and dispatch their
   configured action: the trace-pipeline reactor handles triggers whose filters
   are trace-only, and the evaluation-pipeline reactor handles triggers that
-  also filter on evaluation results. Both can fire for the same trigger and
-  trace, so they share a match-claim (`TriggerSent`) that guarantees a trigger
-  dispatches at most once per trace, then enqueue onto the outbox for the
-  durable dispatch lifecycle.
+  also filter on evaluation results. They are mutually exclusive by trigger
+  shape (a trigger has eval filters or it doesn't), so the per-trigger
+  audit-row dedupKey is what guarantees that a replayed / retried enqueue
+  collapses onto the existing outbox row, and the post-dispatch
+  `TriggerSent` claim (see "Dispatch failures route through the
+  DispatchError contract") is the at-most-once gate on the actual send.
 
   See dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md.
 
@@ -23,40 +25,39 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
     Given a pipeline registers a reactor "alertDispatch" via .withOutbox
     And the ReactorOutbox table is empty
 
-  Rule: A matching trigger is claimed once and enqueued onto the outbox
+  Rule: A matching trigger projects an audit row and enqueues onto the outbox
 
-    Scenario: A matching trace-only trigger is claimed then enqueued
+    Scenario: A matching trace-only trigger writes an audit row and enqueues
       Given an active trigger whose trace-only filters match an incoming trace
       When the trace-pipeline reactor evaluates it
-      Then it claims the match for this trigger and trace
-      And a ReactorOutbox row is created with status "queued"
+      Then a ReactorOutbox audit row is created with status "queued"
       And the row carries reactorName, projectId, dedupKey, and payload
       And the dedupKey begins with "${projectId}/" so it is self-describing for operator scans
       And no side effect (email, Slack, dataset write) has fired yet
+      And the `TriggerSent` row is NOT yet written — that claim is the
+      at-most-once gate on the post-dispatch send, not the at-enqueue gate
 
     Scenario: A matching evaluation trigger fires on the evaluation pipeline
       Given an active trigger with evaluation filters that match a completed evaluation
       When the evaluation-pipeline reactor evaluates it
-      Then it claims the match for this trigger and trace
-      And the dispatch is enqueued onto the outbox
+      Then a ReactorOutbox audit row is created and the dispatch is enqueued
 
-    Scenario: A trigger dispatches at most once across racing pipelines
-      Given the trace and evaluation pipelines both match the same trigger and trace
-      When both reactors attempt to claim the match
-      Then exactly one claim succeeds
-      And a single outbox row is enqueued
+    Scenario: Routing is mutually exclusive across pipelines
+      Given a trigger has either trace-only filters or evaluation filters, not both
+      When a matching trace arrives
+      Then exactly one of the two pipelines' notify reactors fires for it
+      And only that pipeline's reactor enqueues onto the outbox
 
-    Scenario: A trigger already sent for this trace is skipped
-      Given a trigger whose match was already claimed for this trace
-      When a reactor evaluates it again
-      Then the claim fails
-      And no outbox row is enqueued
-      And the trigger is not recorded as having run again
+    Scenario: A trigger already dispatched for this trace is suppressed at send time
+      Given a trigger whose post-dispatch `TriggerSent` claim already exists for this trace
+      When a later cadence batch picks up the same (trigger, trace) pair
+      Then the cadence dispatcher's pre-send `isSendClaimed` read skips the pair
+      And the provider call (email / Slack) does not fire
 
     Scenario: Duplicate matches collapse on the dedupKey
-      Given a ReactorOutbox row exists for (reactorName, dedupKey)
+      Given a ReactorOutbox audit row exists for (reactorName, dedupKey)
       When the same match is observed again (e.g. replay, retry, fan-in)
-      Then the second enqueue is a no-op
+      Then the second enqueue is a no-op via the (projectId, reactorName, dedupKey) unique constraint
       And only one row exists for (reactorName, dedupKey)
 
   Rule: The main event-sourcing queue owns outbox dispatch scheduling and execution

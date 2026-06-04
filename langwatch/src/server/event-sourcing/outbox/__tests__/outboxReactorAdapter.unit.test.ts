@@ -81,6 +81,19 @@ describe("adaptOutboxReactor", () => {
     vi.clearAllMocks();
   });
 
+  describe("when the event is a replay", () => {
+    it("short-circuits before calling decide() so historical events do not re-dispatch", async () => {
+      const outbox = makeOutboxStub();
+      const decide = vi.fn();
+      const adapted = adaptOutboxReactor(makeDefinition(decide), outbox);
+
+      await adapted.handle({} as Event, { ...makeContext(), isReplay: true });
+
+      expect(decide).not.toHaveBeenCalled();
+      expect(outbox.enqueueSettle).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when no outbox runtime is wired", () => {
     it("returns a no-op handle so registration on web is safe", async () => {
       const decide = vi.fn();
