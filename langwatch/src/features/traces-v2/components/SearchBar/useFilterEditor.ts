@@ -32,6 +32,13 @@ import { useLatestRef } from "./useLatestRef";
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
+// Upper bound on what a single paste can insert into the editor. Picked
+// to match the AI prompt input cap (2000) — anything longer is almost
+// certainly an accidental log dump rather than a real filter, and lets
+// the bar grow tall enough to push the page around even with the CSS
+// height cap as a safety net.
+const PASTE_MAX_CHARS = 2000;
+
 /**
  * Remove the chars at `[start, end)` from `text` and clean up any operator
  * glue we left behind. Used by the X widget when the parser is currently
@@ -129,6 +136,14 @@ function suggestionFromTrigger(
 export interface DynamicSuggestionItems {
   items: string[];
   counts?: Record<string, number>;
+  /**
+   * Optional human-readable labels keyed by value id. When set, the
+   * suggestion dropdown renders the label as the primary text and the
+   * id muted underneath; the inserted token is still the raw `value`
+   * so the query language stays ID-only (search-by-name is not a goal —
+   * the value is the canonical identifier).
+   */
+  labels?: Record<string, string>;
 }
 
 export type ValueResolver = (
@@ -412,6 +427,25 @@ export function useFilterEditor({
     },
     editorProps: {
       attributes: { spellcheck: "false" },
+      // Coerce paste into one flat line. The editor's schema technically
+      // allows multiple Paragraph nodes, so pasting a multi-line error
+      // creates 10+ `<p>`s and balloons the bar to push the rest of the
+      // page off-screen. Strip control chars, collapse newlines + tabs
+      // to spaces, and cap the inserted text at PASTE_MAX_CHARS so a
+      // megabyte paste can't lock the parser up. The editor's
+      // overflow-x scroll still handles wide content.
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData("text/plain");
+        if (!text) return false;
+        const flattened = text
+          .replace(/[\r\n\t]+/g, " ")
+          .replace(/[ --]/g, "")
+          .slice(0, PASTE_MAX_CHARS);
+        if (flattened === text) return false;
+        event.preventDefault();
+        view.dispatch(view.state.tr.insertText(flattened));
+        return true;
+      },
       // Suppress PM's default cursor placement when the user clicks on a
       // chip pill or its X widget. PM otherwise drops the caret into the
       // text node *inside* the chip (between "value" and the widget), so

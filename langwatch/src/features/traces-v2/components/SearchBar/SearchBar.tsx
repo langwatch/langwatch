@@ -14,6 +14,7 @@ import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { editorStyles } from "./editorStyles";
+import { setFilterChipLabels } from "./filterHighlight";
 import { FloatingAiBar } from "./FloatingAiBar";
 import { PlaceholderEditor } from "./PlaceholderEditor";
 import {
@@ -35,20 +36,32 @@ import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
 
 const MAX_DYNAMIC_ITEMS = 10;
 
+type RankedValue = { value: string; count: number; label?: string };
+
 function rankAndSlice(
-  values: readonly { value: string; count: number }[],
+  values: readonly RankedValue[],
   query: string,
-): { items: string[]; counts: Record<string, number> } | null {
+): {
+  items: string[];
+  counts: Record<string, number>;
+  labels?: Record<string, string>;
+} | null {
   if (values.length === 0) return null;
   const q = query.toLowerCase();
-  const prefix: { value: string; count: number }[] = [];
-  const contains: { value: string; count: number }[] = [];
+  const prefix: RankedValue[] = [];
+  const contains: RankedValue[] = [];
   for (const v of values) {
     if (!q) {
       prefix.push(v);
       continue;
     }
     const lower = v.value.toLowerCase();
+    // Match against the id only — never the label. The user has
+    // explicitly asked that names are display-only and the query
+    // language stay ID-rooted, which keeps the chip and the typed
+    // query in lock-step: if the user types "gpt-4o" they get a chip
+    // whose underlying value is `gpt-4o`, not whichever evaluator
+    // happens to be named "GPT-4o today".
     if (lower.startsWith(q)) prefix.push(v);
     else if (lower.includes(q)) contains.push(v);
   }
@@ -56,8 +69,16 @@ function rankAndSlice(
   if (top.length === 0) return null;
   const items = top.map((v) => v.value);
   const counts: Record<string, number> = {};
-  for (const v of top) counts[v.value] = v.count;
-  return { items, counts };
+  const labels: Record<string, string> = {};
+  let hasLabel = false;
+  for (const v of top) {
+    counts[v.value] = v.count;
+    if (v.label && v.label !== v.value) {
+      labels[v.value] = v.label;
+      hasLabel = true;
+    }
+  }
+  return hasLabel ? { items, counts, labels } : { items, counts };
 }
 
 export const SearchBar: React.FC = () => {
@@ -221,13 +242,35 @@ export const SearchBar: React.FC = () => {
   // refreshSuggestion so each keystroke produces one render, not two.
   const { data: facets } = useTraceFacets();
   const valueSourceByField = useMemo(() => {
-    const map = new Map<string, readonly { value: string; count: number }[]>();
+    const map = new Map<
+      string,
+      readonly { value: string; count: number; label?: string }[]
+    >();
     for (const facet of facets) {
       if (facet.kind === "categorical") {
         map.set(facet.key, facet.topValues);
       }
     }
     return map;
+  }, [facets]);
+
+  // Publish the (field → value → label) lookup the chip overlay reads
+  // from. The editor's FilterHighlight plugin watches this via a
+  // module-level ref; we ping it with a LABEL_REFRESH meta so chips
+  // re-render with their new overlays the moment facets land. Without
+  // the meta the plugin's cached decorations would stay stale until
+  // the next keystroke.
+  useEffect(() => {
+    const map: Record<string, Record<string, string>> = {};
+    for (const facet of facets) {
+      if (facet.kind !== "categorical") continue;
+      const fieldMap: Record<string, string> = {};
+      for (const v of facet.topValues) {
+        if (v.label && v.label !== v.value) fieldMap[v.value] = v.label;
+      }
+      if (Object.keys(fieldMap).length > 0) map[facet.key] = fieldMap;
+    }
+    setFilterChipLabels(map);
   }, [facets]);
   const valueResolver = useCallback<ValueResolver>(
     (field, query) => {
@@ -365,7 +408,7 @@ const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
     // the editor's typing line on light mode.
     top="calc(50% - 1px)"
     transform="translateY(-50%)"
-    color={{ base: "gray.400", _dark: "gray.500" }}
+    color="fg.subtle"
     fontSize="xs"
     fontWeight="normal"
     whiteSpace="nowrap"
