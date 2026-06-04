@@ -448,11 +448,10 @@ export class TraceSummaryFoldProjection
 
     // Defensive belt-and-suspenders mirror of gen_ai.* canonical
     // attributes onto langwatch.*. Gemini CLI 0.32+ emits these on
-    // log records (the OTTL ports as GEMINI_OTTL_STARTER); the
-    // OpenInferenceExtractor handles the span path but not all log
-    // records run through it. Gated on field presence rather than
-    // a scope/event-name match so any caller emitting OTel GenAI
-    // semconv on logs (custom emitters, future SDKs) benefits.
+    // log records; the OpenInferenceExtractor handles the span path
+    // but not all log records run through it. Gated on field presence
+    // rather than a scope/event-name match so any caller emitting
+    // OTel GenAI semconv on logs (custom emitters, future SDKs) benefits.
     const genAi = extractGenAiLogMetrics(event.data);
     if (genAi !== null) {
       if (genAi.model !== null) {

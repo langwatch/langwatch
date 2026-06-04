@@ -165,10 +165,9 @@ export function extractClaudeCodeApiRequestMetrics(
  * fills `langwatch.cost.usd` from (model, tokens) downstream.
  *
  * Wire shape captured empirically against codex 0.131-0.134
- * with a local OTLP catcher; mirrors CODEX_OTTL_STARTER but
- * runs in TS so the receiver no longer needs to round-trip
- * through the gateway's /internal/transform just for the
- * platform-known tools.
+ * with a local OTLP catcher. Runs in TS so the receiver no
+ * longer needs to round-trip through the gateway's
+ * /internal/transform for platform-known tools.
  *
  * Returns `null` for any other event (codex.user_prompt input
  * lift happens in extractIOFromLogRecord; codex.conversation_starts
@@ -215,9 +214,9 @@ export function extractCodexSseEventMetrics(
 
 /**
  * Defensive log-level lift of gen_ai.* canonical attributes onto
- * langwatch.* fields. Mirrors GEMINI_OTTL_STARTER and benefits
- * every caller that emits the OpenTelemetry GenAI semantic
- * conventions on log records (gemini CLI 0.32+, anyone using the
+ * langwatch.* fields. Benefits every caller that emits the
+ * OpenTelemetry GenAI semantic conventions on log records
+ * (gemini CLI 0.32+, anyone using the
  * @opentelemetry/semantic-conventions-genai SDK, custom emitters).
  *
  * For spans the OpenInferenceExtractor already handles this on the

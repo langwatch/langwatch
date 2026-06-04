@@ -2,11 +2,10 @@
  * Unit tests for extractGenAiLogMetrics — the defensive log-level
  * lift of gen_ai.* canonical attributes onto langwatch.*.
  *
- * Mirrors GEMINI_OTTL_STARTER but runs natively in TS so /me/traces
- * shows gemini CLI 0.32+ telemetry (and any other gen_ai-canonical
- * emitter) without rounding through the gateway. Gated on field
- * PRESENCE, not event.name, so a custom OTel exporter that emits
- * gen_ai.* on logs also benefits.
+ * Runs natively in TS so /me/traces shows gemini CLI 0.32+ telemetry
+ * (and any other gen_ai-canonical emitter) without rounding through
+ * the gateway. Gated on field PRESENCE, not event.name, so a custom
+ * OTel exporter that emits gen_ai.* on logs also benefits.
  */
 import { describe, expect, it } from "vitest";
 

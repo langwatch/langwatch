@@ -22,11 +22,6 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import {
-  CODEX_OTTL_STARTER,
-  GEMINI_OTTL_STARTER,
-} from "./activity-monitor/ottlStarterTemplates";
-
 export interface PlatformTemplateSeed {
   slug: string;
   sourceType: string;
@@ -64,27 +59,27 @@ export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] = [
     sourceType: "codex",
     displayName: "Codex",
     description:
-      "Connect OpenAI Codex CLI to LangWatch. The starter OTTL maps codex.sse_event + codex.user_prompt + codex.conversation_starts onto langwatch.* canonical fields; cost is computed receiver-side from (model, tokens).",
+      "Connect OpenAI Codex CLI to LangWatch. Spans and log records land at /me/traces with model + tokens lifted natively; cost is computed receiver-side from (model, tokens).",
     iconAsset: "preset:codex",
     credentialSchema: null,
-    ottlRules: CODEX_OTTL_STARTER.join("\n"),
+    ottlRules: "",
   },
   {
     slug: "gemini",
     sourceType: "gemini",
     displayName: "Gemini",
     description:
-      "Connect Google Gemini CLI to LangWatch. Gemini emits full gen_ai.* semantic conventions natively; the starter OTTL is a defensive belt-and-suspenders mapping onto langwatch.* canonical fields.",
+      "Connect Google Gemini CLI to LangWatch. Gemini emits full gen_ai.* semantic conventions natively; the receiver lifts them onto langwatch.* canonical fields without admin OTTL.",
     iconAsset: "preset:gemini",
     credentialSchema: null,
-    ottlRules: GEMINI_OTTL_STARTER.join("\n"),
+    ottlRules: "",
   },
   {
     slug: "opencode",
     sourceType: "opencode",
     displayName: "opencode",
     description:
-      "Connect opencode (open-source terminal coding agent) telemetry. opencode 1.14+ emits structural OTel spans (Session.*, LLM.run, Provider.*) but does not yet populate gen_ai.* attributes on them; the receiver surfaces the spans verbatim. A starter OTTL will ship once upstream adds semantic-conv attributes — empirically verified via local OTLP catcher.",
+      "Connect opencode (open-source terminal coding agent) telemetry. opencode 1.14+ emits structural OTel spans (Session.*, LLM.run, Provider.*) but does not yet populate gen_ai.* attributes on them; the receiver surfaces the spans verbatim until upstream adds semantic-conv attributes.",
     iconAsset: "preset:opencode",
     credentialSchema: null,
     ottlRules: "",
