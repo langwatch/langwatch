@@ -37,7 +37,7 @@ function claudeCodeEvent(
     resourceAttributes: { "service.name": "claude-code" },
     scopeName: scope,
     scopeVersion: "2.1.162",
-    piiRedactionLevel: "DISABLED",
+    piiRedactionLevel: "ESSENTIAL",
   };
 }
 
