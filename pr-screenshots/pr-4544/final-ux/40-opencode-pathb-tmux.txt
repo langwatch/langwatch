@@ -1,0 +1,5 @@
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[0m
+> build · big-pickle
+[0m
+PONG-OPENCODE-PATHB-FINAL :)
