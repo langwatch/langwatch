@@ -53,7 +53,21 @@ export function PeerCursorOverlay({
   });
 
   return (
-    <Box ref={internalRef} position="relative" width="100%" height="100%">
+    // `minHeight={0}` (and `minWidth={0}`) is load-bearing in flex
+    // contexts: without it, the implicit `min-height: auto` clamps
+    // this Box to its content's natural size and prevents the
+    // `height: 100%` from shrinking to fit a flex column parent. In
+    // the trace drawer that bug surfaced as a non-scrollable Summary
+    // tab — the overlay grew past `Drawer.Body`'s clipped bounds and
+    // hid content past the fold.
+    <Box
+      ref={internalRef}
+      position="relative"
+      width="100%"
+      height="100%"
+      minHeight={0}
+      minWidth={0}
+    >
       {children}
       {effectivelyEnabled && anchor && projectId
         ? cursors.map((cursor) => (

@@ -238,9 +238,18 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   enabled
                   containerRef={paneContainerRef}
                 >
+                {/*
+                  `height="100%"` (not `flex={1}`) because PeerCursorOverlay
+                  wraps its children in a `position: relative` Box that
+                  isn't a flex container, so `flex: 1` is inert here — the
+                  Flex would collapse to content height, which broke the
+                  Summary tab's scroll (content overflowed the clipped
+                  drawer body) and the Trace tab's PanelGroup (percentages
+                  resolved against 0px → rendered empty).
+                */}
                 <Flex
                   ref={paneContainerRef}
-                  flex={1}
+                  height="100%"
                   minHeight={0}
                   minWidth={0}
                   direction="column"
