@@ -39,6 +39,14 @@ import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/use
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { api } from "~/utils/api";
+import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+
+// The same feature key Langy's chat route resolves against. Used to seed the
+// composer's model picker with whatever's actually resolving today — opening
+// Langy on a project that already has a configured default model lands on
+// THAT model, not on an unrelated branch-primary pick.
+const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 import {
   useLangyConversations,
   type LangyConversationSummary,
@@ -407,6 +415,11 @@ function LangyPanel({
   const projectId = project?.id;
 
   const [input, setInput] = useState("");
+  // Per-session model override for the next send. Empty string = "use whatever
+  // the project DEFAULT resolves to" — i.e. don't pass modelOverride. The
+  // composer's picker writes here, and `send()` reads + forwards it as the
+  // body's `modelOverride` field for the chat route to honor.
+  const [modelOverride, setModelOverride] = useState<string>("");
   const [appliedOutcomes, setAppliedOutcomes] = useState<
     Record<string, { href?: string; label?: string; onOpen?: () => void }>
   >({});
@@ -422,6 +435,19 @@ function LangyPanel({
     () => new DefaultChatTransport({ api: "/api/langy/chat" }),
     [],
   );
+
+  // Seed the picker with the model the gate currently resolves to. Once the
+  // user picks something different, we don't overwrite — they're explicitly
+  // choosing per-session. Only seed on first valid response.
+  const resolvedDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: LANGY_GATE_FEATURE_KEY },
+    { enabled: !!projectId },
+  );
+  useEffect(() => {
+    if (modelOverride) return;
+    const resolved = resolvedDefaultQuery.data?.model;
+    if (resolved) setModelOverride(resolved);
+  }, [resolvedDefaultQuery.data?.model, modelOverride]);
   const { messages, sendMessage, stop, status, setMessages } = useChat({
     transport,
     onError: (error) => {
@@ -485,9 +511,18 @@ function LangyPanel({
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
     setInput("");
+    // modelOverride is empty until the resolved-default query lands OR until
+    // the user picks; in either case the chat route falls back to the project
+    // DEFAULT-role resolution when this field is absent.
     await sendMessage(
       { role: "user", parts: [{ type: "text", text }] },
-      { body: { projectId, experimentSlug } },
+      {
+        body: {
+          projectId,
+          experimentSlug,
+          ...(modelOverride ? { modelOverride } : {}),
+        },
+      },
     );
   };
 
@@ -627,6 +662,8 @@ function LangyPanel({
         <Composer
           input={input}
           onInputChange={setInput}
+          model={modelOverride}
+          onModelChange={setModelOverride}
           onSend={() => void send(input)}
           onStop={() => void stop()}
           isBusy={isBusy}
@@ -912,6 +949,8 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
 function Composer({
   input,
   onInputChange,
+  model,
+  onModelChange,
   onSend,
   onStop,
   isBusy,
@@ -920,6 +959,9 @@ function Composer({
 }: {
   input: string;
   onInputChange: (v: string) => void;
+  /** The model Langy will use for the next send. "" = let the server pick. */
+  model: string;
+  onModelChange: (model: string) => void;
   onSend: () => void;
   onStop: () => void;
   isBusy: boolean;
@@ -941,6 +983,18 @@ function Composer({
         background="bg.surface"
         flexShrink={0}
       >
+        {/* Per-send model picker. ChatGPT-style chip above the input pill.
+            Pre-seeded with the project's currently-resolved Langy model;
+            user can switch on a per-send basis. */}
+        <Box marginBottom={2} data-testid="langy-model-picker">
+          <ModelSelector
+            model={model}
+            options={allModelOptions}
+            onChange={onModelChange}
+            mode="chat"
+            size="sm"
+          />
+        </Box>
         <HStack
           gap={2}
           paddingY={1.5}
