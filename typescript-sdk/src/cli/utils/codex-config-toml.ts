@@ -45,8 +45,13 @@ export function defaultCodexConfigPath(): string {
 }
 
 /**
- * Build the bracketed [otel] + [otel.exporter.otlp-http] block.
+ * Build the bracketed [otel] + [otel.trace_exporter.otlp-http] block.
  * Returned WITH leading + trailing markers and a trailing newline.
+ *
+ * codex 0.137+ separates `trace_exporter` (spans) from `exporter`
+ * (logs) in its config schema. We emit the trace_exporter form so
+ * Path B span ingestion fires; the older `[otel.exporter.otlp-http]`
+ * form is silently ignored on traces in the current schema.
  */
 export function buildCodexOtelBlock(inputs: CodexOtelBlockInputs): string {
   const env = inputs.environment ?? "langwatch";

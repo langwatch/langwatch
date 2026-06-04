@@ -164,7 +164,9 @@ describe("resolveWrapperMode", () => {
       expect(out.codexConfigPath).toBeDefined();
       const contents = fs.readFileSync(out.codexConfigPath!, "utf8");
       expect(contents).toContain("[otel]");
-      expect(contents).toContain("[otel.exporter.otlp-http]");
+      // codex 0.137+ separates trace_exporter from exporter (logs).
+      // Wrapper writes [otel.trace_exporter.otlp-http] so traces emit.
+      expect(contents).toContain("[otel.trace_exporter.otlp-http]");
       // Authorization header must NOT land on disk.
       expect(contents).not.toContain("ik-lw-test-token");
     });
