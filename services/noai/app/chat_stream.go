@@ -8,7 +8,7 @@ import (
 )
 
 // ChatStreamChunk is one SSE chunk in /v1/chat/completions stream mode.
-// Mirrors the OpenAI shape closely enough for any client that recognises
+// Mirrors the OpenAI shape closely enough for any client that recognizes
 // `chat.completion.chunk` events to parse the deltas.
 type ChatStreamChunk struct {
 	ID      string             `json:"id"`

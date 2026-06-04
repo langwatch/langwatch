@@ -71,8 +71,8 @@ type Usage struct {
 }
 
 // BuildChatResponse assembles a deterministic ChatResponse for the given
-// request. Unknown models fall through to echo-text behaviour so a typo
-// produces a recognisable response rather than an opaque 4xx.
+// request. Unknown models fall through to echo-text behavior so a typo
+// produces a recognizable response rather than an opaque 4xx.
 //
 // Response, audio, and message ids are KSUIDs (env-prefixed via ctx), so
 // concurrent requests get unique ids and the surfaces are traceable from
@@ -106,7 +106,7 @@ func BuildChatResponse(ctx context.Context, req ChatRequest, now time.Time) Chat
 // requestAsksForAudio returns true when the caller set `modalities`
 // including "audio". This lets text-typed models still emit an audio
 // blob when the caller explicitly asks for one (mirrors real OpenAI
-// behaviour for gpt-4o-audio-preview).
+// behavior for gpt-4o-audio-preview).
 func requestAsksForAudio(req ChatRequest) bool {
 	for _, m := range req.Modalities {
 		if m == "audio" {

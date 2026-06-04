@@ -435,7 +435,7 @@ func TestLangwatchNoaiSuppressedInProduction(t *testing.T) {
 	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://anywhere:5577")
 	t.Setenv("ENVIRONMENT", "production")
 
-	// Production behaviour: noai is only registered when the operator
+	// Production behavior: noai is only registered when the operator
 	// explicitly opts in. There is no localhost fallback in production —
 	// the env var must be set. An explicit URL therefore registers the
 	// provider even in prod (which is intentional: an operator setting

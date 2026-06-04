@@ -11,7 +11,7 @@ import (
 // ksuid resource tags for the various id surfaces noai mints. Underscores
 // are not allowed (the ksuid wire format uses them as delimiters), and the
 // resource feeds the human-readable middle segment so it stays
-// recognisable in traces / logs.
+// recognizable in traces / logs.
 const (
 	ResourceChatCompletion = "noaichat"
 	ResourceResponses      = "noairesp"

@@ -18,7 +18,7 @@ It speaks two OpenAI surfaces:
 
 All model ids live under the `langwatch_noai/` namespace (also matched bare).
 
-| Model id                             | Behaviour                                                 |
+| Model id                             | Behavior                                                 |
 |--------------------------------------|-----------------------------------------------------------|
 | `langwatch_noai/echo-text`           | text in → `Fake LLM Response to: "<input>"`               |
 | `langwatch_noai/echo-audio`          | text/audio in → echo text **plus** an `audio/wav` output  |
@@ -29,7 +29,7 @@ All model ids live under the `langwatch_noai/` namespace (also matched bare).
 | `langwatch_noai/user-simulation-text`| text in → deterministic next-user utterance               |
 | `langwatch_noai/user-simulation-audio`| text/audio in → next-user utterance + `audio/wav` output |
 
-Audio outputs are a 44-byte silent-WAV stub — recognisable as `audio/wav` by
+Audio outputs are a 44-byte silent-WAV stub — recognizable as `audio/wav` by
 any parser without us shipping a binary asset.
 
 ## Base URL
