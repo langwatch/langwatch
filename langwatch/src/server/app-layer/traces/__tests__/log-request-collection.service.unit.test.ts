@@ -347,6 +347,122 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
+  describe("codex log records — trace_id / span_id synthesis", () => {
+    /**
+     * Codex emits its events (codex.user_prompt, codex.sse_event,
+     * codex.conversation_starts) without trace context. The
+     * synthesizer derives trace_id from conversation.id (groups
+     * multi-turn into one trace) and span_id from
+     * (conversation.id:event.name:event.sequence). Scope-name is
+     * agnostic — codex's scope varies (`codex_exec` in 0.131,
+     * `codex` in 0.13x) so the synth gates on the `codex.*`
+     * event.name prefix instead.
+     */
+    const codexBatch = (
+      records: Array<Record<string, any>>,
+      scopeName = "codex_exec",
+    ) => ({
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "codex_exec" } },
+            ],
+          },
+          scopeLogs: [
+            {
+              scope: { name: scopeName, version: "0.134" },
+              logRecords: records,
+            },
+          ],
+        },
+      ],
+    });
+
+    it("synthesizes trace_id from conversation.id + span_id per event", async () => {
+      const { service, recordLog } = makeService();
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: codexBatch([
+          {
+            timeUnixNano: "1700000000000000000",
+            body: { stringValue: "codex.user_prompt" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "codex.user_prompt" } },
+              { key: "conversation.id", value: { stringValue: "conv_42" } },
+              { key: "event.sequence", value: { stringValue: "1" } },
+              { key: "prompt", value: { stringValue: "Hello" } },
+            ],
+          },
+          {
+            timeUnixNano: "1700000001000000000",
+            body: { stringValue: "codex.sse_event" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "codex.sse_event" } },
+              { key: "conversation.id", value: { stringValue: "conv_42" } },
+              { key: "event.sequence", value: { stringValue: "2" } },
+              { key: "model", value: { stringValue: "gpt-5.5" } },
+            ],
+          },
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      expect(recordLog).toHaveBeenCalledTimes(2);
+      const [c1, c2] = recordLog.mock.calls;
+      expect(c1![0]!.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(c1![0]!.spanId).toMatch(/^[0-9a-f]{16}$/);
+      expect(c2![0]!.traceId).toBe(c1![0]!.traceId); // same conversation = same trace
+      expect(c2![0]!.spanId).not.toBe(c1![0]!.spanId);
+    });
+
+    it("works with the bare `codex` scope name (0.13x)", async () => {
+      const { service, recordLog } = makeService();
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: codexBatch(
+          [
+            {
+              timeUnixNano: "1700000000000000000",
+              body: { stringValue: "codex.sse_event" },
+              attributes: [
+                { key: "event.name", value: { stringValue: "codex.sse_event" } },
+                { key: "conversation.id", value: { stringValue: "c" } },
+                { key: "event.sequence", value: { stringValue: "1" } },
+              ],
+            },
+          ],
+          "codex",
+        ),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      const r = recordLog.mock.calls[0]![0]!;
+      expect(r.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it("leaves ids empty when conversation.id is missing", async () => {
+      const { service, recordLog } = makeService();
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: codexBatch([
+          {
+            timeUnixNano: "1700000000000000000",
+            body: { stringValue: "codex.sse_event" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "codex.sse_event" } },
+              // no conversation.id
+              { key: "event.sequence", value: { stringValue: "1" } },
+            ],
+          },
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      const r = recordLog.mock.calls[0]![0]!;
+      expect(r.traceId).toBe("");
+      expect(r.spanId).toBe("");
+    });
+  });
+
   describe("when a LogRecord body is missing", () => {
     it("drops the record (no body, nothing meaningful to store)", async () => {
       const { service, recordLog } = makeService();

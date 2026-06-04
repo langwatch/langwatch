@@ -151,4 +151,81 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       expect(after.attributes["langwatch.model"]).toBeUndefined();
     });
   });
+
+  describe("codex.sse_event lift", () => {
+    /**
+     * Codex emits cost-bearing turns as codex.sse_event with model +
+     * token counts + conversation.id + user.email. No cost field on
+     * the wire — downstream model-pricing fills langwatch.cost.usd
+     * from (model, tokens).
+     */
+    it("lifts model + token counts + thread.id + principal", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.scopeName = "codex_exec";
+      ev.data.body = "codex.sse_event";
+      ev.data.attributes = {
+        "event.name": "codex.sse_event",
+        model: "gpt-5.5",
+        input_token_count: "9700",
+        output_token_count: "47",
+        cached_token_count: "1200",
+        "conversation.id": "conv_abc",
+        "user.email": "rogerio@langwatch.ai",
+      };
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.model"]).toBe("gpt-5.5");
+      expect(after.attributes["langwatch.input_tokens"]).toBe("9700");
+      expect(after.attributes["langwatch.output_tokens"]).toBe("47");
+      expect(after.attributes["langwatch.cache_read_tokens"]).toBe("1200");
+      expect(after.attributes["langwatch.thread.id"]).toBe("conv_abc");
+      expect(after.attributes["langwatch.principal.email"]).toBe(
+        "rogerio@langwatch.ai",
+      );
+    });
+
+    /**
+     * Codex doesn't emit `cache_creation_tokens` on the wire (anthropic
+     * concept). Lift must leave that langwatch.* key untouched so the
+     * trace UI doesn't show a spurious zero.
+     */
+    it("does NOT set langwatch.cache_creation_tokens for codex (codex doesn't emit it)", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.body = "codex.sse_event";
+      ev.data.attributes = {
+        "event.name": "codex.sse_event",
+        model: "gpt-5.5",
+        input_token_count: "100",
+        output_token_count: "20",
+      };
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.cache_creation_tokens"]).toBeUndefined();
+    });
+  });
+
+  describe("codex.conversation_starts lift", () => {
+    it("lifts model + principal even before the first sse_event arrives", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.body = "codex.conversation_starts";
+      ev.data.attributes = {
+        "event.name": "codex.conversation_starts",
+        model: "gpt-5.5",
+        "user.email": "rogerio@langwatch.ai",
+        "conversation.id": "conv_x",
+      };
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.model"]).toBe("gpt-5.5");
+      expect(after.attributes["langwatch.principal.email"]).toBe(
+        "rogerio@langwatch.ai",
+      );
+    });
+  });
 });

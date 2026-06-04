@@ -48,6 +48,8 @@ import {
   shouldOverrideOutput,
   extractIOFromLogRecord,
   extractClaudeCodeApiRequestMetrics,
+  extractCodexSseEventMetrics,
+  extractCodexConversationStartMetrics,
   OUTPUT_SOURCE,
 } from "./services";
 
@@ -396,6 +398,50 @@ export class TraceSummaryFoldProjection
       const sessionId = event.data.attributes["session.id"];
       if (typeof sessionId === "string" && sessionId.length > 0) {
         mergedAttributes["langwatch.thread.id"] = sessionId;
+      }
+    }
+
+    // Codex equivalent of the claude_code lift: codex.sse_event carries
+    // model + token counts + thread.id + principal; codex.conversation_starts
+    // carries model + principal at conversation creation. No cost field on
+    // the wire — receiver-side model-pricing lookup downstream fills
+    // langwatch.cost.usd from (model, tokens). Distinct gating on event.name
+    // so claude/gemini events pass through untouched.
+    const codexSse = extractCodexSseEventMetrics(event.data);
+    if (codexSse !== null) {
+      if (codexSse.model !== null) {
+        mergedAttributes["langwatch.model"] = codexSse.model;
+      }
+      if (codexSse.inputTokens !== null) {
+        mergedAttributes["langwatch.input_tokens"] = String(
+          codexSse.inputTokens,
+        );
+      }
+      if (codexSse.outputTokens !== null) {
+        mergedAttributes["langwatch.output_tokens"] = String(
+          codexSse.outputTokens,
+        );
+      }
+      if (codexSse.cacheReadTokens !== null) {
+        mergedAttributes["langwatch.cache_read_tokens"] = String(
+          codexSse.cacheReadTokens,
+        );
+      }
+      if (codexSse.threadId !== null) {
+        mergedAttributes["langwatch.thread.id"] = codexSse.threadId;
+      }
+      if (codexSse.principalEmail !== null) {
+        mergedAttributes["langwatch.principal.email"] = codexSse.principalEmail;
+      }
+    }
+    const codexStart = extractCodexConversationStartMetrics(event.data);
+    if (codexStart !== null) {
+      if (codexStart.model !== null) {
+        mergedAttributes["langwatch.model"] = codexStart.model;
+      }
+      if (codexStart.principalEmail !== null) {
+        mergedAttributes["langwatch.principal.email"] =
+          codexStart.principalEmail;
       }
     }
 

@@ -29,6 +29,14 @@ import {
  */
 const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 
+/**
+ * Codex's instrumentation scope varies across builds (codex 0.131
+ * uses `codex_exec`, 0.13x sometimes just `codex`), so the
+ * synthesizer below gates on the event.name prefix (`codex.*`)
+ * which is stable across versions.
+ */
+const CODEX_EVENT_NAME_PREFIX = "codex.";
+
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
 }
@@ -116,10 +124,15 @@ export class LogRequestCollectionService {
                 const logAttrs = normalizeOtlpAttributeMap(
                   logRecord.attributes,
                 );
-                const { traceId, spanId } = synthesizeClaudeCodeIdsIfMissing({
+                const claudeIds = synthesizeClaudeCodeIdsIfMissing({
                   scopeName,
                   wireTraceId,
                   wireSpanId,
+                  attrs: logAttrs,
+                });
+                const { traceId, spanId } = synthesizeCodexIdsIfMissing({
+                  wireTraceId: claudeIds.traceId,
+                  wireSpanId: claudeIds.spanId,
                   attrs: logAttrs,
                 });
 
@@ -223,6 +236,48 @@ function synthesizeClaudeCodeIdsIfMissing(args: {
     ? wireSpanId
     : createHash("sha256")
         .update(`${sessionId}:${promptId}:${eventName}:${eventSequence}`)
+        .digest("hex")
+        .slice(0, 16);
+  return { traceId, spanId };
+}
+
+/**
+ * Codex equivalent of synthesizeClaudeCodeIdsIfMissing. Codex emits
+ * its events (codex.user_prompt / codex.sse_event /
+ * codex.conversation_starts) under a `conversation.id` that groups
+ * a multi-turn chat into one trace. Each event gets its own span id
+ * derived from (conversation.id, event.name, event.sequence) so the
+ * fold sees them as distinct rows under the same trace.
+ *
+ * Scope-agnostic by design: codex's instrumentation scope varies
+ * (`codex_exec` in 0.131, `codex` in 0.13x). We gate on the
+ * event.name prefix instead, which is stable.
+ */
+function synthesizeCodexIdsIfMissing(args: {
+  wireTraceId: string;
+  wireSpanId: string;
+  attrs: Record<string, string>;
+}): { traceId: string; spanId: string } {
+  const { wireTraceId, wireSpanId, attrs } = args;
+  if (wireTraceId && wireSpanId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const eventName = attrs["event.name"] ?? "";
+  if (!eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const conversationId = attrs["conversation.id"];
+  if (!conversationId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const eventSequence = attrs["event.sequence"] ?? "";
+  const traceId = wireTraceId
+    ? wireTraceId
+    : createHash("sha256").update(conversationId).digest("hex").slice(0, 32);
+  const spanId = wireSpanId
+    ? wireSpanId
+    : createHash("sha256")
+        .update(`${conversationId}:${eventName}:${eventSequence}`)
         .digest("hex")
         .slice(0, 16);
   return { traceId, spanId };

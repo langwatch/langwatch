@@ -19,6 +19,15 @@ export const CLAUDE_CODE_SCOPE_NAMES = new Set([
 ]);
 
 /**
+ * Codex's instrumentation scope varies across versions (codex_exec
+ * service.name in 0.131, just `codex` in some 0.13x builds), so we
+ * gate on the event.name prefix instead — every cost-bearing event
+ * codex emits is named `codex.<thing>` and that's stable across
+ * builds.
+ */
+const CODEX_EVENT_NAME_PREFIX = "codex.";
+
+/**
  * Priority: root > explicit > last-finishing.
  * @internal Exported for unit testing
  */
@@ -66,6 +75,23 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
     const prompt = data.attributes.prompt;
     if (prompt && typeof prompt === "string") {
       return { input: prompt, output: null };
+    }
+  }
+
+  // Codex emits the user's text on a separate codex.user_prompt event.
+  // Cost-bearing codex.sse_event events carry no prompt — input lift
+  // happens here so the fold can pair it with the model/token lift
+  // from extractCodexSseEventMetrics on the same trace.
+  const codexEventName = data.attributes["event.name"];
+  if (
+    typeof codexEventName === "string" &&
+    codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX)
+  ) {
+    if (codexEventName === "codex.user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (typeof prompt === "string" && prompt.length > 0) {
+        return { input: prompt, output: null };
+      }
     }
   }
 
@@ -128,6 +154,83 @@ export function extractClaudeCodeApiRequestMetrics(
     outputTokens: asNumber("output_tokens"),
     cacheReadTokens: asNumber("cache_read_tokens"),
     cacheCreationTokens: asNumber("cache_creation_tokens"),
+  };
+}
+
+/**
+ * Lift model + tokens + conversation + principal off a Codex
+ * `codex.sse_event` (the cost-bearing turn event) into the
+ * canonical `langwatch.*` attributes. Codex does NOT emit a
+ * cost field on the wire — receiver-side model-pricing lookup
+ * fills `langwatch.cost.usd` from (model, tokens) downstream.
+ *
+ * Wire shape captured empirically against codex 0.131-0.134
+ * with a local OTLP catcher; mirrors CODEX_OTTL_STARTER but
+ * runs in TS so the receiver no longer needs to round-trip
+ * through the gateway's /internal/transform just for the
+ * platform-known tools.
+ *
+ * Returns `null` for any other event (codex.user_prompt input
+ * lift happens in extractIOFromLogRecord; codex.conversation_starts
+ * carries only metadata; non-codex scopes pass through untouched).
+ */
+export function extractCodexSseEventMetrics(
+  data: LogRecordReceivedEventData,
+): {
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  threadId: string | null;
+  principalEmail: string | null;
+} | null {
+  const eventName = data.attributes["event.name"];
+  if (eventName !== "codex.sse_event") return null;
+
+  const asNumber = (key: string): number | null => {
+    const raw = data.attributes[key];
+    if (raw === undefined || raw === null || raw === "") return null;
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number(raw)
+          : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const asString = (key: string): string | null => {
+    const raw = data.attributes[key];
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  };
+
+  return {
+    model: asString("model"),
+    inputTokens: asNumber("input_token_count"),
+    outputTokens: asNumber("output_token_count"),
+    cacheReadTokens: asNumber("cached_token_count"),
+    threadId: asString("conversation.id"),
+    principalEmail: asString("user.email"),
+  };
+}
+
+/**
+ * Lift the conversation/model/principal off
+ * `codex.conversation_starts` so the trace summary shows the
+ * conversation grouping even when the very first sse_event
+ * hasn't fired yet. Returns null for any other event.
+ */
+export function extractCodexConversationStartMetrics(
+  data: LogRecordReceivedEventData,
+): { model: string | null; principalEmail: string | null } | null {
+  const eventName = data.attributes["event.name"];
+  if (eventName !== "codex.conversation_starts") return null;
+  const asString = (key: string): string | null => {
+    const raw = data.attributes[key];
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  };
+  return {
+    model: asString("model"),
+    principalEmail: asString("user.email"),
   };
 }
 
