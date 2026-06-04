@@ -375,6 +375,41 @@ export class TraceSummaryFoldProjection
       mergedAttributes[key] = value as string;
     }
 
+    // Mirror the canonical langwatch.* attrs lifted from this log
+    // record onto the top-level TraceSummary columns the v2 drawer +
+    // /traces list read directly (Models / TotalCost /
+    // TotalPromptTokenCount / TotalCompletionTokenCount). Without this
+    // mirror a Path B log-only trace ends up with the right strings on
+    // state.attributes but trace.totalCost still NULL, so the drawer
+    // chip and the cost column on /traces both render empty even
+    // though the data is sitting in CH.
+    //
+    // Each api_request event is its OWN turn. Cost + tokens are
+    // additive across turns; models are a deduped set. Reading from
+    // liftedAttrs (this event's contribution) rather than
+    // mergedAttributes (the cumulative latest snapshot) is critical
+    // for cost so we don't double-count across replays.
+    let models = state.models;
+    let totalCost = state.totalCost;
+    let totalPromptTokenCount = state.totalPromptTokenCount;
+    let totalCompletionTokenCount = state.totalCompletionTokenCount;
+    const liftedModel = liftedAttrs["langwatch.model"];
+    if (typeof liftedModel === "string" && !models.includes(liftedModel)) {
+      models = [...models, liftedModel];
+    }
+    const liftedCost = Number(liftedAttrs["langwatch.cost.usd"]);
+    if (Number.isFinite(liftedCost) && liftedCost > 0) {
+      totalCost = (totalCost ?? 0) + liftedCost;
+    }
+    const liftedIn = Number(liftedAttrs["langwatch.input_tokens"]);
+    if (Number.isFinite(liftedIn) && liftedIn > 0) {
+      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + liftedIn;
+    }
+    const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
+    if (Number.isFinite(liftedOut) && liftedOut > 0) {
+      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
+    }
+
     return {
       ...state,
       traceId: state.traceId || event.data.traceId,
@@ -382,6 +417,10 @@ export class TraceSummaryFoldProjection
       computedOutput,
       outputSpanEndTimeMs,
       attributes: mergedAttributes,
+      models,
+      totalCost,
+      totalPromptTokenCount,
+      totalCompletionTokenCount,
     };
   }
 

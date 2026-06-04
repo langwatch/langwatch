@@ -67,6 +67,16 @@ export interface WrapperModeResult {
    * entry without touching the user's default model_provider.
    */
   extraArgs?: string[];
+  /**
+   * Env-var names to STRIP from the inherited parent environment
+   * before merging the wrapper's vars in. Propagated from the
+   * per-tool ToolEnv.clears so the resolver can pass legacy-twin
+   * scrubs through to the spawn step (e.g. claude clears
+   * ANTHROPIC_API_KEY so claude-code 2.x doesn't warn "Both
+   * ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may not
+   * work as expected").
+   */
+  clears?: string[];
   /** True when the wrapper minted a fresh binding (vs reused an existing). */
   newBindingMinted?: boolean;
 }
@@ -92,6 +102,7 @@ export async function resolveWrapperMode(
   cfg: GovernanceConfig,
   tool: string,
   gatewayVars: Record<string, string>,
+  gatewayClears: string[] = [],
 ): Promise<WrapperModeResult> {
   const persistedMode = cfg.tool_mode?.[tool];
   const hasVk = !!cfg.default_personal_vk?.secret;
@@ -155,12 +166,13 @@ export async function resolveWrapperMode(
       return {
         mode,
         vars: gatewayVars,
+        clears: gatewayClears,
         codexConfigPath: gw.path,
         codexProfilePath: gw.profilePath,
         extraArgs: ["--profile", gw.profile],
       };
     }
-    return { mode, vars: gatewayVars };
+    return { mode, vars: gatewayVars, clears: gatewayClears };
   }
 
   // INGESTION mode: ensure binding + (for codex) toml.
@@ -170,7 +182,7 @@ export async function resolveWrapperMode(
     // current example — GUI app, no useful OTel). Fall through to
     // gateway shape; the existing preflight will tell the user
     // what's missing.
-    return { mode: "gateway", vars: gatewayVars };
+    return { mode: "gateway", vars: gatewayVars, clears: gatewayClears };
   }
 
   const templates = await listIngestionTemplates(cfg);

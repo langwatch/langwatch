@@ -25,6 +25,19 @@ import { resolveWrapperMode } from "./wrapper-mode";
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
   vars: Record<string, string>;
+  /**
+   * Env-var names to STRIP from the inherited parent environment
+   * before spawning the tool. Used to scrub legacy credentials the
+   * user has exported in their shell (e.g. ANTHROPIC_API_KEY set
+   * from a previous direct-Anthropic workflow) that would otherwise
+   * race with the gateway-routed auth (ANTHROPIC_AUTH_TOKEN) we
+   * inject — claude-code 2.x detects both and warns
+   * "auth may not work as expected", so we have to actively unset
+   * the conflicting twin rather than just pile on top of it.
+   * Unset BEFORE the merge so a tool that intentionally sets both
+   * (opencode for provider auto-detect) still wins.
+   */
+  clears?: string[];
 }
 
 /**
@@ -50,11 +63,18 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   switch (tool) {
     case "claude":
       // claude-code (2.1.x) appends `/v1/messages` to ANTHROPIC_BASE_URL itself.
+      // Clear the legacy ANTHROPIC_API_KEY twin: claude-code warns
+      // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may
+      // not work as expected" when both are present (the gateway route
+      // uses AUTH_TOKEN; API_KEY is left over from pre-langwatch direct
+      // SDK usage). Stripping it leaves only the gateway-routed creds
+      // on the child env.
       return {
         vars: {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
+        clears: ["ANTHROPIC_API_KEY"],
       };
     case "codex":
       // codex 0.134 appends `/v1/chat/completions` itself.
@@ -65,6 +85,10 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         },
       };
     case "cursor":
+      // Same warning surface as claude: Anthropic SDKs nested in
+      // cursor's runtime will read ANTHROPIC_API_KEY in preference to
+      // ANTHROPIC_AUTH_TOKEN if both are set, bypassing the gateway.
+      // Scrub the legacy key.
       return {
         vars: {
           OPENAI_BASE_URL: gw,
@@ -72,6 +96,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
+        clears: ["ANTHROPIC_API_KEY"],
       };
     case "gemini":
       // gemini-cli 0.46-preview honours `GOOGLE_GEMINI_BASE_URL`
@@ -337,10 +362,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.exit(2);
   }
 
-  const gatewayVars = envForTool(cfg, tool).vars;
+  const toolEnv = envForTool(cfg, tool);
+  const gatewayVars = toolEnv.vars;
+  const gatewayClears = toolEnv.clears ?? [];
   let modeResult;
   try {
-    modeResult = await resolveWrapperMode(cfg, tool, gatewayVars);
+    modeResult = await resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears);
   } catch (err) {
     process.stderr.write(`mode resolution failed: ${(err as Error).message}\n`);
     process.exit(2);
@@ -377,7 +404,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     }
   }
 
-  const env = { ...process.env, ...modeResult.vars };
+  // Scrub conflicting twins from the inherited parent env BEFORE merging
+  // our vars in. The clears list per tool exists because legacy creds
+  // exported in the user's shell (e.g. ANTHROPIC_API_KEY from direct
+  // Anthropic SDK usage) would otherwise race with the gateway-routed
+  // ANTHROPIC_AUTH_TOKEN we set, surfacing as the claude-code warning
+  // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may not
+  // work as expected" and, worse, occasionally letting the SDK pick the
+  // wrong credential.
+  const parentEnv = { ...process.env };
+  for (const key of modeResult.clears ?? []) {
+    delete parentEnv[key];
+  }
+  const env = { ...parentEnv, ...modeResult.vars };
   const finalArgs = [...(modeResult.extraArgs ?? []), ...args];
   // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
   // bare spawn() can't resolve them without a shell. shell:true is safe

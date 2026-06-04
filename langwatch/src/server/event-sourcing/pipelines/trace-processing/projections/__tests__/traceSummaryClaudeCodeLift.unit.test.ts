@@ -274,4 +274,123 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
     });
   });
+
+  // Top-level column mirror — the v2 trace drawer header chips + the
+  // /traces list cost column read trace.totalCost / trace.models /
+  // trace.totalPromptTokenCount / trace.totalCompletionTokenCount
+  // directly, NOT trace.attributes["langwatch.cost.usd"]. For Path B
+  // log-only traces (claude_code subscription mode, codex /v1/logs,
+  // gemini OTLP) those top-level columns were always null because the
+  // fold only wrote to state.attributes. These tests pin the mirror
+  // so the drawer + list chips render populated for log-only
+  // cost-bearing traces.
+  describe("top-level column mirror from log lifts", () => {
+    it("mirrors langwatch.model onto state.models (deduped union)", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+
+      const after = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-opus-4-7",
+          cost_usd: "0.0875",
+          input_tokens: "1542",
+          output_tokens: "318",
+        }),
+        state,
+      );
+      expect(after.models).toEqual(["claude-opus-4-7"]);
+    });
+
+    it("mirrors cost.usd + tokens onto top-level columns", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+
+      const after = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-opus-4-7",
+          cost_usd: "0.0875",
+          input_tokens: "1542",
+          output_tokens: "318",
+        }),
+        state,
+      );
+      expect(after.totalCost).toBeCloseTo(0.0875, 6);
+      expect(after.totalPromptTokenCount).toBe(1542);
+      expect(after.totalCompletionTokenCount).toBe(318);
+    });
+
+    it("accumulates totalCost + tokens across multi-turn api_request events", () => {
+      const projection = makeProjection();
+      let state = createInitState();
+      state = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-opus-4-7",
+          cost_usd: "0.05",
+          input_tokens: "100",
+          output_tokens: "50",
+        }),
+        state,
+      );
+      state = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-opus-4-7",
+          cost_usd: "0.03",
+          input_tokens: "200",
+          output_tokens: "70",
+        }),
+        state,
+      );
+      expect(state.totalCost).toBeCloseTo(0.08, 6);
+      expect(state.totalPromptTokenCount).toBe(300);
+      expect(state.totalCompletionTokenCount).toBe(120);
+      // Same model twice stays as one entry — Models is a set, not a list.
+      expect(state.models).toEqual(["claude-opus-4-7"]);
+    });
+
+    it("unions multiple distinct models across turns", () => {
+      const projection = makeProjection();
+      let state = createInitState();
+      state = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-haiku-4-5-20251001",
+          cost_usd: "0.001",
+          input_tokens: "10",
+          output_tokens: "5",
+        }),
+        state,
+      );
+      state = projection.handleTraceLogRecordReceived(
+        makeClaudeApiRequestEvent({
+          model: "claude-opus-4-7",
+          cost_usd: "0.05",
+          input_tokens: "100",
+          output_tokens: "50",
+        }),
+        state,
+      );
+      expect(state.models).toEqual([
+        "claude-haiku-4-5-20251001",
+        "claude-opus-4-7",
+      ]);
+    });
+
+    it("leaves top-level columns untouched when no canonical lift fires", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({
+        "session.id": "s",
+        prompt: "Hi",
+      });
+      ev.data.attributes["event.name"] = "user_prompt";
+      ev.data.body = "claude_code.user_prompt";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.models).toEqual(state.models);
+      expect(after.totalCost).toBe(state.totalCost);
+      expect(after.totalPromptTokenCount).toBe(state.totalPromptTokenCount);
+      expect(after.totalCompletionTokenCount).toBe(
+        state.totalCompletionTokenCount,
+      );
+    });
+  });
 });

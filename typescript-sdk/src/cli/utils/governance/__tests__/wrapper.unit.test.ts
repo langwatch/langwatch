@@ -36,10 +36,30 @@ describe("envForTool", () => {
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
   });
 
+  // Regression: claude-code 2.x warns "Both ANTHROPIC_AUTH_TOKEN and
+  // ANTHROPIC_API_KEY set, auth may not work as expected" when a
+  // legacy ANTHROPIC_API_KEY is already exported in the user's
+  // shell. The wrapper has to clear that twin from the inherited env
+  // before spawn so the child only sees the gateway-routed
+  // ANTHROPIC_AUTH_TOKEN. Asserted by listing the key in the per-tool
+  // clears array.
+  it("claude → clears ANTHROPIC_API_KEY (gateway auth uses AUTH_TOKEN, twin would conflict)", () => {
+    const result = envForTool(cfg, "claude");
+    expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
+  });
+
   it("codex → OPENAI_BASE_URL + OPENAI_API_KEY", () => {
     const env = envForTool(cfg, "codex").vars;
     expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  // codex sets OPENAI_API_KEY directly (the gateway auth is on the
+  // same standard env var the openai SDK reads); there's no legacy
+  // twin to scrub, so clears stays empty.
+  it("codex → no clears (OPENAI_API_KEY is both legacy and gateway-routed)", () => {
+    const result = envForTool(cfg, "codex");
+    expect(result.clears ?? []).toEqual([]);
   });
 
   it("cursor → both Anthropic + OpenAI pairs", () => {
@@ -48,6 +68,14 @@ describe("envForTool", () => {
     expect(env.OPENAI_BASE_URL).toBeDefined();
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  // Same warning surface as claude: cursor embeds Anthropic SDKs that
+  // would pick up a legacy ANTHROPIC_API_KEY in preference to the
+  // gateway-routed ANTHROPIC_AUTH_TOKEN and bypass the gateway. Scrub.
+  it("cursor → clears ANTHROPIC_API_KEY (same legacy-twin scrub as claude)", () => {
+    const result = envForTool(cfg, "cursor");
+    expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
   });
 
   // Verified empirically against gemini-cli 0.46-preview: the binary
@@ -65,6 +93,15 @@ describe("envForTool", () => {
     expect(env.GOOGLE_GENAI_API_BASE).toBeUndefined();
   });
 
+  // gemini-cli reads GEMINI_API_KEY / GOOGLE_API_KEY directly; the
+  // gateway routing token IS what we write to both, so there's no
+  // legacy twin to scrub. Verifies the no-op explicitly so a future
+  // refactor that adds an erroneous scrub here is caught.
+  it("gemini → no clears (auth env names are the gateway-routed ones)", () => {
+    const result = envForTool(cfg, "gemini");
+    expect(result.clears ?? []).toEqual([]);
+  });
+
   // opencode 1.x uses the Vercel AI SDK, which posts to
   // `{BASE}/messages` and `{BASE}/chat/completions` WITHOUT prepending
   // /v1. So opencode needs the base to ALREADY include /v1, unlike
@@ -79,6 +116,17 @@ describe("envForTool", () => {
     expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/v1");
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
     expect(env.ANTHROPIC_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  // opencode INTENTIONALLY sets both ANTHROPIC_AUTH_TOKEN and
+  // ANTHROPIC_API_KEY (the Vercel AI SDK's anthropic-provider
+  // auto-detect gates on _API_KEY; the gateway routes on _AUTH_TOKEN).
+  // Scrubbing either one would break opencode at provider-init time.
+  // Pinned with an empty-clears assertion so anyone copy-pasting the
+  // claude scrub here would fail this test.
+  it("opencode → no clears (both Anthropic keys are intentionally set)", () => {
+    const result = envForTool(cfg, "opencode");
+    expect(result.clears ?? []).toEqual([]);
   });
 
   // Regression: claude + codex must NOT carry the /v1 suffix. Their
