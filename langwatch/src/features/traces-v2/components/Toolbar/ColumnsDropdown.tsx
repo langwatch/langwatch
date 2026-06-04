@@ -1,5 +1,5 @@
-import { Box, Button, Text } from "@chakra-ui/react";
-import { ChevronDown, Columns3 } from "lucide-react";
+import { Box, Button, HStack, IconButton, Text } from "@chakra-ui/react";
+import { ArrowDown, ArrowUp, ChevronDown, Columns3, X } from "lucide-react";
 import type React from "react";
 import {
   MenuCheckboxItem,
@@ -8,20 +8,14 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "../../../../components/ui/menu";
-import { STANDARD_COLUMNS } from "../../constants/columns";
-import type { ColumnConfig } from "../../stores/viewStore";
+import { toaster } from "../../../../components/ui/toaster";
+import { LENS_CAPABILITIES, type LensColumnOption } from "../../lens/capabilities";
 import { useViewStore } from "../../stores/viewStore";
 
-// Section labels mirror the lens-config dialog so the two surfaces read
-// as the same picker. Previously the standard section had no label, so
-// users skimming the dropdown couldn't tell where Standard ended and
-// Evaluations began without scrolling.
-const SECTIONS: { key: ColumnConfig["section"]; title: string }[] = [
-  { key: "standard", title: "Standard" },
-  { key: "fields", title: "Trace fields" },
-  { key: "evaluations", title: "Evaluations" },
-  { key: "events", title: "Events" },
-];
+// Section ordering within the dropdown. Sections discovered on the
+// active grouping's capability are rendered in this order; anything
+// else falls through to the end alphabetically.
+const SECTION_ORDER = ["Standard", "Trace fields", "Evaluations", "Events"];
 
 const SECTION_LABEL_CSS = {
   "& [data-scope=menu][data-part=item-group-label]": {
@@ -37,8 +31,26 @@ const SECTION_LABEL_CSS = {
 export const ColumnsDropdown: React.FC = () => {
   const columnOrder = useViewStore((s) => s.columnOrder);
   const toggleColumn = useViewStore((s) => s.toggleColumn);
+  const reorderColumns = useViewStore((s) => s.reorderColumns);
+  const grouping = useViewStore((s) => s.grouping);
 
+  // Source columns from the active grouping's capability — not the
+  // flat-trace constant. Each grouping has its own column registry
+  // (trace / conversation / group) and silently drops unknown ids,
+  // so a dropdown wired to the wrong list produces toggles that
+  // appear to do nothing. This keeps the dropdown and the rich
+  // LensConfigDialog reading the same data.
+  const capability = LENS_CAPABILITIES[grouping];
+  const sections = groupColumnsBySection(capability.columns);
+  const columnById = new Map(capability.columns.map((c) => [c.id, c]));
   const isVisible = (id: string) => columnOrder.includes(id);
+  // Visible columns rendered in their current order — drives the
+  // "Visible order" reorder strip at the top of the dropdown. Pinned
+  // columns are filtered out because moving them is a no-op (the
+  // table layout pins them regardless of order).
+  const orderedVisibleColumns = columnOrder
+    .map((id) => columnById.get(id))
+    .filter((c): c is LensColumnOption => !!c && !c.pinned);
 
   return (
     <MenuRoot closeOnSelect={false}>
@@ -82,29 +94,134 @@ export const ColumnsDropdown: React.FC = () => {
             Columns
           </Text>
         </Box>
-        {SECTIONS.map(({ key, title }) => {
-          const columns = STANDARD_COLUMNS.filter((c) => c.section === key);
-          if (columns.length === 0) return null;
-          return (
-            <MenuItemGroup key={key} title={title} css={SECTION_LABEL_CSS}>
-              {columns.map((column) => (
-                <ColumnCheckbox
-                  key={column.id}
-                  column={column}
-                  checked={isVisible(column.id)}
-                  onToggle={() => toggleColumn(column.id)}
-                />
-              ))}
-            </MenuItemGroup>
-          );
-        })}
+        {orderedVisibleColumns.length > 1 && (
+          // Reorder strip — appears above the toggle list. Each row
+          // shows a currently-visible column with up/down arrows that
+          // call `reorderColumns`. The full-blown drag-and-drop UI
+          // doesn't fit cleanly inside a Chakra Menu (the menu
+          // dismisses on outside-pointer-down which fights drag), so
+          // we surface the same `reorderColumns` action via keyboard-
+          // accessible arrow buttons. Power users who want full DnD
+          // still have the table header (when that lands) and the
+          // LensConfigDialog (when it grows a reorder section).
+          <Box
+            paddingX={2}
+            paddingY={1.5}
+            borderBottomWidth="1px"
+            borderColor="border.subtle"
+          >
+            <Text
+              textStyle="2xs"
+              fontWeight="semibold"
+              color="fg.muted"
+              textTransform="uppercase"
+              letterSpacing="0.06em"
+              paddingX={1}
+              paddingBottom={1}
+            >
+              Visible order
+            </Text>
+            {orderedVisibleColumns.map((column, index) => (
+              <HStack
+                key={column.id}
+                gap={1}
+                paddingX={1}
+                paddingY={0.5}
+                _hover={{ bg: "bg.muted" }}
+                borderRadius="sm"
+              >
+                <Text textStyle="xs" color="fg" flex={1} truncate>
+                  {column.label}
+                </Text>
+                <IconButton
+                  aria-label={`Move ${column.label} up`}
+                  size="2xs"
+                  variant="ghost"
+                  disabled={index === 0}
+                  // Resolve the neighbour from the VISIBLE-order strip
+                  // and only then translate back into the full
+                  // `columnOrder` index space. Using `columnOrder ± 1`
+                  // directly would target whatever the next unfiltered
+                  // index happens to be — typically a pinned column
+                  // sitting between two reorderable ones — and the move
+                  // would silently no-op against the pinned slot.
+                  onClick={() => {
+                    const previous = orderedVisibleColumns[index - 1];
+                    if (!previous) return;
+                    reorderColumns(
+                      columnOrder.indexOf(column.id),
+                      columnOrder.indexOf(previous.id),
+                    );
+                  }}
+                >
+                  <ArrowUp size={11} />
+                </IconButton>
+                <IconButton
+                  aria-label={`Move ${column.label} down`}
+                  size="2xs"
+                  variant="ghost"
+                  disabled={index === orderedVisibleColumns.length - 1}
+                  onClick={() => {
+                    const next = orderedVisibleColumns[index + 1];
+                    if (!next) return;
+                    reorderColumns(
+                      columnOrder.indexOf(column.id),
+                      columnOrder.indexOf(next.id),
+                    );
+                  }}
+                >
+                  <ArrowDown size={11} />
+                </IconButton>
+                <IconButton
+                  aria-label={`Remove ${column.label}`}
+                  size="2xs"
+                  variant="ghost"
+                  color="fg.subtle"
+                  onClick={() => toggleColumn(column.id)}
+                >
+                  <X size={11} />
+                </IconButton>
+              </HStack>
+            ))}
+          </Box>
+        )}
+        {sections.map(({ title, columns }) => (
+          <MenuItemGroup key={title} title={title} css={SECTION_LABEL_CSS}>
+            {columns.map((column) => (
+              <ColumnCheckbox
+                key={column.id}
+                column={column}
+                checked={isVisible(column.id)}
+                onToggle={() => {
+                  const wasVisible = isVisible(column.id);
+                  toggleColumn(column.id);
+                  // When adding (not removing), surface a toast that
+                  // tells the user (a) where the column landed and
+                  // (b) how to reposition it. Without this the column
+                  // was silently appended to the end of the row and
+                  // power users had no idea their click "worked" if
+                  // they didn't notice the new header off-screen.
+                  if (!wasVisible) {
+                    toaster.create({
+                      title: `Added "${column.label}"`,
+                      description:
+                        "Appears at the end. Use the arrows in “Visible order” to reposition.",
+                      type: "info",
+                      duration: 4500,
+                    });
+                  }
+                }}
+              />
+            ))}
+          </MenuItemGroup>
+        ))}
       </MenuContent>
     </MenuRoot>
   );
 };
 
 const ColumnCheckbox: React.FC<{
-  column: ColumnConfig;
+  column: LensColumnOption;
   checked: boolean;
   onToggle: () => void;
 }> = ({ column, checked, onToggle }) => {
@@ -133,3 +250,25 @@ const ColumnCheckbox: React.FC<{
     </MenuCheckboxItem>
   );
 };
+
+function groupColumnsBySection(
+  columns: readonly LensColumnOption[],
+): Array<{ title: string; columns: LensColumnOption[] }> {
+  const byTitle = new Map<string, LensColumnOption[]>();
+  for (const c of columns) {
+    const title = c.section ?? "Other";
+    const bucket = byTitle.get(title) ?? [];
+    bucket.push(c);
+    byTitle.set(title, bucket);
+  }
+  // Sort by SECTION_ORDER, leftover sections alphabetically at the end.
+  const ordered = [...byTitle.entries()].sort(([a], [b]) => {
+    const ai = SECTION_ORDER.indexOf(a);
+    const bi = SECTION_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return ordered.map(([title, cols]) => ({ title, columns: cols }));
+}

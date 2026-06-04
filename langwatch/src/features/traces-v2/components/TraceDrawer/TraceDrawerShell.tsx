@@ -12,10 +12,12 @@ import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { useShikiAdapter } from "./markdownView/shikiAdapter";
+import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
 import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
+import { TraceAccordions } from "./traceAccordions";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
@@ -219,6 +221,23 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   </IsolatedErrorBoundary>
                 </Box>
                 <Box borderBottomWidth="1px" borderColor="border" />
+                {/*
+                  Peer cursors render across the entire drawer body —
+                  previously scoped to the viz pane only, which made
+                  peers vanish whenever they hovered out of the
+                  waterfall. The `anchor` keys the shared coordinate
+                  space; everyone looking at the same trace's drawer
+                  body shares one (0..1, 0..1) plane regardless of
+                  which mode (trace / summary / conversation) they're
+                  in. Mounting the overlay here also covers the
+                  ConversationView + Summary surfaces without each
+                  having to wrap themselves.
+                */}
+                <PeerCursorOverlay
+                  anchor={`trace:${trace.traceId}:drawer`}
+                  enabled
+                  containerRef={paneContainerRef}
+                >
                 <Flex
                   ref={paneContainerRef}
                   flex={1}
@@ -249,6 +268,27 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           />
                         </Box>
                       </IsolatedErrorBoundary>
+                    ) : viewMode === "summary" ? (
+                      // Summary mode: render the trace-scope accordion stack
+                      // full-bleed (I/O, metadata, evals, events, exceptions
+                      // — whatever the current `TraceSummaryAccordions`
+                      // composes for `activeTab="summary"`). Reuses the
+                      // existing TraceAccordions surface so all the focus
+                      // behaviour (header-chip jumps, exception pulses) keeps
+                      // working without a parallel implementation.
+                      <IsolatedErrorBoundary
+                        scope="Couldn't render trace summary"
+                        resetKeys={[trace.traceId]}
+                      >
+                        <Box flex={1} minHeight={0} overflow="auto">
+                          <TraceAccordions
+                            trace={trace}
+                            spans={spanTree}
+                            selectedSpan={null}
+                            activeTab="summary"
+                          />
+                        </Box>
+                      </IsolatedErrorBoundary>
                     ) : (
                       <PaneLayout
                         trace={trace}
@@ -260,6 +300,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     )}
                   </ScenarioRoleProvider>
                 </Flex>
+                </PeerCursorOverlay>
               </>
             )}
           </Drawer.Body>

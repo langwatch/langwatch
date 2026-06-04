@@ -107,6 +107,13 @@ const spanTreeNodeSchema = z.object({
   durationMs: z.number(),
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
+  /**
+   * USD cost from `gen_ai.usage.cost` — null when the span had none.
+   * `.nullish()` so older clients (or sample fixtures) that don't set
+   * the field at all stay compatible; readers should treat `undefined`
+   * and `null` identically.
+   */
+  cost: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;

@@ -60,7 +60,10 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
-import { TraceListService } from "./traces/trace-list.service";
+import {
+  setDiscoverBroadcaster,
+  TraceListService,
+} from "./traces/trace-list.service";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -200,6 +203,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceListService",
   );
+  // Wire the discover-cache → SSE bridge. Module-level setter keeps
+  // the TraceListService constructor lean (the null/test preset below
+  // doesn't need a broadcaster — refreshes that never get an SSE push
+  // still hydrate the cache successfully).
+  setDiscoverBroadcaster((tenantId) => {
+    // Broadcast.event payload is a string by contract — sender + SSE
+    // bridge both deserialise it on the client. Keep it tiny: timestamp
+    // is enough for the client to confirm freshness; the actual payload
+    // ships through the discover query they re-fire on receipt.
+    const payload = JSON.stringify({
+      event: "discover_updated",
+      tenantId,
+      timestamp: Date.now(),
+    });
+    void broadcast.broadcastToTenantRateLimited(
+      tenantId,
+      payload,
+      "discover_updated",
+    );
+  });
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
@@ -628,6 +651,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     new PinnedTraceRepository(testPrisma),
   );
   const noop = async () => { };
+  // Clear the module-global discover broadcaster so a test app built
+  // after `initializeDefaultApp` doesn't inherit the production
+  // broadcaster's closure (which captured the production
+  // BroadcastService and would fire SSE pushes out of tests). The
+  // null repository's no-op refresh path can still reach the
+  // broadcaster, so leaving the prod callback wired would leak
+  // cross-app callbacks. Tests that want their own broadcaster can
+  // re-register one after `createTestApp` returns.
+  setDiscoverBroadcaster(null);
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",

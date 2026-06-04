@@ -1,3 +1,4 @@
+import { on } from "node:events";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -145,6 +146,7 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     durationMs: row.durationMs,
     status,
     model: row.model,
+    cost: row.cost,
   };
 }
 
@@ -460,6 +462,34 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         timeRange: input.timeRange,
       });
+    }),
+
+  /**
+   * SSE subscription that pushes `discover_updated` events to active
+   * browsers when a tenant's facet payload finishes background refresh.
+   * The client listens, invalidates its TanStack cache for
+   * `tracesV2.discover`, and refetches — landing the fresh payload
+   * without polling.
+   *
+   * Mirrors the shape of `traces.onTraceUpdate` so the existing
+   * `useSSESubscription` hook handles it without changes.
+   */
+  onDiscoverUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      try {
+        for await (const eventArgs of on(emitter, "discover_updated", {
+          // @ts-expect-error - signal is not typed
+          signal: opts.signal,
+        })) {
+          yield eventArgs[0];
+        }
+      } finally {
+        getApp().broadcast.cleanupTenantEmitter(projectId);
+      }
     }),
 
   facetValues: protectedProcedure

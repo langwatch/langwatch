@@ -27,6 +27,8 @@ interface AttributesSectionProps {
   onToggleNone: (attrKey: string) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onShiftToggle?: (nextOpen: boolean) => void;
+  /** Remove this section from the sidebar (per-user). */
+  onHide?: () => void;
 }
 
 export const AttributesSection: React.FC<AttributesSectionProps> = ({
@@ -39,6 +41,7 @@ export const AttributesSection: React.FC<AttributesSectionProps> = ({
   onToggleNone,
   dragHandleProps,
   onShiftToggle,
+  onHide,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -56,6 +59,8 @@ export const AttributesSection: React.FC<AttributesSectionProps> = ({
       valueCount={keys.length}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      hideLabel={`Hide ${title}`}
     >
       <VStack gap={0.5} align="stretch">
         {keys.length >= SEARCHABLE_VALUE_THRESHOLD && (

@@ -6,6 +6,7 @@ import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
@@ -32,6 +33,24 @@ export const WaterfallView = memo(function WaterfallView({
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [hoveredSpanId, setHoveredSpanId] = useState<string | null>(null);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
+
+  // Pin gestures wire straight to the drawer store — `pinnedSpanIds`
+  // doubles as both the SpanTabBar tab list and the row-level "is this
+  // span pinned" check, so a Set lookup per render is cheaper than
+  // recomputing membership inside each row. `pinSpan`/`unpinSpan` are
+  // both no-ops on duplicates / unknowns, so the toggle handler is
+  // safe to call without first checking membership.
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const pinSpan = useDrawerStore((s) => s.pinSpan);
+  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const pinnedSet = useMemo(() => new Set(pinnedSpanIds), [pinnedSpanIds]);
+  const handleTogglePin = useCallback(
+    (spanId: string) => {
+      if (pinnedSet.has(spanId)) unpinSpan(spanId);
+      else pinSpan(spanId);
+    },
+    [pinnedSet, pinSpan, unpinSpan],
+  );
 
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
@@ -465,6 +484,7 @@ export const WaterfallView = memo(function WaterfallView({
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
                     isHovered={node.span.spanId === hoveredSpanId}
+                    isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
                     isDimmed={
@@ -476,6 +496,7 @@ export const WaterfallView = memo(function WaterfallView({
                       handleToggleCollapse(node.span.spanId)
                     }
                     onSelect={() => handleSelectSpan(node.span.spanId)}
+                    onTogglePin={() => handleTogglePin(node.span.spanId)}
                     onHoverStart={() => setHoveredSpanId(node.span.spanId)}
                     onHoverEnd={() => setHoveredSpanId(null)}
                   />

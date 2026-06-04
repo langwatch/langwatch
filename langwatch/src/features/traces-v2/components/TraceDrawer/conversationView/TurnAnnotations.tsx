@@ -47,6 +47,15 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
 
   if (!canManage) return null;
 
+  // The trio used to sit permanently visible on every turn separator —
+  // ~180px of chrome multiplied across N turns adds a lot of visual
+  // weight to a view that's supposed to be "read the conversation".
+  // Default to invisible + reveal on `_groupHover` of the parent
+  // ChatTurnRow Flex (which already declares `role="group"`). Forced
+  // visible while a popover is open so the anchor doesn't vanish under
+  // the user mid-edit.
+  const isForceVisible = openPopover !== null;
+
   return (
     <HStack
       gap={0.5}
@@ -54,6 +63,10 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
       flexWrap="wrap"
       justify="flex-end"
       onClick={stop}
+      opacity={isForceVisible ? 1 : 0}
+      _groupHover={{ opacity: 1 }}
+      _groupFocusWithin={{ opacity: 1 }}
+      transition="opacity 120ms ease"
     >
       <AnnotationPopover
         traceId={traceId}

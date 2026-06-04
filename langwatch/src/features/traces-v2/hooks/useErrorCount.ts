@@ -1,20 +1,21 @@
-import { useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useFilterStore } from "../stores/filterStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_INTERVAL_MS = 60_000;
 
 export function useErrorCount(): number {
   const { project } = useOrganizationTeamProject();
 
-  // Fixed at mount time — the refetchInterval keeps data fresh without
-  // changing the query key on every render.
-  const [timeRange] = useState(() => {
-    const now = Date.now();
-    return { from: now - TWENTY_FOUR_HOURS_MS, to: now, live: true };
-  });
+  // Bind to the user's currently-selected time range so the Errors lens
+  // tab badge reports the same window as every other panel on the page.
+  // The previous fixed-24h window was confusing — if the user filtered
+  // to "last 7 days" and saw 0 errors on the tab but 50 errors in the
+  // table, that's a contradiction the UI shouldn't manufacture.
+  // `debouncedTimeRange` drives all other network reads, so we use it
+  // here too (avoids a refetch storm while the user drags the range).
+  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
 
   // SSE invalidates `tracesV2.newCount` (all args) on trace_summary_updated,
   // so this query is kept fresh without polling whenever SSE is healthy.

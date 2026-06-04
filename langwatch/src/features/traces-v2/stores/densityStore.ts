@@ -3,7 +3,16 @@ import { create } from "zustand";
 export type Density = "compact" | "comfortable";
 
 const STORAGE_KEY = "langwatch:traces-v2:density:v1";
-const DEFAULT_DENSITY: Density = "compact";
+// Comfortable is the default for new users — Compact (3px row padding,
+// 12px font) reads as "engineering ops dashboard" and was a primary
+// driver of the "too dense / too busy" feedback from non-developer
+// users. Compact remains a one-click toggle for power users who want
+// to see more rows on screen.
+//
+// Existing users with an explicit `compact` / `comfortable` choice in
+// localStorage are unaffected — the load() function below only falls
+// back to this default when nothing is persisted yet.
+const DEFAULT_DENSITY: Density = "comfortable";
 
 /**
  * Density is a personal preference, not a per-lens or per-URL setting.

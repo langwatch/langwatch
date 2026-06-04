@@ -269,7 +269,22 @@ export function getFacetGroupId(key: string): FacetGroupDef["id"] | undefined {
   return KEY_TO_GROUP_ID[key];
 }
 
-/** Maps a facet field key to its `has:`/`none:` value. */
+/**
+ * Maps a facet field key to its `has:`/`none:` toggle value. A field
+ * listed here grows a pinned "(none)" row at the bottom of the section
+ * that adds `NOT none:<value>` (i.e. "show only traces where this is
+ * present") on first click and `none:<value>` ("show only traces
+ * where this is absent") on second click — the toggle cycles
+ * present → absent → cleared.
+ *
+ * Coverage criteria: any field where "is this set or not" is itself a
+ * useful filter, not just "what value does it have". errorMessage is
+ * the canonical case — users care about "any error" / "no error"
+ * almost as often as they care about a specific error string.
+ * Annotation / scenarioRun / selectedPrompt / lastUsedPrompt /
+ * promptVersion / evaluatorVerdict / evaluatorScore all have the same
+ * present/absent shape that's worth surfacing as a one-click filter.
+ */
 export const NONE_TOGGLE_VALUE: Record<string, string> = {
   user: "user",
   conversation: "conversation",
@@ -278,11 +293,54 @@ export const NONE_TOGGLE_VALUE: Record<string, string> = {
   subtopic: "subtopic",
   label: "label",
   evaluator: "eval",
+  errorMessage: "errorMessage",
+  annotation: "annotation",
+  scenarioRun: "scenarioRun",
+  selectedPrompt: "selectedPrompt",
+  lastUsedPrompt: "lastUsedPrompt",
+  promptVersion: "promptVersion",
+  evaluatorVerdict: "evaluatorVerdict",
+  evaluatorScore: "evaluatorScore",
+  event: "event",
 };
 
 export const MAX_VISIBLE_FACETS = 10;
-export const MAX_EXPANDED_FACETS = 30;
+/**
+ * Cap for the "show more" expansion. The backend `discover` query
+ * returns up to TOP_N=50 facet values per section; mirroring that
+ * here lets the user see EVERY value the backend returned without
+ * having to fall back to the always-on search input. If the section
+ * has more than 50 distinct values they don't surface in the top
+ * response at all — only via the type-and-Enter search path.
+ */
+export const MAX_EXPANDED_FACETS = 50;
 /** Sections with at most this many values get auto-expanded. */
 export const AUTO_EXPAND_THRESHOLD = 5;
 /** When a value-list reaches this size, show an inline filter input. */
 export const SEARCHABLE_VALUE_THRESHOLD = 5;
+
+/**
+ * The "easy mode" set of facet keys shown by default in **comfortable**
+ * density. Curated to the handful of cross-cutting filters that almost
+ * every workflow needs — status, origin, model, who, when, how much.
+ * Anything outside this set still appears in **compact** density (which
+ * preserves the historical "show me all 40+ facets" engineering view)
+ * and can be added back individually via the per-user "+ Add facet"
+ * menu when on comfortable.
+ *
+ * Density change ↔ sidebar coupling: see `useFilterSidebarData` for the
+ * runtime filter that consumes this set.
+ */
+export const COMFORTABLE_DEFAULT_SECTIONS: ReadonlySet<string> = new Set([
+  "origin",
+  "status",
+  "errorMessage",
+  "service",
+  "model",
+  "user",
+  "conversation",
+  "duration",
+  "cost",
+  "tokens",
+  "evaluator",
+]);

@@ -184,15 +184,17 @@ export function useTraceHeaderChips(
   // signal, even on heavily-evaluated traces.
   const { rich: evals } = useTraceEvaluations();
   const setViewMode = useDrawerStore((s) => s.setViewMode);
-  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const requestFocus = useFocusSectionStore((s) => s.request);
   for (const ev of evals) {
     chips.push({
       kind: "eval",
       eval: ev,
       onClick: () => {
-        setViewMode("trace");
-        setActiveTab("summary");
+        // After the redesign Summary is its own DrawerViewMode, not a
+        // SpanTabBar tab — jumping to the Evals accordion flips the
+        // drawer mode and lets the section focus store pulse the right
+        // accordion stack (TraceSummaryAccordions).
+        setViewMode("summary");
         requestFocus({ traceId: trace.traceId, section: "evals" });
       },
     });

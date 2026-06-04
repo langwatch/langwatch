@@ -196,7 +196,6 @@ function StatusChip({
   statusColor: string;
 }) {
   const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const requestFocus = useFocusSectionStore((s) => s.request);
   const spanTree = useSpanTree();
@@ -209,17 +208,19 @@ function StatusChip({
   const hasErrorContent = isError && (!!trace.error || errorSpans.length > 0);
 
   const focusExceptions = useCallback(() => {
-    setViewMode("trace");
-    setActiveTab("summary");
+    // After the trace-view redesign Summary is its own DrawerViewMode,
+    // not a SpanTabBar tab — so jumping to the trace's Exceptions
+    // section means flipping mode to "summary" and pulsing the
+    // section, not setting an `activeTab`.
+    setViewMode("summary");
     requestFocus({ traceId: trace.traceId, section: "exceptions" });
-  }, [requestFocus, setActiveTab, setViewMode, trace.traceId]);
+  }, [requestFocus, setViewMode, trace.traceId]);
 
-  // Same focus request without the activeTab override, so a span pill
-  // inside the popover can flip to the span tab (via `selectSpan`)
-  // without our callback then yanking the operator back to summary.
-  // The pulse lands on whichever accordion stack is mounted next —
-  // `SpanAccordions` for span tab, `TraceSummaryAccordions` for
-  // summary — since both observe the same focus store.
+  // Same focus request without the mode override — used by span pills
+  // inside the popover so a follow-up `selectSpan` lands the user on the
+  // span detail. The pulse target component (SpanAccordions or
+  // TraceSummaryAccordions) observes the shared focus store regardless
+  // of where it's mounted.
   const focusExceptionsKeepTab = useCallback(() => {
     requestFocus({ traceId: trace.traceId, section: "exceptions" });
   }, [requestFocus, trace.traceId]);
@@ -342,6 +343,34 @@ const FILTERABLE_PIN_FIELDS: Record<string, string> = {
 };
 
 /**
+ * Liqe field names are bare identifiers — letters, digits, dots,
+ * underscores, dashes. Customer-defined metadata keys come from
+ * arbitrary OTLP attributes, so a malicious or careless key can contain
+ * spaces, quotes, colons, parens, etc. Injecting an unsafe key as a raw
+ * field name breaks the grammar (the query becomes unparsable, or
+ * worse, targets the wrong field). We restrict to a safe whitelist and
+ * disable the filter affordance when the key can't round-trip.
+ */
+const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
+
+/**
+ * Build a Liqe-style fielded query for an auto-pinned metadata value.
+ * Escapes embedded quotes + backslashes in the value so things like
+ * `tenant="org \"acme\""` stay parseable. Returns null when either the
+ * key can't be safely round-tripped as a bare Liqe field, or the value
+ * collapses to empty after escape.
+ */
+function formatMetadataFilterQuery(
+  key: string,
+  value: string,
+): string | null {
+  if (!SAFE_METADATA_KEY_RE.test(key)) return null;
+  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  if (!escaped) return null;
+  return `${key}:"${escaped}"`;
+}
+
+/**
  * Curated hoisted attribute keys we always surface when present on a trace.
  * `category` controls grouping in the pin strip — identity (who/where), run
  * (which scenario/eval invocation), tag (labels). User pins fall into the
@@ -436,7 +465,6 @@ export const DrawerHeader = memo(function DrawerHeader({
   const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
-  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
@@ -497,6 +525,11 @@ export const DrawerHeader = memo(function DrawerHeader({
   );
   const { pins, removePin } = usePinnedAttributes(project?.id);
   const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  // `applyQueryTextFromPin` is used by the auto-pinned metadata filter
+  // affordance below. Pulled at the parent scope so the `useMemo` for
+  // `categorizedPins` doesn't need to re-subscribe to the store on every
+  // pin shape change.
+  const applyQueryTextFromPin = useFilterStore((s) => s.applyQueryText);
   const { closeDrawer, openDrawer } = useDrawer();
   // When the trace lives in a multi-turn conversation the
   // ThreadProgressIndicator already exposes the conversation id (with copy
@@ -541,12 +574,15 @@ export const DrawerHeader = memo(function DrawerHeader({
           return {
             navigateLabel: "Open prompt",
             onNavigate: () => {
+              // Prompts is no longer a separate tab — SpanDetailPane
+              // auto-renders the PromptsPanel when the selected span has
+              // prompt data. So all we do here is select the span and
+              // the right panel adapts.
               const spanId =
                 key === "langwatch.prompt.selected"
                   ? trace.selectedPromptSpanId
                   : trace.lastUsedPromptSpanId;
               if (spanId) selectSpan(spanId);
-              setActiveTab("prompts");
             },
           };
         default:
@@ -596,6 +632,54 @@ export const DrawerHeader = memo(function DrawerHeader({
         navigateLabel: navigate?.navigateLabel,
       });
     }
+
+    // Auto-promote `metadata.*` attribute keys onto the pin strip. This is
+    // the customer-defined metadata namespace (langwatch reserved keys
+    // like `metadata.user_id`, `metadata.thread_id`, plus anything the
+    // caller attached via the SDK's metadata field). These are exactly
+    // the fields observability-first users want to see at the top of the
+    // drawer without having to dig into the Metadata accordion — they're
+    // also (by definition) safe to surface because the customer chose to
+    // emit them as semantic context rather than as raw OTel attributes.
+    //
+    // They land in the `custom` category so they share the inline cap
+    // (MAX_INLINE_PINS) with user-pinned attributes; remaining ones still
+    // spill into the "+N pinned" popover instead of blowing out the strip
+    // for a trace that happens to carry 50 metadata keys.
+    const seenMetadataKeys = new Set<string>();
+    for (const [key, rawValue] of Object.entries(trace.attributes)) {
+      if (!key.startsWith("metadata.")) continue;
+      if (userKeys.has(`attribute:${key}`)) continue;
+      if (seenMetadataKeys.has(key)) continue;
+      seenMetadataKeys.add(key);
+      const value = formatPinValue({ key, value: rawValue ?? null });
+      if (!value) continue;
+      // Label strips the `metadata.` prefix for readability — the strip
+      // is dense and the prefix is redundant inside the per-trace context.
+      const label = key.slice("metadata.".length);
+      // Auto-pinned metadata pins gain a filter affordance: clicking the
+      // filter icon scopes the trace table to traces that share this
+      // attribute key/value. We inject a Liqe-style fielded query
+      // through `applyQueryText` because there's no first-class facet
+      // for arbitrary `metadata.*` keys today — Liqe accepts unknown
+      // field names and the backend's text search treats them as
+      // attribute-key filters (same behaviour the search bar uses for
+      // hand-typed `metadata.tenant:"org-acme"` queries).
+      const filterQuery = formatMetadataFilterQuery(key, value);
+      out.push({
+        pin: { source: "attribute", key, label },
+        value,
+        auto: true,
+        category: "custom",
+        onFilter: filterQuery
+          ? () => {
+              applyQueryTextFromPin(filterQuery);
+              closeDrawer();
+            }
+          : undefined,
+      });
+    }
+
     for (const p of pins) {
       const valueSource =
         p.source === "resource"
@@ -630,10 +714,10 @@ export const DrawerHeader = memo(function DrawerHeader({
     resources.resourceAttributes,
     conversationCoveredByIndicator,
     toggleFacet,
+    applyQueryTextFromPin,
     closeDrawer,
     openDrawer,
     setViewMode,
-    setActiveTab,
     selectSpan,
   ]);
 
@@ -719,7 +803,12 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const chipDefs = useTraceHeaderChipDefs(trace, {
     onSelectSpan: selectSpan,
-    onOpenPromptsTab: () => setActiveTab("prompts"),
+    // `onOpenPromptsTab` is a no-op after the redesign — selecting the
+    // span (via `onSelectSpan`) lands the user on SpanDetailPane and
+    // the body adapts to show the PromptsPanel automatically.
+    onOpenPromptsTab: () => {
+      // intentional no-op — see comment above
+    },
   });
   // Source chips: cap inline at 10 so multi-evaluator traces don't hide
   // their second & third verdicts in the overflow popover by default —
@@ -728,11 +817,21 @@ export const DrawerHeader = memo(function DrawerHeader({
   // rolls into "+N more" so the row stays scannable.
   const { primary: primaryChips, overflowChip: chipsOverflow } =
     splitChipsForOverflow(chipDefs, 10);
-  // Pins: auto-pins (identity/run/tag) always inline, custom pins capped at
-  // 3 inline with the rest in a "+N pinned" popover. Anyone can pin
-  // arbitrary attributes, so this keeps the row from running away.
+  // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata
+  // pins inline up to MAX_INLINE_PINS — the rest still spill into the
+  // overflow popover so a pathological 200-pin trace can't blow out the
+  // header. The strip itself already wraps to multiple rows
+  // (`flexWrap="wrap"` on the HStack below), so a cap of 12 lets typical
+  // metadata-heavy traces breathe across 2-3 wrapped rows without
+  // hiding anything the user expected to see.
+  //
+  // Previous behaviour was a cap of 3 with overflow — which the customer
+  // (Trace Explorer power user) called out specifically: pinning 5
+  // metadata fields left them looking at three pills plus a "+2 pinned"
+  // chip, with no indication of what they'd asked to see.
+  const MAX_INLINE_PINS = 12;
   const pinResult = renderPinPills(categorizedPins, removePin, {
-    maxCustomInline: 3,
+    maxCustomInline: MAX_INLINE_PINS,
   });
 
   return (

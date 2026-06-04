@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
@@ -26,6 +26,17 @@ interface SidebarSectionProps {
   hasActive?: boolean;
   /** Drag handle props from a sortable parent — enables the grip. */
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  /**
+   * Optional handler that removes this section from the sidebar (writes
+   * to the per-user `facetVisibilityStore`). When provided, the header
+   * grows a small × button that's revealed on hover so the affordance
+   * doesn't claim chrome on every row. When omitted, no hide button is
+   * rendered — used for sections without a registered key (or where
+   * the parent doesn't want to expose hiding).
+   */
+  onHide?: () => void;
+  /** Tooltip text for the hide button (defaults to "Hide section"). */
+  hideLabel?: string;
   /**
    * Fired on shift-click of the header so the parent can collapse-all /
    * expand-all in one go. `nextOpen` is the state the clicked section
@@ -69,6 +80,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   activeIndicator,
   hasActive = false,
   dragHandleProps,
+  onHide,
+  hideLabel = "Hide section",
   onShiftToggle,
   orGroupId,
   orPeers,
@@ -270,6 +283,54 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               </Icon>
             </Button>
           </Collapsible.Trigger>
+          {onHide && (
+            // Hover-revealed × removes this section from the user's
+            // sidebar (writes `explicitlyHidden` in
+            // facetVisibilityStore). Renders as a SIBLING of the
+            // Collapsible.Trigger button instead of nested inside it
+            // — nested <button>s are invalid HTML and React flags
+            // them as hydration errors. The hover-reveal still works
+            // because the visibility cue is on the parent `[role=group]`
+            // VStack, which is `data-group`'d.
+            <Box
+              as="button"
+              aria-label={hideLabel}
+              title={hideLabel}
+              width="16px"
+              height="16px"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              borderRadius="sm"
+              color="fg.subtle"
+              flexShrink={0}
+              opacity={0}
+              _groupHover={{ opacity: 0.55 }}
+              // Keyboard users tab onto the hide button just like mouse
+              // users hover the group — surface the affordance the same
+              // way for both so the section-hide action isn't mouse-only.
+              _groupFocusWithin={{ opacity: 0.55 }}
+              _hover={{ opacity: 1, color: "fg", bg: "bg.muted" }}
+              _focusVisible={{
+                opacity: 1,
+                color: "fg",
+                bg: "bg.muted",
+                outline: "2px solid",
+                outlineColor: "blue.focusRing",
+                outlineOffset: "1px",
+              }}
+              transition="opacity 120ms ease, color 120ms ease"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onHide();
+              }}
+            >
+              <Icon boxSize="10px">
+                <X />
+              </Icon>
+            </Box>
+          )}
         </HStack>
 
         {pinnedContent && (
