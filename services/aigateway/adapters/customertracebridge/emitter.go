@@ -221,18 +221,81 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
-	// Gemini-native /v1beta passthrough bodies carry `contents` not
-	// `messages`. Convert to a synthetic chat-completion `messages`
-	// shape so the LangWatch trace viewer renders the conversation
-	// the same way it does for the OpenAI / Anthropic surfaces.
-	if reqType == domain.RequestTypePassthrough {
+	switch reqType {
+	case domain.RequestTypePassthrough:
+		// Gemini-native /v1beta bodies carry `contents` not `messages`.
+		// Convert to a synthetic chat-completion `messages` shape so the
+		// LangWatch trace viewer renders the conversation the same way
+		// it does for the OpenAI / Anthropic surfaces.
 		return geminiContentsAsMessages(body)
+	case domain.RequestTypeResponses:
+		// OpenAI Responses API (used by codex): `input` is either a
+		// string (single user turn) OR an array of messages. Both shapes
+		// are normalised to a chat-style messages array so downstream
+		// rendering matches the other surfaces.
+		return responsesInputAsMessages(body)
+	default:
+		r := gjson.GetBytes(body, "messages")
+		if !r.Exists() {
+			return ""
+		}
+		return r.Raw
 	}
-	r := gjson.GetBytes(body, "messages")
-	if !r.Exists() {
+}
+
+// responsesInputAsMessages normalises OpenAI Responses API `input` into
+// a chat-style `[{role, content}, …]` array. The Responses API accepts
+// `input` as either a bare string ("hello") or as a typed message array
+// ([{role:"user", content:[{type:"input_text", text:"..."}]}]). Both
+// shapes land here and get flattened to the same renderable form so
+// codex traces show the same input cell as OpenAI chat / Anthropic.
+func responsesInputAsMessages(body []byte) string {
+	input := gjson.GetBytes(body, "input")
+	if !input.Exists() {
 		return ""
 	}
-	return r.Raw
+	if input.Type == gjson.String {
+		return fmt.Sprintf(`[{"role":"user","content":%q}]`, input.String())
+	}
+	if !input.IsArray() {
+		return ""
+	}
+	var msgs []string
+	input.ForEach(func(_, m gjson.Result) bool {
+		role := m.Get("role").String()
+		if role == "" {
+			role = "user"
+		}
+		content := m.Get("content")
+		if !content.Exists() {
+			return true
+		}
+		if content.Type == gjson.String {
+			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, content.String()))
+			return true
+		}
+		if !content.IsArray() {
+			return true
+		}
+		var text strings.Builder
+		content.ForEach(func(_, part gjson.Result) bool {
+			if t := part.Get("text"); t.Exists() {
+				if text.Len() > 0 {
+					text.WriteByte('\n')
+				}
+				text.WriteString(t.String())
+			}
+			return true
+		})
+		if text.Len() > 0 {
+			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text.String()))
+		}
+		return true
+	})
+	if len(msgs) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(msgs, ",") + "]"
 }
 
 // geminiContentsAsMessages flattens Gemini's `systemInstruction` +
@@ -295,50 +358,282 @@ func joinGeminiPartsText(parts gjson.Result) string {
 	return out.String()
 }
 
-// extractOutputMessages returns the JSON-encoded assistant message(s) from the response body.
+// extractOutputMessages returns the JSON-encoded assistant message(s)
+// from the response body. The body may be either a single JSON object
+// (sync /v1/messages /v1/chat/completions /v1/responses /v1beta..:generateContent
+// response) or the concatenated SSE chunks from the streaming variant
+// (the trace stream wrapper accumulates every chunk into one buffer
+// then hands it here). For streamed bodies the JSON-first parse falls
+// through and the SSE walker reassembles the assistant text out of the
+// provider-native delta event shape.
 func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
+	streamed := looksLikeSSE(body)
 	switch reqType {
 	case domain.RequestTypeChat:
-		// OpenAI: choices[].message
-		choices := gjson.GetBytes(body, "choices")
-		if !choices.Exists() {
-			return ""
-		}
-		var msgs []string
-		choices.ForEach(func(_, v gjson.Result) bool {
-			msg := v.Get("message")
-			if msg.Exists() {
-				msgs = append(msgs, msg.Raw)
+		if streamed {
+			if out := openAIChatOutputFromSSE(body); out != "" {
+				return out
 			}
-			return true
-		})
-		if len(msgs) == 0 {
-			return ""
 		}
-		return "[" + strings.Join(msgs, ",") + "]"
+		return openAIChatOutputFromJSON(body)
 	case domain.RequestTypeMessages:
-		// Anthropic: content array is the output, wrap as assistant message
-		content := gjson.GetBytes(body, "content")
-		if !content.Exists() {
-			return ""
+		if streamed {
+			if out := anthropicOutputFromSSE(body); out != "" {
+				return out
+			}
 		}
-		return `[{"role":"assistant","content":` + content.Raw + `}]`
+		return anthropicOutputFromJSON(body)
+	case domain.RequestTypeResponses:
+		if streamed {
+			if out := responsesOutputFromSSE(body); out != "" {
+				return out
+			}
+		}
+		return responsesOutputFromJSON(body)
 	case domain.RequestTypePassthrough:
-		// Gemini-native: candidates[].content.parts[].text. The bytes here
-		// are either a single :generateContent JSON or the concatenated
-		// SSE chunks from streamGenerateContent (the trace wrapper now
-		// stamps the LAST chunk's body); both use the same nested shape.
-		text := joinGeminiPartsText(
-			gjson.GetBytes(body, "candidates.0.content.parts"),
-		)
-		if text == "" {
-			return ""
+		if streamed {
+			if out := geminiOutputFromSSE(body); out != "" {
+				return out
+			}
 		}
-		return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text)
+		return geminiOutputFromJSON(body)
 	default:
 		return ""
 	}
+}
+
+// looksLikeSSE returns true if the body's leading non-whitespace bytes
+// match SSE framing rather than a JSON object. Both the streaming and
+// non-streaming paths land in extractOutputMessages with the same byte
+// slice; the dispatch has to detect which shape it is. SSE always opens
+// with one of `event:`, `data:`, or `:` (comment); JSON always opens
+// with `{` or `[`. Using a leading-prefix test (not a substring scan)
+// keeps the check cheap on multi-MB streamed buffers.
+func looksLikeSSE(body []byte) bool {
+	for i, b := range body {
+		switch b {
+		case ' ', '\t', '\r', '\n':
+			continue
+		case '{', '[':
+			return false
+		default:
+			rest := body[i:]
+			return strings.HasPrefix(string(rest), "event:") ||
+				strings.HasPrefix(string(rest), "data:") ||
+				strings.HasPrefix(string(rest), ":")
+		}
+	}
+	return false
+}
+
+func openAIChatOutputFromJSON(body []byte) string {
+	choices := gjson.GetBytes(body, "choices")
+	if !choices.Exists() || !choices.IsArray() {
+		return ""
+	}
+	var msgs []string
+	choices.ForEach(func(_, v gjson.Result) bool {
+		msg := v.Get("message")
+		if msg.Exists() {
+			msgs = append(msgs, msg.Raw)
+		}
+		return true
+	})
+	if len(msgs) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(msgs, ",") + "]"
+}
+
+// openAIChatOutputFromSSE walks OpenAI's chat-completion SSE deltas
+// (data: {"choices":[{"delta":{"content":"…"}}]}) and concatenates the
+// content fragments. Tool-call deltas are ignored for the human-readable
+// trace cell; we only need the assistant text.
+func openAIChatOutputFromSSE(body []byte) string {
+	var text strings.Builder
+	walkSSEData(body, func(data []byte) {
+		delta := gjson.GetBytes(data, "choices.0.delta.content")
+		if delta.Exists() && delta.Type == gjson.String {
+			text.WriteString(delta.String())
+		}
+	})
+	if text.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+}
+
+func anthropicOutputFromJSON(body []byte) string {
+	content := gjson.GetBytes(body, "content")
+	if !content.Exists() || !content.IsArray() {
+		return ""
+	}
+	return `[{"role":"assistant","content":` + content.Raw + `}]`
+}
+
+// anthropicOutputFromSSE walks Anthropic's streaming wire (event: …
+// data: …\n\n) reassembling the assistant text. The shape is a flat
+// stream of content_block_start / content_block_delta(text_delta) /
+// content_block_stop / message_delta events; we only need the
+// text_delta payloads concatenated in order to recover what the
+// assistant said.
+func anthropicOutputFromSSE(body []byte) string {
+	var text strings.Builder
+	walkSSEData(body, func(data []byte) {
+		eventType := gjson.GetBytes(data, "type").String()
+		if eventType != "content_block_delta" {
+			return
+		}
+		deltaType := gjson.GetBytes(data, "delta.type").String()
+		if deltaType != "text_delta" {
+			return
+		}
+		if t := gjson.GetBytes(data, "delta.text"); t.Exists() {
+			text.WriteString(t.String())
+		}
+	})
+	if text.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":[{"type":"text","text":%q}]}]`, text.String())
+}
+
+func responsesOutputFromJSON(body []byte) string {
+	// OpenAI Responses API sync: `output` is an array of items, each a
+	// message whose `content` is an array of parts with `text` fields.
+	output := gjson.GetBytes(body, "output")
+	if !output.Exists() || !output.IsArray() {
+		return ""
+	}
+	var text strings.Builder
+	output.ForEach(func(_, item gjson.Result) bool {
+		if item.Get("type").String() != "message" {
+			return true
+		}
+		parts := item.Get("content")
+		if !parts.Exists() || !parts.IsArray() {
+			return true
+		}
+		parts.ForEach(func(_, p gjson.Result) bool {
+			if t := p.Get("text"); t.Exists() {
+				if text.Len() > 0 {
+					text.WriteByte('\n')
+				}
+				text.WriteString(t.String())
+			}
+			return true
+		})
+		return true
+	})
+	if text.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+}
+
+// responsesOutputFromSSE walks Responses-API SSE
+// (response.output_text.delta events carry .delta string fragments;
+// response.completed carries the final .response.output array). Prefer
+// the completed snapshot if present, otherwise concatenate deltas.
+func responsesOutputFromSSE(body []byte) string {
+	var completedSnapshot string
+	var deltas strings.Builder
+	walkSSEData(body, func(data []byte) {
+		t := gjson.GetBytes(data, "type").String()
+		switch t {
+		case "response.completed":
+			if r := gjson.GetBytes(data, "response.output"); r.Exists() {
+				// Wrap in the same shape as sync responsesOutputFromJSON
+				// by re-running the JSON helper against a synthetic body.
+				synth := []byte(`{"output":` + r.Raw + `}`)
+				if out := responsesOutputFromJSON(synth); out != "" {
+					completedSnapshot = out
+				}
+			}
+		case "response.output_text.delta":
+			if d := gjson.GetBytes(data, "delta"); d.Exists() && d.Type == gjson.String {
+				deltas.WriteString(d.String())
+			}
+		}
+	})
+	if completedSnapshot != "" {
+		return completedSnapshot
+	}
+	if deltas.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, deltas.String())
+}
+
+func geminiOutputFromJSON(body []byte) string {
+	text := joinGeminiPartsText(gjson.GetBytes(body, "candidates.0.content.parts"))
+	if text == "" {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text)
+}
+
+// geminiOutputFromSSE concatenates candidates[0].content.parts[*].text
+// across every SSE data event. Each chunk carries a delta block whose
+// parts array holds the new tokens for that step; the full assistant
+// turn is the in-order concatenation across all chunks.
+func geminiOutputFromSSE(body []byte) string {
+	var text strings.Builder
+	walkSSEData(body, func(data []byte) {
+		parts := gjson.GetBytes(data, "candidates.0.content.parts")
+		if !parts.Exists() || !parts.IsArray() {
+			return
+		}
+		parts.ForEach(func(_, p gjson.Result) bool {
+			if t := p.Get("text"); t.Exists() {
+				text.WriteString(t.String())
+			}
+			return true
+		})
+	})
+	if text.Len() == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+}
+
+// walkSSEData iterates every `data: …` line in the body, invoking fn
+// with the raw JSON bytes that follow `data: `. Lines starting with
+// `event:` / blank lines / `data: [DONE]` are skipped. Multi-line data
+// blocks (rare in LLM SSE) are joined with newlines per the SSE spec.
+func walkSSEData(body []byte, fn func(data []byte)) {
+	var buf strings.Builder
+	flush := func() {
+		if buf.Len() == 0 {
+			return
+		}
+		payload := strings.TrimSpace(buf.String())
+		buf.Reset()
+		if payload == "" || payload == "[DONE]" {
+			return
+		}
+		fn([]byte(payload))
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		if line == "" || line == "\r" {
+			flush()
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			rest := strings.TrimPrefix(line, "data:")
+			rest = strings.TrimPrefix(rest, " ")
+			if buf.Len() > 0 {
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(strings.TrimRight(rest, "\r"))
+			continue
+		}
+		// Any non-data line (event: / id: / retry: / comment) flushes
+		// the pending block so the next data line starts fresh.
+		flush()
+	}
+	flush()
 }
