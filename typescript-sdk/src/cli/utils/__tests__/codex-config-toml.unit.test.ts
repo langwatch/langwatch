@@ -33,7 +33,8 @@ describe("buildCodexOtelBlock", () => {
     expect(out).toContain("# >>> langwatch otel begin >>>");
     expect(out).toContain("# <<< langwatch otel end <<<");
     expect(out).toContain("[otel]");
-    expect(out).toContain("[otel.exporter.otlp-http]");
+    expect(out).toContain("[otel.trace_exporter.otlp-http]");
+    expect(out).not.toContain("[otel.exporter.otlp-http]");
     expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel"`);
     expect(out).toContain(`protocol = "json"`);
   });
@@ -85,7 +86,7 @@ describe("writeCodexOtelBlock", () => {
       const contents = fs.readFileSync(filePath, "utf8");
       expect(contents.startsWith(prior)).toBe(true);
       expect(contents).toContain("# >>> langwatch otel begin >>>");
-      expect(contents).toContain("[otel.exporter.otlp-http]");
+      expect(contents).toContain("[otel.trace_exporter.otlp-http]");
     });
   });
 

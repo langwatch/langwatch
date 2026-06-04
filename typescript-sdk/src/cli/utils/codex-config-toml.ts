@@ -64,7 +64,7 @@ export function buildCodexOtelBlock(inputs: CodexOtelBlockInputs): string {
     "[otel]",
     `environment = "${env}"`,
     "",
-    "[otel.exporter.otlp-http]",
+    "[otel.trace_exporter.otlp-http]",
     `endpoint = "${inputs.endpoint}"`,
     `protocol = "json"`,
     END,
