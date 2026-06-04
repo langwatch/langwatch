@@ -9,6 +9,7 @@ import (
 
 	"github.com/tidwall/gjson"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -26,6 +27,9 @@ const (
 	attrCost           = attribute.Key("gen_ai.usage.cost")
 	attrInputMessages  = attribute.Key("gen_ai.input.messages")
 	attrOutputMessages = attribute.Key("gen_ai.output.messages")
+	// attrDrop marks a span the gateway started but does not want exported
+	// (zero-cost, no-output probe calls). dropFilterExporter omits these.
+	attrDrop = attribute.Key("langwatch.reserved.drop")
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
@@ -35,6 +39,39 @@ type Emitter struct {
 	tp         *sdktrace.TracerProvider
 	tracer     trace.Tracer
 	propagator propagation.TextMapPropagator
+}
+
+// dropFilterExporter omits spans the emitter marked with attrDrop (zero-cost,
+// no-output probe calls) before they reach the customer's OTLP endpoint. The
+// span is still started + ended in-process (so there is no span leak); it is
+// simply not exported. Keeping the decision at export time avoids fighting the
+// OTel span lifecycle, which has no way to cancel an already-started span.
+type dropFilterExporter struct {
+	inner sdktrace.SpanExporter
+}
+
+func (d dropFilterExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	kept := spans[:0]
+	for _, s := range spans {
+		drop := false
+		for _, a := range s.Attributes() {
+			if a.Key == attrDrop && a.Value.AsBool() {
+				drop = true
+				break
+			}
+		}
+		if !drop {
+			kept = append(kept, s)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	return d.inner.ExportSpans(ctx, kept)
+}
+
+func (d dropFilterExporter) Shutdown(ctx context.Context) error {
+	return d.inner.Shutdown(ctx)
 }
 
 // EmitterOptions configures the Emitter.
@@ -50,7 +87,7 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := newRouterExporter(opts.Registry)
+	router := dropFilterExporter{inner: newRouterExporter(opts.Registry)}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
@@ -150,13 +187,40 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
 	}
+
+	// When the request failed upstream, stamp the provider's HTTP status +
+	// error class so the trace renders as an error instead of silently dropping
+	// (previously the span was never ended on error, losing the failure).
+	isError := params.UpstreamStatusCode >= 400 || params.UpstreamErrorType != ""
+	if params.UpstreamStatusCode >= 400 {
+		attrs = append(attrs, semconv.HTTPResponseStatusCodeKey.Int(params.UpstreamStatusCode))
+	}
+	if params.UpstreamErrorType != "" {
+		attrs = append(attrs, semconv.ErrorTypeKey.String(params.UpstreamErrorType))
+	}
 	span.SetAttributes(attrs...)
 
 	if input := extractInputMessages(params.RequestBody, params.RequestType); input != "" {
 		span.SetAttributes(attrInputMessages.String(input))
 	}
-	if output := extractOutputMessages(params.ResponseBody, params.RequestType); output != "" {
+	output := extractOutputMessages(params.ResponseBody, params.RequestType)
+	if output != "" {
 		span.SetAttributes(attrOutputMessages.String(output))
+	}
+
+	if isError {
+		span.SetStatus(codes.Error, params.UpstreamErrorType)
+	}
+
+	// Suppress zero-cost, no-output, successful spans: these are claude-code's
+	// internal probe calls (system-reminder / skills-list pings) that return no
+	// usage and no assistant content, so they'd otherwise clutter the trace list
+	// with empty $0 rows. Keep anything with output OR cost OR an error. The
+	// drop marker is honored by dropFilterExporter at export time. PATH-A ONLY:
+	// Path B (claude-code direct OTLP) does not route through the gateway, so its
+	// probes are not affected here.
+	if !isError && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+		span.SetAttributes(attrDrop.Bool(true))
 	}
 
 	span.End()

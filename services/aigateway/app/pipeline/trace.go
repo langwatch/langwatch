@@ -2,12 +2,39 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/forkedcontext"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
+
+// classifyUpstream maps a dispatch error to an HTTP status + short error-class
+// token for the customer trace. A *domain.UpstreamError forwards the provider's
+// verbatim status; everything else collapses to a generic 502/provider_error so
+// the trace still records that the request failed rather than dropping silently.
+func classifyUpstream(err error) (status int, errType string) {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) {
+		status = ue.StatusCode
+		switch {
+		case status == 429:
+			return status, "rate_limited"
+		case status == 504 || status == 408:
+			return status, "provider_timeout"
+		case status >= 500:
+			return status, "provider_error"
+		case status == 404:
+			return status, "not_found"
+		case status >= 400:
+			return status, "bad_request"
+		default:
+			return status, "provider_error"
+		}
+	}
+	return 502, "provider_error"
+}
 
 // BeginSpanFunc starts a customer trace span and returns the enriched context
 // plus a W3C traceparent string representing the new span.
@@ -27,6 +54,23 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 
 				resp, err := next(spanCtx, call)
 				if err != nil {
+					// End the span on error too (previously this early-returned,
+					// leaking the begin() span AND dropping the failed request from
+					// the trace). Stamp the upstream status so the trace shows red.
+					if call.Request.Resolved != nil {
+						status, errType := classifyUpstream(err)
+						end(spanCtx, domain.AITraceParams{
+							ProjectID:          call.Bundle.ProjectID,
+							Model:              call.Request.Resolved.ModelID,
+							ProviderID:         call.Request.Resolved.ProviderID,
+							RequestType:        call.Request.Type,
+							VirtualKeyID:       call.Bundle.VirtualKeyID,
+							GatewayRequestID:   call.Meta.GatewayRequestID,
+							RequestBody:        call.Request.Body,
+							UpstreamStatusCode: status,
+							UpstreamErrorType:  errType,
+						})
+					}
 					return nil, err
 				}
 				if call.Request.Resolved != nil {
@@ -52,6 +96,23 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 
 				iter, err := next(spanCtx, call)
 				if err != nil {
+					// Stream failed to establish (e.g. upstream 504 before the
+					// first chunk). End the span with the error stamped so the
+					// failure is visible instead of silently dropped.
+					if call.Request.Resolved != nil {
+						status, errType := classifyUpstream(err)
+						end(spanCtx, domain.AITraceParams{
+							ProjectID:          call.Bundle.ProjectID,
+							Model:              call.Request.Resolved.ModelID,
+							ProviderID:         call.Request.Resolved.ProviderID,
+							RequestType:        call.Request.Type,
+							VirtualKeyID:       call.Bundle.VirtualKeyID,
+							GatewayRequestID:   call.Meta.GatewayRequestID,
+							RequestBody:        call.Request.Body,
+							UpstreamStatusCode: status,
+							UpstreamErrorType:  errType,
+						})
+					}
 					return nil, err
 				}
 				if call.Request.Resolved == nil {
@@ -156,20 +217,30 @@ func (w *traceStreamWrapper) onClose() {
 		w.bodyMu.Lock()
 		body := w.body
 		w.bodyMu.Unlock()
+		// A stream that errored mid-flight (e.g. upstream dropped the
+		// connection) carries the error on the inner iterator; stamp it so the
+		// trace records the failure instead of looking like a clean response.
+		var status int
+		var errType string
+		if err := w.inner.Err(); err != nil {
+			status, errType = classifyUpstream(err)
+		}
 		// Use spanCtx (not the caller's Next ctx) because the active span is
 		// stored there by BeginSpan — the transport's request context doesn't
 		// carry it.
 		forkedcontext.ForkWithTimeout(w.spanCtx, 5*time.Second, func(ctx context.Context) error {
 			w.end(ctx, domain.AITraceParams{
-				ProjectID:        w.bundle.ProjectID,
-				Model:            w.req.Resolved.ModelID,
-				ProviderID:       w.req.Resolved.ProviderID,
-				Usage:            w.inner.Usage(),
-				RequestType:      w.req.Type,
-				VirtualKeyID:     w.bundle.VirtualKeyID,
-				GatewayRequestID: w.meta.GatewayRequestID,
-				RequestBody:      w.req.Body,
-				ResponseBody:     body,
+				ProjectID:          w.bundle.ProjectID,
+				Model:              w.req.Resolved.ModelID,
+				ProviderID:         w.req.Resolved.ProviderID,
+				Usage:              w.inner.Usage(),
+				RequestType:        w.req.Type,
+				VirtualKeyID:       w.bundle.VirtualKeyID,
+				GatewayRequestID:   w.meta.GatewayRequestID,
+				RequestBody:        w.req.Body,
+				ResponseBody:       body,
+				UpstreamStatusCode: status,
+				UpstreamErrorType:  errType,
 			})
 			return nil
 		})

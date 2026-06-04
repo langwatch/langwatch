@@ -52,4 +52,13 @@ type AITraceParams struct {
 	// extraction. Either may be nil (e.g. streaming responses).
 	RequestBody  []byte
 	ResponseBody []byte
+
+	// UpstreamStatusCode is the provider's terminal HTTP status when the
+	// request failed upstream (0 on success). Stamped on the customer span so
+	// the trace surfaces the failure instead of being silently dropped.
+	UpstreamStatusCode int
+
+	// UpstreamErrorType is a short error-class token (e.g. provider_timeout,
+	// bad_request) recorded as the span's error.type when the request failed.
+	UpstreamErrorType string
 }
