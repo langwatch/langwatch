@@ -129,17 +129,7 @@ const LANGY_HANDLER_AUTH_REASON =
 const secured = createServiceApp({ basePath: "/api" });
 
 secured.hono.use("/langy/*", async (c, next) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
-  // Staff always have Langy; the flag only opens it to non-staff. The `||`
-  // short-circuits for staff, so the flag is never read for them.
-  const enabled =
-    isLangwatchStaff(session?.user?.email) ||
-    (await featureFlagService.isEnabled("release_langy_enabled", {
-      distinctId: session?.user?.id ?? "",
-    }));
-  if (!enabled) {
-    return c.json({ error: "Langy is not currently enabled" }, 403);
-  }
+  await getServerAuthSession({ req: c.req.raw as any });
   await next();
 });
 
