@@ -155,9 +155,13 @@ async function runInstall(
   };
 
   if (tool === "codex" && !options.envOnly) {
+    // codex's OTLP/HTTP exporter sends every signal to the configured
+    // endpoint verbatim — it does NOT append `/v1/traces` the way the
+    // OTel SDKs do. Spell the trace-signal suffix out (mirror of the
+    // wrapper-mode.ts behaviour) so the POST lands on the real handler.
     const result = writeCodexOtelBlock(
       {
-        endpoint,
+        endpoint: `${endpoint}/v1/traces`,
         ingestionToken: token,
         environment: cfg.organization?.slug ?? "langwatch",
       },
@@ -191,6 +195,10 @@ function buildEnvBlock(
     case "claude_code":
       return [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+        // Without OTEL_LOG_USER_PROMPTS=1 claude code redacts the
+        // prompt body, leaving /me/traces with empty input. Mirror
+        // the wrapper + drawer + docs which all set this.
+        `export OTEL_LOG_USER_PROMPTS=1`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
