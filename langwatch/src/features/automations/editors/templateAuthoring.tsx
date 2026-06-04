@@ -165,6 +165,25 @@ export function LiquidEditor({
         if (current) validateLiquidModel(monaco, current, variables);
       });
     }
+    // Escape inside Monaco normally bubbles up to the surrounding Drawer and
+    // closes it, which costs the author every unsaved edit in one keystroke.
+    // Trap Escape at the editor's DOM root and stop propagation; Monaco's
+    // own handlers (close completion popup, exit suggest) still fire because
+    // they run on the editor's command bus, not on the bubbling DOM event.
+    const editorEl = editor.getDomNode();
+    if (editorEl) {
+      editorEl.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+          }
+        },
+        // `capture: true` so Chakra/Radix `Dialog.Content`'s own bubble-phase
+        // Escape handler (which closes the drawer) never sees it.
+        { capture: true },
+      );
+    }
     setMounted(true);
   };
 
@@ -201,9 +220,13 @@ export function LiquidEditor({
 export function CompactEmailPreview({
   subject,
   html,
+  previewHeight = "220px",
 }: {
   subject: string;
   html: string;
+  /** Default iframe height. Callers in drawers with lots of vertical room
+   *  pass a larger value; the user-resize handle still works. */
+  previewHeight?: string;
 }) {
   return (
     <VStack align="stretch" gap={1}>
@@ -222,7 +245,7 @@ export function CompactEmailPreview({
         borderColor="border"
         borderRadius="md"
         overflow="hidden"
-        height="220px"
+        height={previewHeight}
         minHeight="120px"
         bg="white"
         css={{ resize: "vertical" }}

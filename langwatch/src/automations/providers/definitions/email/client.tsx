@@ -13,6 +13,7 @@ import {
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
 } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -149,15 +150,22 @@ function EmailConfigForm({
     : slice.body.value;
 
   const emailPreview = ctx.preview;
-  // Immediate is the only live cadence — filter variables so authors only see
-  // what's actually populated for the dispatch path they're configuring.
+  // Filter the variable surface to what's populated at the author's current
+  // cadence — digest exposes `digest.windowStart` / `windowEnd`, immediate
+  // hides them so authors don't reach for variables that always render
+  // empty. The inline cadence selector below lets them switch without
+  // leaving the screen.
   const variables = useMemo(
-    () => filterVariablesForCadence(ctx.variables, "immediate"),
-    [ctx.variables],
+    () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
+    [ctx.variables, ctx.cadenceMode],
   );
 
   return (
     <VStack align="stretch" gap={4}>
+      <InlineCadenceSelect
+        value={ctx.notificationCadence}
+        onChange={ctx.setNotificationCadence}
+      />
       <Field.Root>
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>
@@ -259,7 +267,7 @@ function EmailConfigForm({
       />
       <LiquidEditor
         variables={variables}
-        height="280px"
+        height="520px"
         value={bodyValue}
         onChange={(value) =>
           onChange({ ...slice, body: { value, usingDefault: false } })
@@ -270,6 +278,7 @@ function EmailConfigForm({
         <CompactEmailPreview
           subject={emailPreview.subject}
           html={emailPreview.html}
+          previewHeight="520px"
         />
       ) : null}
     </VStack>

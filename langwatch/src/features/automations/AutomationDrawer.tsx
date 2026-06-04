@@ -437,6 +437,9 @@ export function AutomationDrawer({
       // Synchronous render — there is never a loading state to show.
       previewLoading: false,
       cadenceMode,
+      notificationCadence: draft.notificationCadence,
+      setNotificationCadence: (value) =>
+        dispatch({ type: "SET_CADENCE", value: value as NotificationCadence }),
       hasEvaluationFilter,
     }),
     [
@@ -446,6 +449,8 @@ export function AutomationDrawer({
       exampleContext,
       preview,
       cadenceMode,
+      draft.notificationCadence,
+      dispatch,
       hasEvaluationFilter,
     ],
   );

@@ -52,6 +52,37 @@ function isInsideString(source: string, position: number): boolean {
   return inString;
 }
 
+/** Block-tag pairs whose body never contributes to JSON output — the body
+ *  is either a string declaration (`{% capture %}`) or a comment. Treating
+ *  the whole region as one tag span is correct AND avoids the per-span
+ *  treatment turning `{{ ... }}` inside the body into `"___"` at top-level
+ *  (which then trips JSON validation). */
+const PASSTHROUGH_BLOCK_TAGS: Record<string, string> = {
+  capture: "endcapture",
+  comment: "endcomment",
+};
+
+/** Matches `{% [-]?\s*tagName\b ...` so we can recognise the opener for the
+ *  passthrough tags above. The `\b` boundary keeps `captured` etc. from
+ *  matching `capture`. */
+const PASSTHROUGH_OPENER_RE = new RegExp(
+  `^\\{%-?\\s*(${Object.keys(PASSTHROUGH_BLOCK_TAGS).join("|")})\\b`,
+);
+
+function findMatchingCloseTag(
+  source: string,
+  startAfterOpenerEnd: number,
+  closerName: string,
+): number {
+  // Allow whitespace and an optional leading `-` between `{%` and the tag
+  // name to mirror Liquid's whitespace-trim variants.
+  const closerRe = new RegExp(`\\{%-?\\s*${closerName}\\s*-?%\\}`);
+  closerRe.lastIndex = startAfterOpenerEnd;
+  const m = closerRe.exec(source.slice(startAfterOpenerEnd));
+  if (!m) return -1;
+  return startAfterOpenerEnd + m.index + m[0].length;
+}
+
 export function substituteLiquidForJsonValidation(
   source: string,
 ): LiquidSubstitutionResult {
@@ -90,6 +121,30 @@ export function substituteLiquidForJsonValidation(
     const end = endIdx + 2;
     const span = source.slice(next, end);
     const spanLength = end - next;
+
+    // Passthrough block tags (`{% capture %}…{% endcapture %}`,
+    // `{% comment %}…{% endcomment %}`): the body is a Liquid-only string
+    // declaration (or pure documentation), never inlined into the JSON.
+    // Per-span substitution would wrap embedded `{{ ... }}` in `"___"` at
+    // top level, producing invalid JSON and a misleading marker — fold
+    // the whole region into one tag span instead.
+    const passthroughOpener = !isOutput
+      ? PASSTHROUGH_OPENER_RE.exec(span)
+      : null;
+    if (passthroughOpener) {
+      const closerName = PASSTHROUGH_BLOCK_TAGS[passthroughOpener[1]!]!;
+      const blockEnd = findMatchingCloseTag(source, end, closerName);
+      if (blockEnd !== -1) {
+        const blockSpan = source.slice(next, blockEnd);
+        out += fill(blockSpan, " ");
+        liquidRanges.push({ start: next, end: blockEnd, kind: "tag" });
+        i = blockEnd;
+        continue;
+      }
+      // No closer — fall through to the single-tag treatment so the user
+      // still gets a clean span replacement up to `%}` and the editor's
+      // Liquid tokenizer can visually flag the missing closer.
+    }
 
     let replacement: string;
     if (!isOutput) {

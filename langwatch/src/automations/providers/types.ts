@@ -95,6 +95,15 @@ export interface ConfigFormCtx<TPreview = unknown> {
   /** "immediate" vs "digest" — derived from the draft's notificationCadence.
    *  Providers use it to pick template defaults or default-render shapes. */
   cadenceMode: "immediate" | "digest";
+  /** The full notification cadence value off the draft (e.g. "immediate",
+   *  "5min_digest", "1hour_digest"). Providers that want to expose an
+   *  inline cadence selector — because the choice affects which template
+   *  variables are available — read this and call `setNotificationCadence`. */
+  notificationCadence: string;
+  /** Updates the draft's notification cadence. Wired through the store so
+   *  the change is reflected everywhere (variable filter, preview, the
+   *  cadence secondary drawer). */
+  setNotificationCadence: (value: string) => void;
   /** True when the draft has any evaluations.* filter set — used by the
    *  Slack picker to surface the eval-failure template. */
   hasEvaluationFilter: boolean;

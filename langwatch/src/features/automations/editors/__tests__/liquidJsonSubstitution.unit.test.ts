@@ -75,4 +75,60 @@ describe("substituteLiquidForJsonValidation", () => {
       expect(JSON.parse(substituted)).toEqual({ text: 'a" _______' });
     });
   });
+
+  describe("given a capture block declaring a Liquid local at top level", () => {
+    it("folds the entire block into one whitespace-only tag span so embedded {{ ... }} does not produce stray top-level strings", () => {
+      const source = [
+        "{%- capture _url -%}",
+        "{{ project.url }}/messages?startDate={{ digest.windowStart | url_encode }}",
+        "{%- endcapture -%}",
+        '{"text": "{{ _url }}"}',
+      ].join("\n");
+      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
+        source,
+      );
+      // The capture region collapses to one tag span (blanks); only the
+      // trailing `{{ _url }}` inside the JSON string produces an additional
+      // output range filled with underscores.
+      expect(liquidRanges).toHaveLength(2);
+      expect(liquidRanges[0]!.kind).toBe("tag");
+      expect(liquidRanges[1]!.kind).toBe("output");
+      // The JSON object at the bottom is now parseable on its own. The
+      // exact underscore count mirrors `{{ _url }}` minus its surrounding
+      // quotes so positions still map back 1:1 onto the original source.
+      const objectStart = substituted.indexOf('{"text":');
+      const parsed = JSON.parse(substituted.slice(objectStart)) as {
+        text: string;
+      };
+      expect(/^_+$/.test(parsed.text)).toBe(true);
+    });
+  });
+
+  describe("given a comment block", () => {
+    it("folds the comment body into whitespace so its contents never reach JSON validation", () => {
+      const source = '{% comment %}{{ broken.var }}{% endcomment %}{"a": 1}';
+      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
+        source,
+      );
+      expect(liquidRanges).toHaveLength(1);
+      expect(liquidRanges[0]!.kind).toBe("tag");
+      const objectStart = substituted.indexOf('{"a":');
+      expect(JSON.parse(substituted.slice(objectStart))).toEqual({ a: 1 });
+    });
+  });
+
+  describe("given an unterminated capture block", () => {
+    it("falls back to per-span substitution so the editor still flags the missing closer", () => {
+      const source = "{%- capture _url -%}\n{{ project.url }}\n";
+      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
+        source,
+      );
+      // No `{% endcapture %}` to anchor on — the opener is treated as a
+      // single tag span (whitespace) and the body's `{{ project.url }}`
+      // gets the standard top-level output replacement so the JSON service
+      // emits its own position-accurate marker.
+      expect(liquidRanges.map((r) => r.kind)).toEqual(["tag", "output"]);
+      expect(substituted).toContain('"_______________"');
+    });
+  });
 });

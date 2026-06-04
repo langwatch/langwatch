@@ -1,6 +1,8 @@
-import { Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import { Button, createListCollection, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { SiSlack } from "react-icons/si";
+import { Select } from "~/components/ui/select";
+import { api } from "~/utils/api";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
@@ -14,6 +16,7 @@ import {
   DEFAULT_SLACK_TEMPLATE,
 } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -39,7 +42,12 @@ export interface SlackSlice {
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
 
 function initialSlice(): SlackSlice {
-  return { webhook: "", templateType: "string", template: EMPTY_FIELD };
+  // Block Kit is the default for new Slack automations — the framework
+  // ships pre-built layouts the user can pick from, and it renders much
+  // better in Slack than the plain-text fallback. Existing rows whose
+  // `slackTemplateType` is null are read as plain text upstream
+  // (`fromTriggerRow`) so we don't accidentally retype historical configs.
+  return { webhook: "", templateType: "block_kit", template: EMPTY_FIELD };
 }
 
 function isComplete(slice: SlackSlice): boolean {
@@ -105,12 +113,21 @@ function SlackConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
+      <InlineCadenceSelect
+        value={ctx.notificationCadence}
+        onChange={ctx.setNotificationCadence}
+      />
       <Field.Root>
         <Field.Label>Slack webhook URL</Field.Label>
         <Input
           value={slice.webhook}
           onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
           placeholder="https://hooks.slack.com/services/..."
+        />
+        <ReuseSlackWebhook
+          projectId={ctx.projectId}
+          currentWebhook={slice.webhook}
+          onPick={(webhook) => onChange({ ...slice, webhook })}
         />
       </Field.Root>
       <FieldHeader
@@ -214,6 +231,90 @@ function MessageTypeToggle({
       </Button>
     </HStack>
   );
+}
+
+/**
+ * Picks an existing Slack webhook off another automation in the same
+ * project. Most teams share a single Slack channel for alerts, and forcing
+ * the operator to copy the URL out of one automation row and paste it into
+ * the next is friction with no upside — the URL is the same secret across
+ * triggers. Hidden when no other Slack automation exists so it doesn't
+ * advertise an empty menu.
+ */
+function ReuseSlackWebhook({
+  projectId,
+  currentWebhook,
+  onPick,
+}: {
+  projectId: string;
+  currentWebhook: string;
+  onPick: (webhook: string) => void;
+}) {
+  const triggersQuery = api.automation.getTriggers.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  );
+
+  const options = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    for (const t of triggersQuery.data ?? []) {
+      if (t.action !== "SEND_SLACK_MESSAGE") continue;
+      const params = (t.actionParams ?? {}) as { slackWebhook?: string };
+      const url = params.slackWebhook;
+      if (!url) continue;
+      if (url === currentWebhook) continue;
+      if (seen.has(url)) continue;
+      seen.add(url);
+      out.push({
+        value: url,
+        // Show the host + the trigger that owns it so the operator can
+        // tell `#alerts` apart from `#oncall` without leaking the full URL.
+        label: `${t.name} — ${hostnameOnly(url)}`,
+      });
+    }
+    return out;
+  }, [triggersQuery.data, currentWebhook]);
+
+  const collection = useMemo(
+    () => createListCollection({ items: options }),
+    [options],
+  );
+
+  if (triggersQuery.isLoading) return null;
+  if (options.length === 0) return null;
+
+  return (
+    <Select.Root
+      collection={collection}
+      value={[]}
+      onValueChange={({ value }) => {
+        const next = value[0];
+        if (next) onPick(next);
+      }}
+      mt={2}
+    >
+      <Select.Trigger>
+        <Select.ValueText placeholder="Reuse webhook from another automation…" />
+      </Select.Trigger>
+      <Select.Content>
+        {options.map((opt) => (
+          <Select.Item key={opt.value} item={opt}>
+            <Text>{opt.label}</Text>
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
+function hostnameOnly(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname;
+  } catch {
+    return url;
+  }
 }
 
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
