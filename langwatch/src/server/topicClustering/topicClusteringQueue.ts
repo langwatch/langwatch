@@ -5,9 +5,9 @@ import { connection } from "../redis";
 import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import {
   TOPIC_CLUSTERING_QUEUE,
-  runTopicClusteringJob,
   type TopicClusteringJob,
-} from "./topicClusteringWorker";
+} from "./topicClusteringQueue.constants";
+import { runTopicClusteringJob } from "./topicClusteringWorker";
 
 export { TOPIC_CLUSTERING_QUEUE };
 

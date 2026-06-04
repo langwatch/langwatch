@@ -11,18 +11,14 @@ import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../metrics";
-import { connection, makeQueueName } from "../redis";
+import { connection } from "../redis";
 import { clusterTopicsForProject } from "./topicClustering";
+import {
+  TOPIC_CLUSTERING_QUEUE,
+  type TopicClusteringJob,
+} from "./topicClusteringQueue.constants";
 
-export type TopicClusteringJob = {
-  project_id: string;
-  search_after?: [number, string];
-};
-
-export const TOPIC_CLUSTERING_QUEUE = {
-  NAME: makeQueueName("topic_clustering"),
-  JOB: "topic_clustering",
-} as const;
+export { TOPIC_CLUSTERING_QUEUE, type TopicClusteringJob };
 
 const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
