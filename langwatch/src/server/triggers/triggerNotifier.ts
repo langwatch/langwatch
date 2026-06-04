@@ -11,8 +11,8 @@ import type { TriggerNotifier } from "~/server/app-layer/triggers/trigger-templa
  * `text` or allow-listed `blocks`) straight to the incoming webhook.
  */
 export const liveTriggerNotifier: TriggerNotifier = {
-  async sendEmail({ to, subject, html }) {
-    await sendEmail({ to, subject, html });
+  async sendEmail({ to, bcc, subject, html }) {
+    await sendEmail({ to, bcc, subject, html });
   },
   async sendSlack({ webhook, payload }) {
     await new IncomingWebhook(webhook).send(

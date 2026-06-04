@@ -161,6 +161,7 @@ export async function dispatchTriggerAction({
         triggerEmails: params.members ?? [],
         triggerData: [triggerData],
         triggerName: trigger.name,
+        triggerId: trigger.id,
         projectSlug: project.slug,
         triggerType: trigger.alertType,
         triggerMessage: trigger.message ?? "",

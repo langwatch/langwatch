@@ -1,4 +1,9 @@
 import type { AlertType } from "@prisma/client";
+import { computeDefaultFrom } from "~/server/mailer/emailSender";
+import {
+  buildTriggerNoReplyAddress,
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
+} from "~/server/mailer/triggerNoReply";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
@@ -26,7 +31,11 @@ export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
  *  hitting SES/SendGrid or a real Slack webhook. */
 export interface TriggerNotifier {
   sendEmail(args: {
-    to: string[];
+    /** Single visible recipient (the LangWatch no-reply for production
+     *  triggers). All actual recipients ride in `bcc` so they don't see each
+     *  other and can't be enumerated by external mailing-list integrations. */
+    to: string;
+    bcc: string[];
     subject: string;
     html: string;
   }): Promise<void>;
@@ -174,8 +183,13 @@ export class TriggerTemplateService {
         context,
         testFire: true,
       });
+      const noReplyTo = buildTriggerNoReplyAddress({
+        defaultFrom: computeDefaultFrom(),
+        triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+      });
       await this.notifier.sendEmail({
-        to: recipients,
+        to: noReplyTo,
+        bcc: recipients,
         subject: rendered.subject,
         html: rendered.html,
       });

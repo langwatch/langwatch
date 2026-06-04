@@ -49,6 +49,7 @@ describe("handleSendEmail", () => {
         triggerEmails: ["user1@example.com", "user2@example.com"],
         triggerData: context.triggerData,
         triggerName: "Test Trigger",
+        triggerId: "trigger-1",
         projectSlug: "test-project",
         triggerType: "CRITICAL",
         triggerMessage: "Custom alert message",

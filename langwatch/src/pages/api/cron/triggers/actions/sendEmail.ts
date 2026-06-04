@@ -12,6 +12,7 @@ export const handleSendEmail = async (context: TriggerContext) => {
       triggerEmails: actionParams.members ?? [],
       triggerData,
       triggerName: trigger.name,
+      triggerId: trigger.id,
       projectSlug,
       triggerType: trigger.alertType ?? null,
       triggerMessage: trigger.message ?? "",

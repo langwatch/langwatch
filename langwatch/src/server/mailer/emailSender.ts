@@ -20,8 +20,20 @@ type EmailContent = {
   subject: string;
   html: string;
   from?: string;
+  /** When present, these addresses are delivered as BCC — they don't appear
+   *  in the rendered message headers. Used by the trigger sender so
+   *  recipients can't enumerate each other. */
+  bcc?: string | string[];
+  /** Optional `Reply-To` header. Lets the To: be a no-reply while still
+   *  routing inbound replies somewhere useful. */
+  replyTo?: string;
   attachments?: EmailAttachment[];
 };
+
+function toArray(value: string | string[] | undefined): string[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
 
 const extractHostname = (baseHost: string): string => {
   // Try to parse as URL first
@@ -36,6 +48,18 @@ const extractHostname = (baseHost: string): string => {
   }
 };
 
+export const computeDefaultFrom = (): string => {
+  if (env.EMAIL_DEFAULT_FROM) return env.EMAIL_DEFAULT_FROM;
+  const hostname = extractHostname(env.BASE_HOST);
+  if (
+    hostname.includes("app.langwatch.ai") ||
+    hostname.includes("localhost")
+  ) {
+    return "LangWatch <contact@langwatch.ai>";
+  }
+  return `LangWatch <mailer@${hostname}>`;
+};
+
 export const sendEmail = async (content: EmailContent) => {
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     logger.error("No email sending method available. Skipping email sending.");
@@ -44,18 +68,7 @@ export const sendEmail = async (content: EmailContent) => {
     );
   }
 
-  const defaultFrom =
-    env.EMAIL_DEFAULT_FROM ??
-    (() => {
-      const hostname = extractHostname(env.BASE_HOST);
-      if (
-        hostname.includes("app.langwatch.ai") ||
-        hostname.includes("localhost")
-      ) {
-        return "LangWatch <contact@langwatch.ai>";
-      }
-      return `LangWatch <mailer@${hostname}>`;
-    })();
+  const defaultFrom = computeDefaultFrom();
 
   if (env.USE_AWS_SES && env.AWS_REGION) {
     return await sendWithSES(content, defaultFrom);
@@ -73,21 +86,31 @@ const sanitizeHeaderParam = (value: string): string =>
 const buildRawMimeMessage = ({
   from,
   to,
+  bcc,
+  replyTo,
   subject,
   html,
   attachments,
 }: {
   from: string;
   to: string[];
+  /** BCC recipients are NOT written into the MIME headers — SES uses the
+   *  envelope addresses from `SendRawEmail` to deliver them invisibly.
+   *  Including the field here is documentation-only; if the caller passes
+   *  bcc addresses we still don't render a `Bcc:` header. */
+  bcc?: string[];
+  replyTo?: string;
   subject: string;
   html: string;
   attachments: EmailAttachment[];
 }): string => {
+  void bcc;
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   const lines = [
     `From: ${sanitizeHeaderValue(from)}`,
     `To: ${to.map(sanitizeHeaderValue).join(", ")}`,
+    ...(replyTo ? [`Reply-To: ${sanitizeHeaderValue(replyTo)}`] : []),
     `Subject: ${sanitizeHeaderValue(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -119,20 +142,30 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
   logger.info("Sending email using AWS SES");
   const sesClient = new SESClient({ region: env.AWS_REGION });
   const from = content.from ?? defaultFrom;
-  const toAddresses = Array.isArray(content.to) ? content.to : [content.to];
+  const toAddresses = toArray(content.to);
+  const bccAddresses = toArray(content.bcc);
+  const replyToAddresses = content.replyTo ? [content.replyTo] : undefined;
 
   try {
     if (content.attachments && content.attachments.length > 0) {
       const rawMessage = buildRawMimeMessage({
         from,
         to: toAddresses,
+        bcc: bccAddresses,
+        replyTo: content.replyTo,
         subject: content.subject,
         html: content.html,
         attachments: content.attachments,
       });
 
+      // SES routes envelope to `Destinations`, which is the union of
+      // To/Cc/Bcc — the MIME headers above do NOT carry a Bcc line, so
+      // recipients only see the public To list. This is the canonical way
+      // to BCC through SendRawEmail.
+      const allDestinations = [...toAddresses, ...bccAddresses];
       const command = new SendRawEmailCommand({
         RawMessage: { Data: new TextEncoder().encode(rawMessage) },
+        Destinations: allDestinations,
       });
       const data = await sesClient.send(command);
       logger.info({ data }, "Email with attachments sent successfully");
@@ -140,12 +173,16 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
     }
 
     const command = new SendEmailCommand({
-      Destination: { ToAddresses: toAddresses },
+      Destination: {
+        ToAddresses: toAddresses,
+        ...(bccAddresses.length > 0 ? { BccAddresses: bccAddresses } : {}),
+      },
       Message: {
         Body: { Html: { Charset: "UTF-8", Data: content.html } },
         Subject: { Charset: "UTF-8", Data: content.subject },
       },
       Source: from,
+      ...(replyToAddresses ? { ReplyToAddresses: replyToAddresses } : {}),
     });
     const data = await sesClient.send(command);
     logger.info({ data }, "Email sent successfully");
@@ -159,11 +196,15 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
 const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
   sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
 
+  const bccAddresses = toArray(content.bcc);
+
   const msg = {
     to: content.to,
     from: content.from ?? defaultFrom,
     subject: content.subject,
     html: content.html,
+    ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
+    ...(content.replyTo && { replyTo: content.replyTo }),
     ...(content.attachments &&
       content.attachments.length > 0 && {
         attachments: content.attachments.map((att) => ({
