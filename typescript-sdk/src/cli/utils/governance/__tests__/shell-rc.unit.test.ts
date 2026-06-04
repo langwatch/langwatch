@@ -65,11 +65,20 @@ describe("buildExportBlock", () => {
     expect(block).toMatch(/^export ANTHROPIC_AUTH_TOKEN=vk-lw-test/m);
     expect(block).toMatch(/^export OPENAI_BASE_URL=/m);
     expect(block).toMatch(/^export OPENAI_API_KEY=/m);
-    expect(block).toMatch(/^export GOOGLE_GENAI_API_BASE=/m);
+    expect(block).toMatch(/^export GOOGLE_GEMINI_BASE_URL=/m);
     expect(block).toMatch(/^export GEMINI_API_KEY=/m);
     // duplicates collapsed: only one ANTHROPIC_BASE_URL despite many
-    // tools sharing it (claude / cursor / opencode all need it).
-    const matches = block.match(/ANTHROPIC_BASE_URL/g) ?? [];
+    // tools sharing it (claude / cursor / opencode all need it). The
+    // dedup is by KEY, first-write-wins; claude (no /v1 suffix) wins
+    // over opencode (/v1 suffix). That's intentional: shell-rc is for
+    // direct CLI invocation. claude-code + cursor prepend /v1 themselves
+    // so the /v1-less base is what they need. opencode does NOT prepend
+    // /v1 (Vercel AI SDK), so direct `opencode` (without `langwatch`
+    // wrapper) would 404 against shell-rc'd vars — opencode users must
+    // route through the wrapper, which sets the /v1-suffixed values
+    // per-tool. Documented gap; same as gemini-via-shell-rc requiring
+    // `langwatch gemini` for telemetry capture.
+    const matches = block.match(/^export ANTHROPIC_BASE_URL=/gm) ?? [];
     expect(matches.length).toBe(1);
     // No OTEL_*_EXPORTER injection — the wrapper is gateway-only.
     // The gateway captures full I/O server-side, so injecting OTEL

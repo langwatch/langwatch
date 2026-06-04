@@ -49,6 +49,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   if (!auth) return { vars: {} };
   switch (tool) {
     case "claude":
+      // claude-code (2.1.x) appends `/v1/messages` to ANTHROPIC_BASE_URL itself.
       return {
         vars: {
           ANTHROPIC_BASE_URL: gw,
@@ -56,6 +57,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         },
       };
     case "codex":
+      // codex 0.134 appends `/v1/chat/completions` itself.
       return {
         vars: {
           OPENAI_BASE_URL: gw,
@@ -72,23 +74,43 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         },
       };
     case "gemini":
+      // gemini-cli 0.46-preview honours `GOOGLE_GEMINI_BASE_URL`
+      // (verified empirically in the bundled binary). It POSTs to
+      // `{BASE}/models/{model}:generateContent` so the base must
+      // resolve to a `/v1beta` path on the gateway, which terminates
+      // the gemini-native passthrough route. `GOOGLE_GENAI_API_BASE`
+      // is NOT read by gemini-cli — it was a guess that silently
+      // no-op'd in earlier wrapper revisions.
       return {
         vars: {
-          GOOGLE_GENAI_API_BASE: gw,
+          GOOGLE_GEMINI_BASE_URL: `${gw}/v1beta`,
           GEMINI_API_KEY: auth,
+          GOOGLE_API_KEY: auth,
         },
       };
     case "opencode":
-      // opencode is multi-provider — it reads the standard
-      // OPENAI_*/ANTHROPIC_* env vars depending on which model the
-      // user selected at the prompt. Mirror cursor's both-pairs
-      // injection so any provider the user hops to lands at our gw.
+      // opencode 1.x is multi-provider; under the hood it uses the
+      // Vercel AI SDK, which appends `/messages` and `/chat/completions`
+      // to the configured base URL WITHOUT prepending `/v1`. So opencode
+      // needs the base to ALREADY include `/v1`, unlike claude-code +
+      // codex which append it themselves. Verified via `--log-level
+      // DEBUG` — opencode hit `${ANTHROPIC_BASE_URL}/messages` and
+      // got a gateway 404 because the gateway exposes `/v1/messages`.
+      //
+      // Also: opencode's provider auto-detection at init time gates on
+      // ANTHROPIC_API_KEY (NOT ANTHROPIC_AUTH_TOKEN, which claude-code
+      // uses). Without it, opencode logs `providerID=openai found` /
+      // `providerID=opencode found` but NOT anthropic, then fails any
+      // `--model anthropic/...` invocation with ProviderModelNotFoundError.
+      // Set both so anthropic is detected AND the gateway gets the VK on
+      // the wire (the AI SDK forwards x-api-key from ANTHROPIC_API_KEY).
       return {
         vars: {
-          OPENAI_BASE_URL: gw,
+          OPENAI_BASE_URL: `${gw}/v1`,
           OPENAI_API_KEY: auth,
-          ANTHROPIC_BASE_URL: gw,
+          ANTHROPIC_BASE_URL: `${gw}/v1`,
           ANTHROPIC_AUTH_TOKEN: auth,
+          ANTHROPIC_API_KEY: auth,
         },
       };
     default:

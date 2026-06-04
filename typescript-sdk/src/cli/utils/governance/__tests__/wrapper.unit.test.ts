@@ -50,18 +50,43 @@ describe("envForTool", () => {
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
   });
 
-  it("gemini → GOOGLE_GENAI_API_BASE + GEMINI_API_KEY", () => {
+  // Verified empirically against gemini-cli 0.46-preview: the binary
+  // reads GOOGLE_GEMINI_BASE_URL, NOT the previous GOOGLE_GENAI_API_BASE
+  // guess. POSTs `{BASE}/models/{m}:generateContent`, so the base must
+  // resolve to the gateway's `/v1beta` passthrough route.
+  it("gemini → GOOGLE_GEMINI_BASE_URL=$gw/v1beta + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
     const env = envForTool(cfg, "gemini").vars;
-    expect(env.GOOGLE_GENAI_API_BASE).toBe("http://gw.example.com");
+    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com/v1beta");
     expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
+    expect(env.GOOGLE_API_KEY).toBe("lw_vk_test_x");
+    expect(env.GOOGLE_GENAI_API_BASE).toBeUndefined();
   });
 
-  it("opencode → both Anthropic + OpenAI pairs (multi-provider)", () => {
+  // opencode 1.x uses the Vercel AI SDK, which posts to
+  // `{BASE}/messages` and `{BASE}/chat/completions` WITHOUT prepending
+  // /v1. So opencode needs the base to ALREADY include /v1, unlike
+  // claude-code + codex which append it themselves. Also opencode's
+  // anthropic-provider auto-detect gates on ANTHROPIC_API_KEY, not
+  // ANTHROPIC_AUTH_TOKEN — both must be set or `--model anthropic/...`
+  // fails ProviderModelNotFoundError at init time.
+  it("opencode → both Anthropic + OpenAI pairs with /v1 suffix + ANTHROPIC_API_KEY for provider auto-detect", () => {
     const env = envForTool(cfg, "opencode").vars;
-    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/v1");
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/v1");
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+    expect(env.ANTHROPIC_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  // Regression: claude + codex must NOT carry the /v1 suffix. Their
+  // CLIs append /v1 themselves; a double /v1 would 404.
+  it("claude + codex base URLs stay /v1-less (CLI appends /v1 itself)", () => {
+    expect(envForTool(cfg, "claude").vars.ANTHROPIC_BASE_URL).toBe(
+      "http://gw.example.com",
+    );
+    expect(envForTool(cfg, "codex").vars.OPENAI_BASE_URL).toBe(
+      "http://gw.example.com",
+    );
   });
 
   it("unknown tool → empty env", () => {
