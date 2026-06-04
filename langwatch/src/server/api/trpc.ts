@@ -16,6 +16,12 @@ import {
   TRPCError,
 } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+import {
+  SpanKind,
+  SpanStatusCode,
+  trace as otelTrace,
+  type Span,
+} from "@opentelemetry/api";
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
 interface CreateNextContextOptions {
@@ -391,74 +397,53 @@ const auditLogMutations = t.middleware(
   },
 );
 
+function spanAttributes(path: string, type: string) {
+  return {
+    "rpc.system": "trpc",
+    "rpc.method": path,
+    "rpc.type": type,
+  } as const;
+}
+
+function recordSpanError(span: Span, error: unknown): void {
+  const e = error instanceof Error ? error : new Error(String(error));
+  span.recordException(e);
+  span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
+}
+
 export const tracerMiddleware = t.middleware(
   async ({ path, type, next }) => {
-    const silenced = isSilencedCall(path, type);
+    const tracer = otelTrace.getTracer("langwatch:trpc");
+    const spanName = `trpc.${path}`;
 
-    // Fast-path: for silenced routes (presence heartbeats, SSE
-    // subscription messages) we skip span creation on success — those
-    // are the high-frequency calls that drown out the trace surface.
-    // On failure we still want a span so real errors stay visible
-    // (and we own the timing so the span duration matches the call).
-    if (silenced) {
-      const start = Date.now();
+    // For silenced routes (presence heartbeats, SSE subscription
+    // messages) we want zero spans on the happy path — they otherwise
+    // drown out the trace surface — but failures still need a span so
+    // real errors stay visible. Capture the start time before `next()`
+    // so the error span's duration matches the actual call.
+    if (isSilencedCall(path, type)) {
+      const startTime = Date.now();
       const result = await next();
       if (result.ok) return result;
 
-      const { trace, SpanKind, SpanStatusCode } = await import(
-        "@opentelemetry/api"
-      );
-      const tracer = trace.getTracer("langwatch:trpc");
-      const span = tracer.startSpan(`trpc.${path}`, {
+      const span = tracer.startSpan(spanName, {
         kind: SpanKind.SERVER,
-        startTime: start,
-        attributes: {
-          "rpc.system": "trpc",
-          "rpc.method": path,
-          "rpc.type": type,
-        },
+        startTime,
+        attributes: spanAttributes(path, type),
       });
-      const err = result.error;
-      span.recordException(err instanceof Error ? err : new Error(String(err)));
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: err instanceof Error ? err.message : String(err),
-      });
+      recordSpanError(span, result.error);
       span.end();
       return result;
     }
 
-    const { trace, SpanKind, SpanStatusCode } = await import(
-      "@opentelemetry/api"
-    );
-
-    const tracer = trace.getTracer("langwatch:trpc");
-    const spanName = `trpc.${path}`;
-
     return tracer.startActiveSpan(
       spanName,
-      {
-        kind: SpanKind.SERVER,
-        attributes: {
-          "rpc.system": "trpc",
-          "rpc.method": path,
-          "rpc.type": type,
-        },
-      },
+      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
       async (span) => {
         // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
         // returned as { ok: false, error } result objects — NOT thrown.
         const result = await next();
-
-        if (!result.ok) {
-          const err = result.error;
-          span.recordException(err instanceof Error ? err : new Error(String(err)));
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err instanceof Error ? err.message : String(err),
-          });
-        }
-
+        if (!result.ok) recordSpanError(span, result.error);
         span.end();
         return result;
       },
