@@ -36,6 +36,7 @@ import {
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -210,6 +211,25 @@ export const projectRouter = createTRPCRouter({
           apiKey: generateApiKey(),
         },
       });
+
+      // Best-effort: mint Langy's dedicated, least-privilege service key so the
+      // assistant works the moment the project exists. A failure here must never
+      // block project creation — the backfill reconciler mints any that slip through.
+      try {
+        await provisionLangyApiKey({
+          prisma,
+          projectId: project.id,
+          organizationId: input.organizationId,
+          createdByUserId: userId,
+        });
+      } catch (error) {
+        captureException(error, {
+          extra: {
+            projectId: project.id,
+            context: "provisionLangyApiKey:project.create",
+          },
+        });
+      }
 
       return { success: true, projectSlug: project.slug };
     }),
