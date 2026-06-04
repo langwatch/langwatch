@@ -332,20 +332,30 @@ Rule: Filter column layout
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied attributes
 
-  Scenario: Filter sidebar renders facet groups in fixed order
-    When the Observe page loads (and the user has expanded the sidebar)
-    Then the filter sidebar shows groups in this order: Trace, Subjects, Span, Evaluators, Metrics, Prompts
-    And the Trace group leads with Origin, Status, Error message, Guardrail, Contains AI, Root span type, Trace name, Model, Service, Topic, Subtopic, Label, Event
-    And range facets (Duration, Cost, Tokens, Prompt tokens, Completion tokens, TTFT, TTLT, Tokens/sec, Tokens estimated, Span count) live in the Metrics group
+  # Round 3 flattened the sidebar — there are no longer Trace /
+  # Subjects / Span / Evaluators / Metrics / Prompts headings between
+  # sections. The grouping has moved to the FacetManagerPopover and
+  # has been rebuilt around AI-observability axes:
+  #   Origin → Model → Cost → Errors → Quality → Events → Subjects
+  #   → Topics → Custom
+  # Drag-reorder operates section-by-section in the flat sidebar; the
+  # popover's groups are fixed for now (their order may become
+  # operator-customisable in a follow-up).
 
-  Scenario: Group headers can be reordered via drag-and-drop
-    When the user drags a group header to a new position
-    Then the FACET_GROUPS order updates in the sidebar
-    But sections within a group keep their registry order
+  Scenario: Filter sidebar renders facets as a flat, drag-reorderable list
+    When the Observe page loads (and the user has expanded the sidebar)
+    Then the filter sidebar shows facet sections in a flat list (no Trace / Subjects / Span / Evaluators headings)
+    And the operator can drag any section's grip handle to reorder its position in the list
+
+  Scenario: FacetManagerPopover groups facets by AI-observability axis
+    When the user opens the manage-facets popover from the sidebar header
+    Then the picker shows groups in this order: Origin, Model, Cost, Errors, Quality, Events, Subjects, Topics, Custom
+    And the Quality group lists evaluator, evaluator status, verdict, score, and annotation together
+    And the Cost group lists cost, the token family, and the latency family together
 
   Scenario: Dynamic facets appear only when data exists
     Given traces include user IDs
-    Then the User facet section appears in the Subjects group
+    Then the User facet section appears in the sidebar (under the Subjects group when viewed from the popover)
     Given no traces have label data
     Then the Label facet section is not rendered
 

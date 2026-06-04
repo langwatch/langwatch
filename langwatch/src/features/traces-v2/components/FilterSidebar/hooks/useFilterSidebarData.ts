@@ -309,7 +309,7 @@ export function useFilterSidebarData() {
     const out: Record<string, Array<{ key: string; label: string }>> = {};
     for (const key of orderedKeysAll) {
       if (isSectionVisibleForDensity(key)) continue;
-      const groupId = getFacetGroupId(key) ?? "trace";
+      const groupId = getFacetGroupId(key) ?? "custom";
       const label = sectionByKey.get(key)?.label ?? key;
       (out[groupId] ??= []).push({ key, label });
     }
@@ -420,7 +420,7 @@ export function partitionIntoGroups(
   }));
 
   if (ungrouped.length > 0) {
-    slices.push({ id: "trace", label: "Other", keys: ungrouped });
+    slices.push({ id: "custom", label: "Other", keys: ungrouped });
   }
   return slices;
 }

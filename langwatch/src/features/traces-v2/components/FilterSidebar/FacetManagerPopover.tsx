@@ -14,7 +14,9 @@ import {
   BadgeCheck,
   BarChart3,
   Bot,
+  Compass,
   Cpu,
+  Database,
   DollarSign,
   Filter,
   Hash,
@@ -40,15 +42,19 @@ import { FACET_GROUPS, getFacetGroupId } from "./constants";
 
 /** Lucide icon per facet group, rendered next to the group label so
  *  the picker telegraphs each cluster's "type" at a glance. Falls back
- *  to the generic Filter glyph for groups we add later without a
- *  hand-picked icon. */
+ *  to the generic Filter glyph for groups added later without a
+ *  hand-picked icon. Keys mirror the Round-3 AI-observability taxonomy
+ *  in `constants.FACET_GROUPS`. */
 const GROUP_ICON: Record<string, typeof Activity> = {
-  trace: Activity,
+  origin: Compass,
+  model: Sparkles,
+  cost: DollarSign,
+  errors: AlertCircle,
+  quality: BadgeCheck,
+  events: Activity,
   subjects: Users,
-  span: Layers,
-  evaluators: BadgeCheck,
-  metrics: BarChart3,
-  prompts: MessageSquareText,
+  topics: Tag,
+  custom: Database,
 };
 
 /** Per-key icon mapping for the most common facets. Anything not
@@ -179,7 +185,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
         const matchesKey = key.toLowerCase().includes(normalisedQuery);
         if (!matchesLabel && !matchesKey) continue;
       }
-      const groupId = getFacetGroupId(key) ?? "trace";
+      const groupId = getFacetGroupId(key) ?? "custom";
       (out[groupId] ??= []).push(key);
     }
     return out;
