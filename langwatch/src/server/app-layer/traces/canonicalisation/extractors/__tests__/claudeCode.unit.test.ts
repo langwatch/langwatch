@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { ClaudeCodeExtractor } from "../claudeCode";
+import {
+  ClaudeCodeExtractor,
+  extractAssistantTextFromResponseBody,
+} from "../claudeCode";
 import { createLogExtractorContext } from "./_testHelpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
@@ -114,5 +117,177 @@ describe("ClaudeCodeExtractor.applyLog", () => {
     expect(extractor.id).toBe("claude-code");
     // applyLog is present but apply is intentionally a no-op
     expect(typeof extractor.apply).toBe("function");
+  });
+
+  describe("when the event is api_response_body (OTEL_LOG_RAW_API_BODIES=1)", () => {
+    it("lifts concatenated assistant text from content[] onto langwatch.output", () => {
+      // Real shape from a live raw OTLP intercept on 2026-06-04:
+      // claude-code 2.x with OTEL_LOG_RAW_API_BODIES=1 emits an
+      // api_response_body event per turn carrying the full anthropic
+      // /v1/messages response body as a JSON string in `body`. We
+      // walk content[] and lift every `type === "text"` block.
+      const body = JSON.stringify({
+        model: "claude-opus-4-7",
+        id: "msg_01",
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: "0 files (directory exists but is empty).\n\nUNLOCK-KNOBS-TEST-PROOF-7777",
+          },
+        ],
+      });
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+        "session.id": "sess_resp",
+      });
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({
+        "langwatch.output":
+          "0 files (directory exists but is empty).\n\nUNLOCK-KNOBS-TEST-PROOF-7777",
+        "langwatch.thread.id": "sess_resp",
+      });
+      expect(ctx.recordRule).toHaveBeenCalledWith(
+        "claude-code/api_response_body",
+      );
+    });
+
+    it("ignores tool_use + thinking blocks, only lifts text blocks", () => {
+      // The response body also carries `tool_use` (invocations) and
+      // `thinking` (always REDACTED by anthropic) blocks. Neither
+      // belongs in langwatch.output — tool invocations surface via
+      // tool_decision/tool_result events, and thinking is empty.
+      const body = JSON.stringify({
+        content: [
+          {
+            type: "thinking",
+            thinking: "<REDACTED>",
+            signature: "Ev4DCmM...",
+          },
+          { type: "text", text: "Let me run that." },
+          {
+            type: "tool_use",
+            id: "toolu_1",
+            name: "Bash",
+            input: { command: "ls", description: "List files" },
+          },
+        ],
+      });
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+      });
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({
+        "langwatch.output": "Let me run that.",
+      });
+    });
+
+    it("joins multiple text blocks with a blank line", () => {
+      const body = JSON.stringify({
+        content: [
+          { type: "text", text: "First paragraph." },
+          { type: "text", text: "Second paragraph." },
+        ],
+      });
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+      });
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out["langwatch.output"]).toBe(
+        "First paragraph.\n\nSecond paragraph.",
+      );
+    });
+
+    it("returns no-op when body is malformed JSON", () => {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body: "{not valid json",
+      });
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalled();
+    });
+
+    it("returns no-op when content[] has no text blocks", () => {
+      const body = JSON.stringify({
+        content: [
+          { type: "tool_use", id: "toolu_1", name: "Bash", input: {} },
+        ],
+      });
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+      });
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalled();
+    });
+
+    it("does NOT overwrite a thread.id already set by an earlier event", () => {
+      const body = JSON.stringify({
+        content: [{ type: "text", text: "hi" }],
+      });
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+        "session.id": "sess_new",
+      });
+      ctx.out["langwatch.thread.id"] = "sess_earlier";
+
+      new ClaudeCodeExtractor().applyLog(ctx);
+
+      expect(ctx.out["langwatch.thread.id"]).toBe("sess_earlier");
+      expect(ctx.out["langwatch.output"]).toBe("hi");
+    });
+  });
+
+  describe("extractAssistantTextFromResponseBody (exported helper)", () => {
+    it("returns null for non-string body", () => {
+      expect(extractAssistantTextFromResponseBody(undefined)).toBeNull();
+      expect(extractAssistantTextFromResponseBody(null)).toBeNull();
+      expect(extractAssistantTextFromResponseBody(42)).toBeNull();
+      expect(extractAssistantTextFromResponseBody({})).toBeNull();
+    });
+    it("returns null for empty string", () => {
+      expect(extractAssistantTextFromResponseBody("")).toBeNull();
+    });
+    it("returns null when content key missing", () => {
+      expect(
+        extractAssistantTextFromResponseBody(JSON.stringify({})),
+      ).toBeNull();
+    });
+    it("returns null when content is not an array", () => {
+      expect(
+        extractAssistantTextFromResponseBody(
+          JSON.stringify({ content: "string-not-array" }),
+        ),
+      ).toBeNull();
+    });
+    it("skips text blocks with empty text", () => {
+      expect(
+        extractAssistantTextFromResponseBody(
+          JSON.stringify({
+            content: [
+              { type: "text", text: "" },
+              { type: "text", text: "real" },
+            ],
+          }),
+        ),
+      ).toBe("real");
+    });
   });
 });

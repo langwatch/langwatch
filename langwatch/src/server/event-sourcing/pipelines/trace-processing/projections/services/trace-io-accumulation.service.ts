@@ -1,3 +1,4 @@
+import { extractAssistantTextFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -84,6 +85,20 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
       const prompt = data.attributes.prompt;
       if (prompt && typeof prompt === "string") {
         return { input: prompt, output: null };
+      }
+    }
+    // OTEL_LOG_RAW_API_BODIES=1 emits a `claude_code.api_response_body`
+    // log record per turn carrying the FULL anthropic /v1/messages
+    // response body. The assistant's reply text lives in
+    // `body.content[]` where `type === "text"`. We extract the
+    // concatenated text and return it as ComputedOutput so trace
+    // summaries render real assistant replies instead of NULL.
+    if (data.attributes["event.name"] === "api_response_body") {
+      const responseText = extractAssistantTextFromResponseBody(
+        data.attributes.body,
+      );
+      if (responseText !== null) {
+        return { input: null, output: responseText };
       }
     }
   }

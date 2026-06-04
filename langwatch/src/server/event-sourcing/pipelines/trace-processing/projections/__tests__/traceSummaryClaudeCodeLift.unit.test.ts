@@ -143,6 +143,44 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       expect(after.computedInput).toBe("What is 2+2?");
     });
 
+    it("lifts assistant text from api_response_body onto langwatch.output + ComputedOutput (OTEL_LOG_RAW_API_BODIES=1)", () => {
+      // claude-code 2.x with OTEL_LOG_RAW_API_BODIES=1 emits an
+      // api_response_body event per turn carrying the full anthropic
+      // /v1/messages response body as a JSON string. The assistant
+      // reply text lives in body.content[].text where type=="text".
+      // This pins both the canonical attr lift AND the computed
+      // output mirror so the trace summary renders the real reply.
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.attributes = {
+        "event.name": "api_response_body",
+        "session.id": "sess_resp",
+        body: JSON.stringify({
+          model: "claude-opus-4-7",
+          content: [
+            {
+              type: "text",
+              text: "Hello, here is the answer to your question.",
+            },
+          ],
+        }),
+      };
+      ev.data.body = "claude_code.api_response_body";
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.output"]).toBe(
+        "Hello, here is the answer to your question.",
+      );
+      expect(after.attributes["langwatch.thread.id"]).toBe("sess_resp");
+      expect(after.computedOutput).toBe(
+        "Hello, here is the answer to your question.",
+      );
+      // Tokens + cost still come from api_request, never api_response_body
+      expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
+      expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
+    });
+
     it("ignores `prompt` on non-user_prompt claude_code events (subagent pollution guard)", () => {
       // Reported on PR #4544 v2-drawer screenshot: the trace input was
       // showing "env" instead of the user's real prompt. Root cause:
