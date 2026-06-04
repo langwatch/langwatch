@@ -12,6 +12,7 @@ export {
   extractClaudeCodeApiRequestMetrics,
   extractCodexSseEventMetrics,
   extractCodexConversationStartMetrics,
+  extractGenAiLogMetrics,
   OUTPUT_SOURCE,
 } from "./trace-io-accumulation.service";
 export { TracePromptAccumulationService } from "./trace-prompt-accumulation.service";

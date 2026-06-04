@@ -214,6 +214,78 @@ export function extractCodexSseEventMetrics(
 }
 
 /**
+ * Defensive log-level lift of gen_ai.* canonical attributes onto
+ * langwatch.* fields. Mirrors GEMINI_OTTL_STARTER and benefits
+ * every caller that emits the OpenTelemetry GenAI semantic
+ * conventions on log records (gemini CLI 0.32+, anyone using the
+ * @opentelemetry/semantic-conventions-genai SDK, custom emitters).
+ *
+ * For spans the OpenInferenceExtractor already handles this on the
+ * trace path; the log-level lift here is belt-and-suspenders for
+ * records that fire outside an active span or for projects whose
+ * tooling doesn't run the span-side extractor.
+ *
+ * Gated on field PRESENCE rather than event.name so it matches
+ * regardless of which event the producer chose. Returns `null`
+ * when no gen_ai.* attributes are present so the caller can skip.
+ */
+export function extractGenAiLogMetrics(
+  data: LogRecordReceivedEventData,
+): {
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  threadId: string | null;
+  inputMessages: string | null;
+  outputMessages: string | null;
+} | null {
+  const asNumber = (key: string): number | null => {
+    const raw = data.attributes[key];
+    if (raw === undefined || raw === null || raw === "") return null;
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number(raw)
+          : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const asString = (key: string): string | null => {
+    const raw = data.attributes[key];
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  };
+
+  const result = {
+    model: asString("gen_ai.request.model"),
+    inputTokens: asNumber("gen_ai.usage.input_tokens"),
+    outputTokens: asNumber("gen_ai.usage.output_tokens"),
+    // anthropic emits this under its own native key in claude_code;
+    // gemini emits it under cached_content_token_count (vertex-style)
+    // — pick whichever is present without preferring one.
+    cacheReadTokens:
+      asNumber("gen_ai.usage.cache_read_tokens") ??
+      asNumber("cached_content_token_count"),
+    threadId: asString("gen_ai.conversation.id"),
+    inputMessages: asString("gen_ai.input.messages"),
+    outputMessages: asString("gen_ai.output.messages"),
+  };
+
+  if (
+    result.model === null &&
+    result.inputTokens === null &&
+    result.outputTokens === null &&
+    result.cacheReadTokens === null &&
+    result.threadId === null &&
+    result.inputMessages === null &&
+    result.outputMessages === null
+  ) {
+    return null;
+  }
+  return result;
+}
+
+/**
  * Lift the conversation/model/principal off
  * `codex.conversation_starts` so the trace summary shows the
  * conversation grouping even when the very first sse_event

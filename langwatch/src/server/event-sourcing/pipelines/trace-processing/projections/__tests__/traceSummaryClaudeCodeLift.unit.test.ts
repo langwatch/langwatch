@@ -228,4 +228,50 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       );
     });
   });
+
+  describe("gemini / gen_ai.* defensive lift", () => {
+    it("lifts every gen_ai canonical field a gemini log carries", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.scopeName = "gen_ai";
+      ev.data.body = "gen_ai.event";
+      ev.data.attributes = {
+        "gen_ai.request.model": "gemini-2.0-flash",
+        "gen_ai.usage.input_tokens": "150",
+        "gen_ai.usage.output_tokens": "30",
+        "gen_ai.conversation.id": "conv_g",
+        "gen_ai.input.messages":
+          '[{"role":"user","content":"Hi"}]',
+        "gen_ai.output.messages":
+          '[{"role":"assistant","content":"Hello"}]',
+        cached_content_token_count: "7",
+      };
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.model"]).toBe("gemini-2.0-flash");
+      expect(after.attributes["langwatch.input_tokens"]).toBe("150");
+      expect(after.attributes["langwatch.output_tokens"]).toBe("30");
+      expect(after.attributes["langwatch.cache_read_tokens"]).toBe("7");
+      expect(after.attributes["langwatch.thread.id"]).toBe("conv_g");
+      expect(after.attributes["langwatch.input"]).toBe(
+        '[{"role":"user","content":"Hi"}]',
+      );
+      expect(after.attributes["langwatch.output"]).toBe(
+        '[{"role":"assistant","content":"Hello"}]',
+      );
+    });
+
+    it("leaves langwatch.* untouched when zero gen_ai.* fields are present", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const ev = makeClaudeApiRequestEvent({});
+      ev.data.scopeName = "gen_ai";
+      ev.data.attributes = { "event.name": "noise" };
+
+      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.model"]).toBeUndefined();
+      expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
+    });
+  });
 });

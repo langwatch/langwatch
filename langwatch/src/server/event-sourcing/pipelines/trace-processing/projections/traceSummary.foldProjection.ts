@@ -50,6 +50,7 @@ import {
   extractClaudeCodeApiRequestMetrics,
   extractCodexSseEventMetrics,
   extractCodexConversationStartMetrics,
+  extractGenAiLogMetrics,
   OUTPUT_SOURCE,
 } from "./services";
 
@@ -442,6 +443,42 @@ export class TraceSummaryFoldProjection
       if (codexStart.principalEmail !== null) {
         mergedAttributes["langwatch.principal.email"] =
           codexStart.principalEmail;
+      }
+    }
+
+    // Defensive belt-and-suspenders mirror of gen_ai.* canonical
+    // attributes onto langwatch.*. Gemini CLI 0.32+ emits these on
+    // log records (the OTTL ports as GEMINI_OTTL_STARTER); the
+    // OpenInferenceExtractor handles the span path but not all log
+    // records run through it. Gated on field presence rather than
+    // a scope/event-name match so any caller emitting OTel GenAI
+    // semconv on logs (custom emitters, future SDKs) benefits.
+    const genAi = extractGenAiLogMetrics(event.data);
+    if (genAi !== null) {
+      if (genAi.model !== null) {
+        mergedAttributes["langwatch.model"] = genAi.model;
+      }
+      if (genAi.inputTokens !== null) {
+        mergedAttributes["langwatch.input_tokens"] = String(genAi.inputTokens);
+      }
+      if (genAi.outputTokens !== null) {
+        mergedAttributes["langwatch.output_tokens"] = String(
+          genAi.outputTokens,
+        );
+      }
+      if (genAi.cacheReadTokens !== null) {
+        mergedAttributes["langwatch.cache_read_tokens"] = String(
+          genAi.cacheReadTokens,
+        );
+      }
+      if (genAi.threadId !== null) {
+        mergedAttributes["langwatch.thread.id"] = genAi.threadId;
+      }
+      if (genAi.inputMessages !== null) {
+        mergedAttributes["langwatch.input"] = genAi.inputMessages;
+      }
+      if (genAi.outputMessages !== null) {
+        mergedAttributes["langwatch.output"] = genAi.outputMessages;
       }
     }
 
