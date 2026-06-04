@@ -5,8 +5,22 @@ import {
   Icon,
   type SystemStyleObject,
 } from "@chakra-ui/react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, GripHorizontal } from "lucide-react";
 import type React from "react";
 import {
   COLUMN_DRAG_THRESHOLD_PX,
@@ -29,6 +43,21 @@ interface TraceTableShellProps<T> {
   minWidth: string;
   children: React.ReactNode;
   stickyFirstColumn?: boolean;
+  /**
+   * Fired when the user drags a column header to reorder. Receives the
+   * full ordered list of column ids (excluding any pinned-first
+   * select-checkbox column). Callers persist this to the active lens.
+   * When omitted, column headers render without a drag handle and the
+   * row is not wrapped in a DndContext — preserving the previous
+   * behaviour for tables that don't yet support reorder.
+   */
+  onColumnReorder?: (orderedIds: string[]) => void;
+  /**
+   * Column ids that must NOT participate in drag-reorder (typically
+   * the row-select checkbox at index 0). Reordering operates only on
+   * ids outside this set.
+   */
+  pinnedColumnIds?: ReadonlySet<string>;
 }
 
 export function TraceTableShell<T>({
@@ -36,7 +65,44 @@ export function TraceTableShell<T>({
   minWidth,
   children,
   stickyFirstColumn = false,
+  onColumnReorder,
+  pinnedColumnIds,
 }: TraceTableShellProps<T>): React.ReactElement {
+  // Drag-reorder requires the parent to opt-in via onColumnReorder.
+  // When opted in we build the list of reorderable header ids (the
+  // SortableContext items) and wrap the header row in a DndContext so
+  // any header can be dragged into a new slot. Without it the header
+  // row renders exactly as before.
+  const reorderable = !!onColumnReorder;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Same activation distance the sidebar uses — small enough that
+      // intent is unambiguous, large enough that a sloppy click on the
+      // grip doesn't kick off a drag.
+      activationConstraint: { distance: 5 },
+    }),
+  );
+  const sortableHeaderIds = table
+    .getHeaderGroups()[0]
+    ?.headers
+    .map((h) => h.id)
+    .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!onColumnReorder) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = sortableHeaderIds;
+    const fromIdx = ids.indexOf(String(active.id));
+    const toIdx = ids.indexOf(String(over.id));
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...ids];
+    const [moved] = next.splice(fromIdx, 1);
+    if (!moved) return;
+    next.splice(toIdx, 0, moved);
+    onColumnReorder(next);
+  };
+
   return (
     <TableEl
       width="full"
@@ -122,25 +188,43 @@ export function TraceTableShell<T>({
         zIndex={2}
         bg={{ base: "bg.subtle", _dark: "bg.surface" }}
       >
-        {table.getHeaderGroups().map((headerGroup) => (
-          <Tr
-            key={headerGroup.id}
-            // Under `border-collapse: separate` the TR-level border
-            // doesn't paint reliably across cells — the row-level
-            // border needs to live on each TH (handled in HeaderCell
-            // below). Keeping the prop here for legacy SSR markup but
-            // it's a no-op under the new collapse mode.
-            borderBottomWidth="0"
+        {reorderable ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            {headerGroup.headers.map((header, i) => (
-              <HeaderCell
-                key={header.id}
-                header={header}
-                isStickyFirst={stickyFirstColumn && i === 0}
-              />
-            ))}
-          </Tr>
-        ))}
+            <SortableContext
+              items={sortableHeaderIds}
+              strategy={horizontalListSortingStrategy}
+            >
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Tr key={headerGroup.id} borderBottomWidth="0">
+                  {headerGroup.headers.map((header, i) => (
+                    <HeaderCell
+                      key={header.id}
+                      header={header}
+                      isStickyFirst={stickyFirstColumn && i === 0}
+                      reorderable={!pinnedColumnIds?.has(header.id)}
+                    />
+                  ))}
+                </Tr>
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          table.getHeaderGroups().map((headerGroup) => (
+            <Tr key={headerGroup.id} borderBottomWidth="0">
+              {headerGroup.headers.map((header, i) => (
+                <HeaderCell
+                  key={header.id}
+                  header={header}
+                  isStickyFirst={stickyFirstColumn && i === 0}
+                />
+              ))}
+            </Tr>
+          ))
+        )}
       </Thead>
       {children}
     </TableEl>
@@ -150,12 +234,36 @@ export function TraceTableShell<T>({
 interface HeaderCellProps<T> {
   header: Header<T, unknown>;
   isStickyFirst: boolean;
+  /**
+   * When true, the header cell is a sortable item — it picks up a
+   * drag-handle icon at the left of the title and registers with the
+   * surrounding SortableContext. False (the default) means the
+   * column is pinned in its current position (the row-select
+   * checkbox column uses this).
+   */
+  reorderable?: boolean;
 }
 
 function HeaderCell<T>({
   header,
   isStickyFirst,
+  reorderable = false,
 }: HeaderCellProps<T>): React.ReactElement {
+  // Conditional `useSortable` — same hooks-discipline-friendly pattern
+  // the sidebar uses for SortableSection. We always call the hook so
+  // its call order is stable; the returned props are simply unused
+  // when `reorderable` is false.
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: header.id, disabled: !reorderable });
+  const dragHandleProps = (reorderable
+    ? { ...attributes, ...(listeners ?? {}) }
+    : {}) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   // Open the one-off education dialog the first time the user tries
   // to drag a header to reorder it. v2 doesn't support native drag-
@@ -169,11 +277,13 @@ function HeaderCell<T>({
   const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
   const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
     if (educationDismissed) return;
-    // Skip drags that originate on the resize grip — that's a
-    // legitimate sizing gesture; surfacing the reorder dialog there
-    // would be infuriating.
+    // Skip drags that originate on the resize grip (legitimate sizing
+    // gesture) OR on the drag-reorder grip (legitimate reorder
+    // gesture) — surfacing the education dialog from either of those
+    // would be infuriating now that both paths work.
     const target = e.target as HTMLElement | null;
     if (target?.closest("[data-column-resize-grip]")) return;
+    if (target?.closest("[data-column-drag-handle]")) return;
     const startX = e.clientX;
     const startY = e.clientY;
     const onMove = (ev: MouseEvent) => {
@@ -220,6 +330,19 @@ function HeaderCell<T>({
 
   return (
     <Th
+      ref={reorderable ? setNodeRef : undefined}
+      // Apply the sortable transform so the in-flight drag preview
+      // tracks the cursor. Static (non-reorderable) columns stay
+      // unchanged.
+      style={
+        reorderable
+          ? {
+              transform: CSS.Transform.toString(transform),
+              transition,
+              opacity: isDragging ? 0.6 : 1,
+            }
+          : undefined
+      }
       width={useFixedWidth ? `${size}px` : undefined}
       minWidth={`${header.column.columnDef.minSize}px`}
       // Clip header text at the cell boundary so labels like
@@ -237,7 +360,7 @@ function HeaderCell<T>({
       transition="none"
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
-      zIndex={isStickyFirst ? 3 : undefined}
+      zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
       bg={
         isActiveSort
           ? { base: "bg.muted", _dark: "bg.muted" }
@@ -267,17 +390,50 @@ function HeaderCell<T>({
       onMouseDown={onHeaderMouseDown}
       onDoubleClick={onHeaderDoubleClick}
     >
-      {canSort ? (
-        <SortableHeaderButton
-          align={align}
-          sortDirection={sortDirection}
-          onToggle={header.column.getToggleSortingHandler()}
-        >
-          {flexRender(header.column.columnDef.header, header.getContext())}
-        </SortableHeaderButton>
-      ) : (
-        flexRender(header.column.columnDef.header, header.getContext())
-      )}
+      <HStack gap={1} align="center">
+        {reorderable && (
+          // Drag handle — small grip icon on the left of every
+          // reorderable header. Activates the surrounding
+          // SortableContext via `useSortable`'s listeners/attributes.
+          // Marked with data-column-drag-handle so the education-dialog
+          // mousedown detector knows to skip drags that originate here.
+          <Box
+            data-column-drag-handle="true"
+            display="inline-flex"
+            alignItems="center"
+            justifyContent="center"
+            width="14px"
+            height="14px"
+            flexShrink={0}
+            color="fg.subtle"
+            opacity={0.45}
+            cursor="grab"
+            _hover={{ opacity: 1, color: "fg" }}
+            _active={{ cursor: "grabbing" }}
+            aria-label="Drag to reorder column"
+            title="Drag to reorder column"
+            {...dragHandleProps}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Icon boxSize="10px">
+              <GripHorizontal />
+            </Icon>
+          </Box>
+        )}
+        <Box flex={1} minWidth={0}>
+          {canSort ? (
+            <SortableHeaderButton
+              align={align}
+              sortDirection={sortDirection}
+              onToggle={header.column.getToggleSortingHandler()}
+            >
+              {flexRender(header.column.columnDef.header, header.getContext())}
+            </SortableHeaderButton>
+          ) : (
+            flexRender(header.column.columnDef.header, header.getContext())
+          )}
+        </Box>
+      </HStack>
       <ColumnResizeGrip header={header} />
     </Th>
   );

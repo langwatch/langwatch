@@ -18,6 +18,14 @@ import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
 import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
+
+/**
+ * Module-level singleton so the `pinnedColumnIds` prop is referentially
+ * stable across renders — without it, every render would hand the
+ * shell a new Set and the SortableContext would treat its items as
+ * having changed, kicking off unnecessary re-mounts of the header row.
+ */
+const SELECT_COLUMN_ID_SET = new Set([SELECT_COLUMN_ID]);
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
 import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
@@ -68,6 +76,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
+  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -174,7 +183,18 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
             back to the start. The wider column set (TIMESTAMP, etc.)
             makes horizontal overflow the common case rather than the
             edge case it used to be. */}
-        <TraceTableShell table={table} minWidth={minWidth} stickyFirstColumn>
+        <TraceTableShell
+          table={table}
+          minWidth={minWidth}
+          stickyFirstColumn
+          // Persist drag-reorder via viewStore.setVisibleColumns. The
+          // shell passes the new ordered list of column ids excluding
+          // the select column (pinned via pinnedColumnIds); the store
+          // marks the active lens dirty so the change shows up in
+          // the "save lens" affordance.
+          onColumnReorder={setVisibleColumns}
+          pinnedColumnIds={SELECT_COLUMN_ID_SET}
+        >
           <VirtualSpacer height={paddingTop} colSpan={colSpan} />
           {virtualItems.map((virtualItem) => {
             const row = rows[virtualItem.index];

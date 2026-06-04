@@ -56,10 +56,15 @@ export const ColumnEducationDialog: React.FC = () => {
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text textStyle="sm" color="fg">
-              The trace table columns aren't drag-reorderable yet — but
-              you can still change which columns appear and in what
-              order from the <b>Columns</b> dropdown in the toolbar or
-              the floating <b>Configure</b> button.
+              You can drag columns to reorder them — but the drag
+              handle lives on the small grip icon at the <b>left of
+              each column header</b>, not on the header itself.
+              Dragging anywhere else on the header just selects text.
+            </Text>
+            <Text textStyle="sm" color="fg.muted">
+              To change which columns appear, use the <b>Columns</b>
+              dropdown in the toolbar or the floating <b>Configure</b>
+              button.
             </Text>
 
             {/* CSS-illustrated preview of the column picker. Tracks the
