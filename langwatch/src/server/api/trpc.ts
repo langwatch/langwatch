@@ -393,6 +393,13 @@ const auditLogMutations = t.middleware(
 
 export const tracerMiddleware = t.middleware(
   async ({ path, type, next }) => {
+    // Skip tracing for high-frequency, low-signal routes (presence
+    // heartbeats) — they otherwise dominate the trace surface and
+    // make real spans hard to find.
+    if (isSilencedCall(path, type)) {
+      return next();
+    }
+
     const { trace, SpanKind, SpanStatusCode } = await import(
       "@opentelemetry/api"
     );
@@ -544,6 +551,30 @@ export function handleTrpcCallLogging({
   }
 }
 
+/**
+ * Routers whose calls flood the request log without being useful for
+ * debugging: presence (peer cursor / drawer presence heartbeats fire
+ * every few seconds per open tab). Logging + tracing them buries the
+ * signal in noise. Errors are still reported by the middlewares below.
+ */
+const SILENCED_LOG_PATH_PREFIXES = ["presence."] as const;
+
+/**
+ * tRPC call types whose volume is unbounded — SSE subscriptions emit
+ * a "trpc call" log line per delivered message. Silencing the
+ * subscription type as a whole keeps the dev log readable without
+ * sprinkling per-router opt-outs across the codebase.
+ */
+const SILENCED_LOG_TYPES = new Set(["subscription"]);
+
+function isSilencedPath(path: string): boolean {
+  return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function isSilencedCall(path: string, type: string): boolean {
+  return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
@@ -560,6 +591,13 @@ export const loggerMiddleware = t.middleware(
       // objects. Use result.ok to detect errors — NOT try/catch.
       const result = await next();
       const duration = Date.now() - start;
+
+      // Silence happy-path logs for high-frequency, low-signal routes
+      // (presence heartbeats) — still log errors so real failures are
+      // visible.
+      if (isSilencedCall(path, type) && result.ok) {
+        return result;
+      }
 
       handleTrpcCallLogging({
         result,
