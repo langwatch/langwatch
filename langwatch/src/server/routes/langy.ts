@@ -57,6 +57,22 @@ const chatRequestSchema = z.object({
   projectId: z.string().min(1),
   conversationId: z.string().nullable().optional(),
   messages: z.array(chatMessageSchema).min(1),
+  /**
+   * Per-send model override coming from the sidebar's ChatGPT-style picker
+   * (LangySidebar Composer). Optional — when absent, the agent falls back
+   * to the project's DEFAULT-role model the gate resolved against.
+   *
+   * Wire-level field today: forwarded to the OpenCode agent payload so the
+   * agent can pass it to the gateway as the `model` parameter. Until the
+   * agent honors it, this is effectively a hint (no behavior change, but
+   * the picker choice rides through the system). Validation is provider/-
+   * shape only here; the gateway is the final allowlist.
+   */
+  modelOverride: z
+    .string()
+    .regex(/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/, "modelOverride must be in 'provider/model' shape")
+    .max(200)
+    .optional(),
 });
 type ChatMessage = z.infer<typeof chatMessageSchema>;
 
@@ -154,6 +170,7 @@ langyRoute().post("/langy/chat", async (c) => {
     messages,
     projectId,
     conversationId: requestedConversationId,
+    modelOverride,
   } = parsedBody.data;
 
   const agentUrl = process.env.OPENCODE_AGENT_URL;
@@ -291,6 +308,11 @@ langyRoute().post("/langy/chat", async (c) => {
       prompt: userText,
       system: langyOverride,
       credentials,
+      // Forwarded for the agent to thread through to the gateway as the
+      // `model` parameter when its support lands. Today the agent ignores
+      // unrecognized fields, so this is effectively a wire-up that doesn't
+      // change behavior — but the user's picker choice rides through.
+      ...(modelOverride ? { modelOverride } : {}),
     }),
     signal: AbortSignal.timeout(120_000),
   });
