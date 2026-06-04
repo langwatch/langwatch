@@ -18,7 +18,6 @@ import React, { useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
-import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
@@ -41,12 +40,6 @@ import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/Globa
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
-import { LangyProvider, useLangy } from "./langy/LangyContext";
-import {
-  LangyDrawer,
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-} from "./langy/LangySidebar";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -412,19 +405,6 @@ export const DashboardLayout = ({
     { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
-  // Resolve the Langy flag HERE, above the loading / not-found early returns
-  // below. A hook placed after those returns is skipped on the first
-  // (loading) render and runs once data resolves — a changing hook count
-  // across renders, which is React error #310 ("Rendered more hooks than
-  // during the previous render") and crashes the whole dashboard. The derived
-  // `showLangy` (which also needs `user` + route checks) stays lower; only the
-  // hook itself must be unconditional/top-level.
-  const { enabled: langyFlagEnabled } = useFeatureFlag("release_langy_enabled", {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: !!project,
-  });
-
   usePostHogIdentify({
     session: session ?? null,
     organization,
@@ -545,20 +525,13 @@ export const DashboardLayout = ({
   // avatar-menu entry so it stays off the other surfaces' chrome.
   const showPresenceMenuItem = router.pathname.startsWith("/[project]/traces");
 
-  const isProjectRoute =
-    router.pathname === "/[project]" ||
-    router.pathname.startsWith("/[project]/");
-  const showLangy =
-    !publicPage &&
-    userIsPartOfTeam &&
-    isProjectRoute &&
-    // Staff always see Langy; the flag only extends it to non-staff. Mirrors
-    // the server gate in src/server/routes/langy.ts.
-    (isLangwatchStaff(user?.email) || langyFlagEnabled);
-
   return (
-    <LangyProvider>
-      <LangyShiftedRoot showLangy={showLangy}>
+    <Box
+      width="full"
+      minHeight="100vh"
+      background="bg.page"
+      overflowX={["auto", "auto", "hidden"]}
+    >
       <Head>
         <title>
           {pageTitle ?? (
@@ -1054,48 +1027,9 @@ export const DashboardLayout = ({
           Toast lives in the toaster portal that's already at the app
           root; nothing else to mount here. See
           specs/model-providers/missing-model-popup.feature. */}
-    </LangyShiftedRoot>
-    </LangyProvider>
+    </Box>
   );
 };
-
-function LangyShiftedRoot({
-  showLangy,
-  children,
-}: {
-  showLangy: boolean;
-  children: React.ReactNode;
-}) {
-  const { isOpen } = useLangy();
-  const shifted = showLangy && isOpen;
-  return (
-    <>
-      <Box
-        width="full"
-        minHeight="100vh"
-        background="bg.page"
-        overflowX={["auto", "auto", "hidden"]}
-        paddingRight={shifted ? `${LANGY_DOCKED_OFFSET}px` : 0}
-        transition={`padding-right ${LANGY_TRANSITION}`}
-      >
-        {children}
-      </Box>
-      {showLangy && <LangyDrawerConnected />}
-    </>
-  );
-}
-
-function LangyDrawerConnected() {
-  const { isOpen, setIsOpen, proposalHandlers, experimentSlug } = useLangy();
-  return (
-    <LangyDrawer
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      proposalHandlers={proposalHandlers}
-      experimentSlug={experimentSlug}
-    />
-  );
-}
 
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
