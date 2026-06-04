@@ -67,9 +67,25 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Detection Check
-    // Only proceed if Vercel AI SDK signals are present
-    // ─────────────────────────────────────────────────────────────────────────
-    if (ctx.span.instrumentationScope.name !== "ai") return;
+    // Trigger when Vercel AI SDK signals are present. The SDK's own
+    // OTel resource emits with instrumentationScope.name === "ai",
+    // but downstream embedders (opencode, custom Vercel-SDK wrappers)
+    // re-export those same spans under their own scope while keeping
+    // the ai.* attribute shape intact. Gate on either signal so the
+    // input/output message lift runs for both — cost/model already
+    // ride on gen_ai.* attrs that the SDK emits alongside ai.* and
+    // SpanCostService reads independently, but ai.prompt.messages →
+    // gen_ai.input.messages translation lives only here, so a missed
+    // gate leaves ComputedInput/ComputedOutput NULL on the receiver.
+    const scopeMatches = ctx.span.instrumentationScope.name === "ai";
+    const attrsMatch =
+      attrs.has(ATTR_KEYS.AI_MODEL) ||
+      attrs.has(ATTR_KEYS.AI_PROMPT_MESSAGES) ||
+      attrs.has(ATTR_KEYS.AI_PROMPT) ||
+      attrs.has(ATTR_KEYS.AI_RESPONSE) ||
+      attrs.has(ATTR_KEYS.AI_RESPONSE_TEXT) ||
+      attrs.has(ATTR_KEYS.AI_USAGE);
+    if (!scopeMatches && !attrsMatch) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Span Type

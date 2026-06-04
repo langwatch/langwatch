@@ -119,8 +119,8 @@ describe("VercelExtractor", () => {
     });
   });
 
-  describe("when instrumentationScope.name is not 'ai'", () => {
-    it("returns early with nothing in out", () => {
+  describe("when instrumentationScope.name is not 'ai' but ai.* attrs are present", () => {
+    it("still lifts (covers opencode/embedded-Vercel-SDK case)", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
@@ -130,6 +130,26 @@ describe("VercelExtractor", () => {
         },
         {
           name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      // Span type + model lift fire because ai.model attr triggers the gate
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
+    });
+  });
+
+  describe("when scope is unrelated AND no ai.* attrs are present", () => {
+    it("returns early with nothing in out", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "claude-haiku-4-5",
+        },
+        {
+          name: "spanWithoutAiAttrs",
           instrumentationScope: { name: "opentelemetry", version: null },
         },
       );
@@ -142,8 +162,8 @@ describe("VercelExtractor", () => {
     });
   });
 
-  describe("when instrumentationScope.name is undefined", () => {
-    it("returns early with nothing in out", () => {
+  describe("when instrumentationScope.name is undefined but ai.* attrs are present", () => {
+    it("still lifts via attrs-presence fallback", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
@@ -162,8 +182,7 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(Object.keys(ctx.out)).toHaveLength(0);
-      expect(ctx.setAttr).not.toHaveBeenCalled();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
     });
   });
 });
