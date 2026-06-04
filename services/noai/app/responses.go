@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/ksuid"
 )
 
 // ResponsesRequest is the (subset of the) OpenAI /v1/responses request
@@ -56,8 +59,9 @@ type ResponsesUsage struct {
 }
 
 // BuildResponsesResult assembles a deterministic ResponsesResult for the
-// given request.
-func BuildResponsesResult(req ResponsesRequest, now time.Time) ResponsesResult {
+// given request. Response + message item ids are KSUIDs (env-prefixed
+// via ctx).
+func BuildResponsesResult(ctx context.Context, req ResponsesRequest, now time.Time) ResponsesResult {
 	model, _ := Normalize(req.Model)
 	last := ExtractLastUserTextResponses(req.Input)
 	reply := model.Reply(last)
@@ -72,15 +76,14 @@ func BuildResponsesResult(req ResponsesRequest, now time.Time) ResponsesResult {
 		})
 	}
 
-	stamp := newIDStamp(now)
 	return ResponsesResult{
-		ID:        "resp_noai_" + stamp,
+		ID:        ksuid.Generate(ctx, ResourceResponses).String(),
 		Object:    "response",
 		CreatedAt: now.Unix(),
 		Status:    "completed",
 		Model:     req.Model,
 		Output: []ResponsesMsg{{
-			ID:      "msg_noai_" + stamp,
+			ID:      ksuid.Generate(ctx, ResourceMessageItem).String(),
 			Type:    "message",
 			Role:    "assistant",
 			Content: parts,

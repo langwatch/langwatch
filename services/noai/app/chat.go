@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/ksuid"
 )
 
 // ChatRequest is the (subset of the) OpenAI /v1/chat/completions request
@@ -70,16 +73,19 @@ type Usage struct {
 // BuildChatResponse assembles a deterministic ChatResponse for the given
 // request. Unknown models fall through to echo-text behaviour so a typo
 // produces a recognisable response rather than an opaque 4xx.
-func BuildChatResponse(req ChatRequest, now time.Time) ChatResponse {
+//
+// Response, audio, and message ids are KSUIDs (env-prefixed via ctx), so
+// concurrent requests get unique ids and the surfaces are traceable from
+// logs just like every other LangWatch ID.
+func BuildChatResponse(ctx context.Context, req ChatRequest, now time.Time) ChatResponse {
 	model, _ := Normalize(req.Model)
 	last := ExtractLastUserTextChat(req.Messages)
 	reply := model.Reply(last)
 
-	stamp := newIDStamp(now)
 	msg := ChatAssistantMessage{Role: "assistant", Content: reply}
 	if model.HasAudioOutput() || requestAsksForAudio(req) {
 		msg.Audio = &AssistantAudio{
-			ID:         "noai-audio-" + stamp,
+			ID:         ksuid.Generate(ctx, ResourceAudio).String(),
 			Data:       SilentWavBase64,
 			Transcript: reply,
 			ExpiresAt:  now.Add(1 * time.Hour).Unix(),
@@ -88,7 +94,7 @@ func BuildChatResponse(req ChatRequest, now time.Time) ChatResponse {
 	}
 
 	return ChatResponse{
-		ID:      "chatcmpl-noai-" + stamp,
+		ID:      ksuid.Generate(ctx, ResourceChatCompletion).String(),
 		Object:  "chat.completion",
 		Created: now.Unix(),
 		Model:   req.Model,

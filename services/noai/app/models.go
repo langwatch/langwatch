@@ -5,10 +5,18 @@ package app
 
 import (
 	"encoding/json"
-	"strconv"
 	"strings"
-	"sync/atomic"
-	"time"
+)
+
+// ksuid resource tags for the various id surfaces noai mints. Underscores
+// are not allowed (the ksuid wire format uses them as delimiters), and the
+// resource feeds the human-readable middle segment so it stays
+// recognisable in traces / logs.
+const (
+	ResourceChatCompletion = "noaichat"
+	ResourceResponses      = "noairesp"
+	ResourceMessageItem    = "noaimsg"
+	ResourceAudio          = "noaiaud"
 )
 
 // ModelID is the bare model identifier (no `langwatch_noai/` prefix).
@@ -112,17 +120,6 @@ func userSimulationLine(lastUserText string) string {
 	}
 	return `Fake user follow-up to: "` + lastUserText + `"`
 }
-
-// newIDStamp returns a unique-per-invocation suffix used in response /
-// message / audio ids. Combines nanosecond timestamp with an atomic
-// counter so concurrent requests within the same nanosecond — and tests
-// that bake in a fixed `time.Time` — still produce distinct ids.
-func newIDStamp(now time.Time) string {
-	seq := atomic.AddUint64(&idCounter, 1)
-	return strconv.FormatInt(now.UTC().UnixNano(), 10) + "-" + strconv.FormatUint(seq, 10)
-}
-
-var idCounter uint64
 
 func verdictJSON(passed bool, score float64, reason string) string {
 	verdict := struct {

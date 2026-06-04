@@ -31,10 +31,10 @@ func chatCompletionsHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc 
 		}
 		now := time.Now()
 		if req.Stream {
-			writeChatStream(w, req, now)
+			writeChatStream(w, r.Context(), req, now)
 			return
 		}
-		writeJSON(w, http.StatusOK, app.BuildChatResponse(req, now))
+		writeJSON(w, http.StatusOK, app.BuildChatResponse(r.Context(), req, now))
 	}
 }
 
@@ -55,10 +55,10 @@ func responsesHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc {
 		}
 		now := time.Now()
 		if req.Stream {
-			writeResponsesStream(w, req, now)
+			writeResponsesStream(w, r.Context(), req, now)
 			return
 		}
-		writeJSON(w, http.StatusOK, app.BuildResponsesResult(req, now))
+		writeJSON(w, http.StatusOK, app.BuildResponsesResult(r.Context(), req, now))
 	}
 }
 

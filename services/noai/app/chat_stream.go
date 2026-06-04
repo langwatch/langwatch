@@ -1,6 +1,11 @@
 package app
 
-import "time"
+import (
+	"context"
+	"time"
+
+	"github.com/langwatch/langwatch/pkg/ksuid"
+)
 
 // ChatStreamChunk is one SSE chunk in /v1/chat/completions stream mode.
 // Mirrors the OpenAI shape closely enough for any client that recognises
@@ -34,13 +39,12 @@ type ChatStreamDelta struct {
 // optional audio delta, then a finish-reason chunk. Real providers
 // stream token-by-token; that level of detail isn't useful here and
 // just inflates test fixtures.
-func BuildChatStreamChunks(req ChatRequest, now time.Time) []ChatStreamChunk {
+func BuildChatStreamChunks(ctx context.Context, req ChatRequest, now time.Time) []ChatStreamChunk {
 	model, _ := Normalize(req.Model)
 	last := ExtractLastUserTextChat(req.Messages)
 	reply := model.Reply(last)
 
-	stamp := newIDStamp(now)
-	id := "chatcmpl-noai-" + stamp
+	id := ksuid.Generate(ctx, ResourceChatCompletion).String()
 	created := now.Unix()
 	base := func(delta ChatStreamDelta, finish *string) ChatStreamChunk {
 		return ChatStreamChunk{
@@ -58,7 +62,7 @@ func BuildChatStreamChunks(req ChatRequest, now time.Time) []ChatStreamChunk {
 	}
 	if model.HasAudioOutput() || requestAsksForAudio(req) {
 		chunks = append(chunks, base(ChatStreamDelta{Audio: &AssistantAudio{
-			ID:         "noai-audio-" + stamp,
+			ID:         ksuid.Generate(ctx, ResourceAudio).String(),
 			Data:       SilentWavBase64,
 			Transcript: reply,
 			ExpiresAt:  now.Add(1 * time.Hour).Unix(),

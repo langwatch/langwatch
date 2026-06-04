@@ -1,7 +1,7 @@
 package app
 
 import (
-	"strings"
+	"context"
 	"time"
 )
 
@@ -20,14 +20,14 @@ type ResponsesStreamEvent struct {
 // of typed structs) keeps the file small — the Responses API's event
 // catalogue is long and most clients only switch on `event:` + a couple
 // of `data` fields.
-func BuildResponsesStreamEvents(req ResponsesRequest, now time.Time) []ResponsesStreamEvent {
-	result := BuildResponsesResult(req, now)
+func BuildResponsesStreamEvents(ctx context.Context, req ResponsesRequest, now time.Time) []ResponsesStreamEvent {
+	result := BuildResponsesResult(ctx, req, now)
 	model, _ := Normalize(req.Model)
-	// Use the same id as the non-stream builder so clients reconstructing
-	// the response see consistent ids across the two endpoints. Since
-	// BuildResponsesResult already stamped, derive textItemID by stripping
-	// the "resp_noai_" prefix and reusing the suffix.
-	textItemID := "msg_noai_" + strings.TrimPrefix(result.ID, "resp_noai_")
+	// Reuse the id that BuildResponsesResult minted for the assistant
+	// message item, so clients reconstructing the response see the same
+	// id across `response.output_item.added`, `..._part.added`, and the
+	// final non-stream payload.
+	textItemID := result.Output[0].ID
 
 	events := []ResponsesStreamEvent{
 		{Event: "response.created", Data: map[string]any{"response": minimalResponseEnvelope(result, "in_progress")}},
