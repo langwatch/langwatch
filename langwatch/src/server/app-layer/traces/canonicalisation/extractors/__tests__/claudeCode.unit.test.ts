@@ -253,6 +253,66 @@ describe("ClaudeCodeExtractor.applyLog", () => {
       expect(ctx.out["langwatch.thread.id"]).toBe("sess_earlier");
       expect(ctx.out["langwatch.output"]).toBe("hi");
     });
+
+    describe("when the api_response_body is a non-conversational utility call", () => {
+      // claude-code emits api_response_body for utility model calls too
+      // (the greyed-out autosuggest, the session-title generator, quota
+      // probes). Their text is NOT the assistant's reply to the user and
+      // would clobber the headline ComputedOutput (the fold is last-write-
+      // wins), so we skip the output lift but keep thread.id correlation.
+      it("skips langwatch.output for query_source=prompt_suggestion (the autosuggest)", () => {
+        const body = JSON.stringify({
+          content: [{ type: "text", text: "run ls /tmp again" }],
+        });
+        const ctx = createLogExtractorContext(SCOPE, {
+          "event.name": "api_response_body",
+          query_source: "prompt_suggestion",
+          body,
+          "session.id": "sess_sugg",
+        });
+
+        new ClaudeCodeExtractor().applyLog(ctx);
+
+        // No output lift, but the trace stays stitched via thread.id.
+        expect(ctx.out["langwatch.output"]).toBeUndefined();
+        expect(ctx.out["langwatch.thread.id"]).toBe("sess_sugg");
+        expect(ctx.recordRule).toHaveBeenCalledWith(
+          "claude-code/api_response_body",
+        );
+      });
+
+      it("skips langwatch.output for query_source=generate_session_title", () => {
+        const body = JSON.stringify({
+          content: [
+            { type: "text", text: '{"title": "List temporary directory"}' },
+          ],
+        });
+        const ctx = createLogExtractorContext(SCOPE, {
+          "event.name": "api_response_body",
+          query_source: "generate_session_title",
+          body,
+        });
+
+        new ClaudeCodeExtractor().applyLog(ctx);
+
+        expect(ctx.out["langwatch.output"]).toBeUndefined();
+      });
+
+      it("lifts langwatch.output for query_source=repl_main_thread (the real conversation)", () => {
+        const body = JSON.stringify({
+          content: [{ type: "text", text: "I see three entries." }],
+        });
+        const ctx = createLogExtractorContext(SCOPE, {
+          "event.name": "api_response_body",
+          query_source: "repl_main_thread",
+          body,
+        });
+
+        new ClaudeCodeExtractor().applyLog(ctx);
+
+        expect(ctx.out["langwatch.output"]).toBe("I see three entries.");
+      });
+    });
   });
 
   describe("extractAssistantTextFromResponseBody (exported helper)", () => {

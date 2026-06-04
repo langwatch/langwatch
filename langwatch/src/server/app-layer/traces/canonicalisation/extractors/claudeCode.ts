@@ -24,7 +24,10 @@
  *                                  only when OTEL_LOG_USER_PROMPTS=1)
  * - langwatch.output              (api_response_body — concatenated `content[].text`
  *                                  blocks from the response body JSON, only
- *                                  when OTEL_LOG_RAW_API_BODIES=1)
+ *                                  when OTEL_LOG_RAW_API_BODIES=1 AND the call is
+ *                                  a genuine conversation turn — see
+ *                                  CONVERSATIONAL_QUERY_SOURCES; utility calls
+ *                                  like prompt_suggestion are skipped)
  *
  * Span-side `apply()` is a no-op — Claude Code Path A claude_code
  * traffic comes through the gateway as gen_ai.* spans handled by
@@ -50,6 +53,33 @@ import type {
 const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
+
+/**
+ * Claude Code emits an `api_response_body` event for EVERY model call it
+ * makes, not just the user-facing conversation — including non-conversational
+ * utility calls that carry text we must NOT treat as the assistant's reply:
+ *
+ * - `prompt_suggestion`     — the greyed-out autosuggest of what the user
+ *                             might type next (e.g. "continue", "run ls again")
+ * - `generate_session_title`— the haiku-generated conversation title, shipped
+ *                             as a `{"title": "..."}` JSON text block
+ * - `quota` / future utility sources — token-probe / housekeeping calls
+ *
+ * Folding those into `langwatch.output` corrupts the trace's headline output:
+ * the fold is last-write-wins, so a throwaway autosuggest emitted after the
+ * real reply overwrites it. We therefore lift output text ONLY from genuine
+ * conversation turns. The main REPL thread is the headline conversation; an
+ * absent `query_source` is treated as conversational for backwards-compat with
+ * older claude-code builds (and other emitters) that don't stamp the field.
+ * Utility-call text is still fully captured as its own stored log record — it
+ * just doesn't pollute the single rolled-up ComputedOutput.
+ */
+const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
+  "repl_main_thread",
+]);
+
+const isConversationalQuerySource = (querySource: string | null): boolean =>
+  querySource === null || CONVERSATIONAL_QUERY_SOURCES.has(querySource);
 
 const asNumber = (raw: unknown): number | null => {
   if (raw === undefined || raw === null || raw === "") return null;
@@ -155,16 +185,27 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   }
 
   private liftApiResponseBody(ctx: LogExtractorContext): void {
+    const querySource = asString(ctx.bag.attrs.get("query_source"));
     const bodyRaw = ctx.bag.attrs.take("body");
     const sessionId = asString(ctx.bag.attrs.get("session.id"));
 
-    const responseText = extractAssistantTextFromResponseBody(bodyRaw);
+    // Only fold the assistant text from genuine conversation turns into
+    // langwatch.output — utility calls (prompt_suggestion autosuggest,
+    // generate_session_title, etc.) carry text that is NOT the assistant's
+    // reply and would clobber the headline ComputedOutput (last write wins).
+    // See CONVERSATIONAL_QUERY_SOURCES.
+    const responseText = isConversationalQuerySource(querySource)
+      ? extractAssistantTextFromResponseBody(bodyRaw)
+      : null;
 
     let fired = false;
     if (responseText !== null) {
       ctx.setAttr("langwatch.output", responseText);
       fired = true;
     }
+    // thread.id correlation is lifted from EVERY api_response_body (including
+    // utility calls) so the trace stays stitched even if the only records in a
+    // window are non-conversational.
     if (sessionId !== null) {
       ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
       fired = true;
