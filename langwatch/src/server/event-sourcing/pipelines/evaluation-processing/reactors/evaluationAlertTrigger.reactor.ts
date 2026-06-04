@@ -50,17 +50,15 @@ export interface EvaluationAlertTriggerReactorDeps
 }
 
 /**
- * Evaluates user-defined triggers that include evaluation filters.
+ * Persist-class branch of the evaluation-pipeline alert trigger reactor.
  *
- * Fires on the evaluation-processing pipeline after an evaluation completes.
- * For each active trigger with evaluation filters:
- *   1. Cross-reads the trace fold state to check trace-level filters
- *   2. Loads all completed evaluations for the trace
- *   3. Matches evaluation filters against the full set of evaluations
- *   4. Dispatches the configured action if all filters pass
- *
- * This complements the alertTrigger reactor on the trace pipeline, which
- * handles triggers with only trace-level filters.
+ * Fires after a terminal evaluation event. For triggers with evaluation
+ * filters whose action is PERSIST (dataset write, annotation queue add),
+ * cross-reads the trace fold, loads all evaluations for the trace,
+ * matches both filter halves, claims `TriggerSent`, and dispatches
+ * inline. NOTIFY-class triggers with evaluation filters are owned by
+ * `evaluationAlertTriggerNotifyOutbox.reactor.ts`, registered via
+ * `.withOutbox` so dispatch flows through the settle/cadence outbox.
  */
 export function createEvaluationAlertTriggerReactor(
   deps: EvaluationAlertTriggerReactorDeps,
@@ -109,14 +107,19 @@ export function createEvaluationAlertTriggerReactor(
         await deps.triggers.getActiveTraceTriggersForProject(tenantId);
       if (triggers.length === 0) return;
 
-      // Filter to triggers that have evaluation filters
-      const triggersWithEvalFilters = triggers.filter((t) => {
+      // Restrict to persist-class triggers with evaluation filters.
+      // NOTIFY-class triggers with evaluation filters are owned by
+      // `evaluationAlertTriggerNotifyOutbox.reactor.ts`. Pre-filtering
+      // here also skips the expensive cross-pipeline fold + evaluation
+      // load + events derivation when the only matching triggers are
+      // notify-class.
+      const inlineBound = triggers.filter((t) => {
         const { hasEvaluationFilters } = classifyTriggerFilters(t.filters);
-        return hasEvaluationFilters;
+        return hasEvaluationFilters && !NOTIFY_TRIGGER_ACTIONS.has(t.action);
       });
-      if (triggersWithEvalFilters.length === 0) return;
+      if (inlineBound.length === 0) return;
 
-      // Cross-pipeline read: get the trace fold state
+      // Cross-pipeline read: get the trace fold state.
       const brandedTenantId = createTenantId(tenantId);
       const traceSummary = await deps.traceSummaryStore.get(traceId, {
         tenantId: brandedTenantId,
@@ -130,56 +133,6 @@ export function createEvaluationAlertTriggerReactor(
         );
         return;
       }
-
-      // Split triggers by routing. Outbox-bound triggers (notify class, settle
-      // wired) skip the inline filter + claim + dispatch path here — settle
-      // re-reads the now-settled fold *and* re-loads evaluations after
-      // `traceDebounceMs`, so we don't pay the cost of either here.
-      const outboxBound: typeof triggersWithEvalFilters = [];
-      const inlineBound: typeof triggersWithEvalFilters = [];
-      for (const t of triggersWithEvalFilters) {
-        if (deps.enqueueSettle && NOTIFY_TRIGGER_ACTIONS.has(t.action)) {
-          outboxBound.push(t);
-        } else {
-          inlineBound.push(t);
-        }
-      }
-
-      for (const trigger of outboxBound) {
-        try {
-          await deps.enqueueSettle!({
-            projectId: tenantId,
-            triggerId: trigger.id,
-            traceId,
-            foldState: traceSummary,
-            traceDebounceMs: trigger.traceDebounceMs,
-          });
-        } catch (error) {
-          logger.error(
-            {
-              tenantId,
-              traceId,
-              triggerId: trigger.id,
-              evaluationId: evalRun.evaluationId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Failed to enqueue settle stage for trigger",
-          );
-          captureException(error, {
-            extra: {
-              tenantId,
-              traceId,
-              triggerId: trigger.id,
-              evaluationId: evalRun.evaluationId,
-              triggerAction: trigger.action,
-            },
-          });
-        }
-      }
-
-      // Nothing left for the inline path — skip the expensive cross-pipeline
-      // evaluation load + events derivation entirely.
-      if (inlineBound.length === 0) return;
 
       // Load all evaluations for this trace (inline path only)
       const allEvaluations = await deps.evaluationRuns.findByTraceId(

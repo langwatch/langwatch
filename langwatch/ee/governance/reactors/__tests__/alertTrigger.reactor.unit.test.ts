@@ -93,12 +93,17 @@ function createContext(
 }
 
 function createTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
+  // Default to ADD_TO_ANNOTATION_QUEUE (persist-class, single-call
+  // dispatch path) so these tests exercise the inline path the reactor
+  // now owns. NOTIFY-class actions (SEND_EMAIL / SEND_SLACK_MESSAGE)
+  // flow through the `.withOutbox`-registered
+  // alertTriggerNotifyOutbox reactor — see its own test file.
   return {
     id: "trigger-1",
     projectId: "tenant-1",
     name: "Latency Alert",
-    action: TriggerAction.SEND_EMAIL,
-    actionParams: { members: ["user@example.com"] },
+    action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    actionParams: { annotators: [{ id: "annotator-1", name: "Ops" }] },
     filters: {},
     alertType: "WARNING",
     message: "",
@@ -179,7 +184,7 @@ describe("alertTrigger reactor", () => {
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
         createTrigger(),
       ]);
-      vi.mocked(sendTriggerEmail).mockRejectedValueOnce(
+      (deps.addToAnnotationQueue as any).mockRejectedValueOnce(
         new DispatchError({ message: "provider 503", retryable: true }),
       );
 
@@ -203,7 +208,7 @@ describe("alertTrigger reactor", () => {
         createTrigger({ id: "trigger-failing" }),
         createTrigger({ id: "trigger-ok" }),
       ]);
-      vi.mocked(sendTriggerEmail)
+      (deps.addToAnnotationQueue as any)
         .mockRejectedValueOnce(
           new DispatchError({ message: "revoked", retryable: false }),
         )

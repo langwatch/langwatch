@@ -92,6 +92,7 @@ import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/comm
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
+import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
@@ -108,6 +109,7 @@ import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.uti
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
 import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
+import { createAlertTriggerNotifyOutboxReactor } from "@ee/governance/reactors/alertTriggerNotifyOutbox.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import {
   createOriginGateReactor,
@@ -369,6 +371,12 @@ export class PipelineRegistry {
       ...this.buildTraceReactorContext(),
     });
 
+    const evaluationAlertTriggerNotifyOutboxReactor =
+      createEvaluationAlertTriggerNotifyOutboxReactor({
+        triggers: this.deps.triggers,
+        traceSummaryStore,
+      });
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
@@ -377,6 +385,7 @@ export class PipelineRegistry {
         executeEvaluationCommand,
         esSyncReactor,
         evaluationAlertTriggerReactor,
+        evaluationAlertTriggerNotifyOutboxReactor,
       }),
     );
   }
@@ -408,6 +417,10 @@ export class PipelineRegistry {
       triggers: this.deps.triggers,
       projects: this.deps.projects,
       ...this.buildTraceReactorContext(),
+    });
+
+    const alertTriggerNotifyOutboxReactor = createAlertTriggerNotifyOutboxReactor({
+      triggers: this.deps.triggers,
     });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
@@ -485,6 +498,7 @@ export class PipelineRegistry {
         originGateReactor,
         evaluationTriggerReactor,
         alertTriggerReactor,
+        alertTriggerNotifyOutboxReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,

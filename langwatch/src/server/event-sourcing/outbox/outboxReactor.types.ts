@@ -47,6 +47,18 @@ export interface OutboxEnqueueRequest {
    * outbox-wide setting (8 attempts).
    */
   maxAttempts?: number;
+  /**
+   * Per-request enqueue options forwarded to the underlying outbox
+   * runtime. Currently the only knob is `ttlMs` — the per-trigger
+   * trace-readiness debounce (ADR-026). `dedupKey`/`groupKey` above
+   * remain the row-identity for the spec's row-leased architecture;
+   * this codebase's GroupQueue-routed adapter uses `enqueueOptions.ttlMs`
+   * to thread `trigger.traceDebounceMs` through to the settle stage's
+   * Debounce Mode dedup window.
+   */
+  enqueueOptions?: {
+    ttlMs?: number;
+  };
 }
 
 /**

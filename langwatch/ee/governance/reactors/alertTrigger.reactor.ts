@@ -37,12 +37,21 @@ export type AlertTriggerReactorDeps = TriggerActionDispatchDeps & {
 };
 
 /**
- * Evaluates user-defined trace-based triggers reactively when traces arrive.
+ * Persist-class branch of the trace-pipeline alert trigger reactor.
  *
- * Fires on every trace event (via traceSummary fold). For each active trigger
- * on the tenant, evaluates filters in-memory against the fold state. If all
- * filters match and the trace hasn't already been sent for this trigger,
- * dispatches the configured action (email, Slack, dataset, annotation queue).
+ * Fires on every trace event (via traceSummary fold). For each active
+ * trace-only trigger whose action is PERSIST (dataset write, annotation
+ * queue add), evaluates filters in-memory against the fold state and
+ * — on match — claims `TriggerSent` and dispatches inline.
+ *
+ * NOTIFY-class actions (email / Slack) are owned by
+ * `alertTriggerNotifyOutbox.reactor.ts`, registered via `.withOutbox`.
+ * Splitting the two paths means persist work runs synchronously
+ * (fire-and-forget into PG) while notify work flows through the
+ * outbox's settle/cadence dispatch — the operator's two-knob timing
+ * model (`traceDebounceMs`, `notificationCadence`) only applies to the
+ * notify path. Triggers with evaluation filters are handled by the
+ * evaluation pipeline reactors and skipped here.
  */
 export function createAlertTriggerReactor(
   deps: AlertTriggerReactorDeps,
@@ -58,14 +67,21 @@ export function createAlertTriggerReactor(
       );
       if (triggers.length === 0) return;
 
-      // Derive the trace-level events list only if a trace-only trigger filters
-      // on event fields. Triggers with evaluation filters are skipped below
-      // (handled by evaluationAlertTrigger), so they don't need events here.
-      const needsEvents = triggers.some((t) => {
-        const { hasEvaluationFilters, traceFilters } = classifyTriggerFilters(
-          t.filters,
-        );
-        return !hasEvaluationFilters && triggerFiltersReferenceEvents(traceFilters);
+      // Restrict to persist-class trace-only triggers. NOTIFY-class
+      // triggers are handled by the .withOutbox-registered notify
+      // reactor; eval-filter triggers are handled by the evaluation
+      // pipeline. Pre-filtering here also lets us skip the
+      // (potentially expensive) events derivation when the only
+      // matching triggers are notify-class.
+      const persistTriggers = triggers.filter((t) => {
+        const { hasEvaluationFilters } = classifyTriggerFilters(t.filters);
+        return !hasEvaluationFilters && !NOTIFY_TRIGGER_ACTIONS.has(t.action);
+      });
+      if (persistTriggers.length === 0) return;
+
+      const needsEvents = persistTriggers.some((t) => {
+        const { traceFilters } = classifyTriggerFilters(t.filters);
+        return triggerFiltersReferenceEvents(traceFilters);
       });
       const events = needsEvents
         ? await deps.deriveEvents({
@@ -81,38 +97,14 @@ export function createAlertTriggerReactor(
         events,
       );
 
-      for (const trigger of triggers) {
+      for (const trigger of persistTriggers) {
         try {
-          const { traceFilters, hasEvaluationFilters } =
-            classifyTriggerFilters(trigger.filters);
+          const { traceFilters } = classifyTriggerFilters(trigger.filters);
 
-          // Skip triggers that require evaluation results (handled by evaluationAlertTrigger)
-          if (hasEvaluationFilters) continue;
-
-          // Outbox path: notify-class triggers route through the unified
-          // outbox queue (`stage: "settle"`). The settle dispatcher re-reads
-          // the now-settled fold after `traceDebounceMs`, re-runs filters
-          // against fresh state, claims TriggerSent, and re-enqueues as
-          // cadence on match. Skip the inline filter check + claim here so
-          // a half-formed early match doesn't shoot first.
-          if (
-            deps.enqueueSettle &&
-            NOTIFY_TRIGGER_ACTIONS.has(trigger.action)
-          ) {
-            await deps.enqueueSettle({
-              projectId: tenantId,
-              triggerId: trigger.id,
-              traceId,
-              foldState,
-              traceDebounceMs: trigger.traceDebounceMs,
-            });
-            continue;
-          }
-
-          // Inline path: persist-class actions (dataset, annotation queue)
-          // and the legacy unwired notify path. Filter check + claim +
-          // dispatch all happen here against the current (possibly
-          // half-formed) fold state.
+          // Filter check against the current (possibly half-formed)
+          // fold state. Persist actions don't pay the settle-stage
+          // re-read because the side effect is idempotent at the
+          // TriggerSent gate below.
           if (
             Object.keys(traceFilters).length > 0 &&
             !matchesTriggerFilters(traceData, traceFilters)
@@ -120,10 +112,11 @@ export function createAlertTriggerReactor(
             continue;
           }
 
-          // Atomic claim: insert TriggerSent first, dispatch only on success.
-          // Two reactors racing on the same trigger/trace (trace pipeline +
-          // eval pipeline) will see exactly one true. A reactor retry after
-          // a dispatch failure also sees false here — at-most-once.
+          // Atomic claim: insert TriggerSent first, dispatch only on
+          // success. Two reactors racing on the same trigger/trace
+          // (trace pipeline + eval pipeline) will see exactly one
+          // true. A reactor retry after a dispatch failure also sees
+          // false here — at-most-once.
           const claimed = await deps.triggers.claimSend({
             triggerId: trigger.id,
             traceId,
@@ -139,10 +132,11 @@ export function createAlertTriggerReactor(
             foldState,
           });
         } catch (error) {
-          // A failed dispatch now throws (DispatchError) rather than being
-          // swallowed; surface its retryable classification for operators. The
-          // claim already landed, so the in-line path does not retry — the
-          // outbox migration is what adds durable retry.
+          // A failed dispatch now throws (DispatchError) rather than
+          // being swallowed; surface its retryable classification for
+          // operators. Persist-class dispatch is inline (no outbox
+          // retry), so the claim has already landed by the time the
+          // error fires.
           const retryable = isDispatchError(error) ? error.retryable : undefined;
           logger.error(
             {

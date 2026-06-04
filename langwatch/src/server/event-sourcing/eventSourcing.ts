@@ -36,6 +36,8 @@ import {
   type OutboxJob,
 } from "./outbox/payload";
 import type { OutboxRuntime } from "./outbox/setup";
+import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
+import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
@@ -289,7 +291,7 @@ export class EventSourcing {
 
         const eventStore = this.eventStore as EventStore<EventType>;
 
-        const serviceOptions = buildServiceOptions(definition);
+        const serviceOptions = buildServiceOptions(definition, this._outbox);
 
         // Initialize the projection registry if it has projections and hasn't been initialized yet
         if (
@@ -682,11 +684,20 @@ export class EventSourcing {
 /**
  * Pure function to convert a StaticPipelineDefinition's Maps/arrays
  * into the flat arrays that EventSourcingPipeline expects.
+ *
+ * `outbox` is threaded through so reactors registered via `.withOutbox`
+ * are adapted into regular `ReactorDefinition`s that forward each
+ * emitted `OutboxEnqueueRequest` to `outbox.enqueueSettle`. The
+ * adapted reactors are merged into the `reactors`/`mapReactors` arrays
+ * the runtime already consumes — no separate dispatch loop.
  */
 function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
->(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
+>(
+  definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>,
+  outbox: OutboxRuntime | undefined,
+) {
   // Pass class instances directly — do NOT spread.
   // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(
@@ -707,21 +718,44 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const reactors =
-    definition.foldReactors.size > 0
-      ? Array.from(definition.foldReactors.values()).map((entry) => ({
-          foldName: entry.projectionName,
-          definition: entry.definition,
-        }))
-      : undefined;
+  const adaptedFoldOutboxReactors = Array.from(
+    definition.foldOutboxReactors.values(),
+  ).map((entry) => ({
+    foldName: entry.projectionName as string,
+    definition: adaptOutboxReactor(
+      entry.definition as OutboxReactorDefinition<EventType>,
+      outbox,
+    ),
+  }));
 
-  const mapReactors =
-    definition.mapReactors.size > 0
-      ? Array.from(definition.mapReactors.values()).map((entry) => ({
-          mapName: entry.projectionName,
-          definition: entry.definition,
-        }))
-      : undefined;
+  const adaptedMapOutboxReactors = Array.from(
+    definition.mapOutboxReactors.values(),
+  ).map((entry) => ({
+    mapName: entry.projectionName as string,
+    definition: adaptOutboxReactor(
+      entry.definition as OutboxReactorDefinition<EventType>,
+      outbox,
+    ),
+  }));
+
+  const foldReactorList = [
+    ...Array.from(definition.foldReactors.values()).map((entry) => ({
+      foldName: entry.projectionName as string,
+      definition: entry.definition,
+    })),
+    ...adaptedFoldOutboxReactors,
+  ];
+
+  const mapReactorList = [
+    ...Array.from(definition.mapReactors.values()).map((entry) => ({
+      mapName: entry.projectionName as string,
+      definition: entry.definition,
+    })),
+    ...adaptedMapOutboxReactors,
+  ];
+
+  const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
+  const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
 
   return {
     foldProjections: foldProjections.length > 0 ? foldProjections : undefined,

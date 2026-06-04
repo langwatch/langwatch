@@ -126,12 +126,18 @@ function createEvent(
 function createTrigger(
   overrides: Partial<TriggerSummary> = {},
 ): TriggerSummary {
+  // Default to ADD_TO_ANNOTATION_QUEUE (persist-class with a one-step
+  // dispatch path) so these tests exercise the inline-dispatch path the
+  // reactor now owns. NOTIFY-class actions (SEND_EMAIL /
+  // SEND_SLACK_MESSAGE) are dispatched through the
+  // `.withOutbox`-registered evaluationAlertTriggerNotifyOutbox reactor
+  // — see `evaluationAlertTriggerNotifyOutbox.reactor.unit.test.ts`.
   return {
     id: "trigger-1",
     projectId: "tenant-1",
     name: "Quality Alert",
-    action: TriggerAction.SEND_EMAIL,
-    actionParams: { members: ["user@example.com"] },
+    action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    actionParams: { annotators: [{ id: "annotator-1", name: "Ops" }] },
     filters: {
       "evaluations.passed": { "evaluator-1": ["true"] },
     },
@@ -509,7 +515,7 @@ describe("evaluationAlertTrigger reactor", () => {
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
-      vi.mocked(sendTriggerEmail).mockRejectedValueOnce(
+      (deps.addToAnnotationQueue as any).mockRejectedValueOnce(
         new DispatchError({ message: "provider 500", retryable: true }),
       );
 
@@ -544,7 +550,7 @@ describe("evaluationAlertTrigger reactor", () => {
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
-      vi.mocked(sendTriggerEmail)
+      (deps.addToAnnotationQueue as any)
         .mockRejectedValueOnce(
           new DispatchError({ message: "revoked", retryable: false }),
         )
