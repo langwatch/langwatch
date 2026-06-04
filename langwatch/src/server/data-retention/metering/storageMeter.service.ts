@@ -45,6 +45,11 @@ export class StorageMeterService {
     this.cache = new TtlCache(CACHE_TTL_MS, "storage-meter:");
   }
 
+  /**
+   * Total stored bytes for a tenant across all retention-managed tables,
+   * served from a short-lived cache and computed via {@link queryTotalBytes}
+   * on a miss.
+   */
   async getTotalStorageBytes({
     tenantId,
   }: {
@@ -58,6 +63,11 @@ export class StorageMeterService {
     return total;
   }
 
+  /**
+   * Stored bytes for a tenant grouped by retention category. Each table is
+   * queried independently so a single table's failure degrades that category
+   * to zero rather than failing the whole breakdown.
+   */
   async getStorageBreakdown({
     tenantId,
   }: {
@@ -98,6 +108,11 @@ export class StorageMeterService {
     return { totalBytes, byCategory };
   }
 
+  /**
+   * Sums per-table `_size_bytes` totals for a tenant in a single query. Each
+   * table is pre-aggregated inside a UNION ALL so only the 11 scalar subtotals
+   * (not every row's `_size_bytes`) reach the outer sum.
+   */
   private async queryTotalBytes(tenantId: string): Promise<number> {
     if (!this.resolveClickHouseClient) return 0;
 
