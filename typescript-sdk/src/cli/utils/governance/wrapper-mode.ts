@@ -28,6 +28,7 @@ import {
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "@/cli/utils/codex-config-toml";
+import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
@@ -209,6 +210,16 @@ export async function resolveWrapperMode(
       environment: cfg.organization?.slug ?? "langwatch",
     });
     codexConfigPath = result.path;
+  }
+
+  if (tool === "opencode") {
+    // opencode constructs its OTLP exporter but only EMITS spans when
+    // `experimental.openTelemetry` is true in ~/.config/opencode/opencode.jsonc.
+    // Without this the OTEL_EXPORTER_OTLP_* env vars we set below are
+    // accepted-and-ignored — Path B silently produces nothing. Idempotent
+    // merge: if the user already turned it on, no write; if they
+    // explicitly set false, we don't overwrite their intent.
+    setOpencodeOpenTelemetryFlag();
   }
 
   // Persist mode so the next invocation skips re-deriving it.
