@@ -16,6 +16,11 @@ export function useTraceFacets() {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const trpcUtils = api.useContext();
 
+  // Backoff counter for the cold-miss polling fallback below. Ref because
+  // refetchInterval is read by React Query's scheduler outside React's
+  // render cycle, and we don't want a state update to retrigger the query.
+  const pendingPollAttemptsRef = useRef(0);
+
   const query = api.tracesV2.discover.useQuery(
     {
       projectId: projectId ?? "",
@@ -42,6 +47,25 @@ export function useTraceFacets() {
       // on heavy projects (10–30s) and batching makes the sidebar wait the
       // full duration even though discover itself returns in ~2s.
       trpc: { context: { skipBatch: true } },
+      // Polling fallback for cold misses: the server returns `pending: true`
+      // and kicks an async compute that broadcasts `discover_updated` over
+      // SSE when it lands. SSE is the primary settlement path, but if it's
+      // missed/delayed/rate-limited or the subscription isn't connected,
+      // we'd sit on the synthetic skeleton forever. Poll while pending with
+      // 2s/4s/8s/15s backoff so the first warm response always settles.
+      // Cleared as soon as a non-pending payload arrives.
+      refetchInterval: (data) => {
+        if (!data?.pending) {
+          pendingPollAttemptsRef.current = 0;
+          return false;
+        }
+        const delay = Math.min(
+          2000 * 2 ** pendingPollAttemptsRef.current,
+          15000,
+        );
+        pendingPollAttemptsRef.current += 1;
+        return delay;
+      },
     },
   );
 
@@ -62,6 +86,9 @@ export function useTraceFacets() {
     {
       enabled: !!projectId,
       onData: () => {
+        // SSE delivered — drop the backoff so the post-invalidate refetch
+        // (and any subsequent pending-state poll) starts from a clean 2s.
+        pendingPollAttemptsRef.current = 0;
         void trpcUtils.tracesV2.discover.invalidate();
       },
     },
@@ -83,8 +110,10 @@ export function useTraceFacets() {
   // Cold-miss responses come back with `pending: true` and an empty
   // facets array — treat that as still-loading so the FilterSidebar
   // keeps rendering the FACET_DEFAULTS skeleton (gated on `isLoading`)
-  // until the SSE-driven invalidation lands the real payload. Without
-  // this, the sidebar would flash empty for the 1–2s ClickHouse scan.
+  // until the real payload lands (via the SSE-driven invalidation, or
+  // the `refetchInterval` poll above when SSE is delayed/missed).
+  // Without this, the sidebar would flash empty for the 1–2s ClickHouse
+  // scan.
   const result = isFromOtherProject ? EMPTY_RESULT : (query.data ?? EMPTY_RESULT);
 
   return {

@@ -12,7 +12,11 @@ import {
 } from "../stores/drawerStore";
 
 const DEFAULTS = {
-  mode: "trace" as DrawerViewMode,
+  // Mirror drawerStore's "summary" default so a popstate into an older
+  // drawer URL without `drawer.mode` doesn't hydrate the store back to
+  // Trace mode — the store's mount-time default is Summary, and the
+  // URL-sync default has to agree or the two paths diverge on back/forward.
+  mode: "summary" as DrawerViewMode,
   viz: "waterfall" as VizTab,
 } as const;
 
