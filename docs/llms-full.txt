@@ -11789,23 +11789,33 @@ Claude Code supports OpenTelemetry (OTel) traces for monitoring and observabilit
 
 ## Quick Start
 
-Configure Claude Code to send traces to LangWatch using environment variables:
+Configure Claude Code to send telemetry to LangWatch using environment variables:
 
 ```bash
 # 1. Enable telemetry
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 
-# 2. Configure OTLP exporter for traces
+# 2. Configure OTLP exporters
+#    Claude Code 2.1.x emits its cost-bearing api_request and user_prompt
+#    events as OTLP LOG records (not spans), and emits periodic usage
+#    metrics. LangWatch's receiver synthesizes a trace per Claude Code
+#    session from the logs and lifts cost / tokens / model onto it.
 export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
 
-# 3. Set OTLP protocol and endpoint
+# 3. Required so user_prompt events ship the prompt body — the
+#    receiver reads it as langwatch.input on the synthesized trace.
+export OTEL_LOG_USER_PROMPTS=1
+
+# 4. Set OTLP protocol and endpoint
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 
-# 4. Set authentication headers
+# 5. Set authentication headers
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
 
-# 5. Run Claude Code
+# 6. Run Claude Code
 claude
 ```
 
@@ -11826,6 +11836,9 @@ Example managed settings configuration for LangWatch:
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer company-langwatch-api-key"
@@ -11906,9 +11919,12 @@ Claude Code traces include:
 ### Basic LangWatch Integration
 
 ```bash
-# Enable telemetry and send traces to LangWatch
+# Enable telemetry and send to LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
@@ -11920,6 +11936,9 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 # Basic telemetry setup
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
 
 # LangWatch endpoint configuration
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
@@ -11936,6 +11955,9 @@ export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_ce
 # Debug configuration with console output and LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=console,otlp
+export OTEL_LOGS_EXPORTER=console,otlp
+export OTEL_METRICS_EXPORTER=console,otlp
+export OTEL_LOG_USER_PROMPTS=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
@@ -12041,10 +12063,19 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
 <AccordionGroup>
   <Accordion title="No data appearing in LangWatch">
     - Verify `CLAUDE_CODE_ENABLE_TELEMETRY=1` is set
+    - Verify `OTEL_LOGS_EXPORTER=otlp` is set — Claude Code 2.1.x ships its cost-bearing events as OTLP logs, not spans. With only `OTEL_TRACES_EXPORTER` set you'll see nothing in LangWatch
     - Check that the endpoint URL is correct: `https://app.langwatch.ai/api/otel`
     - Ensure your API key is valid and has proper permissions
     - Check network connectivity to the LangWatch endpoint
     - Verify the OTLP protocol is supported (http/json or grpc)
+  </Accordion>
+
+  <Accordion title="Trace shows but input/prompt is empty">
+    Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default — without this env, the receiver has no input text to attach to the synthesized trace.
+  </Accordion>
+
+  <Accordion title="Trace shows but output/response is empty">
+    Anthropic does NOT emit the assistant's response text in OTel as of Claude Code 2.1.x. Only token counts ship on the wire. LangWatch renders the input + cost + token breakdown but the output text stays empty until anthropic resumes emitting the response.
   </Accordion>
 
   <Accordion title="Authentication errors">
