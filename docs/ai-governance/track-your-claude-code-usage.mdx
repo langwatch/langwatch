@@ -9,20 +9,16 @@ The Anthropic Console gives you a monthly total, but nothing about which prompt 
 This guide wires Claude Code up so all of that lands on LangWatch, where you can browse:
 
 - Cost per session and per turn
-- Model used per turn, including silent fallbacks
-- Cache writes vs cache reads (Anthropic prompt caching is ~12x cheaper on reads, so the split matters)
-- Full prompt body, with the redaction off so you can audit what you actually sent
+- Model used per turn, including subagents
+- Cache writes vs cache reads (cached prompts are 10x cheaper, so you can adjust your setup to maximize it)
+- Full prompt body
 - Trace tree of tool calls, latencies, and durations
-- Export to CSV or to OTLP, so you can replay sessions or feed them into your own analysis
+- **Use LangWatch MCP to have your agent automatically self-improving by inspecting its own traces**
 
 How you pay Anthropic decides which path you walk:
 
-| Your setup | Path | Jump to |
-|---|---|---|
-| Pay-per-token Anthropic API key | API key (every call routes through a local gateway) | [Path 1](#path-1-api-key) |
-| Claude Max or Pro subscription (5x / 20x) | Subscription (read Claude Code's own OpenTelemetry output) | [Path 2](#path-2-claude-plan) |
-
-Both end with the same dashboard. Pick whichever matches how you pay; if you have both, do Path 1 first and add Path 2 on top.
+- [Tracking Claude Code usage on pay-per-token API keys](#tracking-claude-code-usage-on-pay-per-token-api-keys)
+- [Tracking Claude Code usage on 5x or 20x plans](#tracking-claude-code-usage-on-5x-or-20x-plans)
 
 ## Step 0: Get LangWatch
 
@@ -42,19 +38,17 @@ That bootstraps Postgres, ClickHouse, Redis, and the app on `http://localhost:55
   ![/me empty landing](/images/ai-governance/post-bypass/01-me-portal.png)
 </Frame>
 
-## Path 1: API key
+## Tracking Claude Code usage on pay-per-token API keys
 
 You hold an Anthropic API key and pay per request. This path routes every Claude Code call through a local gateway that holds your key, captures the full request and response server-side, and writes a trace. Cost numbers come straight from Anthropic's response.
 
 ### 1.1 Paste your Anthropic key
 
-On `/me`, find **Model providers**, click the **Anthropic** tile, paste your `sk-ant-` key. The drawer mints a Virtual Key (prefix `vk-lw-`) that Claude Code will use; LangWatch holds the real Anthropic key.
+Open **Settings → Model providers** (URL: `/[project]/settings/model-providers`), click the **Anthropic** tile, paste your `sk-ant-` key.
 
-<Frame caption="Anthropic provider drawer with the Virtual Key just issued. The vk-lw- is what Claude Code talks to. The sk-ant- stays on the LangWatch side.">
-  ![Virtual Key issued](/images/ai-governance/post-bypass/36-vk-rotated-secret-reveal.png)
+<Frame caption="Model providers screen with Anthropic configured. The sk-ant- key stays on the LangWatch side.">
+  ![Model providers configured](/images/ai-governance/post-bypass/15-model-providers-configured.png)
 </Frame>
-
-<Warning>The full Virtual Key value is shown once. If you lose it, re-mint from the same tile.</Warning>
 
 ### 1.2 Install the CLI
 
@@ -106,7 +100,7 @@ Click **Traces** in the sidebar for the per-request view. Each turn lands as a `
 
 That is the loop. Every future `langwatch claude` session writes here. Skip to [What you can do with this](#what-you-can-do-with-this).
 
-## Path 2: Claude plan
+## Tracking Claude Code usage on 5x or 20x plans
 
 You pay Anthropic flat per month on a Max or Pro plan. The Anthropic Console only shows a monthly total, no per-call breakdown. The only way to see per-call detail is to capture Claude Code's own OpenTelemetry output and let LangWatch render it.
 
