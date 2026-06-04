@@ -5,7 +5,10 @@ package app
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 )
 
 // ModelID is the bare model identifier (no `langwatch_noai/` prefix).
@@ -45,11 +48,16 @@ func IsKnown(id string) bool {
 
 // Normalize strips the optional `langwatch_noai/` prefix and validates the
 // remainder against the known model set. Returns (id, true) on success or
-// ("", false) for unknown ids.
+// ("", false) for unknown ids. Any other provider prefix (e.g. `openai/`)
+// is treated as an unknown model — we don't want misrouted ids to silently
+// satisfy a noai handler.
 func Normalize(id string) (ModelID, bool) {
+	const prefix = "langwatch_noai/"
 	stripped := id
-	if idx := strings.IndexByte(stripped, '/'); idx != -1 {
-		stripped = stripped[idx+1:]
+	if strings.HasPrefix(stripped, prefix) {
+		stripped = stripped[len(prefix):]
+	} else if strings.ContainsRune(stripped, '/') {
+		return "", false
 	}
 	for _, known := range All() {
 		if string(known) == stripped {
@@ -104,6 +112,17 @@ func userSimulationLine(lastUserText string) string {
 	}
 	return `Fake user follow-up to: "` + lastUserText + `"`
 }
+
+// newIDStamp returns a unique-per-invocation suffix used in response /
+// message / audio ids. Combines nanosecond timestamp with an atomic
+// counter so concurrent requests within the same nanosecond — and tests
+// that bake in a fixed `time.Time` — still produce distinct ids.
+func newIDStamp(now time.Time) string {
+	seq := atomic.AddUint64(&idCounter, 1)
+	return strconv.FormatInt(now.UTC().UnixNano(), 10) + "-" + strconv.FormatUint(seq, 10)
+}
+
+var idCounter uint64
 
 func verdictJSON(passed bool, score float64, reason string) string {
 	verdict := struct {

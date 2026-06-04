@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -91,9 +92,15 @@ func listModelsHandler() http.HandlerFunc {
 // ---------- helpers ----------
 
 func decodeJSON(r *http.Request, maxBody int64, dst any) error {
-	body, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, maxBody))
+	// http.MaxBytesReader requires a non-nil ResponseWriter (it calls
+	// WriteHeader on overflow). io.LimitReader gives the same cap with
+	// a clean io.EOF instead of a panic — fine for this dev-only service.
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
 	if err != nil {
 		return err
+	}
+	if int64(len(body)) > maxBody {
+		return fmt.Errorf("request body exceeds %d bytes", maxBody)
 	}
 	if len(body) == 0 {
 		return errors.New("empty request body")

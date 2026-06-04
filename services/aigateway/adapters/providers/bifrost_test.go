@@ -381,9 +381,10 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 
 // LangwatchNoai is a dev-only fake LLM. When LANGWATCH_NOAI_BASE_URL is
 // set, the account adapter must register it as a CustomProvider over
-// OpenAI with the configured BaseURL, keyless. ENVIRONMENT=production
-// suppresses it even if the env var is set, so dev configs leaking into
-// a prod image don't accidentally surface it.
+// OpenAI with the configured BaseURL, keyless. In production the
+// localhost fallback is suppressed — the operator must opt in by
+// setting LANGWATCH_NOAI_BASE_URL explicitly (covered by the
+// suppression test below).
 func TestLangwatchNoaiAccountRegistration(t *testing.T) {
 	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5577")
 	t.Setenv("ENVIRONMENT", "development")
@@ -434,16 +435,18 @@ func TestLangwatchNoaiSuppressedInProduction(t *testing.T) {
 	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://anywhere:5577")
 	t.Setenv("ENVIRONMENT", "production")
 
-	// Production gate: the env-driven default is suppressed. But the
-	// var was set explicitly here, so it still wins — the gate only
-	// keys off ENVIRONMENT for the fallback. The explicit override
-	// is intentional ("operator opted in"), so confirm that behaviour:
-	// the provider IS registered when the URL is explicit, even in
-	// prod. Producers should *not* set the var in prod images; the
-	// TS-side `devOnly` gate already hides the provider from project
-	// configs there.
+	// Production behaviour: noai is only registered when the operator
+	// explicitly opts in. There is no localhost fallback in production —
+	// the env var must be set. An explicit URL therefore registers the
+	// provider even in prod (which is intentional: an operator setting
+	// the var has consciously opted in). Producers should still not
+	// set the var in prod images; the TS-side `devOnly` gate already
+	// hides the provider from project configs there.
 	a := &account{}
-	providers, _ := a.GetConfiguredProviders()
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
 	found := false
 	for _, p := range providers {
 		if p == providerLangwatchNoai {
@@ -455,9 +458,12 @@ func TestLangwatchNoaiSuppressedInProduction(t *testing.T) {
 		t.Fatalf("expected explicit LANGWATCH_NOAI_BASE_URL to register noai even in production")
 	}
 
-	// Unset and confirm the prod gate works for the fallback path.
+	// Unset and confirm the prod gate suppresses noai when nobody opted in.
 	t.Setenv("LANGWATCH_NOAI_BASE_URL", "")
-	providers, _ = a.GetConfiguredProviders()
+	providers, err = a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders after unset: %v", err)
+	}
 	for _, p := range providers {
 		if p == providerLangwatchNoai {
 			t.Fatalf("expected noai to be suppressed when env unset in production")

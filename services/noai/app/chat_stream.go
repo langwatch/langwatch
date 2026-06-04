@@ -39,7 +39,8 @@ func BuildChatStreamChunks(req ChatRequest, now time.Time) []ChatStreamChunk {
 	last := ExtractLastUserTextChat(req.Messages)
 	reply := model.Reply(last)
 
-	id := "chatcmpl-noai-" + now.UTC().Format("20060102T150405Z")
+	stamp := newIDStamp(now)
+	id := "chatcmpl-noai-" + stamp
 	created := now.Unix()
 	base := func(delta ChatStreamDelta, finish *string) ChatStreamChunk {
 		return ChatStreamChunk{
@@ -57,7 +58,7 @@ func BuildChatStreamChunks(req ChatRequest, now time.Time) []ChatStreamChunk {
 	}
 	if model.HasAudioOutput() || requestAsksForAudio(req) {
 		chunks = append(chunks, base(ChatStreamDelta{Audio: &AssistantAudio{
-			ID:         "noai-audio-" + now.UTC().Format("20060102T150405Z"),
+			ID:         "noai-audio-" + stamp,
 			Data:       SilentWavBase64,
 			Transcript: reply,
 			ExpiresAt:  now.Add(1 * time.Hour).Unix(),

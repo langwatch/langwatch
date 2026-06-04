@@ -673,9 +673,10 @@ type account struct{}
 // providerLangwatchNoai is the Bifrost provider key for the local-dev
 // `langwatch_noai` fake LLM. It's registered as a CustomProvider on top
 // of Bifrost's OpenAI provider client, with its BaseURL pulled from
-// `LANGWATCH_NOAI_BASE_URL` (default localhost:5577). The provider is
-// only registered when that env var is set, so production gateways
-// never carry it.
+// `LANGWATCH_NOAI_BASE_URL`. In non-production the URL falls back to
+// `http://localhost:5577`; in production the fallback is suppressed —
+// operators have to opt in by setting LANGWATCH_NOAI_BASE_URL
+// explicitly, so prod gateways don't carry it by accident.
 const providerLangwatchNoai bfschemas.ModelProvider = "langwatch_noai"
 
 // langwatchNoaiBaseURL returns the URL the fake LLM service listens on,

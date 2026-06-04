@@ -11,8 +11,10 @@ import (
 	"github.com/langwatch/langwatch/pkg/config"
 )
 
-// Config is the top-level configuration for the noai service. All fields
-// are populated from environment variables prefixed with `NOAI_`.
+// Config is the top-level configuration for the noai service. Server
+// and Log fields read NOAI_-prefixed env vars (NOAI_SERVER_*, NOAI_LOG_*).
+// Environment intentionally reads the shared `ENVIRONMENT` var so noai
+// picks up the same value as every other service in the mono-binary.
 type Config struct {
 	Environment string        `env:"ENVIRONMENT"`
 	Server      config.Server `env:"NOAI_SERVER"`

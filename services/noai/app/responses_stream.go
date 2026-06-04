@@ -1,6 +1,9 @@
 package app
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ResponsesStreamEvent is one SSE event emitted by /v1/responses in
 // stream mode. The Responses API uses typed events (`response.created`,
@@ -20,8 +23,11 @@ type ResponsesStreamEvent struct {
 func BuildResponsesStreamEvents(req ResponsesRequest, now time.Time) []ResponsesStreamEvent {
 	result := BuildResponsesResult(req, now)
 	model, _ := Normalize(req.Model)
-	stamp := now.UTC().Format("20060102T150405Z")
-	textItemID := "msg_noai_" + stamp
+	// Use the same id as the non-stream builder so clients reconstructing
+	// the response see consistent ids across the two endpoints. Since
+	// BuildResponsesResult already stamped, derive textItemID by stripping
+	// the "resp_noai_" prefix and reusing the suffix.
+	textItemID := "msg_noai_" + strings.TrimPrefix(result.ID, "resp_noai_")
 
 	events := []ResponsesStreamEvent{
 		{Event: "response.created", Data: map[string]any{"response": minimalResponseEnvelope(result, "in_progress")}},

@@ -72,7 +72,7 @@ func BuildResponsesResult(req ResponsesRequest, now time.Time) ResponsesResult {
 		})
 	}
 
-	stamp := now.UTC().Format("20060102T150405Z")
+	stamp := newIDStamp(now)
 	return ResponsesResult{
 		ID:        "resp_noai_" + stamp,
 		Object:    "response",

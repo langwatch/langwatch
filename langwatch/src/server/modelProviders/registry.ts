@@ -409,10 +409,13 @@ export const modelProviders = {
   langwatch_noai: {
     name: "LangWatch NoAI (Local Dev)",
     type: "llm",
-    // The noai service is OpenAI-compatible and ignores credentials, but
-    // the rest of the plumbing assumes every provider names an api-key
-    // env var. We point at a recognisable unused name; the schema below
-    // is empty so prepareLitellmParams never sets params.api_key.
+    // The noai service is OpenAI-compatible and ignores credentials,
+    // but the rest of the plumbing assumes every provider names an
+    // api-key env var. We point at a recognisable unused name. Note the
+    // `apiKey` env name below is *deliberately* not in `keysSchema` —
+    // the schema only carries the endpoint override — so
+    // prepareLitellmParams never populates params.api_key for this
+    // provider.
     apiKey: "LANGWATCH_NOAI_API_KEY",
     endpointKey: "LANGWATCH_NOAI_BASE_URL",
     keysSchema: z.object({

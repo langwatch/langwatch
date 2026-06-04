@@ -75,10 +75,11 @@ func BuildChatResponse(req ChatRequest, now time.Time) ChatResponse {
 	last := ExtractLastUserTextChat(req.Messages)
 	reply := model.Reply(last)
 
+	stamp := newIDStamp(now)
 	msg := ChatAssistantMessage{Role: "assistant", Content: reply}
 	if model.HasAudioOutput() || requestAsksForAudio(req) {
 		msg.Audio = &AssistantAudio{
-			ID:         "noai-audio-" + now.UTC().Format("20060102T150405Z"),
+			ID:         "noai-audio-" + stamp,
 			Data:       SilentWavBase64,
 			Transcript: reply,
 			ExpiresAt:  now.Add(1 * time.Hour).Unix(),
@@ -87,7 +88,7 @@ func BuildChatResponse(req ChatRequest, now time.Time) ChatResponse {
 	}
 
 	return ChatResponse{
-		ID:      "chatcmpl-noai-" + now.UTC().Format("20060102T150405Z"),
+		ID:      "chatcmpl-noai-" + stamp,
 		Object:  "chat.completion",
 		Created: now.Unix(),
 		Model:   req.Model,

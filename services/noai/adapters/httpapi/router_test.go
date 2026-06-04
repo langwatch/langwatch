@@ -101,6 +101,7 @@ func TestChatCompletionsStreamEmitsDoneSentinel(t *testing.T) {
 			sawDone = true
 		}
 	}
+	require.NoError(t, scanner.Err())
 	assert.True(t, sawDelta, "stream must include the echo content delta")
 	assert.True(t, sawDone, "stream must end with data: [DONE]")
 }
