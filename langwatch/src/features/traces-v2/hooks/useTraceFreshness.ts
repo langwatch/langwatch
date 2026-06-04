@@ -121,11 +121,28 @@ export function useTraceFreshness() {
       const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
 
+      // Invalidate every per-trace query that changes shape when a new
+      // span lands — keeps the cache push-fresh so the per-hook
+      // refetchInterval can stay off while SSE is connected. Each
+      // query is also scoped by `projectId` + `traceId` so we only
+      // invalidate the open trace, not the entire CSR cache.
       void trpcUtils.tracesV2.spanTree.invalidate({
         projectId,
         traceId: openTraceId,
       });
       void trpcUtils.tracesV2.spanDetail.invalidate({
+        projectId,
+        traceId: openTraceId,
+      });
+      void trpcUtils.tracesV2.spanLangwatchSignals.invalidate({
+        projectId,
+        traceId: openTraceId,
+      });
+      void trpcUtils.tracesV2.traceEvents.invalidate({
+        projectId,
+        traceId: openTraceId,
+      });
+      void trpcUtils.tracesV2.resourceInfo.invalidate({
         projectId,
         traceId: openTraceId,
       });
