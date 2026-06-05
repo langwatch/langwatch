@@ -35,6 +35,7 @@ import {
   getProviderModelOptions,
   modelProviders as modelProviderRegistry,
 } from "~/server/modelProviders/registry";
+import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
@@ -51,17 +52,11 @@ export interface CliBootstrapResult {
   };
   /**
    * Authoritative gateway base URL for the CLI to use as `cfg.gateway_url`.
-   * Resolution order:
-   *   1. `LW_GATEWAY_PUBLIC_URL` — dedicated TS-side var, unambiguous.
-   *   2. `LW_GATEWAY_BASE_URL`   — legacy SaaS deploys where this var
-   *      still carried the public URL. In dev `scripts/start.sh`
-   *      hijacks it for the Go control-plane URL, so reading it on
-   *      dev would point the CLI at the Hono API (PORT+1000) and a
-   *      `langwatch claude` request would 404.
-   *   3. SaaS default `https://gateway.langwatch.com`.
-   *   4. Self-hosted default `http://localhost:5563`.
-   * Mirrors the same helper used by the personal-VK reveal card so /me
-   * and CLI surfaces report the same URL.
+   * Resolution lives in {@link resolveGatewayBaseUrl} — shared with the
+   * personal-VK reveal card so /me and CLI surfaces report the same URL.
+   * Note: in dev `scripts/start.sh` hijacks `LW_GATEWAY_BASE_URL` for the
+   * Go control-plane URL, so on dev the SaaS branch is what keeps a
+   * `langwatch claude` request off the Hono API (PORT+1000).
    */
   gatewayUrl: string;
   /**
@@ -75,11 +70,11 @@ export interface CliBootstrapResult {
 }
 
 function resolveGatewayUrl(): string {
-  if (env.LW_GATEWAY_PUBLIC_URL) return env.LW_GATEWAY_PUBLIC_URL;
-  if (env.LW_GATEWAY_BASE_URL) return env.LW_GATEWAY_BASE_URL;
-  return env.IS_SAAS
-    ? "https://gateway.langwatch.com"
-    : "http://localhost:5563";
+  return resolveGatewayBaseUrl({
+    publicUrl: env.LW_GATEWAY_PUBLIC_URL,
+    baseUrl: env.LW_GATEWAY_BASE_URL,
+    isSaas: env.IS_SAAS,
+  });
 }
 
 const SCOPE_RANK: Record<string, number> = {

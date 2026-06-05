@@ -32,7 +32,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * Service options for VK lifecycle calls. Forwards the gateway-URL
  * env signal so the service can pick the right default for the
  * deployment shape: explicit `LW_GATEWAY_BASE_URL` always wins,
- * otherwise SaaS gets `gateway.langwatch.com` and self-hosted falls
+ * otherwise SaaS gets `gateway.langwatch.ai` and self-hosted falls
  * back to `http://localhost:5563` (the Docker port the AI gateway
  * binds to). Without this, fresh self-hosted installs displayed the
  * production gateway URL on the VK reveal card and the user's curl
