@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ClaudeCodeExtractor,
   extractAssistantTextFromResponseBody,
+  extractUserTextFromRequestBody,
 } from "../claudeCode";
 import { createLogExtractorContext } from "./_testHelpers";
 
@@ -348,6 +349,46 @@ describe("ClaudeCodeExtractor.applyLog", () => {
           }),
         ),
       ).toBe("real");
+    });
+  });
+
+  describe("extractUserTextFromRequestBody (exported helper)", () => {
+    it("returns null for null/empty/non-object input", () => {
+      expect(extractUserTextFromRequestBody(null)).toBeNull();
+      expect(extractUserTextFromRequestBody(undefined)).toBeNull();
+      expect(extractUserTextFromRequestBody("")).toBeNull();
+      expect(extractUserTextFromRequestBody(42)).toBeNull();
+    });
+    it("returns null when messages key is missing or not an array", () => {
+      expect(extractUserTextFromRequestBody(JSON.stringify({}))).toBeNull();
+      expect(
+        extractUserTextFromRequestBody(JSON.stringify({ messages: "x" })),
+      ).toBeNull();
+    });
+    it("renders each message as 'role: text', skipping system", () => {
+      expect(
+        extractUserTextFromRequestBody(
+          JSON.stringify({
+            system: [{ type: "text", text: "system prompt" }],
+            messages: [
+              { role: "user", content: [{ type: "text", text: "hello" }] },
+              { role: "assistant", content: [{ type: "text", text: "hi" }] },
+            ],
+          }),
+        ),
+      ).toBe("user: hello\n\nassistant: hi");
+    });
+    it("accepts the plain-string content form", () => {
+      expect(
+        extractUserTextFromRequestBody(
+          JSON.stringify({ messages: [{ role: "user", content: "plain" }] }),
+        ),
+      ).toBe("user: plain");
+    });
+    it("falls back to the raw clipped string when the body is unparseable", () => {
+      // Oversized bodies (body_truncated=true) arrive clipped mid-JSON.
+      const truncated = '{"model":"x","messages":[{"role":"user","content":[{"type":"te';
+      expect(extractUserTextFromRequestBody(truncated)).toBe(truncated);
     });
   });
 });

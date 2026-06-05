@@ -50,7 +50,7 @@ import type {
   LogExtractorContext,
 } from "./_types";
 
-const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
+export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
 
@@ -266,18 +266,12 @@ export function extractAssistantTextFromResponseBody(
     }
   }
   if (!parsed || typeof parsed !== "object") return null;
+  // Responses always carry the array `content` form; reject the plain-string
+  // form here (it's only valid on request messages).
   const content = (parsed as { content?: unknown }).content;
   if (!Array.isArray(content)) return null;
-  const parts: string[] = [];
-  for (const c of content) {
-    if (!c || typeof c !== "object") continue;
-    const block = c as { type?: unknown; text?: unknown };
-    if (block.type !== "text") continue;
-    if (typeof block.text !== "string") continue;
-    if (block.text.length === 0) continue;
-    parts.push(block.text);
-  }
-  if (parts.length === 0) return null;
+  const text = collectTextBlocks(content);
+  if (text === null) return null;
   // Defence-in-depth payload-size guard. claude-code 2.x caps each
   // api_response_body inline at ~60KB upstream, and the log
   // command-level cap (capOversizedLogRecord, alexis) bounds the
@@ -285,5 +279,69 @@ export function extractAssistantTextFromResponseBody(
   // ComputedOutput / langwatch.output value specifically, in case
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.
-  return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+  return capPayloadString(text, undefined, "assistant_output");
+}
+
+/**
+ * Join the `text` blocks of an Anthropic Messages-API `content` field into a
+ * single display string. Accepts both the array form (`[{type:"text",text}]`,
+ * always used in responses) and the plain-string form (`content: "…"`, allowed
+ * in request messages). Non-text blocks (tool_use, thinking, images) are
+ * skipped. Returns null when there is no text.
+ */
+function collectTextBlocks(content: unknown): string | null {
+  if (typeof content === "string") return content.length > 0 ? content : null;
+  if (!Array.isArray(content)) return null;
+  const parts: string[] = [];
+  for (const c of content) {
+    if (!c || typeof c !== "object") continue;
+    const block = c as { type?: unknown; text?: unknown };
+    if (block.type !== "text") continue;
+    if (typeof block.text !== "string" || block.text.length === 0) continue;
+    parts.push(block.text);
+  }
+  return parts.length === 0 ? null : parts.join("\n\n");
+}
+
+/**
+ * Lift the user-visible input text from a claude-code `api_request_body` event.
+ * The body is the Anthropic Messages-API request: `{ model, system, messages:
+ * [{role, content}] }`. We render each message as `role: text` so the v2 drawer
+ * shows the conversation turn that produced the response. `system` is
+ * intentionally omitted — it's the (large, static) Claude Code system prompt,
+ * not the user's turn.
+ *
+ * Oversized requests carry `body_truncated=true` and an un-parseable (clipped)
+ * JSON body; rather than render blank, we fall back to the raw clipped string
+ * so the turn still shows something.
+ *
+ * Read-side display helper for the log-record span projector — does NOT feed
+ * the fold (the fold's input comes from `user_prompt`).
+ *
+ * @internal exported for the projector + unit testing
+ */
+export function extractUserTextFromRequestBody(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return capPayloadString(raw, undefined, "request_body_raw");
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const messages = (parsed as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return null;
+  const parts: string[] = [];
+  for (const m of messages) {
+    if (!m || typeof m !== "object") continue;
+    const msg = m as { role?: unknown; content?: unknown };
+    const role = typeof msg.role === "string" ? msg.role : "user";
+    const text = collectTextBlocks(msg.content);
+    if (text !== null) parts.push(`${role}: ${text}`);
+  }
+  if (parts.length === 0) return null;
+  return capPayloadString(parts.join("\n\n"), undefined, "request_body_input");
 }

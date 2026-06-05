@@ -9,6 +9,10 @@ import { ValidationError } from "~/server/app-layer/domain-error";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  projectLogRecordsToSpans,
+  type ProjectedSpan,
+} from "~/server/app-layer/traces/log-record-span-projection";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
@@ -146,6 +150,68 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     status,
     model: row.model,
   };
+}
+
+function projectedSpanToTreeNode(span: ProjectedSpan): SpanTreeNode {
+  return {
+    spanId: span.spanId,
+    parentSpanId: span.parentSpanId,
+    name: span.name,
+    type: span.type,
+    startTimeMs: span.startTimeMs,
+    endTimeMs: span.endTimeMs,
+    durationMs: span.durationMs,
+    status: span.status,
+    model: span.model,
+  };
+}
+
+function projectedSpanToDetail(span: ProjectedSpan): SpanDetail {
+  return {
+    spanId: span.spanId,
+    parentSpanId: span.parentSpanId,
+    name: span.name,
+    type: span.type,
+    startTimeMs: span.startTimeMs,
+    endTimeMs: span.endTimeMs,
+    durationMs: span.durationMs,
+    status: span.status,
+    model: span.model,
+    input: span.input,
+    output: span.output,
+    metrics: span.metrics
+      ? {
+          promptTokens: span.metrics.promptTokens,
+          completionTokens: span.metrics.completionTokens,
+          cost: span.metrics.cost,
+        }
+      : null,
+    params: span.params,
+    events: [],
+  };
+}
+
+/**
+ * For log-only traces (e.g. Claude Code OTLP, which emits log records and zero
+ * spans), project the trace's `stored_log_records` into read-time display
+ * spans so the v2 waterfall populates instead of showing "No span data". Pure
+ * read derivation — never writes spans or fold state. Returns [] when there are
+ * no log records either.
+ */
+async function projectLogSpansForTrace(params: {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+}): Promise<ProjectedSpan[]> {
+  const app = getApp();
+  const logRecords = await app.traces.logRecords.getByTraceId({
+    tenantId: params.projectId,
+    traceId: params.traceId,
+    ...(params.occurredAtMs !== undefined
+      ? { occurredAtMs: params.occurredAtMs }
+      : {}),
+  });
+  return projectLogRecordsToSpans(logRecords);
 }
 
 function stringifySpanIO(
@@ -709,7 +775,15 @@ export const tracesV2Router = createTRPCRouter({
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
-      return rows.map(mapSpanSummaryToTreeNode);
+      if (rows.length > 0) return rows.map(mapSpanSummaryToTreeNode);
+      // Log-only trace (no stored spans): project display spans from the
+      // trace's log records so the waterfall isn't empty. Read-only.
+      const projected = await projectLogSpansForTrace({
+        projectId: input.projectId,
+        traceId: input.traceId,
+        occurredAtMs: input.occurredAtMs,
+      });
+      return projected.map(projectedSpanToTreeNode);
     }),
 
   /**
@@ -795,6 +869,16 @@ export const tracesV2Router = createTRPCRouter({
       ]);
 
       if (!span) {
+        // The waterfall may be showing read-time projected spans (log-only
+        // trace). Re-project and return the matching synthetic span so a
+        // clicked log-derived span shows its input/output instead of 404ing.
+        const projected = await projectLogSpansForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          occurredAtMs: input.occurredAtMs,
+        });
+        const match = projected.find((s) => s.spanId === input.spanId);
+        if (match) return projectedSpanToDetail(match);
         throw new TraceNotFoundError(input.spanId);
       }
 
