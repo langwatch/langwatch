@@ -27,6 +27,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import {
   stampIngestKeyProvenanceOnLogRequest,
+  stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
@@ -520,6 +521,19 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
         return c.json({ error: "Failed to parse metrics" }, { status: 400 });
       }
       const metricsRequest = parsed.request;
+
+      // Receiver-authoritative provenance stamp for ingestion-key metrics —
+      // same contract as traces + logs, so the source / key / origin / org
+      // identity rides every OTLP signal and an upstream payload cannot forge
+      // a different one.
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        stampIngestKeyProvenanceOnMetricRequest(metricsRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0], {
+          apiKeyId: resolved.apiKeyId,
+          sourceType: resolved.ingestSourceType,
+          organizationId: resolved.organizationId,
+          templateId: resolved.ingestionTemplateId,
+        });
+      }
 
       // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {

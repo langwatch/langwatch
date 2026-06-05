@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Receiver-side provenance stamping for traces / logs landed via an ingestion
- * key (a project-scoped, ingest-only ApiKey with `ingestSourceType` set). The
+ * Receiver-side provenance stamping for traces / logs / metrics landed via an
+ * ingestion key (a project-scoped, ingest-only ApiKey with `ingestSourceType`
+ * set). The
  * receiver mutates the parsed OTLP request in-place to overwrite a fixed set of
  * resource attributes on every resource, so a malicious upstream payload can
  * never forge a different source / key / org identity onto its own traces:
@@ -58,6 +59,8 @@ type OtlpResourceSpans = { resource?: OtlpResource | null };
 type OtlpTraceRequest = { resourceSpans?: OtlpResourceSpans[] | null };
 type OtlpResourceLogs = { resource?: OtlpResource | null };
 type OtlpLogRequest = { resourceLogs?: OtlpResourceLogs[] | null };
+type OtlpResourceMetrics = { resource?: OtlpResource | null };
+type OtlpMetricRequest = { resourceMetrics?: OtlpResourceMetrics[] | null };
 
 export function stampIngestKeyProvenanceOnTraceRequest(
   request: OtlpTraceRequest,
@@ -86,6 +89,22 @@ export function stampIngestKeyProvenanceOnLogRequest(
     if (!rl.resource.attributes) rl.resource.attributes = [];
     rl.resource.attributes = stripProvenanceKeys(rl.resource.attributes);
     rl.resource.attributes.push(...buildProvenanceAttributes(provenance));
+    stamped++;
+  }
+  return stamped;
+}
+
+export function stampIngestKeyProvenanceOnMetricRequest(
+  request: OtlpMetricRequest,
+  provenance: IngestKeyProvenance,
+): number {
+  if (!request.resourceMetrics) return 0;
+  let stamped = 0;
+  for (const rm of request.resourceMetrics) {
+    if (!rm.resource) rm.resource = { attributes: [] };
+    if (!rm.resource.attributes) rm.resource.attributes = [];
+    rm.resource.attributes = stripProvenanceKeys(rm.resource.attributes);
+    rm.resource.attributes.push(...buildProvenanceAttributes(provenance));
     stamped++;
   }
   return stamped;
