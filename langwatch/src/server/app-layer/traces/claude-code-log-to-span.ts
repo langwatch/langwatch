@@ -43,8 +43,6 @@
  * turn. Cross-batch dedup is a tracked follow-up, not a silent loss.
  */
 
-import { createHash } from "node:crypto";
-
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type {
   OtlpInstrumentationScope,
