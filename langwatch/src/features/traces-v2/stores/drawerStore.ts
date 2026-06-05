@@ -105,6 +105,15 @@ interface DrawerState extends DrawerUrlState {
    * queries as a partition-pruning hint on `stored_spans`.
    */
   occurredAtMs: number | null;
+  /**
+   * Span count carried over from the table row that opened the drawer
+   * — used by `TraceDrawerSkeleton` to render an accurate-height
+   * placeholder while the real spanTree query is in flight, so the
+   * drawer body doesn't reflow when the data lands. `null` for entry
+   * paths (URL hydration, history navigation) that don't have the row
+   * in hand — the skeleton falls back to its default size in that case.
+   */
+  expectedSpanCount: number | null;
   pinnedSpanIds: string[];
 
   eventsExpanded: boolean;
@@ -113,7 +122,11 @@ interface DrawerState extends DrawerUrlState {
 
   traceBackStack: TraceHistoryEntry[];
 
-  openTrace: (traceId: string, occurredAtMs?: number | null) => void;
+  openTrace: (
+    traceId: string,
+    occurredAtMs?: number | null,
+    expectedSpanCount?: number | null,
+  ) => void;
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
@@ -468,6 +481,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   occurredAtMs: initial.occurredAtMs,
+  expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
   viewMode: initial.viewMode,
   vizTab: initial.vizTab,
@@ -478,11 +492,12 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs) =>
+  openTrace: (traceId, occurredAtMs, expectedSpanCount) =>
     set({
       isOpen: true,
       traceId,
       occurredAtMs: occurredAtMs ?? null,
+      expectedSpanCount: expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
     }),
@@ -494,6 +509,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       shortcutsOpen: false,
       traceId: null,
       occurredAtMs: null,
+      expectedSpanCount: null,
       selectedSpanId: null,
       pinnedSpanIds: [],
       traceBackStack: [],

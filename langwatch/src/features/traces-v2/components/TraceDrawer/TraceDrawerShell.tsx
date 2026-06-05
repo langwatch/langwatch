@@ -64,6 +64,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
   const pinned = useDrawerStore((s) => s.pinned);
+  const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s
@@ -199,7 +200,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             minHeight={0}
           >
             {isLoading || !trace ? (
-              <TraceDrawerSkeleton onClose={handleClose} />
+              <TraceDrawerSkeleton
+                onClose={handleClose}
+                expectedSpanCount={expectedSpanCount}
+              />
             ) : (
               <>
                 <Box

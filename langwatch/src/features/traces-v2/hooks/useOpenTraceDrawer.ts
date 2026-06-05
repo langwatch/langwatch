@@ -214,7 +214,13 @@ export function useOpenTraceDrawer() {
       }
       // Push into the store before route change so drawer hooks render
       // with the right traceId/occurredAtMs on the very next frame.
-      useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
+      // Pass the row's spanCount through so the drawer skeleton can
+      // size its accordion / span list section before the spanTree
+      // query resolves — eliminates the noticeable reflow that
+      // happened once the real data landed.
+      useDrawerStore
+        .getState()
+        .openTrace(trace.traceId, trace.timestamp, trace.spanCount);
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
       // teaches, and the only one we want demos / videos / first
