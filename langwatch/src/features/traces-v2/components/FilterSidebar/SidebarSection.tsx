@@ -327,6 +327,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                 borderRadius="sm"
                 color={searchToggleProps.open ? "fg" : "fg.subtle"}
                 bg={searchToggleProps.open ? "bg.muted" : undefined}
+                cursor="pointer"
                 _hover={{ color: "fg", bg: "bg.muted" }}
                 transition="background 100ms ease, color 100ms ease"
                 onClick={(e) => {
@@ -362,6 +363,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
             justifyContent="center"
             color="fg.subtle"
             flexShrink={0}
+            cursor="pointer"
             _hover={{ color: "fg" }}
             transition="color 100ms ease"
             onClick={(e) => {
