@@ -22,6 +22,7 @@ import {
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import type { BatchEvaluationData, ComparisonRunData } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
+import { useResultsGrouping } from "./useResultsGrouping";
 
 /** Metric types that can be displayed */
 type MetricType = "cost" | "latency" | `score_${string}` | `pass_${string}`;
@@ -776,6 +777,16 @@ export const ComparisonCharts = ({
     }
   }, [availableMetrics]);
 
+  // Generic metadata keys come from the shared hook so the chart and
+  // ComparisonTable use identical discovery (and adding a third surface
+  // later only needs to import the same hook). The hook excludes the
+  // reserved keys (model / prompt_id / prompt / version), which we
+  // surface here under their dedicated labels.
+  const { availableKeys: targetMetadataKeys } = useResultsGrouping({
+    source: "target-metadata",
+    comparisonData,
+  });
+
   // Get available X-axis options from target properties and metadata
   const xAxisOptions = useMemo(() => {
     const options: { value: XAxisOption; label: string }[] = [
@@ -788,44 +799,35 @@ export const ComparisonCharts = ({
       options.push({ value: "target", label: "Target" });
     }
 
-    // Track which properties/metadata keys exist across all targets
+    // Detect "Model" and "Prompt" — these reserve their own labels and
+    // can come from top-level columns or metadata aliases.
     let hasModel = false;
-    let hasPrompt = false; // Prompt option combines promptId + version
-    const metadataKeys = new Set<string>();
-
+    let hasPrompt = false;
     for (const run of runMetrics) {
       for (const targetCol of run.targetColumns) {
-        // Check top-level target properties
         if (targetCol.model) hasModel = true;
         if (targetCol.promptId) hasPrompt = true;
-
-        // Check metadata object
         if (targetCol.metadata) {
-          for (const key of Object.keys(targetCol.metadata)) {
-            if (key === "model") hasModel = true;
-            else if (key === "prompt_id" || key === "prompt") hasPrompt = true;
-            // Skip "version" as it's combined with prompt
-            else if (key !== "version") metadataKeys.add(key);
+          if ("model" in targetCol.metadata) hasModel = true;
+          if (
+            "prompt_id" in targetCol.metadata ||
+            "prompt" in targetCol.metadata
+          ) {
+            hasPrompt = true;
           }
         }
       }
     }
 
-    // Add common keys with nice labels
-    if (hasModel) {
-      options.push({ value: "model", label: "Model" });
-    }
-    if (hasPrompt) {
-      options.push({ value: "prompt", label: "Prompt" });
-    }
+    if (hasModel) options.push({ value: "model", label: "Model" });
+    if (hasPrompt) options.push({ value: "prompt", label: "Prompt" });
 
-    // Add remaining metadata keys
-    for (const key of metadataKeys) {
+    for (const key of targetMetadataKeys) {
       options.push({ value: key, label: key });
     }
 
     return options;
-  }, [runMetrics]);
+  }, [runMetrics, targetMetadataKeys]);
 
   // Show charts if:
   // 1. Multiple runs (compare mode)
