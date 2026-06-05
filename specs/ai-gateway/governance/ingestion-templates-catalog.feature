@@ -6,13 +6,14 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   So that I get cost / tokens / model populated automatically without
   hand-authoring OTTL rules in my upstream tool
 
-  Why templates exist (per the binding-doc):
-    The OAuth / subscription-bound-tool gap is real — when a user has a
+  Why templates exist:
+    The OAuth / subscription-bound-tool gap is real: when a user has a
     subscription-bound tool with no API key, the gateway VK path doesn't
     apply, and direct-OTLP works but lands as raw spans without canonical
     gen_ai.* normalisation. IngestionTemplate ships the OTTL transform admin-
-    side (or platform-team-side); UserIngestionBinding ships the user's
-    personal-project binding token.
+    side (or platform-team-side); installing a template issues an ingestion
+    key (an ApiKey, prefix sk-lw-) scoped to the user's project that carries
+    the templateId so the gateway applies the matching OTTL transform.
 
   Templates are NOT for the platform's coding assistants:
     The coding assistants the platform manages directly (claude_code, codex,
@@ -27,8 +28,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
 
   Per personal-workspace-features.feature + ingestion-attribution.feature:
     NO `IngestionSource.personalProjectId` column. ever.
-    UserIngestionBinding is a separate model from IngestionSource — the
-    binding-doc invariant survives.
+    An ingestion key is an ApiKey (prefix sk-lw-) scoped to one project with
+    an ingest-only role; it is not an IngestionSource row, so the
+    no-personalProjectId invariant survives.
 
   Background:
     Given organization "acme" exists
@@ -43,7 +45,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
         platform-template tiles. The card is NOT an IngestionTemplate row — it deep-
         links to /me/settings#otlp where the user grabs the personal-project OTLP
-        token. It does NOT mint a UserIngestionBinding. Its presence in the catalog
+        token. It does NOT mint an ingestion key. Its presence in the catalog
         is for discovery parity (so the no-template fallback is visible from the
         same surface as templates), not because it shares the IngestionTemplate
         contract.

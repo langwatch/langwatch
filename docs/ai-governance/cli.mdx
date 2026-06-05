@@ -28,14 +28,14 @@ langwatch governance --help
 
 ```bash
 langwatch governance --help
-# Manage governance resources (ingestion templates, user ingestion bindings)
+# Manage governance resources (ingestion templates, ingestion keys)
 # from the CLI. Mirrors the public REST surface at /api/governance/*, every
 # mutating call lands an audit row with metadata.surface='cli'.
 #
 # Commands:
-#   status                   Show the org's governance setup-state OR-of-flags.
-#   ingestion-templates      CRUD on IngestionTemplate rows.
-#   user-ingestion-bindings  Manage UserIngestionBindings (caller-scoped).
+#   status               Show the org's governance setup-state OR-of-flags.
+#   ingestion-templates  CRUD on IngestionTemplate rows.
+#   ingestion-keys       Manage ingestion keys (project-scoped ingest-only ApiKeys).
 
 langwatch governance ingestion-templates --help
 # Verbs:
@@ -86,7 +86,7 @@ The first preview ships with the two governance resources Sergey wired through H
 |---|---|---|
 | `status` | `status` (top-level, no verb tree, prints setup-state OR-of-flags) | `aiTools:view` |
 | `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` | `aiTools:view` (reads), `aiTools:manage` (writes) |
-| `user-ingestion-bindings` | `list` `install` `uninstall` `rotate` (caller-scoped, every org member manages their own) | `organization:view` + PAT bound to a real User |
+| `ingestion-keys` | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage` |
 
 Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `typescript-sdk/src/cli/index.ts`.
 
@@ -102,7 +102,7 @@ langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
 
 ## Setup-from-scratch via agent (v1 preview)
 
-The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + binding-install slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
+The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
 
 ```bash
 # 1. List existing platform templates (admin shape, includes ottl_rules)
