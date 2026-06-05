@@ -288,6 +288,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   describe("PATCH /api/projects/:id", () => {
+    /** @scenario PATCH /api/projects/:id updates project name */
     it("updates project fields", async () => {
       const createRes = await api.post("/api/projects", {
         name: `Patch Test ${nanoid(6)}`,
@@ -338,6 +339,7 @@ describe("Feature: Projects REST API", () => {
         projectToMove = await createRes.json();
       });
 
+      /** @scenario PATCH /api/projects/:id moves project to different team */
       it("moves project to a different team in the same org", async () => {
         const res = await api.patch(`/api/projects/${projectToMove.id}`, {
           teamId: destinationTeam.id,
@@ -348,6 +350,7 @@ describe("Feature: Projects REST API", () => {
         expect(body.teamId).toBe(destinationTeam.id);
       });
 
+      /** @scenario PATCH /api/projects/:id updates name and team together */
       it("updates name and team together", async () => {
         const res = await api.patch(`/api/projects/${projectToMove.id}`, {
           name: "Moved And Renamed",
@@ -360,6 +363,7 @@ describe("Feature: Projects REST API", () => {
         expect(body.teamId).toBe(testTeam.id);
       });
 
+      /** @scenario PATCH rejects non-existent teamId */
       it("rejects teamId that does not exist", async () => {
         const res = await api.patch(`/api/projects/${projectToMove.id}`, {
           teamId: "nonexistent-team",
@@ -367,6 +371,7 @@ describe("Feature: Projects REST API", () => {
         expect(res.status).toBe(400);
       });
 
+      /** @scenario PATCH rejects teamId of archived team */
       it("rejects teamId of archived team", async () => {
         const archivedTeam = await prisma.team.create({
           data: {
@@ -383,6 +388,7 @@ describe("Feature: Projects REST API", () => {
         expect(res.status).toBe(400);
       });
 
+      /** @scenario PATCH rejects teamId from different organization */
       it("rejects teamId from different organization", async () => {
         const otherOrg = await prisma.organization.create({
           data: { name: "Other Org", slug: `--test-other-org-${ns}` },
@@ -404,6 +410,7 @@ describe("Feature: Projects REST API", () => {
         await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
       });
 
+      /** @scenario PATCH with teamId and name is atomic */
       it("does not update name when team validation fails (atomic)", async () => {
         const beforeRes = await api.get(`/api/projects/${projectToMove.id}`);
         const beforeBody = await beforeRes.json();

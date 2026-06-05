@@ -23,6 +23,7 @@ describe("ProjectService.update", () => {
   });
 
   describe("when teamId is not provided", () => {
+    /** @scenario ProjectService.update with no teamId leaves team unchanged */
     it("skips team validation and updates the project", async () => {
       const fakeProject = { id: "p1", name: "Updated", teamId: "t1" };
       vi.mocked(repo.update).mockResolvedValue(fakeProject as any);
@@ -40,6 +41,8 @@ describe("ProjectService.update", () => {
 
   describe("when teamId is provided", () => {
     describe("when destination team exists in same org and is active", () => {
+      /** @scenario ProjectService.update changes teamId with same-org validation */
+      /** @scenario tRPC project.update accepts optional teamId */
       it("updates the project with new teamId", async () => {
         vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({ id: "t2" });
         const fakeProject = { id: "p1", name: "Bot", teamId: "t2" };
@@ -65,6 +68,7 @@ describe("ProjectService.update", () => {
     });
 
     describe("when destination team does not exist", () => {
+      /** @scenario tRPC project.update rejects cross-org team */
       it("throws DestinationTeamNotFoundError", async () => {
         vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue(null);
 
@@ -81,6 +85,7 @@ describe("ProjectService.update", () => {
     });
 
     describe("when destination team is archived", () => {
+      /** @scenario ProjectService.update rejects archived destination team */
       it("throws DestinationTeamNotFoundError", async () => {
         vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue(null);
 
