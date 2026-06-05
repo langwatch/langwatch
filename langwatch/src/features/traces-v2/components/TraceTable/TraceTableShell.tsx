@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, GripHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type React from "react";
 import {
   COLUMN_DRAG_THRESHOLD_PX,
@@ -331,13 +331,18 @@ function HeaderCell<T>({
   return (
     <Th
       ref={reorderable ? setNodeRef : undefined}
-      // Apply the sortable transform so the in-flight drag preview
-      // tracks the cursor. Static (non-reorderable) columns stay
-      // unchanged.
+      // Apply ONLY the translation from the sortable transform —
+      // `CSS.Translate.toString` skips the scaleX/scaleY that
+      // horizontalListSortingStrategy bakes in to fit the source's
+      // visual box to the target slot's width. With variable-width
+      // columns (Time = 60px vs Trace = 400px), the scale was producing
+      // grotesque stretches as the user dragged a narrow column over a
+      // wide one. Translation alone keeps the source at its natural
+      // width while still tracking the pointer.
       style={
         reorderable
           ? {
-              transform: CSS.Transform.toString(transform),
+              transform: CSS.Translate.toString(transform),
               transition,
               opacity: isDragging ? 0.6 : 1,
             }
@@ -358,6 +363,10 @@ function HeaderCell<T>({
       letterSpacing="0.06em"
       whiteSpace="nowrap"
       transition="none"
+      // `role="group"` (set via the Box css below) drives the grip's
+      // _groupHover state. The Th itself stays `position: relative` so
+      // the absolutely-positioned grip anchors inside the cell.
+      role="group"
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
@@ -390,50 +399,77 @@ function HeaderCell<T>({
       onMouseDown={onHeaderMouseDown}
       onDoubleClick={onHeaderDoubleClick}
     >
-      <HStack gap={1} align="center">
-        {reorderable && (
-          // Drag handle — small grip icon on the left of every
-          // reorderable header. Activates the surrounding
-          // SortableContext via `useSortable`'s listeners/attributes.
-          // Marked with data-column-drag-handle so the education-dialog
-          // mousedown detector knows to skip drags that originate here.
-          <Box
-            data-column-drag-handle="true"
-            display="inline-flex"
-            alignItems="center"
-            justifyContent="center"
-            width="14px"
-            height="14px"
-            flexShrink={0}
-            color="fg.subtle"
-            opacity={0.45}
-            cursor="grab"
-            _hover={{ opacity: 1, color: "fg" }}
-            _active={{ cursor: "grabbing" }}
-            aria-label="Drag to reorder column"
-            title="Drag to reorder column"
-            {...dragHandleProps}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Icon boxSize="10px">
-              <GripHorizontal />
-            </Icon>
-          </Box>
-        )}
-        <Box flex={1} minWidth={0}>
-          {canSort ? (
-            <SortableHeaderButton
-              align={align}
-              sortDirection={sortDirection}
-              onToggle={header.column.getToggleSortingHandler()}
-            >
-              {flexRender(header.column.columnDef.header, header.getContext())}
-            </SortableHeaderButton>
-          ) : (
-            flexRender(header.column.columnDef.header, header.getContext())
-          )}
+      {reorderable && (
+        // Drag handle floats on the cell's left edge, hidden until the
+        // user hovers (or focuses) the header. The header label/sort
+        // chrome owns the cell's full width so labels like "TIME" no
+        // longer get squeezed by a permanently-rendered grip — the grip
+        // appears only when the operator is reaching for it. On hover
+        // it sits over the leftmost few pixels of the label; on a
+        // narrow column the label dims behind it, which is fine since
+        // the user is actively about to drag the column.
+        // GripVertical (vertical-dot orientation) reads as the "grab to
+        // move horizontally" gesture, matching every other table
+        // reorder UI users have seen.
+        <Box
+          data-column-drag-handle="true"
+          position="absolute"
+          top="50%"
+          left="2px"
+          transform="translateY(-50%)"
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+          width="14px"
+          height="14px"
+          color="fg.subtle"
+          cursor="grab"
+          opacity={0}
+          // Reveal on hover-of-the-cell OR keyboard focus of the
+          // handle. _groupHover keys off the Th's `role="group"`.
+          _groupHover={{ opacity: 1 }}
+          _focusVisible={{
+            opacity: 1,
+            outline: "2px solid",
+            outlineColor: "blue.focusRing",
+            outlineOffset: "1px",
+            borderRadius: "sm",
+          }}
+          _active={{ cursor: "grabbing" }}
+          transition="opacity 100ms ease"
+          // Backdrop so the grip stays legible when overlaying short
+          // labels in narrow columns. Picks up the active-sort tint
+          // so it doesn't clash with the cell's own background.
+          bg={
+            isActiveSort
+              ? { base: "bg.muted", _dark: "bg.muted" }
+              : { base: "bg.subtle/85", _dark: "bg.surface/85" }
+          }
+          borderRadius="sm"
+          zIndex={1}
+          aria-label="Drag to reorder column"
+          title="Drag to reorder column"
+          {...dragHandleProps}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Icon boxSize="10px">
+            <GripVertical />
+          </Icon>
         </Box>
-      </HStack>
+      )}
+      <Box flex={1} minWidth={0}>
+        {canSort ? (
+          <SortableHeaderButton
+            align={align}
+            sortDirection={sortDirection}
+            onToggle={header.column.getToggleSortingHandler()}
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </SortableHeaderButton>
+        ) : (
+          flexRender(header.column.columnDef.header, header.getContext())
+        )}
+      </Box>
       <ColumnResizeGrip header={header} />
     </Th>
   );

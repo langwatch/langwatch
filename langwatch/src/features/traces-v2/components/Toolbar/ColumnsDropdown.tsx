@@ -1,5 +1,26 @@
-import { Box, Button, HStack, IconButton, Text } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, ChevronDown, Columns3, X } from "lucide-react";
+import { Box, Button, HStack, Icon, IconButton, Text } from "@chakra-ui/react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Columns3,
+  GripVertical,
+  X,
+} from "lucide-react";
 import type React from "react";
 import {
   MenuCheckboxItem,
@@ -52,6 +73,29 @@ export const ColumnsDropdown: React.FC = () => {
     .map((id) => columnById.get(id))
     .filter((c): c is LensColumnOption => !!c && !c.pinned);
 
+  // Drag-reorder for the "Visible order" strip. Activation distance
+  // mirrors the table header's so a stray click on the grip doesn't
+  // kick off a drag — power users get DnD, keyboard users keep the
+  // up/down arrows. Both call into the same `reorderColumns` action.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIdx = orderedVisibleColumns.findIndex(
+      (c) => c.id === String(active.id),
+    );
+    const toIdx = orderedVisibleColumns.findIndex(
+      (c) => c.id === String(over.id),
+    );
+    if (fromIdx < 0 || toIdx < 0) return;
+    reorderColumns(
+      columnOrder.indexOf(orderedVisibleColumns[fromIdx]!.id),
+      columnOrder.indexOf(orderedVisibleColumns[toIdx]!.id),
+    );
+  };
+
   return (
     <MenuRoot closeOnSelect={false}>
       <MenuTrigger asChild>
@@ -95,15 +139,12 @@ export const ColumnsDropdown: React.FC = () => {
           </Text>
         </Box>
         {orderedVisibleColumns.length > 1 && (
-          // Reorder strip — appears above the toggle list. Each row
-          // shows a currently-visible column with up/down arrows that
-          // call `reorderColumns`. The full-blown drag-and-drop UI
-          // doesn't fit cleanly inside a Chakra Menu (the menu
-          // dismisses on outside-pointer-down which fights drag), so
-          // we surface the same `reorderColumns` action via keyboard-
-          // accessible arrow buttons. Power users who want full DnD
-          // still have the table header (when that lands) and the
-          // LensConfigDialog (when it grows a reorder section).
+          // Reorder strip — drag the grip handle, or use the up/down
+          // arrows for a keyboard-accessible fallback. Both paths call
+          // into the same `reorderColumns` action. Drag-and-drop also
+          // works on the table header itself; surfacing it inside the
+          // dropdown gives operators a less-distracting "lay out my
+          // columns away from the live data" workflow.
           <Box
             paddingX={2}
             paddingY={1.5}
@@ -121,68 +162,42 @@ export const ColumnsDropdown: React.FC = () => {
             >
               Visible order
             </Text>
-            {orderedVisibleColumns.map((column, index) => (
-              <HStack
-                key={column.id}
-                gap={1}
-                paddingX={1}
-                paddingY={0.5}
-                _hover={{ bg: "bg.muted" }}
-                borderRadius="sm"
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedVisibleColumns.map((c) => c.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <Text textStyle="xs" color="fg" flex={1} truncate>
-                  {column.label}
-                </Text>
-                <IconButton
-                  aria-label={`Move ${column.label} up`}
-                  size="2xs"
-                  variant="ghost"
-                  disabled={index === 0}
-                  // Resolve the neighbour from the VISIBLE-order strip
-                  // and only then translate back into the full
-                  // `columnOrder` index space. Using `columnOrder ± 1`
-                  // directly would target whatever the next unfiltered
-                  // index happens to be — typically a pinned column
-                  // sitting between two reorderable ones — and the move
-                  // would silently no-op against the pinned slot.
-                  onClick={() => {
-                    const previous = orderedVisibleColumns[index - 1];
-                    if (!previous) return;
-                    reorderColumns(
-                      columnOrder.indexOf(column.id),
-                      columnOrder.indexOf(previous.id),
-                    );
-                  }}
-                >
-                  <ArrowUp size={11} />
-                </IconButton>
-                <IconButton
-                  aria-label={`Move ${column.label} down`}
-                  size="2xs"
-                  variant="ghost"
-                  disabled={index === orderedVisibleColumns.length - 1}
-                  onClick={() => {
-                    const next = orderedVisibleColumns[index + 1];
-                    if (!next) return;
-                    reorderColumns(
-                      columnOrder.indexOf(column.id),
-                      columnOrder.indexOf(next.id),
-                    );
-                  }}
-                >
-                  <ArrowDown size={11} />
-                </IconButton>
-                <IconButton
-                  aria-label={`Remove ${column.label}`}
-                  size="2xs"
-                  variant="ghost"
-                  color="fg.subtle"
-                  onClick={() => toggleColumn(column.id)}
-                >
-                  <X size={11} />
-                </IconButton>
-              </HStack>
-            ))}
+                {orderedVisibleColumns.map((column, index) => (
+                  <SortableVisibleColumnRow
+                    key={column.id}
+                    column={column}
+                    isFirst={index === 0}
+                    isLast={index === orderedVisibleColumns.length - 1}
+                    onMoveUp={() => {
+                      const previous = orderedVisibleColumns[index - 1];
+                      if (!previous) return;
+                      reorderColumns(
+                        columnOrder.indexOf(column.id),
+                        columnOrder.indexOf(previous.id),
+                      );
+                    }}
+                    onMoveDown={() => {
+                      const next = orderedVisibleColumns[index + 1];
+                      if (!next) return;
+                      reorderColumns(
+                        columnOrder.indexOf(column.id),
+                        columnOrder.indexOf(next.id),
+                      );
+                    }}
+                    onRemove={() => toggleColumn(column.id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </Box>
         )}
         {sections.map(({ title, columns }) => (
@@ -248,6 +263,106 @@ const ColumnCheckbox: React.FC<{
         </Text>
       )}
     </MenuCheckboxItem>
+  );
+};
+
+/**
+ * One row of the "Visible order" reorder strip. Wraps `useSortable` so
+ * the row can be dragged via its grip handle, while keeping the
+ * arrow + remove buttons callable independently. Resolve the neighbour
+ * from the VISIBLE-order strip up in the parent and only then translate
+ * back into the full `columnOrder` index space — using `columnOrder ± 1`
+ * directly would target whatever the next unfiltered index happens to
+ * be (typically a pinned column sitting between two reorderable ones),
+ * and the move would silently no-op against the pinned slot.
+ */
+interface SortableVisibleColumnRowProps {
+  column: LensColumnOption;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+}
+
+const SortableVisibleColumnRow: React.FC<SortableVisibleColumnRowProps> = ({
+  column,
+  isFirst,
+  isLast,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: column.id });
+  return (
+    <HStack
+      ref={setNodeRef}
+      // CSS.Translate (not CSS.Transform) — vertical list, same reason
+      // as the table header: avoid baked-in scaleX/scaleY when row
+      // heights are uniform but we want to be defensive.
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+      gap={1}
+      paddingX={1}
+      paddingY={0.5}
+      _hover={{ bg: "bg.muted" }}
+      borderRadius="sm"
+    >
+      <Box
+        {...attributes}
+        {...(listeners ?? {})}
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        width="14px"
+        height="14px"
+        color="fg.subtle"
+        cursor="grab"
+        _hover={{ color: "fg" }}
+        _active={{ cursor: "grabbing" }}
+        aria-label={`Drag to reorder ${column.label}`}
+        title={`Drag to reorder ${column.label}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Icon boxSize="11px">
+          <GripVertical />
+        </Icon>
+      </Box>
+      <Text textStyle="xs" color="fg" flex={1} truncate>
+        {column.label}
+      </Text>
+      <IconButton
+        aria-label={`Move ${column.label} up`}
+        size="2xs"
+        variant="ghost"
+        disabled={isFirst}
+        onClick={onMoveUp}
+      >
+        <ArrowUp size={11} />
+      </IconButton>
+      <IconButton
+        aria-label={`Move ${column.label} down`}
+        size="2xs"
+        variant="ghost"
+        disabled={isLast}
+        onClick={onMoveDown}
+      >
+        <ArrowDown size={11} />
+      </IconButton>
+      <IconButton
+        aria-label={`Remove ${column.label}`}
+        size="2xs"
+        variant="ghost"
+        color="fg.subtle"
+        onClick={onRemove}
+      >
+        <X size={11} />
+      </IconButton>
+    </HStack>
   );
 };
 
