@@ -19,7 +19,8 @@ import type { RouterOutputs } from "~/utils/api";
 const STORAGE_KEY = "langwatch:traces-v2:discoverCache";
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-export type DiscoverDescriptors = RouterOutputs["tracesV2"]["discover"]["facets"];
+export type DiscoverDescriptors =
+  RouterOutputs["tracesV2"]["discover"]["facets"];
 
 interface Entry {
   facets: DiscoverDescriptors;

@@ -142,7 +142,7 @@ export function useTraceFacets() {
         ? liveSettled
         : cachedFacets
           ? { facets: cachedFacets, pending: false }
-          : query.data ?? EMPTY_RESULT;
+          : (query.data ?? EMPTY_RESULT);
 
   // Loading reflects what the sidebar will see: if there's either
   // live or cached data driving `result`, the operator already has a

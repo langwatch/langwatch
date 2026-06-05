@@ -58,15 +58,6 @@ function sliceFallbackTokenRange(
   return joined;
 }
 
-function arraysShallowEqual<T>(a: readonly T[], b: readonly T[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
 function suggestionRowsEqual(
   a: { value: string; isPrefix?: boolean },
   b: { value: string; isPrefix?: boolean },
@@ -598,9 +589,9 @@ export function useFilterEditor({
       // decoration pass; the parent receives the click rect to anchor
       // the popover. Skip when no callback is wired so chip clicks
       // still place the cursor as before.
-      const chipEl = target?.closest("[data-filter-chip-start]") as
-        | HTMLElement
-        | null;
+      const chipEl = target?.closest(
+        "[data-filter-chip-start]",
+      ) as HTMLElement | null;
       if (chipEl && onTokenClick) {
         event.preventDefault();
         event.stopPropagation();
@@ -608,12 +599,7 @@ export function useFilterEditor({
         const end = Number(chipEl.dataset.filterChipEnd);
         const field = chipEl.dataset.filterChipField ?? "";
         const value = chipEl.dataset.filterChipValue ?? "";
-        if (
-          Number.isFinite(start) &&
-          Number.isFinite(end) &&
-          field &&
-          value
-        ) {
+        if (Number.isFinite(start) && Number.isFinite(end) && field && value) {
           onTokenClick({
             rect: chipEl.getBoundingClientRect(),
             field,
@@ -628,9 +614,9 @@ export function useFilterEditor({
       // span carries the liqe-text coordinates as data attributes (set
       // by `filterHighlight`'s decoration pass) so we can flip without
       // re-parsing the AST here.
-      const opEl = target?.closest("[data-filter-op-start]") as
-        | HTMLElement
-        | null;
+      const opEl = target?.closest(
+        "[data-filter-op-start]",
+      ) as HTMLElement | null;
       if (opEl) {
         event.preventDefault();
         event.stopPropagation();
@@ -713,7 +699,9 @@ export function useFilterEditor({
       const { text, cursorPos } = readEditorContext(editor);
       // Look up whether the clicked label corresponds to a prefix row so
       // the accept handler doesn't auto-append `:` to `trace.attribute.`.
-      const matched = suggestionRef.current.items.find((r) => r.value === label);
+      const matched = suggestionRef.current.items.find(
+        (r) => r.value === label,
+      );
       const action = handleKey(
         {
           text,

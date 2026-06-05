@@ -109,13 +109,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
           }}
         >
           <FormatGlyph format={detected} />
-          <Text
-            textStyle="xs"
-            fontFamily="mono"
-            truncate
-            minWidth={0}
-            flex={1}
-          >
+          <Text textStyle="xs" fontFamily="mono" truncate minWidth={0} flex={1}>
             {inline.text}
           </Text>
           {inline.hint && (
@@ -202,11 +196,7 @@ const FORMAT_VISUALS: Record<
  * is enough to telegraph chat / json / text at a glance; the toggle
  * still spells the word out for users who'd rather read it.
  */
-function FormatGlyph({
-  format,
-}: {
-  format: Exclude<AttributeFormat, "leaf">;
-}) {
+function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   const v = FORMAT_VISUALS[format];
   return (
     <Tooltip

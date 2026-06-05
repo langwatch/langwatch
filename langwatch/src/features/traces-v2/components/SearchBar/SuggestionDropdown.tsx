@@ -1,10 +1,18 @@
-import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import {
-  type SearchFieldGroup,
   SEARCH_FIELDS,
+  type SearchFieldGroup,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
 import { useUIStore } from "../../stores/uiStore";
@@ -203,7 +211,11 @@ function groupRows(items: SuggestionRow[]): GroupedSection[] {
   for (const spec of SUGGESTION_GROUPS) {
     const b = buckets.get(spec.id);
     if (b) {
-      ordered.push({ label: b.label, first: ordered.length === 0, rows: b.rows });
+      ordered.push({
+        label: b.label,
+        first: ordered.length === 0,
+        rows: b.rows,
+      });
       buckets.delete(spec.id);
     }
   }
@@ -303,11 +315,7 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
         )}
       </HStack>
       {count !== undefined && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          marginLeft={2}
-        >
+        <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
           {count}
         </Text>
       )}

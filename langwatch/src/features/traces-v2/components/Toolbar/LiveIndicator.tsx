@@ -6,8 +6,8 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import {
-  useSseStatusStore,
   type LiveUpdatesMode,
+  useSseStatusStore,
 } from "../../stores/sseStatusStore";
 
 const SSE_STATE_STYLE: Record<

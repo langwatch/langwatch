@@ -100,7 +100,8 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   // Total interactive rows for keyboard navigation: known values
   // followed by the optional custom-value row at the end.
   const interactiveRowCount = values.length + (customValue ? 1 : 0);
-  const isCustomRowActive = customValue !== null && activeIndex === values.length;
+  const isCustomRowActive =
+    customValue !== null && activeIndex === values.length;
 
   // Click-outside dismisses the popover. Listen on `mousedown` so the
   // dismiss fires before any subsequent click logic somewhere else.
@@ -108,7 +109,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     if (!anchor) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node | null;
-      if (containerRef.current && target && containerRef.current.contains(target)) {
+      if (
+        containerRef.current &&
+        target &&
+        containerRef.current.contains(target)
+      ) {
         return;
       }
       onClose();
@@ -164,7 +169,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
         }
         const next = values[activeIndex];
         if (next) {
-          setFacetValueAt(anchor.location.start, anchor.location.end, next.value);
+          setFacetValueAt(
+            anchor.location.start,
+            anchor.location.end,
+            next.value,
+          );
           onClose();
         }
       }
@@ -322,17 +331,10 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                         </Text>
                       )}
                       {isCurrent && (
-                        <Check
-                          size={12}
-                          color="var(--chakra-colors-blue-fg)"
-                        />
+                        <Check size={12} color="var(--chakra-colors-blue-fg)" />
                       )}
                     </HStack>
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      marginLeft={2}
-                    >
+                    <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
                       {v.count.toLocaleString()}
                     </Text>
                   </chakra.button>

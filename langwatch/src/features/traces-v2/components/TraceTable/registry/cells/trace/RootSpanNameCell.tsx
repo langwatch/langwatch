@@ -1,7 +1,7 @@
 import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
-import { dash } from "../dashPlaceholder";
 import type { CellDef } from "../../types";
+import { dash } from "../dashPlaceholder";
 
 export const RootSpanNameCell = {
   id: "root-span-name",

@@ -148,12 +148,20 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
                       paddingY={0.5}
                       borderRadius="md"
                       borderWidth="1px"
-                      borderColor={active ? `${v.palette}.solid` : `${v.palette}.muted`}
+                      borderColor={
+                        active ? `${v.palette}.solid` : `${v.palette}.muted`
+                      }
                       bg={active ? `${v.palette}.solid` : `${v.palette}.subtle`}
-                      color={active ? `${v.palette}.contrast` : `${v.palette}.fg`}
+                      color={
+                        active ? `${v.palette}.contrast` : `${v.palette}.fg`
+                      }
                       cursor="pointer"
                       transition="background 100ms ease, border-color 100ms ease"
-                      _hover={{ bg: active ? `${v.palette}.solid` : `${v.palette}.muted` }}
+                      _hover={{
+                        bg: active
+                          ? `${v.palette}.solid`
+                          : `${v.palette}.muted`,
+                      }}
                       onClick={() => toggleFacet(VERDICT_FIELD, v.verdict)}
                       aria-pressed={active}
                     >
@@ -199,11 +207,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
           </VStack>
         )}
         {aggregates.hasLabel && (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontStyle="italic"
-          >
+          <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
             This evaluator emits labels.
           </Text>
         )}
@@ -243,8 +247,7 @@ const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
   onChange,
   onClear,
 }) => {
-  const fromValue =
-    currentFrom !== undefined ? String(currentFrom) : "";
+  const fromValue = currentFrom !== undefined ? String(currentFrom) : "";
   const toValue = currentTo !== undefined ? String(currentTo) : "";
   return (
     <HStack gap={1.5} align="center">

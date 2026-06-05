@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   analyzeOrGroups,
   buildFacetStateLookup,
   getFacetValues,
 } from "~/server/app-layer/traces/query-language/queries";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import { useDensityStore } from "../../../stores/densityStore";
 import {
@@ -61,11 +61,7 @@ export function useFilterSidebarData() {
   // glue that hands the analysis + field to the helper and forwards
   // the result.
   const toggleFacet = useCallback(
-    (
-      field: string,
-      value: string,
-      options?: { modifierKey?: boolean },
-    ) => {
+    (field: string, value: string, options?: { modifierKey?: boolean }) => {
       const routing = routeToggleViaOrGroups({
         analysis: orAnalysisRaw,
         field,
@@ -96,7 +92,9 @@ export function useFilterSidebarData() {
   const showFacet = useFacetVisibilityStore((s) => s.showFacet);
   const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
   const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
-  const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
+  const visibilityHydrate = useFacetVisibilityStore(
+    (s) => s.hydrateFromStorage,
+  );
   const visibilityPrefs = useFacetVisibilityStore((s) =>
     selectVisibilityFor(s, projectId),
   );
@@ -443,7 +441,10 @@ function partitionDescriptors(
     // would have no way to clear the filter from there. (a) alone was
     // the previous behaviour, which made cold tenants feel less noisy
     // but stranded active-but-empty filters.
-    if (d.kind === "categorical" && (d.topValues.length > 0 || activeFieldSet.has(d.key))) {
+    if (
+      d.kind === "categorical" &&
+      (d.topValues.length > 0 || activeFieldSet.has(d.key))
+    ) {
       cats.push({
         kind: "cat",
         key: d.key,

@@ -123,7 +123,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setSidebarCollapsed: (collapsed) => {
     set({ sidebarCollapsed: collapsed });
-    persistUI({ sidebarCollapsed: collapsed, sidebarWidth: get().sidebarWidth });
+    persistUI({
+      sidebarCollapsed: collapsed,
+      sidebarWidth: get().sidebarWidth,
+    });
   },
 
   setSidebarWidth: (width) => {

@@ -9,11 +9,7 @@ import { NONE_TOGGLE_VALUE } from "./constants";
 import { EvaluatorDrilldown } from "./EvaluatorDrilldown";
 import { FacetSection } from "./FacetSection";
 import { RangeSection } from "./RangeSection";
-import type {
-  FacetItem,
-  FacetValueState,
-  Section,
-} from "./types";
+import type { FacetItem, FacetValueState, Section } from "./types";
 import { getFacetIcon, getRangeFormatter } from "./utils";
 
 interface SectionRendererProps {

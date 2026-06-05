@@ -1,7 +1,7 @@
 import { Badge, Box, Button, Input, Text, VStack } from "@chakra-ui/react";
-import { Kbd } from "~/components/ops/shared/Kbd";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import {
   AUTO_EXPAND_THRESHOLD,
@@ -218,9 +218,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             state={getValueState(item.value)}
             maxCount={maxCount}
             onToggle={handleToggle}
-            orGroupId={
-              orMemberValues?.has(item.value) ? orGroupId : undefined
-            }
+            orGroupId={orMemberValues?.has(item.value) ? orGroupId : undefined}
             field={field}
           />
         ))}
@@ -325,8 +323,7 @@ function filterAndSortItems({
   // either should reveal the row.
   return sorted.filter(
     (i) =>
-      i.label.toLowerCase().includes(q) ||
-      i.value.toLowerCase().includes(q),
+      i.label.toLowerCase().includes(q) || i.value.toLowerCase().includes(q),
   );
 }
 
@@ -396,8 +393,8 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
         // so the hint points at the always-on search input (which
         // doubles as Enter-to-filter for arbitrary values).
         <Text textStyle="xs" color="fg.subtle" paddingX={1} paddingY={0.5}>
-          {beyondExpanded}+ rare values aren't shown — type a value
-          and press Enter to filter.
+          {beyondExpanded}+ rare values aren't shown — type a value and press
+          Enter to filter.
         </Text>
       )}
       <LinkButton onClick={onShowLess}>Show less</LinkButton>
