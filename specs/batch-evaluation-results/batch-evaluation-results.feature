@@ -144,6 +144,31 @@ Feature: Batch Evaluation Results Visualization
     And I see the evaluation details/reasoning
 
   # ============================================================================
+  # View Lens / Focus Filter
+  # ============================================================================
+  # A "View" control in the results header lets users dial the detail level up
+  # or down by toggling which sections render. Dataset columns stay controlled
+  # by the separate column-visibility popover.
+
+  Scenario: Hide evaluation scores to focus on outputs
+    Given an evaluation run with target outputs and evaluator score chips
+    When I switch the results view to "Data only"
+    Then the target outputs remain visible
+    And the evaluator score chips are hidden
+
+  Scenario: Hide outputs to focus on evaluation scores
+    Given an evaluation run with target outputs and evaluator score chips
+    When I switch the results view to "Scores only"
+    Then the evaluator score chips remain visible
+    And the target outputs are hidden
+
+  Scenario: Hide the target column when no target sections are shown
+    Given an evaluation run with a target column
+    When I turn off both the outputs and evaluations sections
+    Then the target column is removed from the table
+    And the dataset columns remain visible
+
+  # ============================================================================
   # Trace Links
   # ============================================================================
 

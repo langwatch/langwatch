@@ -49,6 +49,10 @@ type SingleRunTableProps = {
   hiddenColumns?: Set<string>;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Whether to render target output values (default true) */
+  showOutputs?: boolean;
+  /** Whether to render evaluator score chips (default true) */
+  showEvaluations?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -66,6 +70,8 @@ const buildColumns = (
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
+  showOutputs: boolean,
+  showEvaluations: boolean,
   targetColors?: Record<string, string>,
 ) => {
   // Evaluator ids whose per-row chip is redundant with the dedicated Winner
@@ -159,11 +165,17 @@ const buildColumns = (
     comparisonColumns.map((p) => [p.evaluatorId, p]),
   );
 
-  // Target columns with headers that include summary
+  // Target columns with headers that include summary.
+  // Skip a column entirely when neither outputs nor evaluations are shown —
+  // unless it hosts a comparison verdict (Winner cell), which is independent
+  // of the output/evaluation section toggles and would otherwise vanish
+  // along with them, silently dropping the comparison result.
+  const showTargetColumns = showOutputs || showEvaluations;
   for (const targetCol of targetColumns) {
+    const comparisonMeta = comparisonByTargetId.get(targetCol.id);
+    if (!showTargetColumns && !comparisonMeta) continue;
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
-    const comparisonMeta = comparisonByTargetId.get(targetCol.id);
 
     columns.push(
       columnHelper.accessor((row) => row.targets[targetCol.id], {
@@ -203,6 +215,8 @@ const buildColumns = (
             <BatchTargetCell
               targetOutput={targetOutput}
               suppressedEvaluatorIds={comparisonEvaluatorIds}
+              showOutput={showOutputs}
+              showEvaluations={showEvaluations}
             />
           );
         },
@@ -261,6 +275,8 @@ export function SingleRunTable({
   isLoading,
   hiddenColumns = new Set(),
   targetColors = {},
+  showOutputs = true,
+  showEvaluations = true,
   disableVirtualization = false,
 }: SingleRunTableProps) {
   // Check if target colors should be shown (non-empty means X-axis is "target")
@@ -282,9 +298,19 @@ export function SingleRunTable({
       aggregatesMap,
       data.rows,
       hiddenColumns,
+      showOutputs,
+      showEvaluations,
       showTargetColors ? targetColors : undefined,
     );
-  }, [data, aggregatesMap, hiddenColumns, showTargetColors, targetColors]);
+  }, [
+    data,
+    aggregatesMap,
+    hiddenColumns,
+    showOutputs,
+    showEvaluations,
+    showTargetColors,
+    targetColors,
+  ]);
 
   // Memoize getCoreRowModel to prevent React scheduling loops
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
@@ -349,7 +375,16 @@ export function SingleRunTable({
   const datasetColCount = data.datasetColumns.filter(
     (c) => !hiddenColumns.has(c.name),
   ).length;
-  const targetColCount = data.targetColumns.length;
+  // Target columns that don't host a comparison verdict collapse away when
+  // both output/evaluation sections are hidden — see the matching skip in
+  // buildColumns above.
+  const comparisonTargetIds = new Set(
+    (data.comparisonColumns ?? []).map((p) => p.evaluatorId),
+  );
+  const showTargetColumns = showOutputs || showEvaluations;
+  const targetColCount = showTargetColumns
+    ? data.targetColumns.length
+    : data.targetColumns.filter((t) => comparisonTargetIds.has(t.id)).length;
   // Only the comparisons that get their own trailing column add width; one
   // rendered inside a target column is already paid for by that column.
   const comparisonColCount = trailingComparisonColumns(

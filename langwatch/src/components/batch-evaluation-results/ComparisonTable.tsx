@@ -37,6 +37,10 @@ type ComparisonTableProps = {
   isLoading?: boolean;
   /** Hidden column names */
   hiddenColumns?: Set<string>;
+  /** Whether to render target output values (default true) */
+  showOutputs?: boolean;
+  /** Whether to render evaluator score chips (default true) */
+  showEvaluations?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -63,6 +67,8 @@ const comparisonColumnHelper = createColumnHelper<ComparisonRow>();
 const buildComparisonColumns = (
   comparisonData: ComparisonRunData[],
   hiddenColumns: Set<string>,
+  showOutputs: boolean,
+  showEvaluations: boolean,
 ) => {
   const columns = [];
 
@@ -153,8 +159,12 @@ const buildComparisonColumns = (
     );
   }
 
-  // Target columns with diff values
-  for (const [targetId, targetCol] of allTargetColumns) {
+  // Target columns with diff values.
+  // Skip them entirely when neither outputs nor evaluations are shown.
+  const showTargetColumns = showOutputs || showEvaluations;
+  for (const [targetId, targetCol] of showTargetColumns
+    ? allTargetColumns
+    : new Map<string, BatchTargetColumn>()) {
     columns.push(
       comparisonColumnHelper.accessor((row) => row.targetsByRun, {
         id: `target_${targetId}`,
@@ -177,7 +187,11 @@ const buildComparisonColumns = (
                 color: run.color,
                 isLoading: run.isLoading,
                 value: targetOutput ? (
-                  <BatchTargetCell targetOutput={targetOutput} />
+                  <BatchTargetCell
+                    targetOutput={targetOutput}
+                    showOutput={showOutputs}
+                    showEvaluations={showEvaluations}
+                  />
                 ) : (
                   <Text fontSize="13px" color="fg.subtle">
                     -
@@ -245,12 +259,19 @@ export function ComparisonTable({
   comparisonData,
   isLoading,
   hiddenColumns = new Set(),
+  showOutputs = true,
+  showEvaluations = true,
   disableVirtualization = false,
 }: ComparisonTableProps) {
   // Build columns for comparison mode
   const columns = useMemo(() => {
-    return buildComparisonColumns(comparisonData, hiddenColumns);
-  }, [comparisonData, hiddenColumns]);
+    return buildComparisonColumns(
+      comparisonData,
+      hiddenColumns,
+      showOutputs,
+      showEvaluations,
+    );
+  }, [comparisonData, hiddenColumns, showOutputs, showEvaluations]);
 
   // Build comparison rows
   const comparisonRows = useMemo(() => {
@@ -321,7 +342,10 @@ export function ComparisonTable({
     firstRunWithData?.data?.datasetColumns.filter(
       (c) => !hiddenColumns.has(c.name),
     ).length ?? 0;
-  const targetColCount = firstRunWithData?.data?.targetColumns.length ?? 0;
+  const targetColCount =
+    showOutputs || showEvaluations
+      ? (firstRunWithData?.data?.targetColumns.length ?? 0)
+      : 0;
   const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
 
   const tableStyles = getTableStyles(minTableWidth);
