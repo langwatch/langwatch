@@ -96,7 +96,7 @@ export function EditProjectDrawer({
         },
       );
     },
-    [updateProject, projectId, currentTeamId, queryClient, closeDrawer],
+    [updateProject, projectId, projectName, currentTeamId, queryClient, closeDrawer],
   );
 
   return (

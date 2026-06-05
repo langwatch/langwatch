@@ -8,6 +8,7 @@ import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import {
   BindingNotFoundError,
+  DuplicateMemberError,
   GroupNotFoundError,
   GroupRestService,
   ScimManagedGroupError,
@@ -35,7 +36,7 @@ const createGroupSchema = z.object({
         role: z.nativeEnum(TeamUserRole),
         customRoleId: z.string().optional(),
         scopeType: z.nativeEnum(RoleBindingScopeType),
-        scopeId: z.string(),
+        scopeId: z.string().min(1, "scopeId is required"),
       }),
     )
     .optional(),
@@ -324,7 +325,8 @@ secured
         }
         if (
           error instanceof ScimManagedGroupError ||
-          error instanceof UserNotInOrganizationError
+          error instanceof UserNotInOrganizationError ||
+          error instanceof DuplicateMemberError
         ) {
           throw new BadRequestError(error.message);
         }
@@ -446,9 +448,22 @@ secured
     groupServiceMiddleware,
     describeRoute({ description: "Remove a role binding from a group" }),
     async (c) => {
-      const { bindingId } = c.req.param();
+      const { id, bindingId } = c.req.param();
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
+
+      const group = await service.getById({
+        id,
+        organizationId: organization.id,
+      });
+      if (!group) throw new NotFoundError("Group not found");
+
+      const bindingBelongsToGroup = group.roleBindings.some(
+        (b) => b.id === bindingId,
+      );
+      if (!bindingBelongsToGroup) {
+        throw new NotFoundError("Binding not found on this group");
+      }
 
       try {
         await service.removeBinding({

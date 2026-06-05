@@ -79,21 +79,25 @@ export class PrismaGroupRepository implements GroupRepository {
 
   async rename({
     id,
+    organizationId,
     name,
     slug,
   }: {
     id: string;
+    organizationId: string;
     name: string;
     slug: string;
-  }): Promise<Group> {
-    return this.prisma.group.update({
-      where: { id },
+  }): Promise<Group | null> {
+    const result = await this.prisma.group.updateMany({
+      where: { id, organizationId },
       data: { name, slug },
     });
+    if (result.count === 0) return null;
+    return this.prisma.group.findUnique({ where: { id } });
   }
 
-  async delete({ id }: { id: string }): Promise<void> {
-    await this.prisma.group.delete({ where: { id } });
+  async delete({ id, organizationId }: { id: string; organizationId: string }): Promise<void> {
+    await this.prisma.group.deleteMany({ where: { id, organizationId } });
   }
 
   async findMembers({ groupId }: { groupId: string }) {

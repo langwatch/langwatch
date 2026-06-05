@@ -67,11 +67,12 @@ export interface GroupRepository {
 
   rename(params: {
     id: string;
+    organizationId: string;
     name: string;
     slug: string;
-  }): Promise<Group>;
+  }): Promise<Group | null>;
 
-  delete(params: { id: string }): Promise<void>;
+  delete(params: { id: string; organizationId: string }): Promise<void>;
 
   findMembers(params: {
     groupId: string;

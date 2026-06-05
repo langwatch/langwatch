@@ -31,6 +31,10 @@ export class BindingNotFoundError extends Error {
   name = "BindingNotFoundError" as const;
 }
 
+export class DuplicateMemberError extends Error {
+  name = "DuplicateMemberError" as const;
+}
+
 export class GroupRestService {
   constructor(readonly repo: GroupRepository) {}
 
@@ -131,7 +135,9 @@ export class GroupRestService {
       excludeId: id,
     });
 
-    return this.repo.rename({ id, name, slug });
+    const renamed = await this.repo.rename({ id, organizationId, name, slug });
+    if (!renamed) throw new GroupNotFoundError("Group not found");
+    return renamed;
   }
 
   async delete({
@@ -146,7 +152,7 @@ export class GroupRestService {
 
     await this.repo.deleteAllMemberships({ groupId: id });
     await this.repo.deleteAllBindings({ groupId: id });
-    await this.repo.delete({ id });
+    await this.repo.delete({ id, organizationId });
   }
 
   async getMembers({ groupId }: { groupId: string }) {
@@ -183,7 +189,18 @@ export class GroupRestService {
       );
     }
 
-    return this.repo.addMember({ groupId, userId });
+    try {
+      return await this.repo.addMember({ groupId, userId });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error as { code: string }).code === "P2002"
+      ) {
+        throw new DuplicateMemberError("User is already a member of this group");
+      }
+      throw error;
+    }
   }
 
   async removeMember({
