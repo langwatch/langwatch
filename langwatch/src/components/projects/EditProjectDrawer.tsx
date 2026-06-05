@@ -2,10 +2,15 @@ import {
   Button,
   createListCollection,
   Field,
+  HStack,
+  Heading,
+  Input,
+  Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -38,7 +43,12 @@ export function EditProjectDrawer({
     { enabled: !!organization },
   );
 
-  const form = useForm<EditProjectFormData>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    control,
+  } = useForm<EditProjectFormData>({
     defaultValues: {
       name: projectName ?? "",
       teamId: currentTeamId ?? "",
@@ -47,7 +57,7 @@ export function EditProjectDrawer({
 
   const updateProject = api.project.update.useMutation();
 
-  const teamItems = useMemo(
+  const teamOptions = useMemo(
     () =>
       (teams.data ?? [])
         .filter((t) => !t.isPersonal)
@@ -58,8 +68,8 @@ export function EditProjectDrawer({
     [teams.data],
   );
   const teamCollection = useMemo(
-    () => createListCollection({ items: teamItems }),
-    [teamItems],
+    () => createListCollection({ items: teamOptions }),
+    [teamOptions],
   );
 
   const onSubmit: SubmitHandler<EditProjectFormData> = useCallback(
@@ -103,66 +113,86 @@ export function EditProjectDrawer({
     <Drawer.Root
       open={open}
       placement="end"
-      size="md"
+      size="lg"
       onOpenChange={({ open: isOpen }) => {
         if (!isOpen) closeDrawer();
       }}
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>Edit Project</Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
+          <Heading>Edit Project</Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <VStack gap={5} align="stretch">
-              <Field.Root>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <VStack align="stretch" gap={6}>
+              <Text fontSize="sm" color="fg.muted">
+                Update the project name or move it to a different team.
+                Moving a project changes which team members inherit access.
+              </Text>
+
+              <Field.Root invalid={!!errors.name}>
                 <Field.Label>Project Name</Field.Label>
-                <input
-                  {...form.register("name", { required: true, minLength: 1 })}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--chakra-colors-border)",
-                    background: "transparent",
-                    fontSize: "14px",
-                  }}
+                <Input
+                  {...register("name", {
+                    required: "Project name is required",
+                    minLength: { value: 1, message: "Name is required" },
+                  })}
+                  placeholder="AI Project"
                 />
+                {errors.name && (
+                  <Field.ErrorText>{errors.name.message}</Field.ErrorText>
+                )}
               </Field.Root>
 
               <Field.Root>
                 <Field.Label>Team</Field.Label>
-                <Select.Root
-                  collection={teamCollection}
-                  value={[form.watch("teamId")]}
-                  onValueChange={(e) => {
-                    const v = e.value[0];
-                    if (v) form.setValue("teamId", v, { shouldDirty: true });
-                  }}
-                  size="md"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="Select team..." />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {teamItems.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
+                <Controller
+                  control={control}
+                  name="teamId"
+                  rules={{ required: "Team is required" }}
+                  render={({ field }) => (
+                    <Select.Root
+                      collection={teamCollection}
+                      value={[field.value]}
+                      onValueChange={(details) => {
+                        const selectedValue = details.value[0];
+                        if (selectedValue) {
+                          field.onChange(selectedValue);
+                        }
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.ValueText placeholder="Select team">
+                          {() =>
+                            teamOptions.find((o) => o.value === field.value)
+                              ?.label ?? "Select team"
+                          }
+                        </Select.ValueText>
+                      </Select.Trigger>
+                      <Select.Content paddingY={2}>
+                        {teamOptions.map((option) => (
+                          <Select.Item key={option.value} item={option}>
+                            {option.label}
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Root>
+                  )}
+                />
               </Field.Root>
 
-              <Button
-                type="submit"
-                colorPalette="blue"
-                loading={updateProject.isPending}
-                disabled={!form.formState.isDirty}
-              >
-                Save
-              </Button>
+              <HStack width="full">
+                <Spacer />
+                <Button
+                  colorPalette="orange"
+                  type="submit"
+                  loading={updateProject.isLoading}
+                  disabled={!isDirty || updateProject.isLoading}
+                >
+                  Save
+                </Button>
+              </HStack>
             </VStack>
           </form>
         </Drawer.Body>
