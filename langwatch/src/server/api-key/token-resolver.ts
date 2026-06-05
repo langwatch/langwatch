@@ -110,19 +110,27 @@ export class TokenResolver {
     const apiKey = await this.apiKeyService.verify({ token });
     if (!apiKey) return null;
 
-    // Ingestion keys are self-scoping: a project-scoped, ingest-only credential
-    // (ingestSourceType set) carries its single target project in its
-    // PROJECT-scoped role binding. The OTLP exporter inside a wrapped tool
-    // authenticates with the bearer token alone and supplies no projectId, so
-    // we derive the bound project from the key itself. Ordinary API keys (no
-    // ingestSourceType) keep requiring an explicit projectId — they can be
-    // scoped to many projects and the caller must say which one.
+    // Single-project self-scoping: when the caller supplies no projectId — an
+    // OTLP exporter that sends only the bearer token, or any client that can't
+    // attach an X-Project-Id header — a key scoped to exactly ONE project is
+    // unambiguous, so we resolve to that project. Keys scoped to two or more
+    // projects (or only at org / team scope) stay ambiguous and still require
+    // an explicit projectId. Ingestion keys are the common case (a single
+    // PROJECT-scoped binding), but this holds for any single-project API key.
     let effectiveProjectId = projectId;
-    if (!effectiveProjectId && apiKey.ingestSourceType) {
-      effectiveProjectId =
-        apiKey.roleBindings.find(
-          (b) => b.scopeType === RoleBindingScopeType.PROJECT && b.scopeId,
-        )?.scopeId ?? null;
+    if (!effectiveProjectId) {
+      const projectScopeIds = [
+        ...new Set(
+          apiKey.roleBindings
+            .filter(
+              (b) => b.scopeType === RoleBindingScopeType.PROJECT && b.scopeId,
+            )
+            .map((b) => b.scopeId),
+        ),
+      ];
+      if (projectScopeIds.length === 1) {
+        effectiveProjectId = projectScopeIds[0]!;
+      }
     }
 
     if (!effectiveProjectId) return null;

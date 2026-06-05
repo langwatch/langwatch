@@ -17,8 +17,11 @@
  *      An ingestion key is self-scoping: the OTLP exporter inside a wrapped
  *      `langwatch <tool>` child authenticates with the bearer token alone (no
  *      projectId header / basic-auth), so the resolver must derive the bound
- *      project from the key's single PROJECT-scoped role binding. Without it
- *      the receiver 401'd ("Invalid auth token") every real ingest.
+ *      project from the key's PROJECT-scoped role binding. Without it the
+ *      receiver 401'd ("Invalid auth token") every real ingest. This now
+ *      generalises: ANY key scoped to exactly one project self-scopes;
+ *      two-or-more-project keys stay ambiguous and require an explicit
+ *      projectId.
  *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
@@ -130,10 +133,10 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     });
   });
 
-  describe("when an ordinary API key carries no ingestSourceType", () => {
-    it("still requires an explicit projectId — self-scoping is ingest-key only", async () => {
+  describe("when an ordinary (non-ingest) API key is scoped to one project", () => {
+    it("self-scopes to that project without an explicit projectId", async () => {
       const { token } = await ApiKeyService.create(prisma).create({
-        name: `ordinary ${suffix}`,
+        name: `ordinary-single ${suffix}`,
         userId: USER_ID,
         createdByUserId: USER_ID,
         organizationId: ORG_ID,
@@ -142,10 +145,42 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
       });
 
-      // No ingestSourceType => the resolver does NOT derive the project from
-      // the binding; a multi-project API key needs the caller to say which.
+      // A single PROJECT-scoped binding is unambiguous, so the key resolves to
+      // its one project even though it is not an ingestion key.
       const resolved = await resolver.resolve({ token, projectId: null });
-      expect(resolved).toBeNull();
+      expect(resolved?.type).toBe("apiKey");
+      if (resolved?.type === "apiKey") {
+        expect(resolved.project.id).toBe(PROJECT_ID);
+        expect(resolved.ingestSourceType).toBeNull();
+      }
+    });
+  });
+
+  describe("when an API key is scoped to two projects", () => {
+    it("stays ambiguous without a projectId, resolves with one", async () => {
+      const { token } = await ApiKeyService.create(prisma).create({
+        name: `multi-project ${suffix}`,
+        userId: USER_ID,
+        createdByUserId: USER_ID,
+        organizationId: ORG_ID,
+        permissionMode: "restricted",
+        permissions: ["traces:create"],
+        bindings: [
+          { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID },
+          { role: "CUSTOM", scopeType: "PROJECT", scopeId: OTHER_PROJECT_ID },
+        ],
+      });
+
+      // Two projects in scope => the caller must say which one.
+      expect(await resolver.resolve({ token, projectId: null })).toBeNull();
+      const resolved = await resolver.resolve({
+        token,
+        projectId: OTHER_PROJECT_ID,
+      });
+      expect(resolved?.type).toBe("apiKey");
+      if (resolved?.type === "apiKey") {
+        expect(resolved.project.id).toBe(OTHER_PROJECT_ID);
+      }
     });
   });
 
