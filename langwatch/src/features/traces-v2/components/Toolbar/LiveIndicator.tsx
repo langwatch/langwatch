@@ -1,4 +1,5 @@
 import { Box, Flex, IconButton } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -19,13 +20,20 @@ const SSE_STATE_STYLE: Record<
   disconnected: { dotColor: "red.solid", pulse: false },
 };
 
-const REFRESH_SPIN_KEYFRAMES = {
+// Module-level keyframes via @emotion/react. The previous setup nested
+// `@keyframes` inside Chakra's `css` prop which didn't get hoisted into
+// a global stylesheet — the rule existed but the animation never had a
+// `@keyframes` block to reference, so the icon stayed still. Defining
+// it through `keyframes` emits a real, named animation that Emotion
+// guarantees is in the stylesheet before the `animation` rule runs.
+const refreshSpin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const REFRESH_SPIN_CSS = {
   "& svg": {
-    animation: "tracesV2RefreshSpin 0.9s linear infinite",
-  },
-  "@keyframes tracesV2RefreshSpin": {
-    from: { transform: "rotate(0deg)" },
-    to: { transform: "rotate(360deg)" },
+    animation: `${refreshSpin} 0.9s linear infinite`,
   },
 };
 
@@ -106,7 +114,7 @@ export const LiveIndicator: React.FC = () => {
           // a mid-fetch click is a no-op that costs nothing. Disabling
           // would also kill the affordance for someone who *wants* to
           // re-kick a stalled fetch.
-          css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
+          css={isRefreshing ? REFRESH_SPIN_CSS : undefined}
         >
           <RefreshCw size={12} />
         </IconButton>

@@ -1,5 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
+import { dash } from "../dashPlaceholder";
 import type { CellDef } from "../../types";
 
 export const RootSpanNameCell = {
@@ -12,7 +13,7 @@ export const RootSpanNameCell = {
       fontWeight="500"
       truncate
     >
-      {row.name || "—"}
+      {row.name || dash}
     </Text>
   ),
 } as const satisfies CellDef<TraceListItem>;

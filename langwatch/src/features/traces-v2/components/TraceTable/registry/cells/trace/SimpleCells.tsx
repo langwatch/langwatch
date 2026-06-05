@@ -6,9 +6,8 @@ import {
 } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import { StatusIndicator } from "../../../StatusRow";
+import { dash } from "../dashPlaceholder";
 import type { CellDef } from "../../types";
-
-const dash = "—";
 
 export const StatusCell = {
   id: "status",
