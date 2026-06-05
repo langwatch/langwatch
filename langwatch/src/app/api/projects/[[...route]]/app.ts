@@ -133,7 +133,7 @@ secured
     projectServiceMiddleware,
     apiKeyServiceMiddleware,
     describeRoute({
-      description: "Create a new project",
+      description: "Create a new project in an existing team or create a new team inline",
     }),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
@@ -221,7 +221,7 @@ secured
     "/:id",
     projectServiceMiddleware,
     describeRoute({
-      description: "Update a project by its id",
+      description: "Update a project by its id, including moving it to another team with teamId",
     }),
     zValidator("json", updateProjectSchema, validationHook),
     async (c) => {

@@ -28,6 +28,10 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `GET` | `/api/teams/{id}` | Get team details |
 | `PATCH` | `/api/teams/{id}` | Update a team |
 | `DELETE` | `/api/teams/{id}` | Archive a team (soft-delete) |
+| `GET` | `/api/teams/{id}/members` | List team members |
+| `POST` | `/api/teams/{id}/members` | Add a member to the team |
+| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
+| `GET` | `/api/teams/{id}/projects` | List projects in the team |
 
 ## Soft Delete
 
@@ -37,7 +41,7 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 
 1. Create an admin API key in Settings > API Keys with `team:manage` permission
 2. Call `POST /api/teams` with a team name
-3. Use the returned team `id` when creating projects via the Projects API
+3. Use the returned team `id` when creating projects via the Projects API, or later move an existing project by updating its `teamId`
 
 ```bash
 # Create team

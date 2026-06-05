@@ -30425,6 +30425,204 @@ openapi: "PATCH /api/graphs/{id}"
 
 ---
 
+# FILE: ./api-reference/groups/add-binding.mdx
+
+---
+title: "Add group binding"
+openapi: "POST /api/groups/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/add-member.mdx
+
+---
+title: "Add group member"
+openapi: "POST /api/groups/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/groups/create-group.mdx
+
+---
+title: "Create group"
+openapi: "POST /api/groups"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-group.mdx
+
+---
+title: "Delete group"
+openapi: "DELETE /api/groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-group.mdx
+
+---
+title: "Get group"
+openapi: "GET /api/groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/list-bindings.mdx
+
+---
+title: "List group bindings"
+openapi: "GET /api/groups/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/list-groups.mdx
+
+---
+title: "List groups"
+openapi: "GET /api/groups"
+---
+
+---
+
+# FILE: ./api-reference/groups/list-members.mdx
+
+---
+title: "List group members"
+openapi: "GET /api/groups/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/groups/overview.mdx
+
+---
+title: 'Overview'
+description: 'Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.'
+---
+
+## Intro
+
+The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
+
+Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
+
+<Info>
+Groups are an **Enterprise** feature. Contact your account team to enable them.
+</Info>
+
+## Authentication
+
+The Groups API requires an **organization-level API key** with `organization:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+### Groups
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups` | List all groups in the organization |
+| `POST` | `/api/groups` | Create a new group (with optional members and bindings) |
+| `GET` | `/api/groups/{id}` | Get group details with members and bindings |
+| `PATCH` | `/api/groups/{id}` | Rename a group |
+| `DELETE` | `/api/groups/{id}` | Delete a group and all its memberships/bindings |
+
+### Members
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups/{id}/members` | List members of a group |
+| `POST` | `/api/groups/{id}/members` | Add a member to a group |
+| `DELETE` | `/api/groups/{id}/members/{userId}` | Remove a member from a group |
+
+### Role Bindings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups/{id}/bindings` | List role bindings for a group |
+| `POST` | `/api/groups/{id}/bindings` | Add a role binding to a group |
+| `DELETE` | `/api/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
+
+## SCIM-Managed Groups
+
+Groups provisioned from an identity provider via SCIM are marked with a `scimSource` field (e.g. `"azure-ad"`, `"okta"`). SCIM-managed groups have restrictions:
+
+- **Cannot be renamed** via this API (the IdP is the source of truth)
+- **Cannot have members added or removed** manually (membership is managed by the IdP)
+- Role bindings can still be managed via this API
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `organization:manage` permission
+2. Create a group with initial members and role bindings:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/groups \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Backend Engineers",
+    "memberIds": ["user_abc", "user_def"],
+    "bindings": [
+      {
+        "role": "MEMBER",
+        "scopeType": "TEAM",
+        "scopeId": "<team_id>"
+      }
+    ]
+  }'
+```
+
+3. All members inherit the MEMBER role on the specified team and all its projects.
+
+## Role Binding Scopes
+
+Bindings can target three scope levels:
+
+| Scope Type | Description |
+|------------|-------------|
+| `ORGANIZATION` | Access to all teams and projects in the org |
+| `TEAM` | Access to a specific team and all its projects |
+| `PROJECT` | Access to a specific project only |
+
+Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`).
+
+---
+
+# FILE: ./api-reference/groups/remove-binding.mdx
+
+---
+title: "Remove group binding"
+openapi: "DELETE /api/groups/{id}/bindings/{bindingId}"
+---
+
+---
+
+# FILE: ./api-reference/groups/remove-member.mdx
+
+---
+title: "Remove group member"
+openapi: "DELETE /api/groups/{id}/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/groups/rename-group.mdx
+
+---
+title: "Rename group"
+openapi: "PATCH /api/groups/{id}"
+---
+
+---
+
 # FILE: ./api-reference/model-providers/list-model-providers.mdx
 
 ---
@@ -30541,6 +30739,15 @@ openapi: "POST /api/projects"
 
 ---
 
+# FILE: ./api-reference/projects/get-api-key.mdx
+
+---
+title: "Get project API key"
+openapi: "GET /api/projects/{id}/api-key"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-project.mdx
 
 ---
@@ -30589,13 +30796,30 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `GET` | `/api/projects` | List all projects in the organization |
 | `POST` | `/api/projects` | Create a new project (returns a service API key) |
 | `GET` | `/api/projects/{id}` | Get project details |
-| `PATCH` | `/api/projects/{id}` | Update project fields |
+| `PATCH` | `/api/projects/{id}` | Update project fields (including moving to a different team) |
 | `DELETE` | `/api/projects/{id}` | Archive a project |
+| `GET` | `/api/projects/{id}/api-key` | Get the project's API key |
+| `POST` | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key |
+
+## Moving a Project to Another Team
+
+You can move a project to a different team by including `teamId` in the `PATCH` request:
+
+```bash
+curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"teamId": "<destination_team_id>"}'
+```
+
+<Warning>
+Moving a project changes its access boundary. Members who had access through the source team will lose inherited access, while members of the destination team will gain it. Project-level access overrides are preserved.
+</Warning>
 
 ## Typical Flow
 
 1. Create an admin API key in Settings > API Keys with `organization:manage` permission
-2. Call `POST /api/projects` with the project name and team
+2. Call `POST /api/projects` with the project name and either an existing `teamId` or a `newTeamName`
 3. Store the returned `serviceApiKey` and project `id`
 4. Use both values in your application:
 
@@ -30607,6 +30831,15 @@ LANGWATCH_PROJECT_ID=<project id>
 <Info>
 The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot retrieve it later.
 </Info>
+
+---
+
+# FILE: ./api-reference/projects/regenerate-api-key.mdx
+
+---
+title: "Regenerate project API key"
+openapi: "POST /api/projects/{id}/regenerate-api-key"
+---
 
 ---
 
@@ -31144,6 +31377,15 @@ openapi: "PATCH /api/suites/{id}"
 
 ---
 
+# FILE: ./api-reference/teams/add-member.mdx
+
+---
+title: "Add team member"
+openapi: "POST /api/teams/{id}/members"
+---
+
+---
+
 # FILE: ./api-reference/teams/archive-team.mdx
 
 ---
@@ -31167,6 +31409,24 @@ openapi: "POST /api/teams"
 ---
 title: "Get team"
 openapi: "GET /api/teams/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/list-members.mdx
+
+---
+title: "List team members"
+openapi: "GET /api/teams/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/teams/list-projects.mdx
+
+---
+title: "List team projects"
+openapi: "GET /api/teams/{id}/projects"
 ---
 
 ---
@@ -31212,6 +31472,10 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `GET` | `/api/teams/{id}` | Get team details |
 | `PATCH` | `/api/teams/{id}` | Update a team |
 | `DELETE` | `/api/teams/{id}` | Archive a team (soft-delete) |
+| `GET` | `/api/teams/{id}/members` | List team members |
+| `POST` | `/api/teams/{id}/members` | Add a member to the team |
+| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
+| `GET` | `/api/teams/{id}/projects` | List projects in the team |
 
 ## Soft Delete
 
@@ -31221,7 +31485,7 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 
 1. Create an admin API key in Settings > API Keys with `team:manage` permission
 2. Call `POST /api/teams` with a team name
-3. Use the returned team `id` when creating projects via the Projects API
+3. Use the returned team `id` when creating projects via the Projects API, or later move an existing project by updating its `teamId`
 
 ```bash
 # Create team
@@ -31236,6 +31500,15 @@ curl -X POST https://app.langwatch.ai/api/projects \
   -H "Content-Type: application/json" \
   -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'
 ```
+
+---
+
+# FILE: ./api-reference/teams/remove-member.mdx
+
+---
+title: "Remove team member"
+openapi: "DELETE /api/teams/{id}/members/{userId}"
+---
 
 ---
 
