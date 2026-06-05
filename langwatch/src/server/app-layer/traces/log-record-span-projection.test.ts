@@ -276,6 +276,28 @@ describe("projectLogRecordsToSpans", () => {
     });
   });
 
+  describe("given an api_request_body with no matching api_request", () => {
+    it("renders the orphan request body as an event span instead of dropping it", () => {
+      const records = [
+        record({
+          spanId: "orphan-reqbody",
+          timeUnixMs: 500,
+          attributes: {
+            "event.name": "api_request_body",
+            model: "claude-opus-4-7",
+            query_source: "repl_main_thread",
+            body: requestBody("claude-opus-4-7"),
+          },
+        }),
+      ];
+      const spans = projectLogRecordsToSpans({ records, totalCount: 1 });
+      const orphan = spans.find((s) => s.spanId === "orphan-reqbody");
+      expect(orphan).toBeDefined();
+      expect(orphan!.type).toBe("span");
+      expect(orphan!.input).toContain("ask claude-opus-4-7");
+    });
+  });
+
   describe("given non-Claude log records", () => {
     it("names the root generically and still projects event spans", () => {
       const records = [
