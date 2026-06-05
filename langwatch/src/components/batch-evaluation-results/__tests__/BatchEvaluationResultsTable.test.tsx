@@ -431,4 +431,63 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.getByText("Test input")).toBeInTheDocument();
     });
   });
+
+  describe("View Lens (section visibility)", () => {
+    /** @scenario Hide evaluation scores to focus on outputs */
+    it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showEvaluations={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Output stays (rendered as JSON containing the "response" field)
+      expect(screen.getByText(/response/)).toBeInTheDocument();
+      // Evaluator score chip is gone
+      expect(screen.queryByText("Exact Match")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide outputs to focus on evaluation scores */
+    it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showOutputs={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Evaluator score chip stays
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
+      // Output is gone
+      expect(screen.queryByText(/response/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide the target column when no target sections are shown */
+    it("removes the target column when both sections are off", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showOutputs={false}
+          showEvaluations={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Target header is gone, but dataset content remains
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+    });
+  });
 });

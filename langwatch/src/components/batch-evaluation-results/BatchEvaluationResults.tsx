@@ -20,6 +20,7 @@ import {
 import { type Experiment, ExperimentType, type Project } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
@@ -30,6 +31,9 @@ import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
+  DEFAULT_VIEW_SECTIONS,
+  ViewLensButton,
+  type ViewSections,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
@@ -80,6 +84,12 @@ export function BatchEvaluationResults({
   // Column visibility state - initialize with defaults
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
     () => new Set(DEFAULT_HIDDEN_COLUMNS),
+  );
+
+  // View lens state - which result sections to render (persisted across sessions)
+  const [viewSections, setViewSections] = useLocalStorage<ViewSections>(
+    "batch-results-view-sections",
+    DEFAULT_VIEW_SECTIONS,
   );
 
   // Toggle column visibility
@@ -488,6 +498,12 @@ export function BatchEvaluationResults({
               Charts
             </Button>
           )}
+          {transformedData && transformedData.targetColumns.length > 0 && (
+            <ViewLensButton
+              sections={viewSections}
+              onChange={setViewSections}
+            />
+          )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
             <ColumnVisibilityButton
               datasetColumns={transformedData.datasetColumns}
@@ -562,6 +578,8 @@ export function BatchEvaluationResults({
                   onToggleColumn={toggleColumn}
                   comparisonData={comparisonData}
                   targetColors={targetColors}
+                  showOutputs={viewSections.outputs}
+                  showEvaluations={viewSections.evaluations}
                 />
               </Card.Body>
             </Card.Root>
