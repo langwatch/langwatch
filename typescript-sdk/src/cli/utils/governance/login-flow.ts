@@ -96,7 +96,7 @@ export async function runUnifiedLoginFlow(
 
       // Pick up the server's authoritative gateway URL. Without this,
       // self-hosted CLI users would see the SaaS default
-      // (https://gateway.langwatch.com) on whoami / login output even
+      // (https://gateway.langwatch.ai) on whoami / login output even
       // though the actual gateway is on localhost:5563. The server's
       // `gatewayUrl` reflects `LW_GATEWAY_BASE_URL` or the IS_SAAS-
       // aware fallback. Backwards-compatible: older servers (without

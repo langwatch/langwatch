@@ -26,6 +26,7 @@ import { type PrismaClient } from "@prisma/client";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 
+import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 import { RoutingPolicyService } from "./routingPolicy.service";
 
@@ -65,10 +66,10 @@ export class PersonalVirtualKeyService {
       prisma,
       new PersonalWorkspaceService(prisma),
       new RoutingPolicyService(prisma),
-      options?.gatewayBaseUrl ??
-        (options?.isSaas
-          ? "https://gateway.langwatch.com"
-          : "http://localhost:5563"),
+      resolveGatewayBaseUrl({
+        publicUrl: options?.gatewayBaseUrl,
+        isSaas: options?.isSaas,
+      }),
     );
   }
 
