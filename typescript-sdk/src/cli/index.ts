@@ -301,7 +301,7 @@ program
   });
 
 program
-  .command("opencode", { hidden: true })
+  .command("opencode")
   .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
   .allowUnknownOption(true)
   .helpOption(false)

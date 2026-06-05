@@ -245,7 +245,7 @@ function legacyScopeFromTeamIds({
  * External tools deliberately omitted — admins fill those in per-org
  * with internal links (no useful default exists across orgs).
  */
-const STARTER_PACK_TILES: ReadonlyArray<{
+export const STARTER_PACK_TILES: ReadonlyArray<{
   type: AiToolType;
   slug: string;
   displayName: string;
@@ -296,6 +296,18 @@ const STARTER_PACK_TILES: ReadonlyArray<{
     config: {
       assistantKind: "gemini",
       setupCommand: "langwatch gemini",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
+    type: "coding_assistant",
+    slug: "opencode",
+    displayName: "opencode",
+    iconAsset: "preset:opencode",
+    config: {
+      assistantKind: "opencode",
+      setupCommand: "langwatch opencode",
       setupDocsUrl:
         "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },

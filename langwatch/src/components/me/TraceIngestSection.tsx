@@ -8,15 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  Bot,
-  Check,
-  Code2,
-  MousePointer2,
-  Sparkles,
-  Terminal,
-  Users,
-} from "lucide-react";
+import { Bot, Check, Terminal, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import {
@@ -48,14 +40,14 @@ import { api } from "~/utils/api";
  * IngestionTemplate row, no install). It deep-links to
  * /me/configure#otlp — the BYO-OTLP fallback discovery card.
  *
- * First-class coding assistants (claude_code, codex, cursor, gemini)
- * are intentionally excluded from this grid (filtered by slug below).
- * The unified entry points live on the AiToolsPortal "$ langwatch
- * <tool>" tiles — each CLI auto-mints the ingestion token and wires
- * both the gateway and OTLP paths in one step, so a separate "Connect"
- * tile here would be a duplicate UX. opencode stays in this grid
- * because it has no unified `langwatch opencode` CLI yet — its
- * ingestion is OTLP-only via the install drawer.
+ * The platform's coding assistants (claude_code, codex, cursor, gemini,
+ * opencode) never appear in this grid because they are not seeded as
+ * ingestion templates at all — the `langwatch <tool>` command owns their
+ * setup and the receiver converts their OTLP logs into canonical gen_ai
+ * spans. Their entry points live on the AiToolsPortal "$ langwatch
+ * <tool>" tiles. The grid simply renders whatever
+ * `api.ingestionTemplates.list` returns (claude_cowork + any org-authored
+ * templates) plus the raw_otlp_advanced discovery card — no slug filter.
  *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
@@ -65,34 +57,11 @@ const TILE_META: Record<
   string,
   { icon: ReactNode; subtitle: string }
 > = {
-  cursor: {
-    icon: <MousePointer2 size={20} />,
-    subtitle: "Cursor IDE telemetry",
-  },
-  codex: {
-    icon: <Code2 size={20} />,
-    subtitle: "OpenAI Codex CLI telemetry",
-  },
-  gemini: {
-    icon: <Sparkles size={20} />,
-    subtitle: "Google Gemini CLI telemetry",
-  },
-  opencode: {
-    icon: <Terminal size={20} />,
-    subtitle: "opencode terminal agent telemetry",
-  },
   claude_cowork: {
     icon: <Users size={20} />,
     subtitle: "Multi-agent Claude sessions",
   },
 };
-
-const UNIFIED_VIA_CLI_SLUGS = new Set([
-  "claude_code",
-  "codex",
-  "cursor",
-  "gemini",
-]);
 
 const FALLBACK_ICON = <Bot size={20} />;
 
@@ -146,9 +115,7 @@ export function TraceIngestSection() {
     Record<string, IngestionBindingResult | null>
   >({});
 
-  const templates = (templatesQuery.data ?? []).filter(
-    (t) => !UNIFIED_VIA_CLI_SLUGS.has(t.slug),
-  );
+  const templates = templatesQuery.data ?? [];
   const bindings = bindingsQuery.data ?? [];
 
   const bindingByTemplateId = new Map(bindings.map((b) => [b.templateId, b]));

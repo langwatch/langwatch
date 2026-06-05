@@ -3,18 +3,26 @@
 /**
  * Platform-published default IngestionTemplate rows.
  *
- * v1 ships six real templates (claude_code / cursor / codex / gemini /
- * opencode / claude_cowork), each `organizationId IS NULL` so they
- * appear in every org's catalog. The /me Trace Ingest tile
+ * v1 ships ONE real template (claude_cowork), `organizationId IS NULL`
+ * so it appears in every org's catalog. The /me Trace Ingest tile
  * `raw_otlp_advanced` is a client-side discovery card — it deep-links to the personal OTLP endpoint panel
  * and does NOT mint a UserIngestionBinding, so it intentionally has no
  * IngestionTemplate row (see Andre PM call at 348936e4f).
  *
+ * The platform's coding assistants (claude_code / codex / cursor / gemini /
+ * opencode) are NOT ingestion templates. The `langwatch <tool>` command
+ * owns their whole setup, and the receiver converts their OTLP model-call
+ * logs into canonical gen_ai spans at ingest, so they surface as
+ * coding-assistant tiles on the AiToolsPortal instead of template rows.
+ * They are simply absent from the seed input below — there is no flag and
+ * no filter. Any rows a previous seed run created are archived via
+ * RETIRED_PLATFORM_TEMPLATE_SLUGS so dev DBs converge to the v1 catalog.
+ *
  * `ottlRules` is empty for v1 — the receiver applies no OTTL transform
  * for otlp_token templates v1; canonical gen_ai shaping is done by the
- * upstream tool's exporter (Claude Code / Cursor / claude_cowork are all
- * already gen_ai-compliant). The OTTL slot is wired so v2 templates can
- * land per-template normalization without a service refactor.
+ * upstream tool's exporter (claude_cowork is already gen_ai-compliant).
+ * The OTTL slot is wired so v2 templates can land per-template
+ * normalization without a service refactor.
  *
  * Spec:
  *   specs/ai-gateway/governance/ingestion-templates-catalog.feature
@@ -35,56 +43,6 @@ export interface PlatformTemplateSeed {
 
 export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] = [
   {
-    slug: "claude_code",
-    sourceType: "claude_code",
-    displayName: "Claude Code",
-    description:
-      "Connect Claude Code (Anthropic CLI) to LangWatch. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
-    iconAsset: "preset:claude_code",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-  {
-    slug: "cursor",
-    sourceType: "cursor",
-    displayName: "Cursor",
-    description:
-      "Connect Cursor's agent telemetry export. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
-    iconAsset: "preset:cursor",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-  {
-    slug: "codex",
-    sourceType: "codex",
-    displayName: "Codex",
-    description:
-      "Connect OpenAI Codex CLI to LangWatch. Spans and log records land at /me/traces with model + tokens lifted natively; cost is computed receiver-side from (model, tokens).",
-    iconAsset: "preset:codex",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-  {
-    slug: "gemini",
-    sourceType: "gemini",
-    displayName: "Gemini",
-    description:
-      "Connect Google Gemini CLI to LangWatch. Gemini emits full gen_ai.* semantic conventions natively; the receiver lifts them onto langwatch.* canonical fields without admin OTTL.",
-    iconAsset: "preset:gemini",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-  {
-    slug: "opencode",
-    sourceType: "opencode",
-    displayName: "opencode",
-    description:
-      "Connect opencode (open-source terminal coding agent) telemetry. opencode 1.14+ emits structural OTel spans (Session.*, LLM.run, Provider.*) but does not yet populate gen_ai.* attributes on them; the receiver surfaces the spans verbatim until upstream adds semantic-conv attributes.",
-    iconAsset: "preset:opencode",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-  {
     slug: "claude_cowork",
     sourceType: "claude_cowork",
     displayName: "Claude cowork",
@@ -102,12 +60,22 @@ export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] = [
  * archives any DB rows matching these slugs so dev environments converge
  * to the locked v1 catalog when the constant evolves.
  */
-const RETIRED_PLATFORM_TEMPLATE_SLUGS: readonly string[] = [
+export const RETIRED_PLATFORM_TEMPLATE_SLUGS: readonly string[] = [
   // raw_otlp_advanced is a client-side discovery card — deep-links to
   // the personal OTLP endpoint panel; never an IngestionTemplate row
   // per Andre PM call at 348936e4f. Cleanup any stale rows from earlier
   // seed runs.
   "raw_otlp_advanced",
+  // Platform coding assistants are owned by `langwatch <tool>` + receiver
+  // log-to-span conversion, not ingestion templates. Earlier seed runs
+  // published them as rows; archive those so dev DBs converge to the v1
+  // catalog (claude_cowork only). They are surfaced as AiToolsPortal
+  // coding-assistant tiles instead.
+  "claude_code",
+  "codex",
+  "cursor",
+  "gemini",
+  "opencode",
 ];
 
 /**
