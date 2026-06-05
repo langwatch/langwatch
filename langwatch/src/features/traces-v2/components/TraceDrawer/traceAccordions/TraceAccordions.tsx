@@ -52,13 +52,15 @@ export const TraceAccordions = memo(function TraceAccordions({
       />
     );
   }
-  // Span tab + an id we haven't resolved yet → render a skeleton.
-  // Previously this branch fell through to TraceSummaryAccordions, so
-  // clicking "Open span" on a trace whose spans were mid-fetch landed
-  // the operator on the trace summary view, which read like the jump
-  // hadn't taken effect. The skeleton keeps us anchored on the span
-  // pane until the tree lands and SpanAccordions can mount for real.
-  if (activeTab === "span" && selectedSpanId) {
+  // Span tab + an id we haven't resolved yet + tree is still loading →
+  // render a skeleton instead of falling through to the trace summary.
+  // Without this branch, clicking "Open span" on a trace whose spans
+  // were mid-fetch landed the operator on the trace summary view, which
+  // read like the jump hadn't taken effect. Once the tree resolves but
+  // the spanId isn't in it (deleted span, stale link), we DO fall
+  // through to the summary — the operator gets a graceful "couldn't
+  // find that span" landing rather than an indefinite skeleton.
+  if (activeTab === "span" && selectedSpanId && spansLoading) {
     return (
       <Box padding={4}>
         <VStack align="stretch" gap={2}>
@@ -72,9 +74,6 @@ export const TraceAccordions = memo(function TraceAccordions({
       </Box>
     );
   }
-  // Silence the unused warning when spansLoading is consulted only by
-  // future call sites — keeps the prop in the API without TS noise.
-  void spansLoading;
   return (
     <TraceSummaryAccordions
       trace={trace}

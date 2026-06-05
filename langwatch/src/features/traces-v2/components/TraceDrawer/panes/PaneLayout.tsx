@@ -406,6 +406,7 @@ export function PaneLayout({
       spans={spans}
       selectedSpan={selectedSpan}
       layout={layout}
+      spansLoading={spansLoading}
     />
   );
 
