@@ -330,9 +330,12 @@ export const FilterSidebar: React.FC = () => {
           overflowX: "hidden",
           // Reserve right-side gutter for OR connector lanes — one lane
           // per OR group, sized to match `OrConnectorOverlay`'s internal
-          // LANE_WIDTH. With no OR groups the gutter collapses to zero
-          // and the rail looks identical to before this feature.
-          paddingRight: `${orAnalysis.groups.length * CONNECTOR_LANE_WIDTH}px`,
+          // LANE_WIDTH. Plus a constant 4px so the auto-scroll's track
+          // sits to the LEFT of the resize handle line, not on top of
+          // it. Without this 4px the scrollbar visually overlapped the
+          // 1px sidebar divider and read as "bleeding past the
+          // sidebar's right edge."
+          paddingRight: `${4 + orAnalysis.groups.length * CONNECTOR_LANE_WIDTH}px`,
         }}
       >
         {showSkeleton ? (
