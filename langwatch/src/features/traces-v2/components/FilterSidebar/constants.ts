@@ -343,6 +343,14 @@ export const NONE_TOGGLE_VALUE: Record<string, string> = {
   evaluatorVerdict: "evaluatorVerdict",
   evaluatorScore: "evaluatorScore",
   event: "event",
+  // Round-3 additions matched by the backend's HAS_NONE_VALUES +
+  // meta-handlers. Each one is a single-column check on trace_summaries
+  // so the cost of "show only traces missing this field" is the same as
+  // any other categorical predicate.
+  model: "model",
+  service: "service",
+  traceName: "traceName",
+  rootSpanType: "rootSpanType",
 };
 
 export const MAX_VISIBLE_FACETS = 10;

@@ -157,6 +157,18 @@ function translateExistence(
         negated,
       );
 
+    case "model":
+      return wrap("length(Models) > 0", negated);
+
+    case "service":
+      return wrap("Attributes['service.name'] != ''", negated);
+
+    case "traceName":
+      return wrap("ifNull(TraceName, '') != ''", negated);
+
+    case "rootSpanType":
+      return wrap("ifNull(RootSpanType, '') != ''", negated);
+
     default:
       throw new FilterParseError(
         `Unknown has/none value "${value}". Valid: ${HAS_VALUES.join(", ")}, attribute.<key>`,
