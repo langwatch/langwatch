@@ -167,15 +167,32 @@ describe("UserIngestionBindingService.install", () => {
   });
 
   describe("when Alice tries to install the same template twice", () => {
-    it("throws BindingAlreadyExistsError on the second call", async () => {
-      // Alice already has a binding from the first scenario above.
-      await expect(
-        service.install({
-          callerUserId: ALICE_ID,
+    it("rotates the token in place on the second call (no duplicate binding)", async () => {
+      // The install is idempotent per (personalProjectId, sourceType): a
+      // repeat install rotates Alice's existing binding token in place
+      // instead of raising binding-already-exists.
+      const first = await service.install({
+        callerUserId: ALICE_ID,
+        organizationId: ORG_ID,
+        templateId: TEMPLATE_ID,
+      });
+      const second = await service.install({
+        callerUserId: ALICE_ID,
+        organizationId: ORG_ID,
+        templateId: TEMPLATE_ID,
+      });
+
+      expect(second.binding.id).toBe(first.binding.id);
+      expect(second.token).not.toBe(first.token);
+
+      const bindings = await prisma.userIngestionBinding.findMany({
+        where: {
+          userId: ALICE_ID,
           organizationId: ORG_ID,
-          templateId: TEMPLATE_ID,
-        }),
-      ).rejects.toThrowError(/binding already exists/i);
+          archivedAt: null,
+        },
+      });
+      expect(bindings).toHaveLength(1);
     });
   });
 });
