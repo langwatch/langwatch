@@ -39,7 +39,12 @@ function DurationBar({ durationMs, width, height }: DurationBarProps) {
       height={height}
       bg="border.subtle"
       borderRadius="full"
+      display="flex"
+      justifyContent="flex-end"
     >
+      {/* Right-anchored fill — the duration column is right-aligned,
+          so the bar visually connects to the value above it rather
+          than floating off to the left side of the cell. */}
       <Box
         height="full"
         width={`${fillRatio * 100}%`}
