@@ -33,6 +33,7 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 
 import { IngestionKeyService } from "../ingestionKey.service";
+import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-ik-${suffix}`;
@@ -205,6 +206,29 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       expect(live?.type).toBe("apiKey");
       if (live?.type === "apiKey") {
         expect(live.project.id).toBe(OTHER_PROJECT_ID);
+      }
+    });
+  });
+
+  describe("when an admin mints a company-wide governance-project key", () => {
+    it("binds to the org Governance Project and self-scopes there", async () => {
+      const govProject = await ensureHiddenGovernanceProject(prisma, ORG_ID);
+
+      const issued = await ingestKeys.ensureForOrganizationGovernanceProject({
+        callerUserId: USER_ID,
+        organizationId: ORG_ID,
+        sourceType: "copilot_studio",
+      });
+      expect(issued.token).toMatch(/^sk-lw-/);
+
+      // The OTLP exporter inside the company-wide tool (Copilot Studio) sends
+      // the bearer token alone; it must resolve to the hidden Governance
+      // Project, not a personal one.
+      const resolved = await resolver.resolve({ token: issued.token, projectId: null });
+      expect(resolved?.type).toBe("apiKey");
+      if (resolved?.type === "apiKey") {
+        expect(resolved.project.id).toBe(govProject.id);
+        expect(resolved.ingestSourceType).toBe("copilot_studio");
       }
     });
   });

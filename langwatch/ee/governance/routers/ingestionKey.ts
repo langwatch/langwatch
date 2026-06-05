@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 
+import { env } from "~/env.mjs";
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
@@ -28,6 +29,17 @@ const mintInput = z.object({
   sourceType: z.string().min(1),
   templateId: z.string().min(1).optional(),
 });
+
+/**
+ * The OTLP endpoint a sysadmin pastes into a company-wide tool (Copilot Studio,
+ * etc.). Mirrors controlPlaneBaseUrl() in auth-cli.ts so dev / staging / prod
+ * resolve without per-env config.
+ */
+function otlpEndpoint(): string {
+  const base =
+    env.NEXTAUTH_URL ?? env.BASE_HOST ?? "https://app.langwatch.ai";
+  return `${base.replace(/\/+$/, "")}/api/otel`;
+}
 
 export const ingestionKeyRouter = createTRPCRouter({
   /**
@@ -80,5 +92,54 @@ export const ingestionKeyRouter = createTRPCRouter({
         sourceType: input.sourceType,
         ingestionTemplateId: input.templateId ?? null,
       });
+    }),
+
+  // ── Company-wide push ingestion (org Governance Project) ──────────────────
+  // A sysadmin mints ONE key bound to the org's hidden Governance Project and
+  // pastes it into a company-wide tool's OTLP endpoint (e.g. Copilot Studio),
+  // so the whole company's telemetry pushes into one governed project. Gated
+  // on the ingestion-source admin permission — a stronger gate than the
+  // personal "are you a member of this org".
+
+  /** Live company-wide ingestion keys + the OTLP endpoint to paste into the tool. */
+  companyWideList: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("ingestionSources:view"))
+    .query(async ({ ctx, input }) => {
+      const service = IngestionKeyService.create(ctx.prisma);
+      const sources = await service.listForOrganizationGovernanceProject({
+        organizationId: input.organizationId,
+      });
+      return { endpoint: otlpEndpoint(), sources };
+    }),
+
+  /** Mint (rotating in place) a company-wide key; reveals the token once. */
+  companyWideInstall: protectedProcedure
+    .input(mintInput)
+    .use(checkOrganizationPermission("ingestionSources:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionKeyService.create(ctx.prisma);
+      const result = await service.ensureForOrganizationGovernanceProject({
+        callerUserId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        sourceType: input.sourceType,
+        ingestionTemplateId: input.templateId ?? null,
+      });
+      return { ...result, endpoint: otlpEndpoint() };
+    }),
+
+  /** Hard-cut rotation of the company-wide key (the previous token dies). */
+  companyWideRotate: protectedProcedure
+    .input(mintInput)
+    .use(checkOrganizationPermission("ingestionSources:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionKeyService.create(ctx.prisma);
+      const result = await service.ensureForOrganizationGovernanceProject({
+        callerUserId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        sourceType: input.sourceType,
+        ingestionTemplateId: input.templateId ?? null,
+      });
+      return { ...result, endpoint: otlpEndpoint() };
     }),
 });

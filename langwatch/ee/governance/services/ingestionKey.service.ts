@@ -5,6 +5,7 @@ import type { PrismaClient } from "@prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 
+import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
 /**
@@ -127,6 +128,74 @@ export class IngestionKeyService {
       sourceType,
       ingestionTemplateId,
     });
+  }
+
+  /**
+   * Issues (rotating in place) a COMPANY-WIDE push ingestion key bound to the
+   * org's hidden Governance Project. A sysadmin pastes this single `sk-lw-` key
+   * into a company-wide tool's OTLP endpoint (e.g. Microsoft Copilot Studio's
+   * "OTLP endpoint" field) so the whole company's telemetry pushes into one
+   * governed project. Same ingest-only `traces:create` scope as a personal
+   * key, just bound to the Governance Project instead of a personal one.
+   * Authorization (an org ingestion-source admin) is enforced by the router.
+   */
+  async ensureForOrganizationGovernanceProject({
+    callerUserId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+  }: {
+    callerUserId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+  }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
+    const govProject = await ensureHiddenGovernanceProject(
+      this.prisma,
+      organizationId,
+    );
+    return this.ensureForProject({
+      callerUserId,
+      organizationId,
+      projectId: govProject.id,
+      sourceType,
+      ingestionTemplateId,
+    });
+  }
+
+  /**
+   * Lists the live company-wide ingestion keys bound to the org's Governance
+   * Project, so the admin UI renders connected sources without re-revealing
+   * the token. Only mint/rotate ever surface the plaintext token.
+   */
+  async listForOrganizationGovernanceProject({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<
+    {
+      apiKeyId: string;
+      sourceType: string;
+      ingestionTemplateId: string | null;
+    }[]
+  > {
+    const govProject = await ensureHiddenGovernanceProject(
+      this.prisma,
+      organizationId,
+    );
+    const keys = await this.apiKeyRepo.findIngestKeysForProject({
+      organizationId,
+      projectId: govProject.id,
+    });
+    return keys
+      .filter((k): k is typeof k & { ingestSourceType: string } =>
+        Boolean(k.ingestSourceType),
+      )
+      .map((k) => ({
+        apiKeyId: k.id,
+        sourceType: k.ingestSourceType,
+        ingestionTemplateId: k.ingestionTemplateId,
+      }));
   }
 
   /**
