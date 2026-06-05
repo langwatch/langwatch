@@ -55,6 +55,10 @@ type BatchEvaluationResultsTableProps = {
   rowHeight?: RowHeight;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /** Group rows by this dataset-entry metadata key (comparison mode). */
+  groupBy?: string | null;
+  /** Called when the user changes the grouping key. */
+  onGroupByChange?: (key: string | null) => void;
 };
 
 /**
@@ -223,6 +227,8 @@ export function BatchEvaluationResultsTable({
   showCostAndLatency = true,
   rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
+  groupBy,
+  onGroupByChange,
 }: BatchEvaluationResultsTableProps) {
   // Determine if we're in comparison mode
   const isComparisonMode = !!comparisonData && comparisonData.length > 1;
@@ -238,6 +244,8 @@ export function BatchEvaluationResultsTable({
         showCostAndLatency={showCostAndLatency}
         rowHeight={rowHeight}
         disableVirtualization={disableVirtualization}
+        groupBy={groupBy}
+        onGroupByChange={onGroupByChange}
       />
     );
   }
