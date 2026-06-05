@@ -106,15 +106,6 @@ export async function runUnifiedLoginFlow(
         saveConfig(cfg);
       }
 
-      // Cache the org's per-tool path policy so the `langwatch <tool>`
-      // wrapper gates path selection on the admin's choices offline.
-      // Older servers omit the field — the wrapper then falls back to
-      // the hardcoded defaults.
-      if (bootstrap?.toolPolicies) {
-        cfg.tool_policies = bootstrap.toolPolicies;
-        saveConfig(cfg);
-      }
-
       console.log();
       const ceremonyLines = formatLoginCeremony({
         email: cfg.user?.email ?? result.user.email,

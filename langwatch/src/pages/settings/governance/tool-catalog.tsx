@@ -14,7 +14,6 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
-import { ToolPathPolicyEditor } from "~/components/settings/governance/ToolPathPolicyEditor";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -77,13 +76,6 @@ function ToolCatalogPage() {
             >
               Ingestion Templates
             </Tabs.Trigger>
-            <Tabs.Trigger
-              value="cli-paths"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              CLI Paths
-            </Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="tool-tiles" paddingTop={4}>
             <ToolCatalogEditor
@@ -98,9 +90,6 @@ function ToolCatalogPage() {
           </Tabs.Content>
           <Tabs.Content value="ingestion-templates" paddingTop={4}>
             <IngestionTemplatesEditor organizationId={organization.id} />
-          </Tabs.Content>
-          <Tabs.Content value="cli-paths" paddingTop={4}>
-            <ToolPathPolicyEditor organizationId={organization.id} />
           </Tabs.Content>
         </Tabs.Root>
       </VStack>

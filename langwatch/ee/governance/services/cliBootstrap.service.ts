@@ -37,10 +37,6 @@ import {
 } from "~/server/modelProviders/registry";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
-import {
-  type PlatformToolPolicyMap,
-  PlatformToolPolicyService,
-} from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
   providers: Array<{
@@ -76,13 +72,6 @@ export interface CliBootstrapResult {
    * surfaces. Null when the org has no admin row yet.
    */
   adminEmail: string | null;
-  /**
-   * Per-tool path policy resolved for this org (stored overrides merged over
-   * the hardcoded Stage-A defaults). The CLI caches this at login and gates
-   * `langwatch <tool>` path selection on it; an offline / legacy CLI with no
-   * cached map falls back to the same hardcoded defaults.
-   */
-  toolPolicies: PlatformToolPolicyMap;
 }
 
 function resolveGatewayUrl(): string {
@@ -112,19 +101,13 @@ export class CliBootstrapService {
     userId: string;
     organizationId: string;
   }): Promise<CliBootstrapResult> {
-    // Per-tool policy is org-level, independent of whether the user has a
-    // personal workspace yet — a fresh login still needs the cached map.
-    const toolPolicies = await PlatformToolPolicyService.create(
-      this.prisma,
-    ).getForOrg({ organizationId: input.organizationId });
-
     const workspaceService = new PersonalWorkspaceService(this.prisma);
     const workspace = await workspaceService.findExisting({
       userId: input.userId,
       organizationId: input.organizationId,
     });
     if (!workspace) {
-      return emptyBootstrap(toolPolicies);
+      return emptyBootstrap();
     }
 
     const providers = await this.resolveProviders(workspace.project.id);
@@ -136,13 +119,7 @@ export class CliBootstrapService {
     });
     const adminEmail = await this.resolveAdminEmail(input.organizationId);
 
-    return {
-      providers,
-      budget,
-      gatewayUrl: resolveGatewayUrl(),
-      adminEmail,
-      toolPolicies,
-    };
+    return { providers, budget, gatewayUrl: resolveGatewayUrl(), adminEmail };
   }
 
   private async resolveAdminEmail(
@@ -246,7 +223,7 @@ export class CliBootstrapService {
   }
 }
 
-function emptyBootstrap(toolPolicies: PlatformToolPolicyMap): CliBootstrapResult {
+function emptyBootstrap(): CliBootstrapResult {
   return {
     providers: [],
     budget: {
@@ -256,6 +233,5 @@ function emptyBootstrap(toolPolicies: PlatformToolPolicyMap): CliBootstrapResult
     },
     gatewayUrl: resolveGatewayUrl(),
     adminEmail: null,
-    toolPolicies,
   };
 }
