@@ -41,15 +41,23 @@ interface RunVersion {
  * take their table defaults.
  */
 async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
-  const tenant = v.tenant ?? tenantId;
-  const targets = (v.targets ?? "[]").replace(/'/g, "\\'");
   await ch.command({
     query: `
       INSERT INTO experiment_runs
         (ProjectionId, TenantId, RunId, ExperimentId, Version, Total, Progress, Targets, CreatedAt, UpdatedAt, StartedAt)
       VALUES
-        ('${nanoid()}', '${tenant}', '${v.runId}', '${v.experimentId}', 'v1', ${v.total ?? 10}, ${v.progress}, '${targets}', now64(3), now64(3) - ${v.agoSec}, now64(3))
+        ({pid:String}, {tenant:String}, {runId:String}, {experimentId:String}, 'v1', {total:UInt32}, {progress:UInt32}, {targets:String}, now64(3), now64(3) - {agoSec:UInt32}, now64(3))
     `,
+    query_params: {
+      pid: nanoid(),
+      tenant: v.tenant ?? tenantId,
+      runId: v.runId,
+      experimentId: v.experimentId,
+      total: v.total ?? 10,
+      progress: v.progress,
+      targets: v.targets ?? "[]",
+      agoSec: v.agoSec,
+    },
   });
 }
 
