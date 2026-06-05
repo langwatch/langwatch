@@ -48,11 +48,14 @@ import { api } from "~/utils/api";
  * IngestionTemplate row, no install). It deep-links to
  * /me/configure#otlp — the BYO-OTLP fallback discovery card.
  *
- * Claude Code is intentionally excluded from this grid (filtered by
- * slug below). The unified entry point for Claude Code lives on the
- * AiToolsPortal "$ langwatch claude" tile — the CLI auto-mints the
- * ingestion token and wires both the gateway and OTLP paths in one
- * step, so a separate "Connect" tile here would be a duplicate UX.
+ * First-class coding assistants (claude_code, codex, cursor, gemini)
+ * are intentionally excluded from this grid (filtered by slug below).
+ * The unified entry points live on the AiToolsPortal "$ langwatch
+ * <tool>" tiles — each CLI auto-mints the ingestion token and wires
+ * both the gateway and OTLP paths in one step, so a separate "Connect"
+ * tile here would be a duplicate UX. opencode stays in this grid
+ * because it has no unified `langwatch opencode` CLI yet — its
+ * ingestion is OTLP-only via the install drawer.
  *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
@@ -84,7 +87,12 @@ const TILE_META: Record<
   },
 };
 
-const UNIFIED_VIA_CLI_SLUGS = new Set(["claude_code"]);
+const UNIFIED_VIA_CLI_SLUGS = new Set([
+  "claude_code",
+  "codex",
+  "cursor",
+  "gemini",
+]);
 
 const FALLBACK_ICON = <Bot size={20} />;
 
