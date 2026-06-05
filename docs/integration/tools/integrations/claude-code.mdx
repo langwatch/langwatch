@@ -300,7 +300,9 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
   </Accordion>
 
   <Accordion title="Trace shows but output/response is empty">
-    Anthropic does NOT emit the assistant's response text in OTel as of Claude Code 2.1.x. Only token counts ship on the wire. LangWatch renders the input + cost + token breakdown but the output text stays empty until anthropic resumes emitting the response.
+    Set `OTEL_LOG_RAW_API_BODIES=1`. Claude Code only emits the assistant's response text on its `api_response_body` event, and that event is off by default. With the flag set, LangWatch lifts the full response text into the trace output alongside the cost and token breakdown.
+
+    Claude Code also emits `api_response_body` for non-conversational utility calls (autosuggestions, session-title generation). LangWatch filters those by `query_source` so only genuine conversation turns populate the trace output, never a stray title or suggestion.
   </Accordion>
 
   <Accordion title="Authentication errors">
@@ -310,11 +312,8 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
     - Verify the header is properly formatted in the environment variable
   </Accordion>
 
-  <Accordion title="Performance issues">
-    - Consider using batch span processors for high-volume applications
-    - Implement sampling to reduce the number of traces sent
-    - Use async span processors to avoid blocking your application
-    - Adjust export intervals based on your monitoring needs
+  <Accordion title="Large payloads or truncated content">
+    The content flags ship the full request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_TOOL_DETAILS` to keep payloads small. The other flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) are lightweight.
   </Accordion>
 
   <Accordion title="Configuration not taking effect">
@@ -372,8 +371,8 @@ For comprehensive monitoring resources, see the [Claude Code Monitoring Guide](h
 ## Security and Privacy
 
 - **Telemetry is opt-in** and requires explicit configuration
-- **Sensitive information** like API keys or file contents are never included in traces
-- **User prompt content** is redacted by default - only prompt length is recorded
+- **Prompts, tool I/O, and full request/response bodies are off by default** - only token counts and cost ship until you opt in with the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`)
+- **Once enabled, prompt text, tool outputs, and file contents passed to tools will appear in traces** - enable the flags only where capturing that content is acceptable
 
 <Note>
   All data sent to LangWatch is encrypted in transit and stored securely. Review LangWatch's [privacy policy](https://langwatch.ai/privacy) and [security practices](https://langwatch.ai/security) for more details.
