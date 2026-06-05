@@ -55,15 +55,17 @@ const GATEWAY_ORIGIN_VALUE = "gateway";
  * like the gateway customertracebridge and direct-OTLP from customer
  * apps).
  *
- * `gateway` — LangWatch AI Gateway proxy traces (the original v1 surface)
- * `binding`  — UserIngestionBinding-routed personal-project traces
- *              (closes ralph-loop gap #5; matches BINDING_ORIGIN_VALUE
- *              in bindingProvenance.utils.ts)
+ * `gateway`    — LangWatch AI Gateway proxy traces (the original v1 surface)
+ * `ingest_key` — ingestion-key-routed project traces (the unified `langwatch
+ *                <tool>` Path B + template installs; matches
+ *                INGEST_KEY_ORIGIN_VALUE in ingestKeyProvenance.utils.ts).
+ *                Without this, ingest-key traces would bypass the org's no-spy
+ *                setting (compliance hole).
  */
-const BINDING_ORIGIN_VALUE = "binding";
+const INGEST_KEY_ORIGIN_VALUE = "ingest_key";
 const GOVERNED_ORIGINS = new Set<string>([
   GATEWAY_ORIGIN_VALUE,
-  BINDING_ORIGIN_VALUE,
+  INGEST_KEY_ORIGIN_VALUE,
 ]);
 const ORG_ID_ATTR = "langwatch.organization_id";
 const ORIGIN_ATTR = "langwatch.origin";

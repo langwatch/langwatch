@@ -35,6 +35,8 @@ export class ApiKeyRepository {
     createdByUserId,
     organizationId,
     expiresAt,
+    ingestSourceType,
+    ingestionTemplateId,
   }: {
     name: string;
     description?: string | null;
@@ -45,6 +47,8 @@ export class ApiKeyRepository {
     createdByUserId?: string | null;
     organizationId: string;
     expiresAt?: Date | null;
+    ingestSourceType?: string | null;
+    ingestionTemplateId?: string | null;
   }): Promise<ApiKey> {
     return this.prisma.apiKey.create({
       data: {
@@ -57,7 +61,35 @@ export class ApiKeyRepository {
         createdByUserId: createdByUserId ?? null,
         organizationId,
         expiresAt: expiresAt ?? null,
+        ingestSourceType: ingestSourceType ?? null,
+        ingestionTemplateId: ingestionTemplateId ?? null,
       },
+    });
+  }
+
+  /**
+   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
+   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
+   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
+   * accumulate keys.
+   */
+  async findIngestKey({
+    projectId,
+    sourceType,
+  }: {
+    projectId: string;
+    sourceType: string;
+  }): Promise<ApiKeyWithBindings | null> {
+    return this.prisma.apiKey.findFirst({
+      where: {
+        ingestSourceType: sourceType,
+        revokedAt: null,
+        roleBindings: {
+          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+        },
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
     });
   }
 

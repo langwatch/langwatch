@@ -1693,12 +1693,29 @@ model ApiKey {
   expiresAt       DateTime?
   lastUsedAt      DateTime?
   revokedAt       DateTime?
+
+  /// Non-null marks this key as an "ingestion key": a project-scoped,
+  /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
+  /// installs) mint for OTLP Path B. The slug (claude_code / codex / gemini /
+  /// opencode / claude_cowork) is stamped as `langwatch.source` provenance on
+  /// every span the key authorizes. NULL for normal API / service keys.
+  ingestSourceType String?
+
+  /// Set only for ingestion keys derived from an admin IngestionTemplate
+  /// (e.g. claude_cowork). Drives receiver OTTL application + the
+  /// `langwatch.template.id` provenance stamp. NULL for unified-CLI tools
+  /// (which have no template) and for normal keys. Column ref only (no FK,
+  /// per the app-layer-integrity convention); resolved by the ingest-key service.
+  ingestionTemplateId String?
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 
   @@index([userId])
   @@index([organizationId])
   @@index([lookupId])
+  @@index([ingestSourceType])
+  @@index([ingestionTemplateId])
 }
 
 model BillingMeterCheckpoint {
