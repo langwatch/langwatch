@@ -464,6 +464,27 @@ model CostCenter {
   @@index([organizationId])
 }
 
+/// Per-(organization, tool) override for which `langwatch <tool>` paths the
+/// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
+/// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
+/// row resolves to the hardcoded Stage-A defaults (both true for claude/codex/
+/// gemini/opencode; cursor allows the gateway path only), so the policy is
+/// purely additive — disabling a path is an explicit admin choice. The CLI
+/// caches the resolved map at login and gates path selection on it.
+/// See specs/ai-gateway/governance/cli-tool-mode-policy.feature.
+model PlatformToolPolicy {
+  id              String   @id @default(nanoid())
+  organizationId  String
+  toolSlug        String
+  allowVk         Boolean  @default(true)
+  allowOtelDirect Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, toolSlug])
+  @@index([organizationId])
+}
+
 enum INVITE_STATUS {
   PENDING
   ACCEPTED

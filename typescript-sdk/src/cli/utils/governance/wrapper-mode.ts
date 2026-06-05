@@ -103,7 +103,7 @@ export async function resolveWrapperMode(
 ): Promise<WrapperModeResult> {
   const persistedMode = cfg.tool_mode?.[tool];
   const hasVk = !!cfg.default_personal_vk?.secret;
-  const policy = resolvePlatformToolPolicy(tool);
+  const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
 
   if (!policy.allowVk && !policy.allowOtelDirect) {
     throw new GovernanceCliError(

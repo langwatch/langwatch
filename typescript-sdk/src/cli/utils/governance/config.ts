@@ -9,6 +9,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import type { PlatformToolPolicyMap } from "./platform-tool-policy";
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -77,6 +79,16 @@ export interface GovernanceConfig {
    * to Path B when no VK + the user opts in.
    */
   tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
+
+  /**
+   * Per-(org, tool) path policy cached from the login bootstrap
+   * (`/api/auth/cli/bootstrap` → `toolPolicies`). The `langwatch
+   * <tool>` wrapper gates path selection on this map so it only
+   * offers the paths the org admin permits. Absent for a legacy /
+   * offline CLI that never cached it — `resolvePlatformToolPolicy`
+   * then falls back to the hardcoded defaults.
+   */
+  tool_policies?: PlatformToolPolicyMap;
 
   /**
    * Most-recent signed `request_increase_url` returned by the
