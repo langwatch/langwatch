@@ -4,9 +4,18 @@ import { Prisma } from "@prisma/client";
 import { encrypt, decrypt } from "~/utils/encryption";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
+import { getResolvedDefaultForFeature } from "~/server/modelProviders/modelDefaults.read";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:langy:credential");
+
+/**
+ * Feature key whose cascade-resolved model we seed onto the Langy VK's
+ * `modelsAllowed` at provision time. Same key the sidebar picker seeds
+ * itself from (LangySidebar's LANGY_GATE_FEATURE_KEY) so the VK and the
+ * composer agree on "the model Langy uses by default".
+ */
+const LANGY_VK_MODEL_FEATURE_KEY = "prompt.create_default";
 
 /**
  * Name under which the auto-provisioned Langy VK secret is stored in
@@ -74,6 +83,24 @@ export async function provisionLangyVirtualKey(args: {
     return null;
   }
 
+  // Seed the VK's model allowlist with whatever the project currently
+  // resolves as its default chat model, so the VK "has a model in it" from
+  // day 1 and the sidebar picker starts narrowed to it. At a fresh
+  // project.create there's usually no provider yet → this resolves to null
+  // and we leave modelsAllowed null (= "all eligible models"). It fires when
+  // an org/team default is inherited, and on the self-heal / backfill paths.
+  // getResolvedDefaultForFeature returns null instead of throwing when
+  // nothing is configured, so a missing default never breaks provisioning.
+  const resolvedDefault = await getResolvedDefaultForFeature(
+    // ReadCtx wants a session, but this resolver only reads ctx.prisma;
+    // provisioning runs without a user session, so null is correct.
+    { prisma, session: null },
+    { projectId, featureKey: LANGY_VK_MODEL_FEATURE_KEY },
+  );
+  const modelsAllowed = resolvedDefault?.model
+    ? [resolvedDefault.model]
+    : null;
+
   // GatewayProviderCredential was removed in iter 110 — VKs route through the
   // project's ModelProviders. The /chat route's model gate handles "no model
   // configured" with a 409 before we get here, so we don't validate here.
@@ -86,6 +113,9 @@ export async function provisionLangyVirtualKey(args: {
     principalUserId: null,
     scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
     actorUserId,
+    // Omit config entirely when nothing resolved so the VK keeps the schema
+    // default (modelsAllowed: null = all). Only set it when we have a seed.
+    ...(modelsAllowed ? { config: { modelsAllowed } } : {}),
   });
 
   try {

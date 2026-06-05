@@ -33,17 +33,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
+import { isLangyManagedVk } from "~/components/gateway/langyVk";
 
 type ScopeEntry = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
-
-// Heuristic: is this row the auto-provisioned Langy VK (project.create →
-// provisionLangyVirtualKey)? Match the display name + null principal user.
-// Source-of-truth string: LANGY_VK_DISPLAY_NAME in
-// src/server/services/langy/LangyCredentialService.ts (kept inlined here to
-// avoid importing server-only modules into the client bundle).
-function isLangyManagedVk(vk: { name: string; principalUserId: string | null }) {
-  return vk.name === "Langy" && vk.principalUserId === null;
-}
 
 type CreatedSecret = {
   id: string;

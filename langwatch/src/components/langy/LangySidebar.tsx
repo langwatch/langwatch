@@ -41,6 +41,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { api } from "~/utils/api";
 import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+import { isLangyManagedVk } from "~/components/gateway/langyVk";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
 // composer's model picker with whatever's actually resolving today — opening
@@ -411,8 +412,9 @@ function LangyPanel({
   proposalHandlers?: ProposalHandlers;
   experimentSlug?: string;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
+  const organizationId = organization?.id;
 
   const [input, setInput] = useState("");
   // Per-session model override for the next send. Empty string = "use whatever
@@ -443,11 +445,60 @@ function LangyPanel({
     { projectId: projectId ?? "", featureKey: LANGY_GATE_FEATURE_KEY },
     { enabled: !!projectId },
   );
+
+  // The project's Langy VK carries an optional `modelsAllowed` allowlist
+  // (configured in the VK editor). When set, the composer's picker is
+  // narrowed to exactly those models; when null/empty it falls back to all
+  // of the project's provider models. VKs are org-scoped, so we list the
+  // org's keys and pick the auto-managed Langy VK scoped to THIS project.
+  const virtualKeysQuery = api.virtualKeys.list.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId },
+  );
+  const langyModelsAllowed = useMemo<string[] | null>(() => {
+    const langyVk = virtualKeysQuery.data?.find(
+      (vk) =>
+        isLangyManagedVk(vk) &&
+        vk.scopes.some(
+          (s) => s.scopeType === "PROJECT" && s.scopeId === projectId,
+        ),
+    );
+    const allowed = (langyVk?.config as { modelsAllowed?: string[] | null })
+      ?.modelsAllowed;
+    return allowed && allowed.length > 0 ? allowed : null;
+  }, [virtualKeysQuery.data, projectId]);
+
+  // Options the picker offers: the VK allowlist when present, else every
+  // registry model (ModelSelector further narrows that to the project's
+  // enabled providers). "Narrow to VK, fall back to all."
+  const modelOptions = useMemo(
+    () => langyModelsAllowed ?? allModelOptions,
+    [langyModelsAllowed],
+  );
+
+  // Seed the picker with the model the gate resolves to — but keep it inside
+  // the allowlist. If the resolved default isn't allowed, start on the first
+  // allowed model instead.
   useEffect(() => {
     if (modelOverride) return;
     const resolved = resolvedDefaultQuery.data?.model;
-    if (resolved) setModelOverride(resolved);
-  }, [resolvedDefaultQuery.data?.model, modelOverride]);
+    if (resolved && (!langyModelsAllowed || langyModelsAllowed.includes(resolved))) {
+      setModelOverride(resolved);
+    } else if (langyModelsAllowed) {
+      setModelOverride(langyModelsAllowed[0]!);
+    }
+  }, [resolvedDefaultQuery.data?.model, modelOverride, langyModelsAllowed]);
+
+  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model,
+  // snap to the first allowed model. Safe because under an allowlist the
+  // picker only offers allowed models, so an out-of-list value can only be a
+  // stale seed, never a user choice.
+  useEffect(() => {
+    if (!langyModelsAllowed) return;
+    if (modelOverride && !langyModelsAllowed.includes(modelOverride)) {
+      setModelOverride(langyModelsAllowed[0]!);
+    }
+  }, [langyModelsAllowed, modelOverride]);
   const { messages, sendMessage, stop, status, setMessages } = useChat({
     transport,
     onError: (error) => {
@@ -663,6 +714,7 @@ function LangyPanel({
           input={input}
           onInputChange={setInput}
           model={modelOverride}
+          modelOptions={modelOptions}
           onModelChange={setModelOverride}
           onSend={() => void send(input)}
           onStop={() => void stop()}
@@ -950,6 +1002,7 @@ function Composer({
   input,
   onInputChange,
   model,
+  modelOptions,
   onModelChange,
   onSend,
   onStop,
@@ -961,6 +1014,8 @@ function Composer({
   onInputChange: (v: string) => void;
   /** The model Langy will use for the next send. "" = let the server pick. */
   model: string;
+  /** Models the picker may offer (the VK allowlist, or all registry models). */
+  modelOptions: string[];
   onModelChange: (model: string) => void;
   onSend: () => void;
   onStop: () => void;
@@ -989,7 +1044,7 @@ function Composer({
         <Box marginBottom={2} data-testid="langy-model-picker">
           <ModelSelector
             model={model}
-            options={allModelOptions}
+            options={modelOptions}
             onChange={onModelChange}
             mode="chat"
             size="sm"

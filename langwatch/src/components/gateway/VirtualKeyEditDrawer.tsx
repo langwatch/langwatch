@@ -18,6 +18,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { ModelMultiSelect } from "~/components/ModelMultiSelect";
 
 import {
   ConfigureModelProvidersLink,
@@ -39,6 +40,10 @@ type VirtualKeyDetail = {
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   config: {
+    // null / undefined = no allowlist = every eligible model is allowed.
+    // A non-empty list restricts the VK (and the Langy picker) to exactly
+    // these `provider/model` ids.
+    modelsAllowed?: string[] | null;
     cache?: { mode: "respect" | "force" | "disable"; ttlS: number };
     rateLimits?: {
       rpm: number | null;
@@ -76,6 +81,7 @@ export function VirtualKeyEditDrawer({
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
   const [tagsCsv, setTagsCsv] = useState<string>("");
+  const [modelsAllowed, setModelsAllowed] = useState<string[]>([]);
 
   useEffect(() => {
     if (!vk) return;
@@ -88,6 +94,7 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
+    setModelsAllowed(vk.config.modelsAllowed ?? []);
   }, [vk]);
 
   const availableTeams = useMemo(
@@ -141,6 +148,9 @@ export function VirtualKeyEditDrawer({
         description: description || null,
         routingPolicyId: routingPolicyId ? routingPolicyId : null,
         config: {
+          // Empty selection ⇒ null (no allowlist = all eligible models),
+          // never [] (which the gateway would read as "allow zero models").
+          modelsAllowed: modelsAllowed.length > 0 ? modelsAllowed : null,
           cache: { mode: cacheMode, ttlS: cacheTtlS },
           rateLimits: {
             rpm: rpm ? Number.parseInt(rpm, 10) : null,
@@ -269,6 +279,33 @@ export function VirtualKeyEditDrawer({
                 providers={(orgProvidersQuery.data?.providers ?? []) as any}
               />
             </Box>
+
+            <Field.Root>
+              <Field.Label>
+                Models {name ? `“${name}” ` : ""}can use
+                <FieldInfoTooltip
+                  description="Restrict this virtual key to specific models. Leave everything unchecked to allow every model the eligible providers can serve. For the Langy assistant this is exactly the set its sidebar model picker offers."
+                  docHref="/ai-gateway/virtual-keys"
+                />
+              </Field.Label>
+              {/* v1 limitation: the palette comes from the CURRENT project's
+                  providers (useModelSelectionOptions). That's correct for the
+                  current project's Langy VK — the common case — but editing a
+                  different project's VK from the org-wide list would show this
+                  project's palette. Per-VK-project sourcing is a follow-up. */}
+              <ModelMultiSelect
+                value={modelsAllowed}
+                onChange={setModelsAllowed}
+                mode="chat"
+              />
+              <Field.HelperText>
+                {modelsAllowed.length === 0
+                  ? "All eligible models allowed. Check models to restrict."
+                  : `${modelsAllowed.length} model${
+                      modelsAllowed.length === 1 ? "" : "s"
+                    } selected.`}
+              </Field.HelperText>
+            </Field.Root>
 
             {((policiesQuery.data ?? []).length > 0 || routingPolicyId) && (
               <Field.Root>
