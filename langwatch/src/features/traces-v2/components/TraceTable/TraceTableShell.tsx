@@ -363,10 +363,20 @@ function HeaderCell<T>({
       letterSpacing="0.06em"
       whiteSpace="nowrap"
       transition="none"
-      // `role="group"` (set via the Box css below) drives the grip's
-      // _groupHover state. The Th itself stays `position: relative` so
-      // the absolutely-positioned grip anchors inside the cell.
-      role="group"
+      // Th-scoped CSS reveals the drag grip on hover. `_groupHover` via
+      // `role="group"` was unreliable across our chakra("th") wrapper —
+      // the raw `&:hover` descendant selector is simpler and works
+      // regardless of how the parent's group plumbing resolves.
+      css={{
+        "& [data-column-drag-handle]": {
+          opacity: 0,
+          transition: "opacity 100ms ease",
+        },
+        "&:hover [data-column-drag-handle], & [data-column-drag-handle]:focus-visible":
+          {
+            opacity: 1,
+          },
+      }}
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
@@ -424,19 +434,18 @@ function HeaderCell<T>({
           height="14px"
           color="fg.subtle"
           cursor="grab"
-          opacity={0}
-          // Reveal on hover-of-the-cell OR keyboard focus of the
-          // handle. _groupHover keys off the Th's `role="group"`.
-          _groupHover={{ opacity: 1 }}
+          // Opacity is controlled by the Th-scoped CSS above; keyboard
+          // focus also reveals the handle via the `:focus-visible`
+          // selector. We still paint a focus ring locally for the
+          // keyboard path so the handle is unambiguously the focused
+          // element.
           _focusVisible={{
-            opacity: 1,
             outline: "2px solid",
             outlineColor: "blue.focusRing",
             outlineOffset: "1px",
             borderRadius: "sm",
           }}
           _active={{ cursor: "grabbing" }}
-          transition="opacity 100ms ease"
           // Backdrop so the grip stays legible when overlaying short
           // labels in narrow columns. Picks up the active-sort tint
           // so it doesn't clash with the cell's own background.

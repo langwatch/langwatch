@@ -251,23 +251,21 @@ export const FilterSidebar: React.FC = () => {
         groups={orAnalysis.groups}
         containerRef={scrollAreaRef}
       />
-      {/* Floating header chrome: Configure (text), expand/collapse-all
-          toggle, and hide-sidebar. Painted with a tinted backdrop so it
-          stays legible over the first section's header text behind it.
-          The scroll area below adds compensating top padding so the
-          first section's own chrome (search icon + chevron) doesn't sit
-          underneath these buttons. */}
+      {/* Header bar: Configure (text), expand/collapse-all toggle, and
+          hide-sidebar. minHeight=36px matches the Toolbar's tab row at
+          the top of the trace table, so the two bars sit on the same
+          horizontal grid across the page. Border-bottom delineates the
+          bar from the scrolling section list. */}
       <HStack
-        position="absolute"
-        top={1}
-        right={1}
+        flexShrink={0}
+        minHeight="36px"
+        paddingX={2}
+        borderBottomWidth="1px"
+        borderColor="border"
+        bg={{ base: "bg.subtle", _dark: "bg.surface" }}
         gap={1}
         align="center"
-        zIndex={3}
-        bg={{ base: "bg.surface/90", _dark: "bg.panel/90" }}
-        backdropFilter="blur(6px)"
-        borderRadius="md"
-        paddingX={1}
+        justify="flex-end"
       >
         <FacetManagerPopover
           orderedKeysAll={orderedKeysAll}
@@ -330,13 +328,6 @@ export const FilterSidebar: React.FC = () => {
           flexDirection: "column",
           overflowY: "auto",
           overflowX: "hidden",
-          // Reserve room above the first section for the floating
-          // header chrome (Configure + expand/collapse-all + hide).
-          // Without this, the first section's own header icons (search,
-          // chevron) overlap with the floating buttons, making either
-          // set hard to click. The 36px matches the visual height of
-          // the floating row at default density.
-          paddingTop: 36,
           // Reserve right-side gutter for OR connector lanes — one lane
           // per OR group, sized to match `OrConnectorOverlay`'s internal
           // LANE_WIDTH. With no OR groups the gutter collapses to zero

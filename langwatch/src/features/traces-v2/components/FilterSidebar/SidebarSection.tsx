@@ -208,7 +208,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               variant="plain"
               size="sm"
               flex={1}
-              justifyContent="space-between"
+              minWidth={0}
+              justifyContent="flex-start"
               paddingX={0}
               height="auto"
               minHeight="unset"
@@ -217,7 +218,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               onClick={handleTriggerClick}
               onKeyDown={handleTriggerKeyDown}
             >
-              <HStack gap={1.5} paddingRight="5px">
+              <HStack gap={1.5} paddingRight="5px" minWidth={0}>
                 {SectionIcon && (
                   <Icon
                     boxSize="12px"
@@ -235,20 +236,10 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                   letterSpacing="0.08em"
                   transition="color 100ms ease"
                   _hover={{ color: "fg" }}
+                  truncate
                 >
                   {title}
                 </Text>
-                {!effectiveOpen &&
-                  valueCount !== undefined &&
-                  valueCount > 0 && (
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      _hover={{ color: "fg" }}
-                    >
-                      {valueCount}
-                    </Text>
-                  )}
                 {orPalette && (
                   <Box
                     as="span"
@@ -288,54 +279,78 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               </HStack>
             </Button>
           </Collapsible.Trigger>
-          {/* The chevron and filter toggle render as siblings of the
-              Collapsible.Trigger (not inside it) so the filter button
+          {/* Value-count slot — right-aligned so the count digits AND the
+              chevron below form a clean vertical column across every
+              section row. Width is reserved (minWidth 26px) regardless
+              of whether this row has a count so chevrons stack at the
+              same X position whether the count is empty, single-digit,
+              or 4-digit. */}
+          <Box
+            minWidth="26px"
+            textAlign="right"
+            flexShrink={0}
+            color="fg.subtle"
+          >
+            {!effectiveOpen &&
+              valueCount !== undefined &&
+              valueCount > 0 && (
+                <Text textStyle="2xs">{valueCount}</Text>
+              )}
+          </Box>
+          {/* The chevron and search toggle render as siblings of the
+              Collapsible.Trigger (not inside it) so the search button
               can sit between them without its clicks bubbling through
               to collapse the section. The chevron is a small button
               that mirrors the trigger's open state and forwards to
-              the same handler. */}
-          {searchToggleProps && (
-            <Box
-              as="button"
-              type="button"
-              aria-label={
-                searchToggleProps.open
-                  ? `Hide ${title} search`
-                  : `Search ${title} values`
-              }
-              aria-pressed={searchToggleProps.open}
-              width="16px"
-              height="16px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              borderRadius="sm"
-              color={searchToggleProps.open ? "fg" : "fg.subtle"}
-              bg={searchToggleProps.open ? "bg.muted" : undefined}
-              flexShrink={0}
-              _hover={{ color: "fg", bg: "bg.muted" }}
-              transition="background 100ms ease, color 100ms ease"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                // Pressing search on a collapsed section also expands
-                // it — otherwise the input toggles open behind a closed
-                // Collapsible and the user types into invisible chrome.
-                // We only auto-expand on the "opening" press; once
-                // search is up, a second press hides the input but
-                // leaves the section state alone (closing the section
-                // is the chevron's job).
-                if (!searchToggleProps.open && !effectiveOpen) {
-                  handleOpenChange(true);
+              the same handler.
+
+              Both occupy a fixed 16px slot — the search slot reserves
+              its width even when the section has no items (no toggle
+              rendered) so the chevron position stays consistent across
+              rows whether or not a search toggle is present. */}
+          <Box width="16px" height="16px" flexShrink={0}>
+            {searchToggleProps && (
+              <Box
+                as="button"
+                type="button"
+                aria-label={
+                  searchToggleProps.open
+                    ? `Hide ${title} search`
+                    : `Search ${title} values`
                 }
-                searchToggleProps.onToggle();
-              }}
-            >
-              <Icon boxSize="11px">
-                <Search />
-              </Icon>
-            </Box>
-          )}
+                aria-pressed={searchToggleProps.open}
+                width="16px"
+                height="16px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                borderRadius="sm"
+                color={searchToggleProps.open ? "fg" : "fg.subtle"}
+                bg={searchToggleProps.open ? "bg.muted" : undefined}
+                _hover={{ color: "fg", bg: "bg.muted" }}
+                transition="background 100ms ease, color 100ms ease"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  // Pressing search on a collapsed section also expands
+                  // it — otherwise the input toggles open behind a
+                  // closed Collapsible and the user types into invisible
+                  // chrome. We only auto-expand on the "opening" press;
+                  // once search is up, a second press hides the input
+                  // but leaves the section state alone (closing the
+                  // section is the chevron's job).
+                  if (!searchToggleProps.open && !effectiveOpen) {
+                    handleOpenChange(true);
+                  }
+                  searchToggleProps.onToggle();
+                }}
+              >
+                <Icon boxSize="11px">
+                  <Search />
+                </Icon>
+              </Box>
+            )}
+          </Box>
           <Box
             as="button"
             type="button"
@@ -347,7 +362,6 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
             justifyContent="center"
             color="fg.subtle"
             flexShrink={0}
-            marginRight={2}
             _hover={{ color: "fg" }}
             transition="color 100ms ease"
             onClick={(e) => {
