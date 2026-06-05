@@ -283,23 +283,6 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
       );
     }
 
-    if (body.spans?.length > 200) {
-      logger.info(
-        {
-          projectId: project.id,
-          spansCount: body.spans?.length,
-          traceId: nullableTraceId,
-        },
-        "[429] Too many spans",
-      );
-      return c.json(
-        {
-          message: "Too many spans, maximum of 200 per trace",
-        },
-        429,
-      );
-    }
-
     let reservedTraceMetadata: ReservedTraceMetadata = {};
     let customMetadata: CustomMetadata = {};
     try {
