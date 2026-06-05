@@ -102,11 +102,17 @@ function DurationCellInner({
 export const DurationCell = {
   id: "duration",
   label: "Duration",
+  // Both densities now let the bar fill the column width — the
+  // previous fixed 40 / 56 px widths left a big gap to the right of
+  // the bar that looked accidental once the column was widened or
+  // resized. Full-width also gives latency-comparison reads more
+  // visual resolution (a 3 % difference becomes visible instead of
+  // collapsing to a 1-pixel fill delta).
   render: ({ row }) => (
     <DurationCellInner
       durationMs={row.durationMs}
       textStyle="mono"
-      barWidth="40px"
+      barWidth="100%"
       barHeight="2px"
       gap={0}
     />
@@ -115,7 +121,7 @@ export const DurationCell = {
     <DurationCellInner
       durationMs={row.durationMs}
       textStyle="comfortable"
-      barWidth="56px"
+      barWidth="100%"
       barHeight="3px"
       gap={1}
     />
