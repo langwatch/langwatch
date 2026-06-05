@@ -21,20 +21,11 @@ interface UIState {
   syntaxHelpOpen: boolean;
   shortcutsHelpOpen: boolean;
   /**
-   * Whether the FacetManagerPopover is open. Hoisted here so the
-   * sidebar's icon trigger AND the floating "Configure" CTA in the
-   * trace list area can both drive the same popover without each
-   * keeping its own copy of the state. Both surfaces watch this
-   * field; only one popover is mounted (in the sidebar).
+   * Whether the FacetManagerPopover is open. Hoisted here so multiple
+   * triggers can drive the same popover instance without each keeping
+   * its own copy of the state.
    */
   facetManagerOpen: boolean;
-  /**
-   * Set on the user's first interaction with the floating Configure
-   * button — either clicking it OR scrolling far enough to surface it.
-   * Once set, the bottom-anchored CTA stops running its one-time
-   * activation animation. Persisted to `localStorage`.
-   */
-  hasSeenConfigureCta: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -50,8 +41,6 @@ interface UIState {
   setShortcutsHelpOpen: (open: boolean) => void;
   toggleShortcutsHelp: () => void;
   setFacetManagerOpen: (open: boolean) => void;
-  /** Marks the activation animation as seen + persists to localStorage. */
-  markConfigureCtaSeen: () => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
@@ -100,27 +89,6 @@ function persistUI(snapshot: Persisted): void {
   }
 }
 
-const CONFIGURE_CTA_SEEN_KEY = "langwatch:traces-v2:ui:configureCtaSeen";
-
-function loadConfigureCtaSeen(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(CONFIGURE_CTA_SEEN_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function persistConfigureCtaSeen(seen: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (seen) localStorage.setItem(CONFIGURE_CTA_SEEN_KEY, "1");
-    else localStorage.removeItem(CONFIGURE_CTA_SEEN_KEY);
-  } catch {
-    // storage may be full / disabled
-  }
-}
-
 const initial = loadPersistedUI();
 
 // Chakra's default `md` breakpoint is 48em — match that here so the
@@ -138,7 +106,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   syntaxHelpOpen: false,
   shortcutsHelpOpen: false,
   facetManagerOpen: false,
-  hasSeenConfigureCta: loadConfigureCtaSeen(),
 
   toggleSidebar: () => {
     // On mobile we don't touch the persisted desktop preference — the
@@ -179,10 +146,4 @@ export const useUIStore = create<UIState>((set, get) => ({
     set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
 
   setFacetManagerOpen: (open) => set({ facetManagerOpen: open }),
-
-  markConfigureCtaSeen: () => {
-    if (get().hasSeenConfigureCta) return;
-    set({ hasSeenConfigureCta: true });
-    persistConfigureCtaSeen(true);
-  },
 }));

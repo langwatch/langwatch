@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuColumns3, LuMoveHorizontal, LuSettings2 } from "react-icons/lu";
+import { LuColumns3, LuMoveHorizontal } from "react-icons/lu";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -63,8 +63,7 @@ export const ColumnEducationDialog: React.FC = () => {
             </Text>
             <Text textStyle="sm" color="fg.muted">
               To change which columns appear, use the <b>Columns</b>
-              dropdown in the toolbar or the floating <b>Configure</b>
-              button.
+              dropdown in the toolbar.
             </Text>
 
             {/* CSS-illustrated preview of the column picker. Tracks the
@@ -117,15 +116,6 @@ export const ColumnEducationDialog: React.FC = () => {
                 )}
               </VStack>
             </Box>
-
-            <HStack gap={2}>
-              <Icon as={LuSettings2} boxSize={4} color="blue.fg" />
-              <Text textStyle="xs" color="fg.muted">
-                Or click the floating <b>Configure</b> button at the
-                bottom of the table to manage facets and columns in one
-                place.
-              </Text>
-            </HStack>
 
             <Checkbox.Root
               checked={dontShowAgain}

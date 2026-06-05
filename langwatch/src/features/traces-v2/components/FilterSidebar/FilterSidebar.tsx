@@ -14,9 +14,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { PanelLeftClose } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, PanelLeftClose } from "lucide-react";
 import type React from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -116,6 +116,22 @@ export const FilterSidebar: React.FC = () => {
     (nextOpen: boolean) => setAllSectionsOpen(orderedKeys, nextOpen),
     [orderedKeys, setAllSectionsOpen],
   );
+
+  // Header-bar expand/collapse-all toggle. Mirror state locally so the
+  // icon flips between "expand" and "collapse" on each click without
+  // having to inspect per-section open state through the lens store
+  // (sections have a smart per-key default that the store doesn't
+  // explicitly record). First click expands all → flip to "collapse";
+  // next click collapses all → flip back. Resets to the conservative
+  // "expand" affordance whenever the user manually toggles a section
+  // back is *not* something we attempt to detect — the explicit button
+  // is for "do them all at once," not "track which mode I'm in."
+  const [allExpanded, setAllExpanded] = useState(false);
+  const handleToggleAll = useCallback(() => {
+    const next = !allExpanded;
+    setAllSectionsOpen(orderedKeys, next);
+    setAllExpanded(next);
+  }, [allExpanded, orderedKeys, setAllSectionsOpen]);
 
   const renderSection = useCallback(
     (
@@ -235,13 +251,12 @@ export const FilterSidebar: React.FC = () => {
         groups={orAnalysis.groups}
         containerRef={scrollAreaRef}
       />
-      {/* Manage-facets + collapse-sidebar buttons float in the
-          top-right corner instead of claiming a dedicated 28px row.
-          Audit feedback was that the dedicated row read as "wasted
-          space at the top of the sidebar"; floating it lets the
-          first section's title appear at the very top of the rail.
-          Both buttons have their own bg-tinted backdrop so they
-          stay legible over the section header text behind them. */}
+      {/* Floating header chrome: Configure (text), expand/collapse-all
+          toggle, and hide-sidebar. Painted with a tinted backdrop so it
+          stays legible over the first section's header text behind it.
+          The scroll area below adds compensating top padding so the
+          first section's own chrome (search icon + chevron) doesn't sit
+          underneath these buttons. */}
       <HStack
         position="absolute"
         top={1}
@@ -263,7 +278,30 @@ export const FilterSidebar: React.FC = () => {
           onResetAll={resetAllFacets}
           open={facetManagerOpen}
           onOpenChange={setFacetManagerOpen}
+          triggerLabel="Configure"
         />
+        <Tooltip
+          positioning={{ placement: "bottom" }}
+          content={
+            allExpanded ? "Collapse all sections" : "Expand all sections"
+          }
+        >
+          <IconButton
+            aria-label={
+              allExpanded ? "Collapse all sections" : "Expand all sections"
+            }
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            onClick={handleToggleAll}
+          >
+            {allExpanded ? (
+              <ChevronsDownUp size={14} />
+            ) : (
+              <ChevronsUpDown size={14} />
+            )}
+          </IconButton>
+        </Tooltip>
         <Tooltip
           positioning={{ placement: "bottom" }}
           content={
@@ -292,7 +330,13 @@ export const FilterSidebar: React.FC = () => {
           flexDirection: "column",
           overflowY: "auto",
           overflowX: "hidden",
-          paddingTop: 0,
+          // Reserve room above the first section for the floating
+          // header chrome (Configure + expand/collapse-all + hide).
+          // Without this, the first section's own header icons (search,
+          // chevron) overlap with the floating buttons, making either
+          // set hard to click. The 36px matches the visual height of
+          // the floating row at default density.
+          paddingTop: 36,
           // Reserve right-side gutter for OR connector lanes — one lane
           // per OR group, sized to match `OrConnectorOverlay`'s internal
           // LANE_WIDTH. With no OR groups the gutter collapses to zero

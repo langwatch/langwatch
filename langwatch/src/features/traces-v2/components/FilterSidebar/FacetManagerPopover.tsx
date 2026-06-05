@@ -118,12 +118,19 @@ interface FacetManagerPopoverProps {
   /**
    * Optional controlled-open prop. When set, the popover ignores its
    * internal `open` state and mirrors the caller's value (and reports
-   * changes via `onOpenChange`). Used by the floating Configure CTA so
-   * both the sidebar icon and the bottom-anchored button drive the
-   * same popover.
+   * changes via `onOpenChange`). Used so the sidebar's text trigger and
+   * any future external opener can drive the same popover instance.
    */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * When set, the popover renders a labelled text Button as its
+   * trigger instead of the default settings-icon IconButton. Drops the
+   * tooltip in this mode — the label itself explains the action. Used
+   * by the sidebar header where the new "Configure" CTA replaced the
+   * old floating bottom-right button.
+   */
+  triggerLabel?: string;
 }
 
 /**
@@ -157,6 +164,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
   onResetAll,
   open: controlledOpen,
   onOpenChange,
+  triggerLabel,
 }) => {
   // Controlled-or-uncontrolled hybrid: when the caller passes `open`
   // we treat it as the source of truth (so the floating Configure CTA
@@ -201,22 +209,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     [byGroup],
   );
 
-  return (
-    // Tooltip wraps a Box that *contains* the Popover — not the
-    // Popover.Trigger directly. Both `Tooltip` and `Popover.Trigger`
-    // use `asChild` ref forwarding under the hood, and when they
-    // stack on the same node they fight over the slot, leaving the
-    // popover with no measurable anchor (it lands at the viewport's
-    // top-left). Splitting the chains via a host Box gives each
-    // component its own ref target — Tooltip anchors to the Box,
-    // Popover anchors to the IconButton. Same pattern as
-    // CreateLensButton.
-    <Tooltip
-      positioning={{ placement: "bottom" }}
-      content="Choose which facets appear in the sidebar"
-      openDelay={300}
-    >
-      <Box display="inline-flex">
+  const popover = (
     <Popover.Root
       open={open}
       onOpenChange={(e) => {
@@ -239,14 +232,31 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
       unmountOnExit
     >
         <Popover.Trigger asChild>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            aria-label="Manage which facets appear in the sidebar"
-          >
-            <Settings2 size={14} />
-          </IconButton>
+          {triggerLabel ? (
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.subtle"
+              gap={1}
+              paddingX={1.5}
+              aria-label="Manage which facets appear in the sidebar"
+              _hover={{ color: "fg", bg: "bg.muted" }}
+            >
+              <Settings2 size={12} />
+              <Text textStyle="2xs" fontWeight="600">
+                {triggerLabel}
+              </Text>
+            </Button>
+          ) : (
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              color="fg.subtle"
+              aria-label="Manage which facets appear in the sidebar"
+            >
+              <Settings2 size={14} />
+            </IconButton>
+          )}
         </Popover.Trigger>
       <Popover.Content width="280px">
         <Popover.Body padding={0}>
@@ -409,7 +419,30 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
         </Popover.Body>
       </Popover.Content>
     </Popover.Root>
-      </Box>
+  );
+
+  // When the caller asked for the labelled text button we drop the
+  // tooltip — the label itself ("Configure") is the affordance, and
+  // wrapping it in a hover-revealed tooltip felt redundant. The
+  // icon-only path still gets the tooltip, since the Settings2 glyph
+  // on its own benefits from spelling out the action.
+  if (triggerLabel) return popover;
+  return (
+    // Tooltip wraps a Box that *contains* the Popover — not the
+    // Popover.Trigger directly. Both `Tooltip` and `Popover.Trigger`
+    // use `asChild` ref forwarding under the hood, and when they
+    // stack on the same node they fight over the slot, leaving the
+    // popover with no measurable anchor (it lands at the viewport's
+    // top-left). Splitting the chains via a host Box gives each
+    // component its own ref target — Tooltip anchors to the Box,
+    // Popover anchors to the IconButton. Same pattern as
+    // CreateLensButton.
+    <Tooltip
+      positioning={{ placement: "bottom" }}
+      content="Choose which facets appear in the sidebar"
+      openDelay={300}
+    >
+      <Box display="inline-flex">{popover}</Box>
     </Tooltip>
   );
 };

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, GripVertical, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Search } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
@@ -58,12 +58,12 @@ interface SidebarSectionProps {
    */
   orPeers?: readonly string[];
   /**
-   * When provided, a small "sliders" toggle renders just before the
-   * chevron in the section header. The handle's coloured-active style
-   * mirrors `open`; clicks call `onToggle`. Used by FacetSection to
-   * reveal the typed-value filter input only on demand — replaces the
-   * always-visible search row that took up a fixed slice of every
-   * section's vertical real estate.
+   * When provided, a small magnifying-glass toggle renders just before
+   * the chevron in the section header. `open` reflects whether the
+   * typed-value filter is currently revealed. Clicks call `onToggle`.
+   * If the section is collapsed when the user presses search, we
+   * expand it first so the input is actually visible — "find a value"
+   * implicitly means "look at the values."
    */
   searchToggleProps?: {
     open: boolean;
@@ -318,11 +318,21 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
+                // Pressing search on a collapsed section also expands
+                // it — otherwise the input toggles open behind a closed
+                // Collapsible and the user types into invisible chrome.
+                // We only auto-expand on the "opening" press; once
+                // search is up, a second press hides the input but
+                // leaves the section state alone (closing the section
+                // is the chevron's job).
+                if (!searchToggleProps.open && !effectiveOpen) {
+                  handleOpenChange(true);
+                }
                 searchToggleProps.onToggle();
               }}
             >
               <Icon boxSize="11px">
-                <SlidersHorizontal />
+                <Search />
               </Icon>
             </Box>
           )}
