@@ -20,6 +20,7 @@ import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
+import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
 
 export interface ToolEnv {
@@ -402,6 +403,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         `langwatch: wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
       );
     }
+
+    // Path B only: offer to persist the OTLP telemetry exports so a future
+    // plain `<tool>` (without the langwatch wrapper) captures
+    // automatically. Gated on ingestion mode + opt-out remembered. Runs
+    // BEFORE spawn so the prompt still owns stdin.
+    await maybeOfferIngestionShellRcPersist({
+      cfg,
+      tool,
+      vars: modeResult.vars,
+    });
   }
 
   // Scrub conflicting twins from the inherited parent env BEFORE merging

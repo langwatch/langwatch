@@ -29,7 +29,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline";
 
-import type { GovernanceConfig } from "./config";
+import chalk from "chalk";
+
+import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./wrapper";
 
 /** Wrapped tools included in the union'd export block. */
@@ -184,4 +186,74 @@ export async function askPersistChoice(
   if (norm === "" || norm === "y" || norm === "yes") return "yes";
   if (norm === "never") return "never";
   return "no";
+}
+
+/**
+ * Ingestion-mode (Path B) variant of the shell-rc persist offer. Called
+ * by the `langwatch <tool>` wrapper AFTER it resolves to ingestion mode,
+ * so the user can install the tool's OTLP telemetry exports into their
+ * shell rc. Once persisted, a plain `<tool>` invocation (without the
+ * `langwatch` wrapper) inherits the OTEL_EXPORTER_OTLP_* env and captures
+ * automatically — which is the whole point of "installing" the telemetry.
+ *
+ * Unlike the login-time gateway offer, this persists the exact OTEL env
+ * the wrapper just computed for this run (`vars`), not the gateway block.
+ * Y / n / never, same `shell_rc_preference=skip` opt-out. Stays quiet when
+ * the shell already has the OTLP exporter env set.
+ */
+export async function maybeOfferIngestionShellRcPersist({
+  cfg,
+  tool,
+  vars,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  vars: Record<string, string>;
+}): Promise<void> {
+  if (cfg.shell_rc_preference === "skip") return;
+  // Already wired up — the OTLP exporter env is present in this shell.
+  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
+  const shell = detectShell();
+  if (!shell) return;
+  const entries = Object.entries(vars);
+  if (entries.length === 0) return;
+
+  const fmt =
+    shell === "fish"
+      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
+      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
+  const block = entries.map(fmt).join("\n");
+
+  const target = rcPath(shell);
+  console.log();
+  console.log(
+    chalk.gray(
+      `  Install telemetry so a plain \`${tool}\` (without \`langwatch\`) captures automatically.`,
+    ),
+  );
+  const choice = await askPersistChoice(target);
+  if (choice === "skip" || choice === "no") return;
+  if (choice === "never") {
+    cfg.shell_rc_preference = "skip";
+    try {
+      saveConfig(cfg);
+    } catch {
+      // best effort
+    }
+    return;
+  }
+  // "yes"
+  try {
+    const wrote = persistBlockToRc(shell, block);
+    console.log(
+      chalk.green(`  ✓ Installed langwatch telemetry exports to ${wrote}`),
+    );
+    console.log(
+      chalk.gray(`  Open a new shell or run \`source ${wrote}\` to load it.`),
+    );
+  } catch (err) {
+    console.log(
+      chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`),
+    );
+  }
 }

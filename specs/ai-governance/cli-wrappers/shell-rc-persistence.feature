@@ -1,67 +1,85 @@
-Feature: Persist the langwatch export block to the user's shell rc file
-  After `langwatch login` succeeds, the CLI offers to persist the
-  union export block (one block covering claude, codex, cursor,
-  gemini, opencode) to the user's shell rc file so a brand new shell
-  auto-picks up the gateway + OTLP env vars and the developer can
-  invoke `claude`, `codex`, `cursor`, `gemini`, or `opencode`
-  directly — without the `langwatch <tool>` wrapper prefix — on
-  every subsequent session.
+Feature: Persist the OTLP telemetry exports to the user's shell rc file
+  `langwatch login` is auth-only: it never prompts to edit the shell rc,
+  because the device session is already authoritative in config.json.
 
-  As a developer who just signed into LangWatch through the device
-  flow, I want the export block written to my shell rc once,
-  idempotently, with an explicit prompt so I can decline (or decline
-  permanently) when I don't want it.
+  The shell-rc persist offer instead fires from the `langwatch <tool>`
+  wrapper, and ONLY when the tool resolves to Path B (ingestion / direct
+  OTLP). At that point the wrapper has computed the tool's OTEL_EXPORTER_*
+  env, and offers to install it into the shell rc so a plain `<tool>`
+  invocation (without the `langwatch` prefix) inherits the exporter env and
+  captures telemetry automatically on every subsequent session.
+
+  As a developer running `langwatch claude` over a subscription (Path B),
+  I want to optionally install the telemetry exports once, idempotently,
+  with an explicit prompt so I can decline (or decline permanently).
 
   Background:
     Given the langwatch CLI is installed
-    And the user has just completed `langwatch login --device`
+    And the user has signed in with `langwatch login`
+
+  Rule: login itself never prompts to persist the shell rc
+
+    Scenario: `langwatch login` is auth-only
+      When `langwatch login` completes
+      Then the CLI does NOT prompt to persist a shell rc block
+      And no edit is made to ~/.zshrc / ~/.bashrc / fish config
+
+  Rule: the offer fires from the wrapper only in ingestion mode
+
+    Scenario: Gateway mode does not offer to persist telemetry exports
+      Given `langwatch claude` resolves to gateway mode (Path A)
+      When the wrapper finishes setting up
+      Then the CLI does NOT prompt to persist a shell rc block
+
+    Scenario: Ingestion mode offers to install the telemetry exports
+      Given `langwatch claude` resolves to ingestion mode (Path B)
+      And the shell does not already export OTEL_EXPORTER_OTLP_ENDPOINT
+      When the wrapper finishes setting up
+      Then the CLI offers to install the telemetry exports into the shell rc
+      And the prompt is framed as installing telemetry so a plain `claude`
+        captures automatically next time
 
   Rule: The prompt only fires when the shell isn't already configured
 
-    Scenario: Skip the prompt when the export block is already sourced
-      Given the user's current shell has both ANTHROPIC_BASE_URL
-        and ANTHROPIC_AUTH_TOKEN exported
-      When `langwatch login` completes
+    Scenario: Skip the prompt when the OTLP exporter env is already set
+      Given the user's current shell already exports OTEL_EXPORTER_OTLP_ENDPOINT
+      When `langwatch claude` resolves to ingestion mode
       Then the CLI does NOT prompt to persist the shell rc block
-      And no edit is made to ~/.zshrc / ~/.bashrc / fish config
 
     Scenario: Skip the prompt when the user previously chose "never"
       Given the langwatch config carries `shell_rc_preference: "skip"`
-      When `langwatch login` completes
+      When `langwatch claude` resolves to ingestion mode
       Then the CLI does NOT prompt
-      And no edit is made to ~/.zshrc / ~/.bashrc / fish config
 
   Rule: The prompt is Y / n / never
 
-    Scenario: Accept Y — write the block once
+    Scenario: Accept Y — install the exports once
       Given the user is on zsh
       And ~/.zshrc does not yet contain the langwatch block
-      When `langwatch login` completes
+      When `langwatch claude` resolves to ingestion mode
       And the user types "y" at the persistence prompt
       Then ~/.zshrc gains a block bracketed by
         "# >>> langwatch begin >>>" and "# <<< langwatch end <<<"
-      And the block exports ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN,
-        OPENAI_BASE_URL, OPENAI_API_KEY, GOOGLE_GEMINI_BASE_URL,
-        GEMINI_API_KEY, and the OTLP env vars
-      And opening a fresh shell sources these vars without re-running
-        `langwatch <tool>`
+      And the block exports the OTEL_EXPORTER_OTLP_* telemetry env vars
+      And opening a fresh shell sources these vars so a plain `claude`
+        captures without re-running `langwatch claude`
 
-    Scenario: Decline "n" — re-prompt next login
+    Scenario: Decline "n" — re-prompt next run
       Given ~/.zshrc does not contain the langwatch block
-      When `langwatch login` completes
+      When `langwatch claude` resolves to ingestion mode
       And the user types "n" at the persistence prompt
       Then ~/.zshrc is unchanged
       And `shell_rc_preference` remains unset
-      When the user runs `langwatch login` again later
+      When the user runs `langwatch claude` in ingestion mode again later
       Then the persistence prompt re-appears
 
     Scenario: Decline "never" — silence the prompt forever on this machine
       Given ~/.zshrc does not contain the langwatch block
-      When `langwatch login` completes
+      When `langwatch claude` resolves to ingestion mode
       And the user types "never" at the persistence prompt
       Then the langwatch config persists `shell_rc_preference: "skip"`
       And ~/.zshrc is unchanged
-      When the user runs `langwatch login` again later
+      When the user runs `langwatch claude` in ingestion mode again later
       Then the persistence prompt does NOT re-appear
 
   Rule: Re-running persistence is idempotent
@@ -69,10 +87,10 @@ Feature: Persist the langwatch export block to the user's shell rc file
     Scenario: Second persist run replaces the existing block, no duplicates
       Given ~/.zshrc already contains one langwatch block from a
         previous run
-      When `langwatch login` completes and the user types "y" again
+      When the user types "y" at the persistence prompt again
       Then ~/.zshrc still contains exactly one block bracketed by
         the begin/end markers
-      And the block reflects the latest set of wrapped tools
+      And the block reflects the latest telemetry exports
 
   Rule: Shell detection covers zsh, bash, and fish
 
@@ -90,5 +108,5 @@ Feature: Persist the langwatch export block to the user's shell rc file
     Scenario: Unsupported shells skip silently
       Given the user's $SHELL points at an unsupported shell
         (cmd, powershell, nushell, etc.)
-      When `langwatch login` completes
+      When `langwatch claude` resolves to ingestion mode
       Then the persistence flow is skipped entirely with no error
