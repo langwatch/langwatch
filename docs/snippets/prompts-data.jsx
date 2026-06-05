@@ -720,6 +720,36 @@ audio_effects=[
 ]
 \`\`\`
 
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
 The default \`UserSimulatorAgent\` system prompt encodes a text-chat style ("very short inputs, few words, all lowercase, like talking to chatgpt") which TTS-renders robotic. Always nudge the persona toward natural spoken sentences:
@@ -834,7 +864,7 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -886,6 +916,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
@@ -2548,6 +2637,36 @@ audio_effects=[
 ]
 \`\`\`
 
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
 The default \`UserSimulatorAgent\` system prompt encodes a text-chat style ("very short inputs, few words, all lowercase, like talking to chatgpt") which TTS-renders robotic. Always nudge the persona toward natural spoken sentences:
@@ -2662,7 +2781,7 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -2714,6 +2833,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
@@ -3963,6 +4141,36 @@ audio_effects=[
 ]
 \`\`\`
 
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
 The default \`UserSimulatorAgent\` system prompt encodes a text-chat style ("very short inputs, few words, all lowercase, like talking to chatgpt") which TTS-renders robotic. Always nudge the persona toward natural spoken sentences:
@@ -4077,7 +4285,7 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -4129,6 +4337,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
