@@ -1,4 +1,4 @@
-import type { Group, GroupMembership, PrismaClient, RoleBinding } from "@prisma/client";
+import { RoleBindingScopeType, type Group, type GroupMembership, type PrismaClient, type RoleBinding } from "@prisma/client";
 import type {
   CreateBindingInput,
   CreateGroupInput,
@@ -210,6 +210,35 @@ export class PrismaGroupRepository implements GroupRepository {
       select: { userId: true },
     });
     return !!member;
+  }
+
+  async validateScopeInOrganization({
+    organizationId,
+    scopeType,
+    scopeId,
+  }: {
+    organizationId: string;
+    scopeType: RoleBindingScopeType;
+    scopeId: string;
+  }): Promise<boolean> {
+    if (scopeType === RoleBindingScopeType.ORGANIZATION) {
+      return scopeId === organizationId;
+    }
+    if (scopeType === RoleBindingScopeType.TEAM) {
+      const team = await this.prisma.team.findFirst({
+        where: { id: scopeId, organizationId },
+        select: { id: true },
+      });
+      return !!team;
+    }
+    if (scopeType === RoleBindingScopeType.PROJECT) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: scopeId, team: { organizationId } },
+        select: { id: true },
+      });
+      return !!project;
+    }
+    return false;
   }
 
   async findUniqueSlug({

@@ -119,6 +119,12 @@ export interface GroupRepository {
     organizationId: string;
   }): Promise<boolean>;
 
+  validateScopeInOrganization(params: {
+    organizationId: string;
+    scopeType: RoleBindingScopeType;
+    scopeId: string;
+  }): Promise<boolean>;
+
   findUniqueSlug(params: {
     organizationId: string;
     baseSlug: string;

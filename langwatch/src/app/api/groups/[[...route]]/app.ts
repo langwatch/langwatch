@@ -12,6 +12,7 @@ import {
   GroupNotFoundError,
   GroupRestService,
   ScimManagedGroupError,
+  ScopeNotInOrganizationError,
   UserNotInOrganizationError,
 } from "~/server/app-layer/groups/group.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -435,6 +436,9 @@ secured
       } catch (error) {
         if (error instanceof GroupNotFoundError) {
           throw new NotFoundError(error.message);
+        }
+        if (error instanceof ScopeNotInOrganizationError) {
+          throw new BadRequestError(error.message);
         }
         throw error;
       }

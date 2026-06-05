@@ -35,6 +35,10 @@ export class DuplicateMemberError extends Error {
   name = "DuplicateMemberError" as const;
 }
 
+export class ScopeNotInOrganizationError extends Error {
+  name = "ScopeNotInOrganizationError" as const;
+}
+
 export class GroupRestService {
   constructor(readonly repo: GroupRepository) {}
 
@@ -239,6 +243,17 @@ export class GroupRestService {
       organizationId,
     });
     if (!group) throw new GroupNotFoundError("Group not found");
+
+    const scopeValid = await this.repo.validateScopeInOrganization({
+      organizationId,
+      scopeType,
+      scopeId,
+    });
+    if (!scopeValid) {
+      throw new ScopeNotInOrganizationError(
+        "Scope does not belong to this organization",
+      );
+    }
 
     return this.repo.createBinding({
       id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
