@@ -363,12 +363,18 @@ export function useFilterEditor({
             );
             // Dynamic value-mode rows have no group (values aren't grouped)
             // and aren't prefix entries — wrap the bare strings into the
-            // SuggestionRow shape that the dropdown renderer now expects.
+            // SuggestionRow shape that the dropdown renderer expects.
+            // `label` carries the human-readable name when the resolver
+            // emitted one (evaluator: "Faithfulness" for the id
+            // "ragas/faithfulness"); the dropdown renders the label as
+            // the primary row and the raw id as a muted secondary line.
+            // Without this the dropdown only ever showed ids, which is
+            // what the operator was complaining about for evaluators.
             next = {
               state: base.state,
               items: dynamic.items.map((value) => ({
                 value,
-                label: value,
+                label: dynamic.labels?.[value] ?? value,
                 group: null,
               })),
               itemCounts: dynamic.counts,

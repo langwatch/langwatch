@@ -239,6 +239,14 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
     state.mode === "field" && !row.isPrefix
       ? SEARCH_FIELDS[row.value]
       : undefined;
+  // In value-mode, when the row carries a human-readable label (e.g.
+  // evaluator name "Faithfulness") that differs from the raw id
+  // (`ragas/faithfulness`), surface the id as a muted hint after the
+  // label so the operator knows what's actually going into the query.
+  // The id is the canonical document value; the label is just the
+  // display overlay.
+  const idHint =
+    state.mode === "value" && row.label !== row.value ? row.value : null;
 
   return (
     <chakra.button
@@ -270,6 +278,18 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
             </Text>
           )}
         </Text>
+        {idHint && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            truncate
+            minWidth={0}
+            flexShrink={1}
+          >
+            {idHint}
+          </Text>
+        )}
         {fieldMeta && <FieldMetaSummary meta={fieldMeta} />}
         {row.isPrefix && (
           <Badge
