@@ -229,11 +229,18 @@ function StatusChip({
 
   const jumpToSpan = useCallback(
     (spanId: string) => {
-      // Land on the span detail tab — `selectSpan` flips activeTab to
-      // "span" internally, so we just ensure trace mode here. The
-      // accordion-side focus-glow observer on SpanAccordions will catch
-      // the follow-up `requestFocus({section: "exceptions"})` fired by
-      // ExceptionsContent and pulse the span's own Exceptions section.
+      // Land on the trace pane with the span selected. `setViewMode`
+      // flips the drawer to the trace-pane layout (PaneLayout); the
+      // SpanDetailPane mounts because `selectedSpanId` is now set, and
+      // the SpanTabBar highlights the selected span. The accordion-side
+      // focus-glow observer on SpanAccordions catches the follow-up
+      // `requestFocus({section: "exceptions"})` fired by
+      // ExceptionsContent and pulses the span's own Exceptions section.
+      //
+      // When the spanTree query is still in flight we'd previously fall
+      // through to the trace summary view; TraceAccordions now renders
+      // a span-shaped skeleton in that window so the jump reads as
+      // "landed, waiting for data" rather than "jump didn't take."
       setViewMode("trace");
       selectSpan(spanId);
     },

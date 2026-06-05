@@ -106,6 +106,7 @@ export const SpanDetailPane = memo(function SpanDetailPane({
               spans={spans}
               selectedSpan={selectedSpan}
               activeTab="span"
+              selectedSpanId={selectedSpanId}
               onSelectSpan={selectSpan}
             />
           </IsolatedErrorBoundary>
