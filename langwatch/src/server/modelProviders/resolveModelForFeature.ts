@@ -1,18 +1,11 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
-import {
-  featureByKey,
-  type FeatureDescriptor,
-} from "./featureRegistry";
+import { type FeatureDescriptor, featureByKey } from "./featureRegistry";
 import { expandLatestAlias, isLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
 export type ResolutionSource = "feature_override" | "role_default";
-export type ResolutionScope =
-  | "project"
-  | "team"
-  | "organization"
-  | null;
+export type ResolutionScope = "project" | "team" | "organization" | null;
 
 export interface Resolution {
   model: string;
@@ -140,14 +133,20 @@ function tierForConfig(
   // specific project), prefer the most specific one when picking the
   // "scope" attribute we surface back to callers.
   const types = new Set(config.scopeTiersHere.map((s) => s.scopeType));
-  if (types.has("PROJECT") && config.scopeTiersHere.some(
-    (s) => s.scopeType === "PROJECT" && s.scopeId === chain.projectId,
-  )) {
+  if (
+    types.has("PROJECT") &&
+    config.scopeTiersHere.some(
+      (s) => s.scopeType === "PROJECT" && s.scopeId === chain.projectId,
+    )
+  ) {
     return "project";
   }
-  if (types.has("TEAM") && config.scopeTiersHere.some(
-    (s) => s.scopeType === "TEAM" && s.scopeId === chain.teamId,
-  )) {
+  if (
+    types.has("TEAM") &&
+    config.scopeTiersHere.some(
+      (s) => s.scopeType === "TEAM" && s.scopeId === chain.teamId,
+    )
+  ) {
     return "team";
   }
   if (types.has("ORGANIZATION")) {
@@ -156,10 +155,7 @@ function tierForConfig(
   return null;
 }
 
-function readKey(
-  config: Record<string, unknown>,
-  key: string,
-): string | null {
+function readKey(config: Record<string, unknown>, key: string): string | null {
   const v = config[key];
   return typeof v === "string" && v.length > 0 ? v : null;
 }
@@ -296,7 +292,12 @@ export async function findAlternateBelowScope(
       if (value) {
         const expanded = expandLatestAlias(value);
         if (isLatestAlias(value) && expanded === value) continue;
-        return { model: expanded, source: "feature_override", scope: tier, feature };
+        return {
+          model: expanded,
+          source: "feature_override",
+          scope: tier,
+          feature,
+        };
       }
     }
     for (const c of tierConfigs) {
@@ -304,7 +305,12 @@ export async function findAlternateBelowScope(
       if (value) {
         const expanded = expandLatestAlias(value);
         if (isLatestAlias(value) && expanded === value) continue;
-        return { model: expanded, source: "role_default", scope: tier, feature };
+        return {
+          model: expanded,
+          source: "role_default",
+          scope: tier,
+          feature,
+        };
       }
     }
   }

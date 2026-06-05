@@ -4,28 +4,37 @@
  *
  * We also create a few inference helpers for input and output types.
  */
-import {
-  createWSClient,
-  httpBatchLink,
-  httpLink,
-  loggerLink,
-  splitLink,
-  TRPCClientError,
-  createTRPCClient,
-  wsLink,
-} from "@trpc/client";
-import { createTRPCReact } from "@trpc/react-query";
+
 import {
   MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import {
+  createTRPCClient,
+  createWSClient,
+  httpBatchLink,
+  httpLink,
+  loggerLink,
+  splitLink,
+  TRPCClientError,
+  wsLink,
+} from "@trpc/client";
+import { createTRPCReact } from "@trpc/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
+import { type ReactNode, useState } from "react";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
+import {
+  showAiCallFailedToast,
+  showMissingModelToast,
+  showProviderDisabledToast,
+} from "../components/MissingModelToast";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { sseLink } from "./sseLink";
 import {
+  extractAiCallFailedInfo,
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
   extractMissingModelInfo,
@@ -35,14 +44,6 @@ import {
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
 } from "./trpcError";
-import {
-  showAiCallFailedToast,
-  showMissingModelToast,
-  showProviderDisabledToast,
-} from "../components/MissingModelToast";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { extractAiCallFailedInfo } from "./trpcError";
-import { useState, type ReactNode } from "react";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -237,9 +238,8 @@ function createQueryClientConfig() {
           }
           showProviderDisabledToast({
             ...providerDisabledInfo,
-            onSwapToAlternate: providerDisabledSwapHandler(
-              providerDisabledInfo,
-            ),
+            onSwapToAlternate:
+              providerDisabledSwapHandler(providerDisabledInfo),
           });
         }
         // Non-license/non-restriction errors bubble up to component-level handlers
@@ -276,9 +276,8 @@ function createQueryClientConfig() {
           }
           showProviderDisabledToast({
             ...providerDisabledInfo,
-            onSwapToAlternate: providerDisabledSwapHandler(
-              providerDisabledInfo,
-            ),
+            onSwapToAlternate:
+              providerDisabledSwapHandler(providerDisabledInfo),
           });
         }
       },
@@ -327,12 +326,14 @@ export const trpcClient = createTRPCClient<AppRouter>({
  * Provides QueryClient and tRPC client to the React tree.
  */
 export function TRPCProvider({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient(createQueryClientConfig()));
+  const [queryClient] = useState(
+    () => new QueryClient(createQueryClientConfig()),
+  );
   const [trpcClientInstance] = useState(() =>
     api.createClient({
       links: createTRPCLinks(),
       transformer: superjson,
-    })
+    }),
   );
 
   return (

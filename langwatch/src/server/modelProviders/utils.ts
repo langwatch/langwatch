@@ -29,7 +29,7 @@ import {
 export const getVercelAIModel = async (
   projectId: string,
   model?: string,
-  featureKey: string = "prompt.create_default",
+  featureKey = "prompt.create_default",
 ) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },

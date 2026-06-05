@@ -30,7 +30,10 @@ import {
   MenuTrigger,
 } from "../../../../components/ui/menu";
 import { toaster } from "../../../../components/ui/toaster";
-import { LENS_CAPABILITIES, type LensColumnOption } from "../../lens/capabilities";
+import {
+  LENS_CAPABILITIES,
+  type LensColumnOption,
+} from "../../lens/capabilities";
 import { useViewStore } from "../../stores/viewStore";
 
 // Section ordering within the dropdown. Sections discovered on the
@@ -293,8 +296,14 @@ const SortableVisibleColumnRow: React.FC<SortableVisibleColumnRowProps> = ({
   onMoveDown,
   onRemove,
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: column.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
   return (
     <HStack
       ref={setNodeRef}

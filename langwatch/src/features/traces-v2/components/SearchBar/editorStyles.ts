@@ -89,9 +89,10 @@ export const editorStyles: SystemStyleObject = {
   // covers the case where the hover happens over the X-button half of
   // the pill, so the overlay drops there too — otherwise the user would
   // see "label, label, X" and "label, ID, X" inconsistently.
-  "& .filter-token[data-filter-chip-label]:hover::after, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)::after": {
-    opacity: 0,
-  },
+  "& .filter-token[data-filter-chip-label]:hover::after, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)::after":
+    {
+      opacity: 0,
+    },
   // Field name was unrecognised (typo, removed key) — still parses as a
   // tag but the rest of the platform won't filter on it. A warning tint
   // makes that visible without rejecting the query outright.

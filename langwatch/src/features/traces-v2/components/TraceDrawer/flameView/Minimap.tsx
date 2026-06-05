@@ -177,11 +177,7 @@ export function Minimap({
           >
             Overview
           </Text>
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            lineHeight={1}
-          >
+          <Text textStyle="2xs" color="fg.subtle" lineHeight={1}>
             {formatDuration(fullDur)}
           </Text>
         </Flex>

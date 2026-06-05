@@ -2,7 +2,6 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
-import NextLink from "~/utils/compat/next-link";
 import React, { useCallback, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
@@ -14,6 +13,7 @@ import {
 } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import NextLink from "~/utils/compat/next-link";
 import { aiBrandPalette } from "./aiBrandPalette";
 
 // Slow, breathing halo that cycles through the brand palette so the
@@ -186,8 +186,8 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
               Ask AI uses your own model provider keys to translate plain
               English into trace queries — &ldquo;errors yesterday from
-              service-x&rdquo;, &ldquo;slow checkout traces with eval
-              scores under 0.5&rdquo;. Add a provider to unlock it.
+              service-x&rdquo;, &ldquo;slow checkout traces with eval scores
+              under 0.5&rdquo;. Add a provider to unlock it.
             </Text>
             <NextLink
               href="/settings/model-providers"

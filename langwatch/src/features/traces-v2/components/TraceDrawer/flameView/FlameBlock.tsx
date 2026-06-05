@@ -74,10 +74,7 @@ export function FlameBlock({
   // palettes in light mode; everything else stays the saturated
   // white-on-colour treatment.
   const isLowContrastPalette = color === "gray.solid";
-  const depthAlpha = Math.max(
-    DEPTH_FADE_FLOOR,
-    1 - depth * DEPTH_FADE_STEP,
-  );
+  const depthAlpha = Math.max(DEPTH_FADE_FLOOR, 1 - depth * DEPTH_FADE_STEP);
   const isError = span.status === "error";
   const isSelected = span.spanId === selectedSpanId;
   const isHovered = span.spanId === hoveredSpanId;
@@ -210,7 +207,9 @@ export function FlameBlock({
           // instead because grey.solid at 85% alpha is too pale for
           // white text — dark mode stays white because the canvas
           // already pushes the fill into a dark band.
-          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
+          color={
+            isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"
+          }
           truncate
           lineHeight={1}
           // Dark drop-shadow lifts white text off the saturated fills.

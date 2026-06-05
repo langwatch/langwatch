@@ -31,8 +31,6 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
-import { OverflowMenu } from "../shared/OverflowMenu";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
 // so cursors render anywhere a peer's cursor lands in the drawer — the
@@ -47,10 +45,12 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
-import { NewSpanFlash } from "./NewSpanFlash";
+import { OverflowMenu } from "../shared/OverflowMenu";
 import { FlameView } from "./flameView";
+import { NewSpanFlash } from "./NewSpanFlash";
 import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
 import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
 import { WaterfallView } from "./waterfallView";
@@ -254,10 +254,6 @@ export function VizPlaceholder({
   });
 
   const [height, setHeight] = useState(getStoredHeight);
-  const [spanListSearch, setSpanListSearch] = useState("");
-  const [spanListTypeFilter, setSpanListTypeFilter] = useState<
-    string | undefined
-  >();
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
@@ -470,10 +466,7 @@ export function VizPlaceholder({
                     onClick={() => handleVizTabChange(tab.value)}
                     fontWeight={isActive ? "600" : "500"}
                   >
-                    <VizTabContent
-                      tab={tab}
-                      traceId={trace?.traceId ?? null}
-                    />
+                    <VizTabContent tab={tab} traceId={trace?.traceId ?? null} />
                   </Flex>
                 </Tooltip>
               );
@@ -484,20 +477,18 @@ export function VizPlaceholder({
                 = appendix to the rightmost tab". */}
             <Box flex={1} minWidth={0} />
             <OverflowMenu
-              items={TABS.filter((t) => hiddenTabIds.has(t.value)).map(
-                (t) => ({
-                  id: t.value,
-                  label: t.label,
-                  // Mirror the in-row tab rendering so the dropdown row
-                  // carries the same icon + label + shortcut + presence
-                  // dot the user would have seen on the tab itself.
-                  content: (
-                    <HStack gap={1.5} flex={1} color={`${t.palette}.fg`}>
-                      <VizTabContent tab={t} traceId={trace?.traceId ?? null} />
-                    </HStack>
-                  ),
-                }),
-              )}
+              items={TABS.filter((t) => hiddenTabIds.has(t.value)).map((t) => ({
+                id: t.value,
+                label: t.label,
+                // Mirror the in-row tab rendering so the dropdown row
+                // carries the same icon + label + shortcut + presence
+                // dot the user would have seen on the tab itself.
+                content: (
+                  <HStack gap={1.5} flex={1} color={`${t.palette}.fg`}>
+                    <VizTabContent tab={t} traceId={trace?.traceId ?? null} />
+                  </HStack>
+                ),
+              }))}
               activeId={vizTab}
               onSelect={(id) => handleVizTabChange(id as VizTab)}
               ariaLabel="Show more viz tabs"

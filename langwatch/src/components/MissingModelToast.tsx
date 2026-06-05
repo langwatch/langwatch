@@ -168,10 +168,7 @@ export function providerDisabledToastId(info: ProviderDisabledInfo): string {
   return `provider-disabled:${info.role}:${info.featureKey}:${info.resolvedScope}`;
 }
 
-const SCOPE_LABEL: Record<
-  ProviderDisabledInfo["resolvedScope"],
-  string
-> = {
+const SCOPE_LABEL: Record<ProviderDisabledInfo["resolvedScope"], string> = {
   project: "project",
   team: "team",
   organization: "organization",

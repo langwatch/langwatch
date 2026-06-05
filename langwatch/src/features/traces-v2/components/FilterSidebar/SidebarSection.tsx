@@ -291,11 +291,9 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
             flexShrink={0}
             color="fg.subtle"
           >
-            {!effectiveOpen &&
-              valueCount !== undefined &&
-              valueCount > 0 && (
-                <Text textStyle="2xs">{valueCount}</Text>
-              )}
+            {!effectiveOpen && valueCount !== undefined && valueCount > 0 && (
+              <Text textStyle="2xs">{valueCount}</Text>
+            )}
           </Box>
           {/* The chevron and search toggle render as siblings of the
               Collapsible.Trigger (not inside it) so the search button
@@ -385,9 +383,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               popover can drive the same store action. */}
         </HStack>
 
-        {pinnedContent && (
-          <Box marginTop={1}>{pinnedContent}</Box>
-        )}
+        {pinnedContent && <Box marginTop={1}>{pinnedContent}</Box>}
 
         <Collapsible.Content>
           <Box marginTop={pinnedContent ? 0 : 1}>{children}</Box>

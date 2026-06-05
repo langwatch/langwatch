@@ -1,13 +1,10 @@
-import { type ModelMessage, generateObject, generateText } from "ai";
+import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import {
-  FIELD_VALUES,
-  SEARCH_FIELDS,
-} from "./query-language/metadata";
+import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
@@ -108,7 +105,11 @@ export async function generateTraceQueryFromPrompt(
   const systemPrompt = buildSystemPrompt(fieldsBlock);
   const messages: ModelMessage[] = [{ role: "user", content: input.prompt }];
 
-  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
+  const model = await getVercelAIModel(
+    input.projectId,
+    undefined,
+    "traces.ai_search",
+  );
 
   let lastQuery = "";
   let lastError = "Unknown error";
@@ -191,7 +192,11 @@ export async function generateTraceAction(
   const fieldsBlock = await buildFieldsBlock(input);
   const systemPrompt = buildActionSystemPrompt(fieldsBlock);
 
-  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
+  const model = await getVercelAIModel(
+    input.projectId,
+    undefined,
+    "traces.ai_search",
+  );
 
   let lastError = "Unknown error";
   let lastQuery = "";
@@ -271,7 +276,8 @@ export async function generateTraceAction(
     ok: false,
     error: {
       code: "validation_error",
-      message: "AI's reply didn't match the trace query syntax. Try rephrasing.",
+      message:
+        "AI's reply didn't match the trace query syntax. Try rephrasing.",
       details: { reason: lastError, lastQuery },
     },
   };
@@ -304,13 +310,12 @@ function summarizeProviderError(err: unknown): AiActionError {
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider = providerMatch
-    ? providerMatch[1].toLowerCase()
-    : undefined;
+  const provider = providerMatch ? providerMatch[1].toLowerCase() : undefined;
 
   const modelMatch =
-    cleaned.match(/model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i) ??
-    cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
+    cleaned.match(
+      /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
+    ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
   const model = modelMatch ? modelMatch[1] : undefined;
 
   const reasonMatch =

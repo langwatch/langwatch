@@ -231,33 +231,33 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
       lazyMount
       unmountOnExit
     >
-        <Popover.Trigger asChild>
-          {triggerLabel ? (
-            <Button
-              size="2xs"
-              variant="ghost"
-              color="fg.subtle"
-              gap={1}
-              paddingX={1.5}
-              aria-label="Manage which facets appear in the sidebar"
-              _hover={{ color: "fg", bg: "bg.muted" }}
-            >
-              <Settings2 size={12} />
-              <Text textStyle="2xs" fontWeight="600">
-                {triggerLabel}
-              </Text>
-            </Button>
-          ) : (
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color="fg.subtle"
-              aria-label="Manage which facets appear in the sidebar"
-            >
-              <Settings2 size={14} />
-            </IconButton>
-          )}
-        </Popover.Trigger>
+      <Popover.Trigger asChild>
+        {triggerLabel ? (
+          <Button
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            gap={1}
+            paddingX={1.5}
+            aria-label="Manage which facets appear in the sidebar"
+            _hover={{ color: "fg", bg: "bg.muted" }}
+          >
+            <Settings2 size={12} />
+            <Text textStyle="2xs" fontWeight="600">
+              {triggerLabel}
+            </Text>
+          </Button>
+        ) : (
+          <IconButton
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            aria-label="Manage which facets appear in the sidebar"
+          >
+            <Settings2 size={14} />
+          </IconButton>
+        )}
+      </Popover.Trigger>
       <Popover.Content width="280px">
         <Popover.Body padding={0}>
           <VStack align="stretch" gap={0}>

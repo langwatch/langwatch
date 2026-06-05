@@ -156,7 +156,8 @@ function tagClassName({
   // Unknown field — the query parses, but no part of the platform knows
   // how to filter on it. Yellow/dashed treatment makes the typo obvious
   // before the user submits and gets zero rows.
-  if (!isKnownField(fieldName)) return "filter-token filter-token-unknown-field";
+  if (!isKnownField(fieldName))
+    return "filter-token filter-token-unknown-field";
   if (negated) return "filter-token filter-token-exclude";
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
@@ -489,7 +490,7 @@ function computeDecorations(
       if (slot.opLoc) {
         attrs["data-filter-op-start"] = String(slot.opLoc.start);
         attrs["data-filter-op-end"] = String(slot.opLoc.end);
-        attrs["title"] = "Click to switch AND ↔ OR";
+        attrs.title = "Click to switch AND ↔ OR";
       }
       if (slot.chipToken) {
         attrs["data-filter-chip-start"] = String(slot.chipToken.start);

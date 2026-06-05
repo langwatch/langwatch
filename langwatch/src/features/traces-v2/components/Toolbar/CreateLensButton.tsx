@@ -88,27 +88,27 @@ export const CreateLensButton: React.FC = () => {
               </Button>
             </PopoverTrigger>
             <PopoverContent width="280px">
-          <PopoverBody>
-            <Stack gap={3}>
-              <HStack gap={2}>
-                <Input
-                  autoFocus
-                  size="sm"
-                  placeholder="Lens name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-                <Button
-                  size="sm"
-                  colorPalette="blue"
-                  onClick={submitQuick}
-                  disabled={!name.trim()}
-                >
-                  Create
-                </Button>
-              </HStack>
-              {/* "Configure columns, sort, and more…" link retired in
+              <PopoverBody>
+                <Stack gap={3}>
+                  <HStack gap={2}>
+                    <Input
+                      autoFocus
+                      size="sm"
+                      placeholder="Lens name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                    />
+                    <Button
+                      size="sm"
+                      colorPalette="blue"
+                      onClick={submitQuick}
+                      disabled={!name.trim()}
+                    >
+                      Create
+                    </Button>
+                  </HStack>
+                  {/* "Configure columns, sort, and more…" link retired in
                   Round 3 — the full-screen dialog was overkill for
                   lens creation. Columns are managed inline now (drag-
                   reorder right on the sidebar tab), sort is the
@@ -116,12 +116,12 @@ export const CreateLensButton: React.FC = () => {
                   rest of the dialog's fields (grouping, filter text,
                   addons) are exposed elsewhere. The lens-name popover
                   is the only step that's still distinct. */}
-              <Text fontSize="2xs" color="fg.subtle" lineHeight="1.4">
-                Saved locally during beta. Won't sync across browsers yet.
-              </Text>
-            </Stack>
-          </PopoverBody>
-        </PopoverContent>
+                  <Text fontSize="2xs" color="fg.subtle" lineHeight="1.4">
+                    Saved locally during beta. Won't sync across browsers yet.
+                  </Text>
+                </Stack>
+              </PopoverBody>
+            </PopoverContent>
           </PopoverRoot>
         </Box>
       </Tooltip>

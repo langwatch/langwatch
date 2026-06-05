@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  formatRelativeTime,
-  formatVerboseRelative,
-} from "./formatters";
+import { formatRelativeTime, formatVerboseRelative } from "./formatters";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;

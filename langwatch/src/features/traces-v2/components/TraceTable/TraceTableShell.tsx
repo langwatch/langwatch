@@ -82,11 +82,11 @@ export function TraceTableShell<T>({
       activationConstraint: { distance: 5 },
     }),
   );
-  const sortableHeaderIds = table
-    .getHeaderGroups()[0]
-    ?.headers
-    .map((h) => h.id)
-    .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
+  const sortableHeaderIds =
+    table
+      .getHeaderGroups()[0]
+      ?.headers.map((h) => h.id)
+      .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (!onColumnReorder) return;
@@ -145,33 +145,39 @@ export function TraceTableShell<T>({
           // sticky cell paints the SAME surface that's behind the
           // transparent row body. Still opaque, still covers any
           // horizontally-scrolled content underneath it.
-          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child": {
-            backgroundColor: "var(--chakra-colors-bg-surface)",
-          },
+          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child":
+            {
+              backgroundColor: "var(--chakra-colors-bg-surface)",
+            },
           // Default-row hover variant for the sticky cell. Mirrors the
           // `style.hoverBg = gray.subtle` painted on the main row's Tr
           // (see RegistryRow). Without this rule, only the row body
           // picked up the hover tint and the sticky cell kept its
           // resting bg — the row read as "half hovered".
-          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child": {
-            backgroundColor: "var(--chakra-colors-gray-subtle)",
-          },
+          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child":
+            {
+              backgroundColor: "var(--chakra-colors-gray-subtle)",
+            },
           "& tbody[data-row-variant='selected'] > tr > td:first-child": {
             backgroundColor: "var(--chakra-colors-blue-subtle)",
           },
           "& tbody[data-row-variant='error'] > tr > td:first-child": {
             // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
             // as part of the same red surface the rest of the row paints.
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-panel))",
           },
           "& tbody[data-row-variant='warning'] > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-panel))",
           },
           "& tbody[data-row-variant='error']:hover > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-panel))",
           },
           "& tbody[data-row-variant='warning']:hover > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-panel))",
           },
         }),
       }}
@@ -261,9 +267,9 @@ function HeaderCell<T>({
     transition,
     isDragging,
   } = useSortable({ id: header.id, disabled: !reorderable });
-  const dragHandleProps = (reorderable
-    ? { ...attributes, ...(listeners ?? {}) }
-    : {}) as React.HTMLAttributes<HTMLElement>;
+  const dragHandleProps = (
+    reorderable ? { ...attributes, ...(listeners ?? {}) } : {}
+  ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   // Open the one-off education dialog the first time the user tries
   // to drag a header to reorder it. v2 doesn't support native drag-
@@ -321,7 +327,8 @@ function HeaderCell<T>({
   // Without this, dragging the trace column's grip updated state but
   // visually nothing happened because `width` stayed undefined.
   const isFlex = meta?.flex;
-  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
+  const wasResized =
+    isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
   const align = meta?.align ?? "left";
   const canSort = header.column.getCanSort();

@@ -91,10 +91,7 @@ export function useAiTraceAction({
       // out of the store instead of seeding the composer with the
       // (already-displayed) generated query — they get to keep editing
       // their original wording rather than start from the syntax.
-      if (
-        lastSubmittedProjectIdRef.current &&
-        lastSubmittedPromptRef.current
-      ) {
+      if (lastSubmittedProjectIdRef.current && lastSubmittedPromptRef.current) {
         recordAiTranslation({
           projectId: lastSubmittedProjectIdRef.current,
           prompt: lastSubmittedPromptRef.current,

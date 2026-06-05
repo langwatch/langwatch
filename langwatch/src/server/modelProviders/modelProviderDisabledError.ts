@@ -1,5 +1,5 @@
-import type { ResolutionScope } from "./resolveModelForFeature";
 import type { ModelRole } from "./featureRegistry";
+import type { ResolutionScope } from "./resolveModelForFeature";
 
 /**
  * Stable wire-format cause carried on tRPC/REST responses so the frontend
@@ -7,8 +7,7 @@ import type { ModelRole } from "./featureRegistry";
  * MODEL_NOT_CONFIGURED — the cascade DID find a model, it's just unusable
  * right now because the backing provider is disabled.
  */
-export const MODEL_PROVIDER_DISABLED_CAUSE =
-  "MODEL_PROVIDER_DISABLED" as const;
+export const MODEL_PROVIDER_DISABLED_CAUSE = "MODEL_PROVIDER_DISABLED" as const;
 
 /**
  * The cascade-next alternative the user could swap to with one click.

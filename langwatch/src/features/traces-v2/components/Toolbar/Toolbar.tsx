@@ -74,7 +74,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
           </LensNamePopover>
         )}
         <Tooltip
-          content={tourActive ? "Click to end the tour" : "Take the trace explorer tour"}
+          content={
+            tourActive
+              ? "Click to end the tour"
+              : "Take the trace explorer tour"
+          }
           positioning={{ placement: "bottom" }}
         >
           <Button

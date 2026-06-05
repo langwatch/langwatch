@@ -512,10 +512,7 @@ const domainErrorMiddleware = t.middleware(async ({ next }) => {
       cause: result.error.cause,
     });
   }
-  if (
-    !result.ok &&
-    result.error.cause instanceof ModelProviderDisabledError
-  ) {
+  if (!result.ok && result.error.cause instanceof ModelProviderDisabledError) {
     // Same shape as the other typed model errors: BAD_REQUEST so the
     // errorFormatter serialises `cause` and the frontend interceptor
     // opens the swap-to-parent toast. Without this re-raise the error

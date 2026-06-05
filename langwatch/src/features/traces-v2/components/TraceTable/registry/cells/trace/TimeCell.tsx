@@ -1,10 +1,10 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
+import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { formatCompactAbsolute } from "../../../../../utils/formatters";
 import { useRelativeTime } from "../../../../../utils/useRelativeTime";
-import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./TimeHoverCard";
@@ -55,7 +55,9 @@ export const TimeCell = {
 const CompactRelative: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const mode = useTimeColumnModeStore((s) => s.mode);
   const relative = useRelativeTime(timestamp);
-  return <>{mode === "absolute" ? formatCompactAbsolute(timestamp) : relative}</>;
+  return (
+    <>{mode === "absolute" ? formatCompactAbsolute(timestamp) : relative}</>
+  );
 };
 
 const PeekButton: React.FC<{

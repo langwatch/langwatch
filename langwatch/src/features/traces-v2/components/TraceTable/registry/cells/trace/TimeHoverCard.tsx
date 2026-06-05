@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
+import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import {
   formatAbsoluteTime,
   formatDayOfWeek,
@@ -17,7 +18,6 @@ import {
   resolveViewerTimeZone,
 } from "../../../../../utils/formatters";
 import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
-import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 
 /**
  * Shared hover popover for the TIME / SINCE / TIMESTAMP columns. Surfaces

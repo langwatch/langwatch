@@ -26,9 +26,10 @@ import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
  * having changed, kicking off unnecessary re-mounts of the header row.
  */
 const SELECT_COLUMN_ID_SET = new Set([SELECT_COLUMN_ID]);
+
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
-import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
+import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { useTraceLensColumns } from "./useTraceLensColumns";
 import { useTraceLensKeyboard } from "./useTraceLensKeyboard";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
@@ -222,9 +223,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                   isLoading ? undefined : () => toggleTrace(row.original)
                 }
                 onTogglePeek={
-                  isLoading
-                    ? undefined
-                    : () => togglePeek(row.original.traceId)
+                  isLoading ? undefined : () => togglePeek(row.original.traceId)
                 }
                 isLoading={isLoading}
                 isFirstOfErrorRun={

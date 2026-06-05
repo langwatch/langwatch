@@ -346,7 +346,10 @@ const ErrorBadge: React.FC<{ error: AiActionError }> = ({ error }) => {
             </Text>
             <VStack align="stretch" gap={0.5}>
               {error.details?.httpStatus !== undefined && (
-                <DetailRow label="Status" value={String(error.details.httpStatus)} />
+                <DetailRow
+                  label="Status"
+                  value={String(error.details.httpStatus)}
+                />
               )}
               {error.details?.provider && (
                 <DetailRow label="Provider" value={error.details.provider} />
@@ -355,7 +358,11 @@ const ErrorBadge: React.FC<{ error: AiActionError }> = ({ error }) => {
                 <DetailRow label="Model" value={error.details.model} />
               )}
               {error.details?.reason && (
-                <DetailRow label="Reason" value={error.details.reason} multiline />
+                <DetailRow
+                  label="Reason"
+                  value={error.details.reason}
+                  multiline
+                />
               )}
               {error.details?.lastQuery && (
                 <DetailRow

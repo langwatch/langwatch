@@ -1,9 +1,9 @@
 import { Text } from "@chakra-ui/react";
 import type React from "react";
+import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { formatCompactAbsolute } from "../../../../../utils/formatters";
 import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
-import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./TimeHoverCard";
 

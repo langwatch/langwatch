@@ -7,15 +7,15 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { editorStyles } from "./editorStyles";
-import { setFilterChipLabels } from "./filterHighlight";
 import { FloatingAiBar } from "./FloatingAiBar";
+import { setFilterChipLabels } from "./filterHighlight";
 import { PlaceholderEditor } from "./PlaceholderEditor";
 import {
   ClearButton,
@@ -104,8 +104,7 @@ export const SearchBar: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
-  const askAiNeedsProviderPrimer =
-    !isLoadingProviders && !hasEnabledProviders;
+  const askAiNeedsProviderPrimer = !isLoadingProviders && !hasEnabledProviders;
 
   // Defer TipTap mount until the user actually focuses the search bar — the
   // ProseMirror init reflow used to dominate LCP.
@@ -125,8 +124,9 @@ export const SearchBar: React.FC = () => {
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
   // the live ProseMirror editor.
-  const [tokenAnchor, setTokenAnchor] =
-    useState<TokenValuePickerAnchor | null>(null);
+  const [tokenAnchor, setTokenAnchor] = useState<TokenValuePickerAnchor | null>(
+    null,
+  );
 
   const requestEditor = useCallback(() => setEditorMounted(true), []);
 
@@ -388,7 +388,8 @@ export const SearchBar: React.FC = () => {
 };
 
 const IS_MAC =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**

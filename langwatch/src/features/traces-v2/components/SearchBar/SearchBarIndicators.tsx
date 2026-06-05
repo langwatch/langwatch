@@ -175,4 +175,3 @@ export const ClearButton: React.FC<{
     <X size={12} />
   </Button>
 );
-

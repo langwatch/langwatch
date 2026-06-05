@@ -23,11 +23,11 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useUIStore } from "../../stores/uiStore";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
+import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import {
   ConnectorLaneWidth as CONNECTOR_LANE_WIDTH,
   OrConnectorOverlay,
 } from "./OrConnectorOverlay";
-import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import { SectionRenderer } from "./SectionRenderer";
 import { SortableSection } from "./SortableSection";
 
@@ -45,7 +45,6 @@ export const FilterSidebar: React.FC = () => {
   const {
     ast,
     categoricals,
-    ranges,
     facetItems,
     getValueStates,
     facetsLoading,
@@ -134,10 +133,7 @@ export const FilterSidebar: React.FC = () => {
   }, [allExpanded, orderedKeys, setAllSectionsOpen]);
 
   const renderSection = useCallback(
-    (
-      key: string,
-      dragHandleProps?: React.HTMLAttributes<HTMLDivElement>,
-    ) => {
+    (key: string, dragHandleProps?: React.HTMLAttributes<HTMLDivElement>) => {
       const section = sectionByKey.get(key);
       if (!section) return null;
       return (
@@ -364,7 +360,6 @@ export const FilterSidebar: React.FC = () => {
           </DndContext>
         )}
       </div>
-
     </VStack>
   );
 };
