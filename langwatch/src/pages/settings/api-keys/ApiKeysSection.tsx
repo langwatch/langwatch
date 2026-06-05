@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Heading,
   HStack,
   Spacer,
   Table,
@@ -11,7 +12,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { Clipboard, Key, Pencil, Plus, Trash2 } from "lucide-react";
+import { Clipboard, Key, Pencil, Plus, Radio, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
@@ -113,13 +114,28 @@ export function ApiKeysSection({
     projectId: project?.id,
   });
 
-  // Client-side filter: map each key's roleBindings → scopes so
-  // filterProvidersByScope can apply its inclusive cascade directly.
+  // Split ingestion keys (ingest-only, CLI-minted, project-scoped write
+  // credentials carrying a non-null ingestSourceType) from regular personal /
+  // service API keys. They render in two separate labeled sections. `!= null`
+  // catches both null and undefined so keys without the field stay in the
+  // regular list.
   const allApiKeys = apiKeys.data ?? [];
+  const ingestionKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType != null),
+    [allApiKeys],
+  );
+  const serviceApiKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType == null),
+    [allApiKeys],
+  );
+
+  // Client-side filter: map each regular key's roleBindings → scopes so
+  // filterProvidersByScope can apply its inclusive cascade directly. The scope
+  // filter only governs the regular API keys section.
   const filteredKeys = useMemo(
     () =>
       filterProvidersByScope(
-        allApiKeys.map((k) => ({
+        serviceApiKeys.map((k) => ({
           ...k,
           scopes: k.roleBindings.map((rb) => ({
             scopeType: rb.scopeType,
@@ -133,7 +149,7 @@ export function ApiKeysSection({
           currentProjectId: project?.id,
         },
       ),
-    [allApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
+    [serviceApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
   );
 
   const handleCreate = (input: CreateApiKeyInput): void => {
@@ -315,7 +331,128 @@ export function ApiKeysSection({
 
   return (
     <>
-      <VStack gap={4} width="full" align="start">
+      <VStack gap={8} width="full" align="stretch">
+        {/* Ingestion keys — write-only, project-scoped credentials the CLI
+            mints. Rendered only when at least one exists so orgs without any
+            ingestion keys see no change. These are not created from the
+            "Create API key" drawer, so no permissions/scope editor here. */}
+        {ingestionKeys.length > 0 && (
+          <VStack gap={4} width="full" align="start">
+            <VStack gap={1} align="start">
+              <Heading size="md">Ingestion keys</Heading>
+              <Text fontSize="sm" color="fg.muted">
+                Write-only keys scoped to one project that only ingest traces.
+                The langwatch CLI mints these when you connect a tool.
+              </Text>
+            </VStack>
+
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0}>
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader>Status</Table.ColumnHeader>
+                      <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
+                      <Table.ColumnHeader>Created</Table.ColumnHeader>
+                      <Table.ColumnHeader>Last Used</Table.ColumnHeader>
+                      <Table.ColumnHeader>Source</Table.ColumnHeader>
+                      <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {ingestionKeys.map((apiKey) => (
+                      <Table.Row key={apiKey.id}>
+                        <Table.Cell>
+                          <HStack align="start">
+                            <Box paddingTop={1}>
+                              <Radio size={14} />
+                            </Box>
+                            <VStack align="start" gap={0}>
+                              <Text>{apiKey.name}</Text>
+                              {apiKey.description && (
+                                <Text fontSize="xs" color="fg.muted">
+                                  {apiKey.description}
+                                </Text>
+                              )}
+                            </VStack>
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {getStatus(apiKey) === "Expired" ? (
+                            <Badge size="sm" colorPalette="red">Expired</Badge>
+                          ) : (
+                            <Badge size="sm" colorPalette="green">Active</Badge>
+                          )}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
+                            sk-lw-{apiKey.lookupIdPrefix}…
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </Table.Cell>
+                        <Table.Cell>
+                          {apiKey.lastUsedAt ? (
+                            <Tooltip content={new Date(apiKey.lastUsedAt).toISOString()}>
+                              <Text
+                                cursor="help"
+                                tabIndex={0}
+                                aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
+                              >
+                                {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime())}
+                              </Text>
+                            </Tooltip>
+                          ) : (
+                            <Text fontSize="sm" color="fg.muted">Never</Text>
+                          )}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge size="sm" colorPalette="blue">
+                            {apiKey.ingestSourceType}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {/* Ingestion keys carry no role bindings to edit;
+                              revoke only, gated to admins. */}
+                          {isAdmin && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              colorPalette="red"
+                              aria-label={`Revoke ingestion key ${apiKey.name}`}
+                              onClick={() => setApiKeyToRevoke(apiKey.id)}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </Button>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
+          </VStack>
+        )}
+
+        {/* API keys — personal + service keys (ingestSourceType == null).
+            The "Create API key" flow and scope filter belong to this section. */}
+        <VStack gap={4} width="full" align="start">
+        {ingestionKeys.length > 0 && (
+          <VStack gap={1} align="start">
+            <Heading size="md">API keys</Heading>
+            <Text fontSize="sm" color="fg.muted">
+              Keys scoped to a user or service that honor your role bindings and
+              can be revoked individually.
+            </Text>
+          </VStack>
+        )}
         <HStack width="full" flexWrap="wrap" gap={2}>
           <Text fontSize="sm" color="fg.muted">
             Do not share your API keys or expose them in the browser or other
@@ -509,6 +646,7 @@ export function ApiKeysSection({
             </Table.Root>
           </Card.Body>
         </Card.Root>
+        </VStack>
       </VStack>
 
       <CreateApiKeyDrawer
