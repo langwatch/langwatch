@@ -99,10 +99,8 @@ async function main() {
     const service = UserIngestionBindingService.create(prisma);
 
     if (args.uninstallFirst) {
-      const existing = await prisma.userIngestionBinding.findUnique({
-        where: {
-          userId_templateId: { userId: user.id, templateId: template.id },
-        },
+      const existing = await prisma.userIngestionBinding.findFirst({
+        where: { userId: user.id, templateId: template.id },
         select: { id: true, archivedAt: true },
       });
       if (existing && !existing.archivedAt) {

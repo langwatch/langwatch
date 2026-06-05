@@ -108,7 +108,7 @@ export function InstallCliCard({
 
         {!isSaas && (
           <Text fontSize="xs" color="fg.muted">
-            Self-hosted detected. The login flag targets{" "}
+            The login flag targets{" "}
             <Code fontSize="xs">{baseHost}</Code>; the endpoint is persisted
             after that first login, so subsequent commands don&apos;t need it.
           </Text>

@@ -32,6 +32,7 @@ describe("PLATFORM_INGESTION_TEMPLATES", () => {
       expect(slugs).toEqual(["claude_cowork"]);
     });
 
+    /** @scenario The platform-template seed produces no coding-assistant rows */
     it("excludes every platform coding assistant from the seed input", () => {
       const slugs = new Set(PLATFORM_INGESTION_TEMPLATES.map((t) => t.slug));
       for (const codingSlug of CODING_ASSISTANT_SLUGS) {

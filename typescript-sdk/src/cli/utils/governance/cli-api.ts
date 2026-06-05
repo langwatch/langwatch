@@ -496,17 +496,31 @@ export async function listUserIngestionBindings(
 
 export async function installUserIngestionBinding(
   cfg: GovernanceConfig,
-  templateId: string,
+  /**
+   * A template id (string, back-compat) installs a template-backed
+   * binding. A `{ sourceType }` object installs a template-free binding
+   * for the unified coding assistants (claude / codex / gemini /
+   * opencode) — they are no longer ingestion templates, so the server
+   * keys the binding on the tool's source slug instead.
+   */
+  target: string | { templateId?: string; sourceType?: string },
   options: CliApiOptions = {},
 ): Promise<{
   user_ingestion_binding: UserIngestionBindingRow;
   binding_access_token: string;
 }> {
+  const body =
+    typeof target === "string"
+      ? { template_id: target }
+      : {
+          ...(target.templateId ? { template_id: target.templateId } : {}),
+          ...(target.sourceType ? { source_type: target.sourceType } : {}),
+        };
   return requestREST(
     cfg,
     "POST",
     "/api/auth/cli/governance/user-ingestion-bindings",
-    { ...options, body: { template_id: templateId }, mutating: true },
+    { ...options, body, mutating: true },
   );
 }
 

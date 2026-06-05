@@ -138,18 +138,28 @@ const userIngestionBindingDtoSchema = z.object({
   updated_at: z.string(),
 });
 
-const installBindingSchema = z.object({
-  template_id: z.string().min(1),
-  // Opaque metadata for templates whose credentialSchema is
-  // `static_api_key` or `agent_id`. v1 ships only otlp_token; the field
-  // stays null for those rows but the path is wired for v2.
-  encrypted_credential: z.unknown().optional(),
-});
+const installBindingSchema = z
+  .object({
+    // Template-backed install (e.g. claude_cowork). Mutually exclusive
+    // with source_type.
+    template_id: z.string().min(1).optional(),
+    // Template-free install for the unified coding assistants — the CLI
+    // passes the tool's canonical source slug; no template row required.
+    source_type: z.string().min(1).optional(),
+    // Opaque metadata for templates whose credentialSchema is
+    // `static_api_key` or `agent_id`. v1 ships only otlp_token; the field
+    // stays null for those rows but the path is wired for v2.
+    encrypted_credential: z.unknown().optional(),
+  })
+  .refine((d) => Boolean(d.template_id) || Boolean(d.source_type), {
+    message: "either template_id or source_type is required",
+  });
 
 function toBindingDto(row: {
   id: string;
   userId: string;
-  templateId: string;
+  templateId: string | null;
+  sourceType: string;
   personalProjectId: string;
   organizationId: string;
   bindingAccessTokenPrefix: string;
@@ -162,6 +172,7 @@ function toBindingDto(row: {
     id: row.id,
     user_id: row.userId,
     template_id: row.templateId,
+    source_type: row.sourceType,
     personal_project_id: row.personalProjectId,
     organization_id: row.organizationId,
     binding_access_token_prefix: row.bindingAccessTokenPrefix,
@@ -843,6 +854,7 @@ secured.access(apiKeyPermission("organization:view")).post(
         callerUserId: caller.userId,
         organizationId,
         templateId: body.data.template_id,
+        sourceType: body.data.source_type,
         encryptedCredential: body.data.encrypted_credential as
           | Prisma.InputJsonValue
           | undefined,

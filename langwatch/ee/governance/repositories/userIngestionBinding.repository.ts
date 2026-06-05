@@ -16,25 +16,30 @@ type Client = Prisma.TransactionClient | PrismaClient;
 
 export class UserIngestionBindingRepository {
   /**
-   * Lookup by the (userId, templateId) UNIQUE — used by `install` to
-   * detect existing-or-soft-archived binding for the same template.
+   * Install identity: race-safe upsert keyed on the
+   * (personalProjectId, sourceType) UNIQUE. `update` rotates the token
+   * in place (and revives a soft-archived row); `create` mints a fresh
+   * binding. Per-personal-project keying scopes the binding to one
+   * (user, org) so multi-org users never collide.
    */
-  findUniqueByUserAndTemplate(
+  upsertByProjectAndSource(
     client: Client,
     params: {
-      userId: string;
-      templateId: string;
-      select?: Prisma.UserIngestionBindingSelect;
+      personalProjectId: string;
+      sourceType: string;
+      create: Prisma.UserIngestionBindingUncheckedCreateInput;
+      update: Prisma.UserIngestionBindingUncheckedUpdateInput;
     },
   ) {
-    return client.userIngestionBinding.findUnique({
+    return client.userIngestionBinding.upsert({
       where: {
-        userId_templateId: {
-          userId: params.userId,
-          templateId: params.templateId,
+        personalProjectId_sourceType: {
+          personalProjectId: params.personalProjectId,
+          sourceType: params.sourceType,
         },
       },
-      select: params.select,
+      create: params.create,
+      update: params.update,
     });
   }
 
@@ -93,6 +98,7 @@ export class UserIngestionBindingRepository {
         id: true,
         userId: true,
         templateId: true,
+        sourceType: true,
         personalProjectId: true,
         organizationId: true,
         enabled: true,

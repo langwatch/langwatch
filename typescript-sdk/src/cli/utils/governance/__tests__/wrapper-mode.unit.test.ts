@@ -171,41 +171,33 @@ describe("resolveWrapperMode", () => {
       expect(contents).not.toContain("ik-lw-test-token");
     });
 
-    it("rotates the binding when one already exists rather than minting again", async () => {
+    it("delegates rotate-vs-mint to the server via a template-free install", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_codex",
-          slug: "codex",
+      // The unified coding assistants are no longer ingestion templates,
+      // so the wrapper never looks one up. It always calls the
+      // template-free install keyed by sourceType; the server upserts on
+      // (personalProjectId, sourceType), rotating the token in place when
+      // a binding already exists. No CLI-side rotate-vs-install branching.
+      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
+        user_ingestion_binding: {
+          id: "b_codex",
+          template_id: null,
           source_type: "codex",
-          display_name: "Codex",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
         },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "b_prior", template_id: "tpl_codex" },
-      ]);
-      (cliApi.rotateUserIngestionBindingToken as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b_prior", template_id: "tpl_codex" },
         binding_access_token: "ik-lw-rotated",
       });
 
       const out = await resolveWrapperMode(baseCfg(), "codex", {});
 
       expect(out.mode).toBe("ingestion");
-      expect(out.newBindingMinted).toBe(false);
+      expect(out.newBindingMinted).toBe(true);
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-rotated");
-      expect(cliApi.installUserIngestionBinding).not.toHaveBeenCalled();
-      expect(cliApi.rotateUserIngestionBindingToken).toHaveBeenCalledWith(
+      expect(cliApi.installUserIngestionBinding).toHaveBeenCalledWith(
         expect.any(Object),
-        "b_prior",
+        { sourceType: "codex" },
       );
+      // No template lookup happens for unified coding assistants.
+      expect(cliApi.listIngestionTemplates).not.toHaveBeenCalled();
     });
   });
 

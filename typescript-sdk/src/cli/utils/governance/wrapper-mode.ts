@@ -35,9 +35,6 @@ import { saveConfig } from "./config";
 import {
   GovernanceCliError,
   installUserIngestionBinding,
-  listIngestionTemplates,
-  listUserIngestionBindings,
-  rotateUserIngestionBindingToken,
 } from "./cli-api";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
@@ -178,37 +175,21 @@ export async function resolveWrapperMode(
   // INGESTION mode: ensure binding + (for codex) toml.
   const sourceType = SOURCE_TYPE_BY_TOOL[tool];
   if (!sourceType) {
-    // No ingestion template defined for this tool (cursor is the
-    // current example — GUI app, no useful OTel). Fall through to
-    // gateway shape; the existing preflight will tell the user
-    // what's missing.
+    // No source slug defined for this tool (cursor is the current
+    // example — GUI app, no useful OTel). Fall through to gateway shape;
+    // the existing preflight will tell the user what's missing.
     return { mode: "gateway", vars: gatewayVars, clears: gatewayClears };
   }
 
-  const templates = await listIngestionTemplates(cfg);
-  const template = templates.find((t) => t.slug === sourceType);
-  if (!template) {
-    throw new GovernanceCliError(
-      404,
-      "ingestion_template_not_found",
-      `No IngestionTemplate found with slug '${sourceType}'. The catalog seed may not have run on this control plane yet.`,
-    );
-  }
-
-  const bindings = await listUserIngestionBindings(cfg);
-  const prior = bindings.find((b) => b.template_id === template.id);
-
-  let token: string;
-  let minted: boolean;
-  if (prior) {
-    const r = await rotateUserIngestionBindingToken(cfg, prior.id);
-    token = r.binding_access_token;
-    minted = false;
-  } else {
-    const r = await installUserIngestionBinding(cfg, template.id);
-    token = r.binding_access_token;
-    minted = true;
-  }
+  // The unified coding assistants are NOT ingestion templates — the
+  // platform owns their whole setup and the receiver converts their OTLP
+  // model-call logs into canonical gen_ai spans. So we mint a
+  // template-free binding keyed by sourceType. The server install is an
+  // idempotent upsert on (personalProjectId, sourceType): a repeat
+  // `langwatch <tool>` rotates the token in place instead of 409'ing, so
+  // no list/rotate-vs-install branching is needed here.
+  const r = await installUserIngestionBinding(cfg, { sourceType });
+  const token = r.binding_access_token;
 
   const endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
   const vars = buildOtelEnvBlock(tool, endpoint, token);
@@ -249,7 +230,9 @@ export async function resolveWrapperMode(
     // Best-effort cache — failure to persist doesn't block this run.
   }
 
-  return { mode, vars, codexConfigPath, newBindingMinted: minted };
+  // The idempotent install always issues a fresh token (shown once), so
+  // from the user's perspective a binding token was minted this run.
+  return { mode, vars, codexConfigPath, newBindingMinted: true };
 }
 
 function buildOtelEnvBlock(

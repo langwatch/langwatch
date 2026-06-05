@@ -2501,8 +2501,21 @@ model UserIngestionBinding {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  templateId String
-  template   IngestionTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  /// NULL for platform-managed coding assistants (claude / codex /
+  /// gemini / opencode). They are no longer ingestion templates: the
+  /// `langwatch <tool>` CLI mints their binding directly, identified by
+  /// `sourceType` instead of a template row. Set when the binding was
+  /// minted from a catalog template (e.g. claude_cowork).
+  templateId String?
+  template   IngestionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  /// Canonical source slug for the bound tool (e.g. `claude_code`,
+  /// `codex`, `gemini`, `opencode`). Always set: template-free CLI
+  /// bindings carry the tool slug, template-backed bindings mirror
+  /// `template.sourceType`. Combined with `personalProjectId` it is the
+  /// install identity, so it must be non-null for the unique to dedup
+  /// (Postgres treats NULLs as distinct).
+  sourceType String
 
   /// Server-resolved at install (NOT input-accepted). Always points at
   /// the user's personal Project (`Project.isPersonal=true` AND
@@ -2546,7 +2559,7 @@ model UserIngestionBinding {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now()) @updatedAt
 
-  @@unique([userId, templateId])
+  @@unique([personalProjectId, sourceType])
   @@index([organizationId, archivedAt])
   @@index([userId, archivedAt])
   @@index([templateId])

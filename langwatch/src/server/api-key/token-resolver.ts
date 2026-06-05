@@ -28,10 +28,13 @@ export type ResolvedToken =
   | {
       type: "user_ingestion_binding";
       bindingId: string;
-      templateId: string;
-      /** Template slug (e.g. `claude_code`) — receiver stamps this as
-       *  `langwatch.source` provenance attr on every span. */
-      templateSlug: string;
+      /** Null for template-free coding-assistant bindings. */
+      templateId: string | null;
+      /** Template slug, null for template-free bindings. */
+      templateSlug: string | null;
+      /** Canonical tool slug (e.g. `claude_code`) — always set; the
+       *  receiver stamps this as `langwatch.source` on every span. */
+      sourceType: string;
       userId: string;
       organizationId: string;
       project: Project & { team: { id: string; organizationId: string } };
@@ -203,6 +206,7 @@ export class TokenResolver {
         id: true,
         userId: true,
         templateId: true,
+        sourceType: true,
         organizationId: true,
         enabled: true,
         archivedAt: true,
@@ -229,7 +233,8 @@ export class TokenResolver {
       type: "user_ingestion_binding",
       bindingId: binding.id,
       templateId: binding.templateId,
-      templateSlug: binding.template.slug,
+      templateSlug: binding.template?.slug ?? null,
+      sourceType: binding.sourceType,
       userId: binding.userId,
       organizationId: binding.organizationId,
       project: binding.personalProject,
