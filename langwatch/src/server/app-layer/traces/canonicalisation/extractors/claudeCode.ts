@@ -1,45 +1,38 @@
 /**
- * Claude Code Extractor
+ * Claude Code Extractor (log side)
  *
- * Handles: Anthropic Claude Code's native OpenTelemetry log records
- * (scope `com.anthropic.claude_code.events`). Lifts cost-bearing
- * `api_request` events, the user-typed `user_prompt` event, AND
- * the full `api_response_body` (assistant text) onto canonical
- * `langwatch.*` attributes so the trace summary renders the same
- * shape as a real gen_ai span.
+ * Handles: the `user_prompt` log event of Anthropic Claude Code's native
+ * OpenTelemetry log records (scope `com.anthropic.claude_code.events`),
+ * lifting the user-typed prompt onto `langwatch.input` so the trace
+ * summary headline input is populated.
+ *
+ * The cost-bearing model-call events (`api_request`, `api_request_body`,
+ * `api_response_body`) are NOT handled here: they are trapped at ingest
+ * and CONVERTED into a single standard gen_ai.* span by
+ * `claude-code-log-to-span.ts`, then dropped from the log path. The
+ * existing span pipeline + canonicalisation + fold lift model / tokens /
+ * cost / input / output from that span. This extractor therefore only
+ * sees the lifecycle/prompt events that stay on the log path.
  *
  * Detection: log record scope matches CLAUDE_CODE_SCOPE_NAMES and
- *            attributes["event.name"] in { "api_request",
- *            "user_prompt", "api_response_body" }.
+ *            attributes["event.name"] === "user_prompt".
  *
  * Canonical attributes produced (when present on the wire):
- * - langwatch.model               (api_request)
- * - langwatch.cost.usd            (api_request)
- * - langwatch.input_tokens        (api_request)
- * - langwatch.output_tokens       (api_request)
- * - langwatch.cache_read_tokens   (api_request)
- * - langwatch.cache_creation_tokens (api_request)
- * - langwatch.thread.id           (api_request OR user_prompt OR api_response_body — from session.id)
- * - langwatch.input               (user_prompt — from `prompt` attr,
- *                                  only when OTEL_LOG_USER_PROMPTS=1)
- * - langwatch.output              (api_response_body — concatenated `content[].text`
- *                                  blocks from the response body JSON, only
- *                                  when OTEL_LOG_RAW_API_BODIES=1 AND the call is
- *                                  a genuine conversation turn — see
- *                                  CONVERSATIONAL_QUERY_SOURCES; utility calls
- *                                  like prompt_suggestion are skipped)
+ * - langwatch.input      (user_prompt — from `prompt` attr, only when
+ *                         OTEL_LOG_USER_PROMPTS=1)
+ * - langwatch.thread.id  (user_prompt — from session.id)
  *
- * Span-side `apply()` is a no-op — Claude Code Path A claude_code
- * traffic comes through the gateway as gen_ai.* spans handled by
- * GenAIExtractor. This extractor is the Path B (OTLP-from-claude-code)
- * counterpart on the log side.
+ * Span-side `apply()` is a no-op — Claude Code Path A claude_code traffic
+ * comes through the gateway as gen_ai.* spans handled by GenAIExtractor,
+ * and Path B model calls become synthesized gen_ai.* spans whose attrs are
+ * already canonical.
  *
- * Earlier we reported claude-code 2.x as having a hard vendor limit
- * on assistant output text — that was wrong. The text DOES flow on
- * the `api_response_body` event, but only when OTEL_LOG_RAW_API_BODIES=1
- * is in the env. The langwatch wrapper now sets all 4 OTEL_LOG_*
- * unlock knobs by default (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS
- * + RAW_API_BODIES) so this lift covers every cost-bearing turn.
+ * The body-parsing helpers (extractAssistantTextFromResponseBody,
+ * extractUserTextFromRequestBody) and the isConversationalQuerySource gate
+ * live here as the home of claude_code body knowledge and are imported by
+ * the log-to-span converter. The langwatch wrapper sets all 4 OTEL_LOG_*
+ * unlock knobs (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS + RAW_API_BODIES)
+ * so the converted spans carry input/output text on every turn.
  */
 
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
@@ -65,14 +58,13 @@ const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
  *                             as a `{"title": "..."}` JSON text block
  * - `quota` / future utility sources — token-probe / housekeeping calls
  *
- * Folding those into `langwatch.output` corrupts the trace's headline output:
- * the fold is last-write-wins, so a throwaway autosuggest emitted after the
- * real reply overwrites it. We therefore lift output text ONLY from genuine
- * conversation turns. The main REPL thread is the headline conversation; an
- * absent `query_source` is treated as conversational for backwards-compat with
- * older claude-code builds (and other emitters) that don't stamp the field.
- * Utility-call text is still fully captured as its own stored log record — it
- * just doesn't pollute the single rolled-up ComputedOutput.
+ * Surfacing those as the span's `gen_ai.completion` would mislabel a throwaway
+ * autosuggest as the assistant's reply. We therefore set completion text ONLY
+ * for genuine conversation turns. The main REPL thread is the headline
+ * conversation; an absent `query_source` is treated as conversational for
+ * backwards-compat with older claude-code builds (and other emitters) that
+ * don't stamp the field. The token/cost usage of utility calls still folds —
+ * only their TEXT is withheld from the completion.
  */
 const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
   "repl_main_thread",
@@ -82,26 +74,14 @@ const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
  * True when an `api_response_body` came from a genuine conversation turn whose
  * text is the assistant's reply to the user — as opposed to a non-conversational
  * utility call (see CONVERSATIONAL_QUERY_SOURCES). An absent query_source is
- * treated as conversational for backwards-compat. Exported so the trace-io
- * accumulation projection (which lifts ComputedOutput directly from
- * api_response_body, a second path) reuses this exact gate instead of
- * duplicating the allowlist.
+ * treated as conversational for backwards-compat. Exported so the log-to-span
+ * converter gates the synthesized span's gen_ai.completion through this exact
+ * allowlist instead of duplicating it.
  */
 export const isConversationalQuerySource = (
   querySource: string | null,
 ): boolean =>
   querySource === null || CONVERSATIONAL_QUERY_SOURCES.has(querySource);
-
-const asNumber = (raw: unknown): number | null => {
-  if (raw === undefined || raw === null || raw === "") return null;
-  const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw)
-        : NaN;
-  return Number.isFinite(n) ? n : null;
-};
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -118,65 +98,13 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
     if (!CLAUDE_CODE_SCOPE_NAMES.has(ctx.bag.scopeName)) return;
     const eventName = ctx.bag.attrs.get("event.name");
 
-    if (eventName === "api_request") {
-      this.liftApiRequest(ctx);
-      return;
-    }
+    // The model-call events (api_request / api_request_body /
+    // api_response_body) are trapped at ingest and converted to a gen_ai
+    // span by claude-code-log-to-span.ts — they never reach the log path,
+    // so the only claude_code event this extractor lifts is user_prompt.
     if (eventName === "user_prompt") {
       this.liftUserPrompt(ctx);
-      return;
     }
-    if (eventName === "api_response_body") {
-      this.liftApiResponseBody(ctx);
-      return;
-    }
-  }
-
-  private liftApiRequest(ctx: LogExtractorContext): void {
-    const model = asString(ctx.bag.attrs.take("model"));
-    const costUsd = asNumber(ctx.bag.attrs.take("cost_usd"));
-    const inputTokens = asNumber(ctx.bag.attrs.take("input_tokens"));
-    const outputTokens = asNumber(ctx.bag.attrs.take("output_tokens"));
-    const cacheReadTokens = asNumber(ctx.bag.attrs.take("cache_read_tokens"));
-    const cacheCreationTokens = asNumber(
-      ctx.bag.attrs.take("cache_creation_tokens"),
-    );
-    const sessionId = asString(ctx.bag.attrs.get("session.id"));
-
-    let fired = false;
-    if (model !== null) {
-      ctx.setAttr("langwatch.model", model);
-      fired = true;
-    }
-    if (costUsd !== null) {
-      ctx.setAttr("langwatch.cost.usd", String(costUsd));
-      fired = true;
-    }
-    if (inputTokens !== null) {
-      ctx.setAttr("langwatch.input_tokens", String(inputTokens));
-      fired = true;
-    }
-    if (outputTokens !== null) {
-      ctx.setAttr("langwatch.output_tokens", String(outputTokens));
-      fired = true;
-    }
-    if (cacheReadTokens !== null) {
-      ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
-      fired = true;
-    }
-    if (cacheCreationTokens !== null) {
-      ctx.setAttr(
-        "langwatch.cache_creation_tokens",
-        String(cacheCreationTokens),
-      );
-      fired = true;
-    }
-    if (sessionId !== null) {
-      ctx.setAttr("langwatch.thread.id", sessionId);
-      fired = true;
-    }
-
-    if (fired) ctx.recordRule("claude-code/api_request");
   }
 
   private liftUserPrompt(ctx: LogExtractorContext): void {
@@ -193,35 +121,6 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       fired = true;
     }
     if (fired) ctx.recordRule("claude-code/user_prompt");
-  }
-
-  private liftApiResponseBody(ctx: LogExtractorContext): void {
-    const querySource = asString(ctx.bag.attrs.get("query_source"));
-    const bodyRaw = ctx.bag.attrs.take("body");
-    const sessionId = asString(ctx.bag.attrs.get("session.id"));
-
-    // Only fold the assistant text from genuine conversation turns into
-    // langwatch.output — utility calls (prompt_suggestion autosuggest,
-    // generate_session_title, etc.) carry text that is NOT the assistant's
-    // reply and would clobber the headline ComputedOutput (last write wins).
-    // See CONVERSATIONAL_QUERY_SOURCES.
-    const responseText = isConversationalQuerySource(querySource)
-      ? extractAssistantTextFromResponseBody(bodyRaw)
-      : null;
-
-    let fired = false;
-    if (responseText !== null) {
-      ctx.setAttr("langwatch.output", responseText);
-      fired = true;
-    }
-    // thread.id correlation is lifted from EVERY api_response_body (including
-    // utility calls) so the trace stays stitched even if the only records in a
-    // window are non-conversational.
-    if (sessionId !== null) {
-      ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
-      fired = true;
-    }
-    if (fired) ctx.recordRule("claude-code/api_response_body");
   }
 }
 
@@ -286,4 +185,63 @@ export function extractAssistantTextFromResponseBody(
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/**
+ * Walk a claude_code.api_request_body JSON payload (the Anthropic
+ * /v1/messages REQUEST) and pull out the latest user turn's text — the
+ * span's gen_ai.prompt. The body shape:
+ *   { "model": "...", "system": "...", "messages": [
+ *       { "role": "user", "content": "..." },
+ *       { "role": "assistant", "content": [{ "type": "text", "text": "..." }] },
+ *       { "role": "user", "content": [{ "type": "text", "text": "..." }] }
+ *     ] }
+ *
+ * `content` is either a plain string or an array of content blocks. We take
+ * the LAST `role === "user"` message (the current turn's input) and
+ * concatenate its text. Returns null when the body isn't parseable (claude
+ * truncates large request bodies inline, so the caller falls back to the raw
+ * capped body), has no messages, or the last user message has no text.
+ *
+ * Pure extraction — the caller bounds the result with capPayloadString.
+ *
+ * @internal exported for the log-to-span converter + unit testing
+ */
+export function extractUserTextFromRequestBody(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const messages = (parsed as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return null;
+
+  let lastUserContent: unknown = null;
+  for (const m of messages) {
+    if (!m || typeof m !== "object") continue;
+    const message = m as { role?: unknown; content?: unknown };
+    if (message.role === "user") lastUserContent = message.content;
+  }
+  if (lastUserContent === null) return null;
+
+  if (typeof lastUserContent === "string") {
+    return lastUserContent.length > 0 ? lastUserContent : null;
+  }
+  if (!Array.isArray(lastUserContent)) return null;
+  const parts: string[] = [];
+  for (const c of lastUserContent) {
+    if (!c || typeof c !== "object") continue;
+    const block = c as { type?: unknown; text?: unknown };
+    if (block.type !== "text") continue;
+    if (typeof block.text !== "string") continue;
+    if (block.text.length === 0) continue;
+    parts.push(block.text);
+  }
+  return parts.length > 0 ? parts.join("\n\n") : null;
 }

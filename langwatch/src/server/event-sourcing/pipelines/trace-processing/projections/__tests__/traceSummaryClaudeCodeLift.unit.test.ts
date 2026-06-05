@@ -1,16 +1,21 @@
 /**
- * Fold-projection regression tests for the claude_code.api_request
- * cost/tokens/model lift in handleTraceLogRecordReceived.
+ * Fold-projection log-lift regression tests for the events that REMAIN on
+ * the log path: claude_code `user_prompt`, codex (`codex.sse_event` /
+ * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
  *
- * Verifies the fold writes the canonical langwatch.* attributes
- * onto the trace_summary state when a Claude Code api_request log
- * lands with synthesized trace context. Without this lift, the
- * trace UI shows blank cost/tokens/model even when the underlying
- * log records carry them.
+ * The claude_code model-call triplet (api_request / api_request_body /
+ * api_response_body) is trapped at ingest and converted into a gen_ai span
+ * (see claude-code-log-to-span.unit.test.ts) — it NO LONGER lifts model /
+ * cost / tokens / output through the log fold. The "does NOT lift a converted
+ * api_request" case below pins that: even if one ever reached the log path it
+ * must be a no-op so cost/tokens can never be double-counted.
  *
- * Includes the cache_read vs cache_creation distinct-value
- * regression — silently swapping those would misreport customer
- * cost by ~12× in either direction.
+ * The top-level column mirror (langwatch.* lift -> Models /
+ * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the
+ * log-path emitters and is exercised here through codex.sse_event. Claude's
+ * cost/tokens now mirror onto the top-level columns via the SPAN fold
+ * (computeSpanCost + accumulateTokens), covered in the converter + service
+ * tests.
  */
 import { describe, expect, it } from "vitest";
 
@@ -30,11 +35,12 @@ function makeProjection() {
   });
 }
 
-function makeClaudeApiRequestEvent(
+function makeLogEvent(
   attrs: Record<string, string>,
+  opts: { scopeName?: string; body?: string } = {},
 ): LogRecordReceivedEvent {
   return {
-    id: `evt-claude-api`,
+    id: `evt-log`,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
     version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
     aggregateType: "trace",
@@ -48,13 +54,10 @@ function makeClaudeApiRequestEvent(
       timeUnixMs: 1700000000000,
       severityNumber: 9,
       severityText: "INFO",
-      body: "claude_code.api_request",
-      attributes: {
-        "event.name": "api_request",
-        ...attrs,
-      },
+      body: opts.body ?? "log",
+      attributes: attrs,
       resourceAttributes: { "service.name": "claude-code" },
-      scopeName: "com.anthropic.claude_code.events",
+      scopeName: opts.scopeName ?? "com.anthropic.claude_code.events",
       scopeVersion: "2.1.162",
       piiRedactionLevel: "ESSENTIAL",
     },
@@ -62,228 +65,92 @@ function makeClaudeApiRequestEvent(
   };
 }
 
-describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
-  describe("when an api_request log carries cost, tokens, and model", () => {
-    it("lifts model + cost_usd + tokens onto langwatch.* canonical attributes", () => {
+describe("TraceSummaryFoldProjection — log-path lift", () => {
+  describe("when the record is a claude_code user_prompt", () => {
+    it("lifts the prompt + thread.id and leaves cost/tokens/model untouched", () => {
       const projection = makeProjection();
       const state = createInitState();
 
       const after = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          "session.id": "sess_42",
-          model: "claude-haiku-4-5-20251001",
-          cost_usd: "0.001234",
-          input_tokens: "462",
-          output_tokens: "39",
-          cache_read_tokens: "5",
-          cache_creation_tokens: "17",
-        }),
+        makeLogEvent(
+          {
+            "event.name": "user_prompt",
+            "session.id": "s",
+            prompt: "What is 2+2?",
+          },
+          { body: "claude_code.user_prompt" },
+        ),
         state,
       );
 
-      expect(after.attributes["langwatch.model"]).toBe(
-        "claude-haiku-4-5-20251001",
-      );
-      expect(after.attributes["langwatch.cost.usd"]).toBe("0.001234");
-      expect(after.attributes["langwatch.input_tokens"]).toBe("462");
-      expect(after.attributes["langwatch.output_tokens"]).toBe("39");
-      expect(after.attributes["langwatch.thread.id"]).toBe("sess_42");
-    });
-
-    /**
-     * REGRESSION GUARD — anthropic's cache pricing tiers:
-     *   cache_creation ~1.25× regular input (writing)
-     *   cache_read     ~0.10× regular input (reading)
-     * A field-swap would silently mis-bill by ~12× in either
-     * direction. Distinct numeric values + by-name assertions
-     * make any flip visible at the test layer.
-     */
-    it("keeps cache_read distinct from cache_creation (no swap)", () => {
-      const projection = makeProjection();
-      const state = createInitState();
-
-      const after = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          "session.id": "s",
-          model: "claude-opus-4-7",
-          cache_read_tokens: "1000",
-          cache_creation_tokens: "2000",
-        }),
-        state,
-      );
-      expect(after.attributes["langwatch.cache_read_tokens"]).toBe("1000");
-      expect(after.attributes["langwatch.cache_creation_tokens"]).toBe("2000");
-      expect(after.attributes["langwatch.cache_read_tokens"]).not.toBe(
-        after.attributes["langwatch.cache_creation_tokens"],
-      );
-    });
-
-    it("does NOT touch cost/tokens/model langwatch.* keys when the record is user_prompt", () => {
-      // user_prompt events carry the prompt text + session.id but
-      // NO model/cost/tokens (those are on api_request). The fold
-      // must keep those fields untouched even though it DOES lift
-      // langwatch.input + langwatch.thread.id off the same record.
-      const projection = makeProjection();
-      const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({
-        "session.id": "s",
-        prompt: "What is 2+2?",
-      });
-      ev.data.attributes["event.name"] = "user_prompt";
-      ev.data.body = "claude_code.user_prompt";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      expect(after.attributes["langwatch.input"]).toBe("What is 2+2?");
+      expect(after.attributes["langwatch.thread.id"]).toBe("s");
+      expect(after.computedInput).toBe("What is 2+2?");
+      // user_prompt never carries model/cost/tokens.
       expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
       expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
       expect(after.attributes["langwatch.model"]).toBeUndefined();
-      // The prompt itself + thread id DO land via the user_prompt lift.
-      expect(after.attributes["langwatch.input"]).toBe("What is 2+2?");
-      expect(after.attributes["langwatch.thread.id"]).toBe("s");
-      // ComputedInput on the trace summary picks up the user prompt.
-      expect(after.computedInput).toBe("What is 2+2?");
-    });
-
-    it("lifts assistant text from api_response_body onto langwatch.output + ComputedOutput (OTEL_LOG_RAW_API_BODIES=1)", () => {
-      // claude-code 2.x with OTEL_LOG_RAW_API_BODIES=1 emits an
-      // api_response_body event per turn carrying the full anthropic
-      // /v1/messages response body as a JSON string. The assistant
-      // reply text lives in body.content[].text where type=="text".
-      // This pins both the canonical attr lift AND the computed
-      // output mirror so the trace summary renders the real reply.
-      const projection = makeProjection();
-      const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.attributes = {
-        "event.name": "api_response_body",
-        "session.id": "sess_resp",
-        body: JSON.stringify({
-          model: "claude-opus-4-7",
-          content: [
-            {
-              type: "text",
-              text: "Hello, here is the answer to your question.",
-            },
-          ],
-        }),
-      };
-      ev.data.body = "claude_code.api_response_body";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
-      expect(after.attributes["langwatch.output"]).toBe(
-        "Hello, here is the answer to your question.",
-      );
-      expect(after.attributes["langwatch.thread.id"]).toBe("sess_resp");
-      expect(after.computedOutput).toBe(
-        "Hello, here is the answer to your question.",
-      );
-      // Tokens + cost still come from api_request, never api_response_body
-      expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
-      expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
-    });
-
-    it("does NOT fold a generate_session_title api_response_body into ComputedOutput (utility-call guard)", () => {
-      // Reported on PR #4544: claude emits api_response_body for its
-      // non-conversational utility calls too. The session-title generator
-      // ships its title as a {"title":"..."} JSON text block. Because the
-      // fold's ComputedOutput is last-write-wins, an unfiltered title
-      // clobbers the assistant's real reply — the trace headline output
-      // showed `{"title":"Execute bash command and verify output"}` instead
-      // of the answer. The query_source gate skips it.
-      const projection = makeProjection();
-      const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.attributes = {
-        "event.name": "api_response_body",
-        query_source: "generate_session_title",
-        "session.id": "sess_title",
-        body: JSON.stringify({
-          content: [
-            { type: "text", text: '{"title":"Execute bash command"}' },
-          ],
-        }),
-      };
-      ev.data.body = "claude_code.api_response_body";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
-      expect(after.computedOutput).toBe(state.computedOutput);
-      expect(after.attributes["langwatch.output"]).toBeUndefined();
-      // thread.id correlation is still lifted so the trace stays stitched.
-      expect(after.attributes["langwatch.thread.id"]).toBe("sess_title");
-    });
-
-    it("does NOT fold a prompt_suggestion api_response_body into ComputedOutput (autosuggest guard)", () => {
-      // The greyed-out autosuggest of the next thing the user might type
-      // also rides on api_response_body. Skipping it stops a throwaway
-      // suggestion (e.g. "run ls /tmp again") from overwriting the reply.
-      const projection = makeProjection();
-      const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.attributes = {
-        "event.name": "api_response_body",
-        query_source: "prompt_suggestion",
-        body: JSON.stringify({
-          content: [{ type: "text", text: "run ls /tmp again" }],
-        }),
-      };
-      ev.data.body = "claude_code.api_response_body";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
-      expect(after.computedOutput).toBe(state.computedOutput);
-      expect(after.attributes["langwatch.output"]).toBeUndefined();
-    });
-
-    it("DOES fold a repl_main_thread api_response_body into ComputedOutput (the real conversation)", () => {
-      const projection = makeProjection();
-      const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.attributes = {
-        "event.name": "api_response_body",
-        query_source: "repl_main_thread",
-        body: JSON.stringify({
-          content: [{ type: "text", text: "I see three entries." }],
-        }),
-      };
-      ev.data.body = "claude_code.api_response_body";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
-      expect(after.computedOutput).toBe("I see three entries.");
-      expect(after.attributes["langwatch.output"]).toBe("I see three entries.");
     });
 
     it("ignores `prompt` on non-user_prompt claude_code events (subagent pollution guard)", () => {
-      // Reported on PR #4544 v2-drawer screenshot: the trace input was
-      // showing "env" instead of the user's real prompt. Root cause:
-      // a tool/subagent emitted a record with `prompt:"env"` (a Bash
-      // tool subagent's shell command) and the fold accepted it as a
-      // valid trace input because it only gated on the claude_code
-      // scope, not on event.name.
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({
-        "session.id": "s",
-        prompt: "env",
-      });
-      ev.data.attributes["event.name"] = "tool_call";
-      ev.data.body = "claude_code.tool_call";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          { "event.name": "tool_call", "session.id": "s", prompt: "env" },
+          { body: "claude_code.tool_call" },
+        ),
+        state,
+      );
       expect(after.computedInput).toBe(state.computedInput);
       expect(after.attributes["langwatch.input"]).toBeUndefined();
     });
   });
 
-  describe("when api_request comes from a non-claude scope", () => {
-    it("does NOT misfire on codex.api_request even with same event.name", () => {
+  describe("when a converted model-call event reaches the log fold", () => {
+    it("does NOT lift model/cost/tokens off an api_request (no double-count)", () => {
+      // api_request is converted to a span at ingest and never reaches the
+      // log path; if one ever did, the fold must NOT re-lift its cost/tokens
+      // — that would double-count against the span fold's contribution.
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({
-        "session.id": "s",
-        model: "gpt-5",
-        cost_usd: "0.5",
-      });
-      ev.data.scopeName = "com.openai.codex.events";
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "api_request",
+            "session.id": "s",
+            model: "claude-opus-4-7",
+            cost_usd: "0.5",
+            input_tokens: "100",
+            output_tokens: "50",
+          },
+          { body: "claude_code.api_request" },
+        ),
+        state,
+      );
+      expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
+      expect(after.attributes["langwatch.model"]).toBeUndefined();
+      expect(after.totalCost).toBe(state.totalCost);
+      expect(after.models).toEqual(state.models);
+    });
+  });
 
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+  describe("when api_request comes from a non-claude scope", () => {
+    it("does NOT misfire on a codex api_request even with the same event.name", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "api_request",
+            "session.id": "s",
+            model: "gpt-5",
+            cost_usd: "0.5",
+          },
+          { scopeName: "com.openai.codex.events" },
+        ),
+        state,
+      );
       expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
       expect(after.attributes["langwatch.model"]).toBeUndefined();
     });
@@ -292,27 +159,27 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
   describe("codex.sse_event lift", () => {
     /**
      * Codex emits cost-bearing turns as codex.sse_event with model +
-     * token counts + conversation.id + user.email. No cost field on
-     * the wire — downstream model-pricing fills langwatch.cost.usd
-     * from (model, tokens).
+     * token counts + conversation.id + user.email. No cost field on the
+     * wire — downstream model-pricing fills cost from (model, tokens).
      */
     it("lifts model + token counts + thread.id + principal", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.scopeName = "codex_exec";
-      ev.data.body = "codex.sse_event";
-      ev.data.attributes = {
-        "event.name": "codex.sse_event",
-        model: "gpt-5.5",
-        input_token_count: "9700",
-        output_token_count: "47",
-        cached_token_count: "1200",
-        "conversation.id": "conv_abc",
-        "user.email": "rogerio@langwatch.ai",
-      };
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "codex.sse_event",
+            model: "gpt-5.5",
+            input_token_count: "9700",
+            output_token_count: "47",
+            cached_token_count: "1200",
+            "conversation.id": "conv_abc",
+            "user.email": "rogerio@langwatch.ai",
+          },
+          { scopeName: "codex_exec", body: "codex.sse_event" },
+        ),
+        state,
+      );
       expect(after.attributes["langwatch.model"]).toBe("gpt-5.5");
       expect(after.attributes["langwatch.input_tokens"]).toBe("9700");
       expect(after.attributes["langwatch.output_tokens"]).toBe("47");
@@ -323,24 +190,21 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
       );
     });
 
-    /**
-     * Codex doesn't emit `cache_creation_tokens` on the wire (anthropic
-     * concept). Lift must leave that langwatch.* key untouched so the
-     * trace UI doesn't show a spurious zero.
-     */
     it("does NOT set langwatch.cache_creation_tokens for codex (codex doesn't emit it)", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.body = "codex.sse_event";
-      ev.data.attributes = {
-        "event.name": "codex.sse_event",
-        model: "gpt-5.5",
-        input_token_count: "100",
-        output_token_count: "20",
-      };
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "codex.sse_event",
+            model: "gpt-5.5",
+            input_token_count: "100",
+            output_token_count: "20",
+          },
+          { body: "codex.sse_event" },
+        ),
+        state,
+      );
       expect(after.attributes["langwatch.cache_creation_tokens"]).toBeUndefined();
     });
   });
@@ -349,16 +213,18 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
     it("lifts model + principal even before the first sse_event arrives", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.body = "codex.conversation_starts";
-      ev.data.attributes = {
-        "event.name": "codex.conversation_starts",
-        model: "gpt-5.5",
-        "user.email": "rogerio@langwatch.ai",
-        "conversation.id": "conv_x",
-      };
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "codex.conversation_starts",
+            model: "gpt-5.5",
+            "user.email": "rogerio@langwatch.ai",
+            "conversation.id": "conv_x",
+          },
+          { body: "codex.conversation_starts" },
+        ),
+        state,
+      );
       expect(after.attributes["langwatch.model"]).toBe("gpt-5.5");
       expect(after.attributes["langwatch.principal.email"]).toBe(
         "rogerio@langwatch.ai",
@@ -370,22 +236,22 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
     it("lifts every gen_ai canonical field a gemini log carries", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.scopeName = "gen_ai";
-      ev.data.body = "gen_ai.event";
-      ev.data.attributes = {
-        "gen_ai.request.model": "gemini-2.0-flash",
-        "gen_ai.usage.input_tokens": "150",
-        "gen_ai.usage.output_tokens": "30",
-        "gen_ai.conversation.id": "conv_g",
-        "gen_ai.input.messages":
-          '[{"role":"user","content":"Hi"}]',
-        "gen_ai.output.messages":
-          '[{"role":"assistant","content":"Hello"}]',
-        cached_content_token_count: "7",
-      };
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "gen_ai.request.model": "gemini-2.0-flash",
+            "gen_ai.usage.input_tokens": "150",
+            "gen_ai.usage.output_tokens": "30",
+            "gen_ai.conversation.id": "conv_g",
+            "gen_ai.input.messages": '[{"role":"user","content":"Hi"}]',
+            "gen_ai.output.messages":
+              '[{"role":"assistant","content":"Hello"}]',
+            cached_content_token_count: "7",
+          },
+          { scopeName: "gen_ai", body: "gen_ai.event" },
+        ),
+        state,
+      );
       expect(after.attributes["langwatch.model"]).toBe("gemini-2.0-flash");
       expect(after.attributes["langwatch.input_tokens"]).toBe("150");
       expect(after.attributes["langwatch.output_tokens"]).toBe("30");
@@ -402,126 +268,95 @@ describe("TraceSummaryFoldProjection — claude_code api_request lift", () => {
     it("leaves langwatch.* untouched when zero gen_ai.* fields are present", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({});
-      ev.data.scopeName = "gen_ai";
-      ev.data.attributes = { "event.name": "noise" };
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent({ "event.name": "noise" }, { scopeName: "gen_ai" }),
+        state,
+      );
       expect(after.attributes["langwatch.model"]).toBeUndefined();
       expect(after.attributes["langwatch.input_tokens"]).toBeUndefined();
     });
   });
 
-  // Top-level column mirror — the v2 trace drawer header chips + the
-  // /traces list cost column read trace.totalCost / trace.models /
-  // trace.totalPromptTokenCount / trace.totalCompletionTokenCount
-  // directly, NOT trace.attributes["langwatch.cost.usd"]. For Path B
-  // log-only traces (claude_code subscription mode, codex /v1/logs,
-  // gemini OTLP) those top-level columns were always null because the
-  // fold only wrote to state.attributes. These tests pin the mirror
-  // so the drawer + list chips render populated for log-only
-  // cost-bearing traces.
+  // Top-level column mirror — the v2 drawer header chips + /traces list read
+  // trace.models / trace.totalPromptTokenCount / trace.totalCompletionTokenCount
+  // directly. For Path B log-only emitters that stay on the log path (codex,
+  // gemini) the mirror lifts those columns off the canonical log attrs.
   describe("top-level column mirror from log lifts", () => {
+    const codexTurn = (
+      model: string,
+      inTok: string,
+      outTok: string,
+    ): LogRecordReceivedEvent =>
+      makeLogEvent(
+        {
+          "event.name": "codex.sse_event",
+          model,
+          input_token_count: inTok,
+          output_token_count: outTok,
+          "conversation.id": "conv_mirror",
+        },
+        { scopeName: "codex_exec", body: "codex.sse_event" },
+      );
+
     it("mirrors langwatch.model onto state.models (deduped union)", () => {
       const projection = makeProjection();
-      const state = createInitState();
-
       const after = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-opus-4-7",
-          cost_usd: "0.0875",
-          input_tokens: "1542",
-          output_tokens: "318",
-        }),
-        state,
+        codexTurn("gpt-5.5", "1542", "318"),
+        createInitState(),
       );
-      expect(after.models).toEqual(["claude-opus-4-7"]);
+      expect(after.models).toEqual(["gpt-5.5"]);
     });
 
-    it("mirrors cost.usd + tokens onto top-level columns", () => {
+    it("mirrors token counts onto the top-level columns", () => {
       const projection = makeProjection();
-      const state = createInitState();
-
       const after = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-opus-4-7",
-          cost_usd: "0.0875",
-          input_tokens: "1542",
-          output_tokens: "318",
-        }),
-        state,
+        codexTurn("gpt-5.5", "1542", "318"),
+        createInitState(),
       );
-      expect(after.totalCost).toBeCloseTo(0.0875, 6);
       expect(after.totalPromptTokenCount).toBe(1542);
       expect(after.totalCompletionTokenCount).toBe(318);
     });
 
-    it("accumulates totalCost + tokens across multi-turn api_request events", () => {
+    it("accumulates tokens across multi-turn events; models stay deduped", () => {
       const projection = makeProjection();
       let state = createInitState();
       state = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-opus-4-7",
-          cost_usd: "0.05",
-          input_tokens: "100",
-          output_tokens: "50",
-        }),
+        codexTurn("gpt-5.5", "100", "50"),
         state,
       );
       state = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-opus-4-7",
-          cost_usd: "0.03",
-          input_tokens: "200",
-          output_tokens: "70",
-        }),
+        codexTurn("gpt-5.5", "200", "70"),
         state,
       );
-      expect(state.totalCost).toBeCloseTo(0.08, 6);
       expect(state.totalPromptTokenCount).toBe(300);
       expect(state.totalCompletionTokenCount).toBe(120);
-      // Same model twice stays as one entry — Models is a set, not a list.
-      expect(state.models).toEqual(["claude-opus-4-7"]);
+      expect(state.models).toEqual(["gpt-5.5"]);
     });
 
     it("unions multiple distinct models across turns", () => {
       const projection = makeProjection();
       let state = createInitState();
       state = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-haiku-4-5-20251001",
-          cost_usd: "0.001",
-          input_tokens: "10",
-          output_tokens: "5",
-        }),
+        codexTurn("gpt-5-mini", "10", "5"),
         state,
       );
       state = projection.handleTraceLogRecordReceived(
-        makeClaudeApiRequestEvent({
-          model: "claude-opus-4-7",
-          cost_usd: "0.05",
-          input_tokens: "100",
-          output_tokens: "50",
-        }),
+        codexTurn("gpt-5.5", "100", "50"),
         state,
       );
-      expect(state.models).toEqual([
-        "claude-haiku-4-5-20251001",
-        "claude-opus-4-7",
-      ]);
+      expect(state.models).toEqual(["gpt-5-mini", "gpt-5.5"]);
     });
 
     it("leaves top-level columns untouched when no canonical lift fires", () => {
       const projection = makeProjection();
       const state = createInitState();
-      const ev = makeClaudeApiRequestEvent({
-        "session.id": "s",
-        prompt: "Hi",
-      });
-      ev.data.attributes["event.name"] = "user_prompt";
-      ev.data.body = "claude_code.user_prompt";
-
-      const after = projection.handleTraceLogRecordReceived(ev, state);
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          { "event.name": "user_prompt", "session.id": "s", prompt: "Hi" },
+          { body: "claude_code.user_prompt" },
+        ),
+        state,
+      );
       expect(after.models).toEqual(state.models);
       expect(after.totalCost).toBe(state.totalCost);
       expect(after.totalPromptTokenCount).toBe(state.totalPromptTokenCount);

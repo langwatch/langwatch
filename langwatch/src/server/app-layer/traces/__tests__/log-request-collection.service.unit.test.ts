@@ -1,14 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type {
+  RecordLogCommandData,
+  RecordSpanCommandData,
+} from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import { LogRequestCollectionService } from "../log-request-collection.service";
 
 function makeService() {
   const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(
     () => Promise.resolve(),
   );
-  const service = new LogRequestCollectionService({ recordLog });
-  return { service, recordLog };
+  const recordSpan = vi.fn<(data: RecordSpanCommandData) => Promise<void>>(
+    () => Promise.resolve(),
+  );
+  const service = new LogRequestCollectionService({ recordLog, recordSpan });
+  return { service, recordLog, recordSpan };
 }
 
 describe("LogRequestCollectionService", () => {
@@ -107,14 +113,15 @@ describe("LogRequestCollectionService", () => {
 
   describe("claude_code log records — trace_id / span_id synthesis", () => {
     /**
-     * Claude Code 2.1.x emits its api_request / user_prompt events
-     * outside any active span, so the OTLP exporter sends them with
-     * empty trace_id / span_id. Without the synthesizer the fold
-     * projection skips the records and /me/traces shows nothing.
+     * Claude Code 2.1.x emits its events outside any active span, so the
+     * OTLP exporter sends them with empty trace_id / span_id. Without the
+     * synthesizer the fold projection skips the records and /me/traces
+     * shows nothing. The synthesizer derives stable ids from (session.id,
+     * prompt.id, event.name, event.sequence) at receive time.
      *
-     * The synthesizer derives stable ids from (session.id,
-     * prompt.id, event.name, event.sequence) at receive time so the
-     * existing fold + extractIOFromLogRecord operate unchanged.
+     * These cases exercise the synthesis through `user_prompt`, which stays
+     * on the log path (only the model-call triplet is converted to spans —
+     * see the conversion describe block below).
      */
     const claudeBatch = (records: Array<Record<string, any>>) => ({
       resourceLogs: [
@@ -137,32 +144,40 @@ describe("LogRequestCollectionService", () => {
       ],
     });
 
+    const userPrompt = (
+      sessionId: string,
+      promptId: string,
+      seq: string,
+      extra: Record<string, any>[] = [],
+    ) => ({
+      timeUnixNano: "1700000000000000000",
+      body: { stringValue: "claude_code.user_prompt" },
+      attributes: [
+        { key: "event.name", value: { stringValue: "user_prompt" } },
+        { key: "session.id", value: { stringValue: sessionId } },
+        { key: "prompt.id", value: { stringValue: promptId } },
+        { key: "event.sequence", value: { stringValue: seq } },
+        ...extra,
+      ],
+    });
+
     it("synthesizes a stable traceId from session.id and a stable spanId per event", async () => {
       const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
         logRequest: claudeBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "claude_code.user_prompt" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "user_prompt" } },
-              { key: "session.id", value: { stringValue: "sess_42" } },
-              { key: "prompt.id", value: { stringValue: "p_1" } },
-              { key: "event.sequence", value: { stringValue: "1" } },
-              { key: "prompt", value: { stringValue: "What is 2+2?" } },
-            ],
-          },
+          userPrompt("sess_42", "p_1", "1", [
+            { key: "prompt", value: { stringValue: "What is 2+2?" } },
+          ]),
           {
             timeUnixNano: "1700000001000000000",
-            body: { stringValue: "claude_code.api_request" },
+            body: { stringValue: "claude_code.hook_registered" },
             attributes: [
-              { key: "event.name", value: { stringValue: "api_request" } },
+              { key: "event.name", value: { stringValue: "hook_registered" } },
               { key: "session.id", value: { stringValue: "sess_42" } },
               { key: "prompt.id", value: { stringValue: "p_1" } },
               { key: "event.sequence", value: { stringValue: "2" } },
-              { key: "model", value: { stringValue: "claude-opus-4-7" } },
             ],
           },
         ]),
@@ -182,24 +197,12 @@ describe("LogRequestCollectionService", () => {
 
     it("returns the SAME traceId across multiple turns of one session", async () => {
       const { service, recordLog } = makeService();
-      const mkRec = (promptId: string, seq: string, evName: string) => ({
-        timeUnixNano: "1700000000000000000",
-        body: { stringValue: `claude_code.${evName}` },
-        attributes: [
-          { key: "event.name", value: { stringValue: evName } },
-          { key: "session.id", value: { stringValue: "sess_multiturn" } },
-          { key: "prompt.id", value: { stringValue: promptId } },
-          { key: "event.sequence", value: { stringValue: seq } },
-        ],
-      });
 
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
         logRequest: claudeBatch([
-          mkRec("p_1", "1", "user_prompt"),
-          mkRec("p_1", "2", "api_request"),
-          mkRec("p_2", "3", "user_prompt"),
-          mkRec("p_2", "4", "api_request"),
+          userPrompt("sess_multiturn", "p_1", "1"),
+          userPrompt("sess_multiturn", "p_2", "3"),
         ]),
         piiRedactionLevel: "ESSENTIAL",
       });
@@ -209,20 +212,13 @@ describe("LogRequestCollectionService", () => {
 
     it("returns DIFFERENT traceIds across different sessions", async () => {
       const { service, recordLog } = makeService();
-      const mkRec = (sessionId: string) => ({
-        timeUnixNano: "1700000000000000000",
-        body: { stringValue: "claude_code.api_request" },
-        attributes: [
-          { key: "event.name", value: { stringValue: "api_request" } },
-          { key: "session.id", value: { stringValue: sessionId } },
-          { key: "prompt.id", value: { stringValue: "p_1" } },
-          { key: "event.sequence", value: { stringValue: "1" } },
-        ],
-      });
 
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
-        logRequest: claudeBatch([mkRec("sess_A"), mkRec("sess_B")]),
+        logRequest: claudeBatch([
+          userPrompt("sess_A", "p_1", "1"),
+          userPrompt("sess_B", "p_1", "1"),
+        ]),
         piiRedactionLevel: "ESSENTIAL",
       });
       const [c1, c2] = recordLog.mock.calls;
@@ -232,21 +228,11 @@ describe("LogRequestCollectionService", () => {
     /**
      * Idempotency guard: re-running the same OTLP batch (network
      * retry, receiver restart) must produce the same trace+span ids
-     * so the stored_log_records ReplacingMergeTree dedups instead
-     * of double-counting cost.
+     * so the stored_log_records ReplacingMergeTree dedups.
      */
     it("derives the same ids when re-ingesting the same record", async () => {
       const { service, recordLog } = makeService();
-      const rec = {
-        timeUnixNano: "1700000000000000000",
-        body: { stringValue: "claude_code.api_request" },
-        attributes: [
-          { key: "event.name", value: { stringValue: "api_request" } },
-          { key: "session.id", value: { stringValue: "s" } },
-          { key: "prompt.id", value: { stringValue: "p" } },
-          { key: "event.sequence", value: { stringValue: "1" } },
-        ],
-      };
+      const rec = userPrompt("s", "p", "1");
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
         logRequest: claudeBatch([rec]),
@@ -311,9 +297,9 @@ describe("LogRequestCollectionService", () => {
             timeUnixNano: "1700000000000000000",
             traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             spanId: "1122334455667788",
-            body: { stringValue: "claude_code.api_request" },
+            body: { stringValue: "claude_code.user_prompt" },
             attributes: [
-              { key: "event.name", value: { stringValue: "api_request" } },
+              { key: "event.name", value: { stringValue: "user_prompt" } },
               { key: "session.id", value: { stringValue: "s" } },
             ],
           },
@@ -332,9 +318,9 @@ describe("LogRequestCollectionService", () => {
         logRequest: claudeBatch([
           {
             timeUnixNano: "1700000000000000000",
-            body: { stringValue: "claude_code.api_request" },
+            body: { stringValue: "claude_code.user_prompt" },
             attributes: [
-              { key: "event.name", value: { stringValue: "api_request" } },
+              { key: "event.name", value: { stringValue: "user_prompt" } },
               // no session.id
             ],
           },
@@ -344,6 +330,129 @@ describe("LogRequestCollectionService", () => {
       const r = recordLog.mock.calls[0]![0]!;
       expect(r.traceId).toBe("");
       expect(r.spanId).toBe("");
+    });
+  });
+
+  describe("when a claude_code model-call event is converted to a span", () => {
+    /**
+     * The model-call triplet (api_request / api_request_body /
+     * api_response_body) is trapped at ingest and converted into a single
+     * gen_ai span; those records are NOT written to stored_log_records.
+     * Every OTHER claude_code event stays on the log path. The detailed
+     * join / shape / cost / orphan behaviour lives in the converter's own
+     * unit test — these cases assert the service-level routing.
+     */
+    const scopeLogs = (records: Array<Record<string, any>>) => ({
+      resourceLogs: [
+        {
+          resource: { attributes: [] },
+          scopeLogs: [
+            {
+              scope: {
+                name: "com.anthropic.claude_code.events",
+                version: "2.1.162",
+              },
+              logRecords: records,
+            },
+          ],
+        },
+      ],
+    });
+
+    const apiRequest = (seq: string, requestId: string) => ({
+      timeUnixNano: "1700000001000000000",
+      body: { stringValue: "claude_code.api_request" },
+      attributes: [
+        { key: "event.name", value: { stringValue: "api_request" } },
+        { key: "session.id", value: { stringValue: "sess_conv" } },
+        { key: "prompt.id", value: { stringValue: "p_1" } },
+        { key: "event.sequence", value: { stringValue: seq } },
+        { key: "model", value: { stringValue: "claude-opus-4-7" } },
+        { key: "input_tokens", value: { stringValue: "120" } },
+        { key: "output_tokens", value: { stringValue: "30" } },
+        { key: "cost_usd", value: { stringValue: "0.0875" } },
+        { key: "duration_ms", value: { stringValue: "2113" } },
+        { key: "request_id", value: { stringValue: requestId } },
+        { key: "query_source", value: { stringValue: "repl_main_thread" } },
+      ],
+    });
+
+    const attrOf = (data: RecordSpanCommandData, key: string): unknown =>
+      data.span.attributes.find((a) => a.key === key)?.value;
+
+    it("drops the api_request from the log path and emits a gen_ai span instead", async () => {
+      const { service, recordLog, recordSpan } = makeService();
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: scopeLogs([apiRequest("1", "req_a")]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(recordLog).not.toHaveBeenCalled();
+      expect(recordSpan).toHaveBeenCalledTimes(1);
+      const data = recordSpan.mock.calls[0]![0]!;
+      expect(data.span.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(attrOf(data, "gen_ai.system")).toEqual({
+        stringValue: "claude_code",
+      });
+      expect(attrOf(data, "gen_ai.request.model")).toEqual({
+        stringValue: "claude-opus-4-7",
+      });
+      expect(attrOf(data, "gen_ai.usage.input_tokens")).toEqual({
+        intValue: 120,
+      });
+      expect(attrOf(data, "langwatch.span.cost")).toEqual({
+        doubleValue: 0.0875,
+      });
+      expect(attrOf(data, "langwatch.span.type")).toEqual({
+        stringValue: "llm",
+      });
+    });
+
+    it("keeps lifecycle events as logs while converting model-call events", async () => {
+      const { service, recordLog, recordSpan } = makeService();
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: scopeLogs([
+          {
+            timeUnixNano: "1700000000000000000",
+            body: { stringValue: "claude_code.user_prompt" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "user_prompt" } },
+              { key: "session.id", value: { stringValue: "sess_conv" } },
+              { key: "prompt", value: { stringValue: "hello" } },
+            ],
+          },
+          apiRequest("2", "req_b"),
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(recordLog).toHaveBeenCalledTimes(1);
+      expect(recordLog.mock.calls[0]![0]!.attributes["event.name"]).toBe(
+        "user_prompt",
+      );
+      expect(recordSpan).toHaveBeenCalledTimes(1);
+    });
+
+    it("is idempotent: the same api_request yields the same span id on re-ingest", async () => {
+      const { service, recordSpan } = makeService();
+      const batch = scopeLogs([apiRequest("1", "req_c")]);
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: batch,
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: batch,
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      const [c1, c2] = recordSpan.mock.calls;
+      expect(c1![0]!.span.spanId).toBe(c2![0]!.span.spanId);
+      expect(c1![0]!.span.traceId).toBe(c2![0]!.span.traceId);
     });
   });
 
