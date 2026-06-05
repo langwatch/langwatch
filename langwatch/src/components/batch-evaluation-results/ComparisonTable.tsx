@@ -1,10 +1,12 @@
 /**
- * ComparisonTable - Table component for comparing multiple evaluation runs
+ * ComparisonTable - Table component for comparing multiple evaluation runs.
  *
- * Displays stacked values from different runs with colored indicators.
+ * Displays stacked per-run values with colored indicators. Optionally
+ * groups rows under collapsible headers keyed on a dataset-entry
+ * metadata field (issue #4632).
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -12,7 +14,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { DiffCell, type DiffValue } from "./DiffCell";
@@ -29,6 +31,7 @@ import type {
   BatchTargetColumn,
   ComparisonRunData,
 } from "./types";
+import { useResultsGrouping } from "./useResultsGrouping";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */
@@ -39,6 +42,14 @@ type ComparisonTableProps = {
   hiddenColumns?: Set<string>;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /**
+   * Group rows by this dataset-entry metadata key. `null`/undefined =
+   * flat (no grouping). Controlled when provided; otherwise the
+   * component manages its own local selection (no URL sync).
+   */
+  groupBy?: string | null;
+  /** Callback when the user picks a different grouping key. */
+  onGroupByChange?: (key: string | null) => void;
 };
 
 /**
@@ -53,6 +64,8 @@ type ComparisonRow = {
   >;
   runColors: Record<string, string>;
 };
+
+const GROUP_UNSPECIFIED = "Unspecified";
 
 // Column helper for comparison rows
 const comparisonColumnHelper = createColumnHelper<ComparisonRow>();
@@ -241,11 +254,108 @@ const buildComparisonRows = (
   return rows;
 };
 
+/**
+ * Pick the group value for a row from whichever run carries it.
+ * Falls back to "Unspecified" if no run has a usable value.
+ */
+const getGroupValueForRow = (
+  row: ComparisonRow,
+  groupBy: string,
+): string => {
+  for (const runId of Object.keys(row.datasetEntries)) {
+    const entry = row.datasetEntries[runId];
+    const value = entry?.[groupBy];
+    if (value === null || value === undefined || value === "") continue;
+    if (typeof value === "object") continue;
+    return String(value);
+  }
+  return GROUP_UNSPECIFIED;
+};
+
+/**
+ * Bucket rows by group value, preserving first-seen order and pushing
+ * the "Unspecified" bucket to the end so users notice the catch-all.
+ */
+const bucketRowsByGroup = (
+  rows: ComparisonRow[],
+  groupBy: string,
+): Array<{ value: string; rows: ComparisonRow[] }> => {
+  const buckets = new Map<string, ComparisonRow[]>();
+  for (const row of rows) {
+    const value = getGroupValueForRow(row, groupBy);
+    const existing = buckets.get(value) ?? [];
+    existing.push(row);
+    buckets.set(value, existing);
+  }
+  const ordered = Array.from(buckets.entries()).map(([value, rows]) => ({
+    value,
+    rows,
+  }));
+  ordered.sort((a, b) => {
+    if (a.value === GROUP_UNSPECIFIED) return 1;
+    if (b.value === GROUP_UNSPECIFIED) return -1;
+    return 0;
+  });
+  return ordered;
+};
+
+type GroupAggregates = Record<
+  string, // runId
+  Record<string, { mean: number; count: number; evaluatorName: string }>
+>;
+
+/**
+ * Mean evaluator score per (runId, evaluatorId) across the rows in the
+ * group. Aggregates from `evaluatorResults` rather than the top-level
+ * evaluatorIds list — that field can be V2/V3 keyed and is not needed
+ * here since we only display present scores.
+ */
+const computeGroupAggregates = (
+  rowsInGroup: ComparisonRow[],
+  comparisonData: ComparisonRunData[],
+): GroupAggregates => {
+  const result: GroupAggregates = {};
+  for (const run of comparisonData) {
+    const perEval = new Map<
+      string,
+      { sum: number; count: number; evaluatorName: string }
+    >();
+    for (const row of rowsInGroup) {
+      const targets = row.targetsByRun[run.runId];
+      if (!targets) continue;
+      for (const target of Object.values(targets)) {
+        for (const ev of target.evaluatorResults) {
+          if (ev.score === null || ev.score === undefined) continue;
+          const slot = perEval.get(ev.evaluatorId) ?? {
+            sum: 0,
+            count: 0,
+            evaluatorName: ev.evaluatorName,
+          };
+          slot.sum += ev.score;
+          slot.count += 1;
+          perEval.set(ev.evaluatorId, slot);
+        }
+      }
+    }
+    result[run.runId] = {};
+    for (const [evId, slot] of perEval) {
+      result[run.runId]![evId] = {
+        mean: slot.sum / slot.count,
+        count: slot.count,
+        evaluatorName: slot.evaluatorName,
+      };
+    }
+  }
+  return result;
+};
+
 export function ComparisonTable({
   comparisonData,
   isLoading,
   hiddenColumns = new Set(),
   disableVirtualization = false,
+  groupBy: controlledGroupBy,
+  onGroupByChange,
 }: ComparisonTableProps) {
   // Build columns for comparison mode
   const columns = useMemo(() => {
@@ -267,6 +377,54 @@ export function ComparisonTable({
     getCoreRowModel: coreRowModel,
   });
 
+  // Group-by: controlled (parent owns URL sync) or internal (component-local).
+  const [internalGroupBy, setInternalGroupBy] = useState<string | null>(null);
+  const effectiveGroupBy =
+    controlledGroupBy !== undefined ? controlledGroupBy : internalGroupBy;
+  const handleGroupByChange = useCallback(
+    (next: string | null) => {
+      if (onGroupByChange) onGroupByChange(next);
+      else setInternalGroupBy(next);
+    },
+    [onGroupByChange],
+  );
+
+  const { availableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+
+  // Group-by dropdown state. Match the chart's portal-popover pattern
+  // (see ComparisonCharts.tsx) so the menu can't be clipped by an
+  // overflow:hidden ancestor in BatchEvaluationResults.
+  const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
+  const [groupByBtnRect, setGroupByBtnRect] = useState<DOMRect | null>(null);
+  const groupByBtnRef = useRef<HTMLButtonElement>(null);
+  const openGroupByDropdown = () => {
+    const rect = groupByBtnRef.current?.getBoundingClientRect() ?? null;
+    setGroupByBtnRect(rect);
+    setGroupByDropdownOpen(true);
+  };
+
+  // Collapse state for grouped sections.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleCollapse = useCallback((value: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }, []);
+
+  // Bucket rows when grouping is active.
+  const groupedRows = useMemo(() => {
+    if (!effectiveGroupBy) return null;
+    return bucketRowsByGroup(comparisonRows, effectiveGroupBy);
+  }, [comparisonRows, effectiveGroupBy]);
+
   // State for scroll container - using state triggers re-render when mounted
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
     null,
@@ -287,14 +445,15 @@ export function ComparisonTable({
   );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
-  // Set up row virtualization with dynamic measurement
+  // Set up row virtualization with dynamic measurement. Virtualization
+  // assumes a flat tbody — when grouping is active we render multiple
+  // <tbody> sections, so we skip the virtualizer in that mode.
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement,
     estimateSize,
     overscan: 5,
-    enabled: !!scrollContainer,
-    // Enable dynamic measurement - measures actual row heights as they render
+    enabled: !!scrollContainer && !groupedRows,
     measureElement:
       typeof window !== "undefined"
         ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
@@ -328,8 +487,13 @@ export function ComparisonTable({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
-  const rows = table.getRowModel().rows;
+  const tableRows = table.getRowModel().rows;
   const columnCount = table.getAllColumns().length;
+  // Lookup table-row by original index, so the grouped render can reuse
+  // TanStack's column model without rebuilding cells from scratch.
+  const tableRowByIndex = new Map(
+    tableRows.map((r) => [r.original.index, r] as const),
+  );
 
   // Calculate padding to maintain scroll position (only when virtualizing)
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
@@ -338,92 +502,297 @@ export function ComparisonTable({
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
+  const showGroupByControl = availableKeys.length > 0;
+  const dropdownOptions: Array<{ key: string | null; label: string }> = [
+    { key: null, label: "No grouping" },
+    ...availableKeys.map((k) => ({ key: k, label: k })),
+  ];
+
   return (
-    <Box
-      ref={scrollContainerRef}
-      overflowX="auto"
-      overflowY="auto"
-      width="100%"
-      height="100%"
-      css={tableStyles}
-    >
-      <table>
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th key={header.id} style={{ width: header.getSize() }}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {disableVirtualization ? (
-            // Test mode: render all rows without virtualization
-            rows.map((row) => (
-              <tr key={row.id} data-index={row.index}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+    <VStack align="stretch" width="100%" height="100%" gap={0}>
+      {showGroupByControl && (
+        <HStack paddingX={2} paddingY={2} flexShrink={0}>
+          <Box>
+            <Button
+              ref={groupByBtnRef}
+              size="xs"
+              variant="outline"
+              onClick={() =>
+                groupByDropdownOpen
+                  ? setGroupByDropdownOpen(false)
+                  : openGroupByDropdown()
+              }
+              data-testid="group-by-row-button"
+            >
+              Group rows by: {effectiveGroupBy ?? "No grouping"}
+            </Button>
+            {groupByDropdownOpen && groupByBtnRect && (
+              <Portal>
+                <Box
+                  position="fixed"
+                  inset={0}
+                  zIndex={1000}
+                  onClick={() => setGroupByDropdownOpen(false)}
+                  data-testid="group-by-row-backdrop"
+                />
+                <Box
+                  position="fixed"
+                  top={`${groupByBtnRect.bottom + 4}px`}
+                  left={`${groupByBtnRect.left}px`}
+                  bg="bg.panel"
+                  border="1px solid"
+                  borderColor="border"
+                  borderRadius="md"
+                  boxShadow="md"
+                  zIndex={1001}
+                  minWidth="180px"
+                  padding={2}
+                  style={{
+                    maxHeight: `calc(100vh - ${groupByBtnRect.bottom + 16}px)`,
+                    overflowY: "auto",
+                  }}
+                  data-testid="group-by-row-dropdown"
+                >
+                  <VStack align="stretch" gap={1}>
+                    {dropdownOptions.map((opt) => {
+                      const selected = effectiveGroupBy === opt.key ||
+                        (effectiveGroupBy == null && opt.key === null);
+                      return (
+                        <HStack
+                          key={opt.key ?? "none"}
+                          padding={1}
+                          borderRadius="sm"
+                          cursor="pointer"
+                          bg={selected ? "blue.subtle" : "transparent"}
+                          _hover={{
+                            bg: selected ? "blue.muted" : "bg.subtle",
+                          }}
+                          onClick={() => {
+                            handleGroupByChange(opt.key);
+                            setGroupByDropdownOpen(false);
+                          }}
+                          data-testid={`group-by-row-option-${opt.key ?? "none"}`}
+                        >
+                          <Text
+                            fontSize="sm"
+                            fontWeight={selected ? "medium" : "normal"}
+                            color={selected ? "blue.fg" : "inherit"}
+                          >
+                            {opt.label}
+                          </Text>
+                        </HStack>
+                      );
+                    })}
+                  </VStack>
+                </Box>
+              </Portal>
+            )}
+          </Box>
+        </HStack>
+      )}
+
+      <Box
+        ref={scrollContainerRef}
+        overflowX="auto"
+        overflowY="auto"
+        width="100%"
+        flex={1}
+        minHeight={0}
+        css={tableStyles}
+      >
+        <table>
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th key={header.id} style={{ width: header.getSize() }}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </th>
                 ))}
               </tr>
-            ))
+            ))}
+          </thead>
+
+          {groupedRows ? (
+            // Grouped mode: one <tbody> per group. Header row spans all
+            // columns and carries the per-run mean badges.
+            groupedRows.map(({ value, rows }) => {
+              const aggregates = computeGroupAggregates(rows, comparisonData);
+              const collapsed = collapsedGroups.has(value);
+              return (
+                <tbody
+                  key={value}
+                  data-testid={`group-section-${value}`}
+                >
+                  <tr data-testid={`group-header-${value}`}>
+                    <td
+                      colSpan={columnCount}
+                      style={{
+                        background: "var(--chakra-colors-bg-subtle)",
+                        borderTop: "1px solid var(--chakra-colors-border)",
+                        borderBottom:
+                          "1px solid var(--chakra-colors-border)",
+                        padding: "6px 8px",
+                      }}
+                    >
+                      <HStack gap={3} align="center">
+                        <Box
+                          as="button"
+                          aria-label={collapsed ? "Expand" : "Collapse"}
+                          onClick={() => toggleCollapse(value)}
+                          data-testid={`group-header-toggle-${value}`}
+                          fontSize="12px"
+                          color="fg.muted"
+                          paddingX={1}
+                          cursor="pointer"
+                        >
+                          {collapsed ? "▶" : "▼"}
+                        </Box>
+                        <Text fontSize="13px" fontWeight="semibold">
+                          {value}
+                        </Text>
+                        <Text
+                          fontSize="12px"
+                          color="fg.muted"
+                          data-testid={`group-count-${value}`}
+                        >
+                          {rows.length}
+                          {rows.length === 1 ? " row" : " rows"}
+                        </Text>
+                        <Spacer />
+                        <HStack gap={4} align="start">
+                          {comparisonData.map((run) => {
+                            const perEval = aggregates[run.runId] ?? {};
+                            const entries = Object.entries(perEval);
+                            if (entries.length === 0) return null;
+                            return (
+                              <VStack key={run.runId} gap={0} align="end">
+                                {entries.map(([evId, stats]) => (
+                                  <HStack
+                                    key={evId}
+                                    gap={1}
+                                    fontSize="11px"
+                                    color="fg.muted"
+                                  >
+                                    <Box
+                                      width="6px"
+                                      height="6px"
+                                      borderRadius="full"
+                                      bg={run.color}
+                                    />
+                                    <Text>{stats.evaluatorName}</Text>
+                                    <Text
+                                      fontWeight="medium"
+                                      color="fg"
+                                      data-testid={`group-mean-${value}-${run.runId}-${evId}`}
+                                    >
+                                      {stats.mean.toFixed(2)}
+                                    </Text>
+                                  </HStack>
+                                ))}
+                              </VStack>
+                            );
+                          })}
+                        </HStack>
+                      </HStack>
+                    </td>
+                  </tr>
+                  {!collapsed &&
+                    rows.map((comparisonRow) => {
+                      const tableRow = tableRowByIndex.get(
+                        comparisonRow.index,
+                      );
+                      if (!tableRow) return null;
+                      return (
+                        <tr
+                          key={tableRow.id}
+                          data-index={tableRow.index}
+                        >
+                          {tableRow.getVisibleCells().map((cell) => (
+                            <td
+                              key={cell.id}
+                              style={{ width: cell.column.getSize() }}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              );
+            })
           ) : (
-            <>
-              {/* Top padding row to maintain scroll position */}
-              {paddingTop > 0 && (
-                <tr>
-                  <td
-                    style={{ height: `${paddingTop}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
-                </tr>
-              )}
-              {/* Render only virtualized rows - empty until container is measured */}
-              {virtualRows.map((virtualRow) => {
-                const row = rows[virtualRow.index];
-                if (!row) return null;
-                return (
-                  <tr
-                    key={row.id}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                  >
+            <tbody>
+              {disableVirtualization ? (
+                // Test mode: render all rows without virtualization
+                tableRows.map((row) => (
+                  <tr key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
-                );
-              })}
-              {/* Bottom padding row to maintain scroll position */}
-              {paddingBottom > 0 && (
-                <tr>
-                  <td
-                    style={{ height: `${paddingBottom}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
-                </tr>
+                ))
+              ) : (
+                <>
+                  {/* Top padding row to maintain scroll position */}
+                  {paddingTop > 0 && (
+                    <tr>
+                      <td
+                        style={{ height: `${paddingTop}px`, padding: 0 }}
+                        colSpan={columnCount}
+                      />
+                    </tr>
+                  )}
+                  {/* Render only virtualized rows - empty until container is measured */}
+                  {virtualRows.map((virtualRow) => {
+                    const row = tableRows[virtualRow.index];
+                    if (!row) return null;
+                    return (
+                      <tr
+                        key={row.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            style={{ width: cell.column.getSize() }}
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                  {/* Bottom padding row to maintain scroll position */}
+                  {paddingBottom > 0 && (
+                    <tr>
+                      <td
+                        style={{ height: `${paddingBottom}px`, padding: 0 }}
+                        colSpan={columnCount}
+                      />
+                    </tr>
+                  )}
+                </>
               )}
-            </>
+            </tbody>
           )}
-        </tbody>
-      </table>
-    </Box>
+        </table>
+      </Box>
+    </VStack>
   );
 }

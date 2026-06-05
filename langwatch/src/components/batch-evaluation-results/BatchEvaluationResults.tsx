@@ -282,6 +282,35 @@ export function BatchEvaluationResults({
     return undefined;
   }, [router.query.compare]);
 
+  // Group-by-metadata URL sync. The dropdown lives inside ComparisonTable
+  // but the URL contract is shared state, so we own it here. `null`
+  // means "no grouping" (URL param absent).
+  const queryGroupBy = useMemo(() => {
+    const value = router.query.groupBy;
+    if (typeof value === "string" && value.length > 0) return value;
+    return null;
+  }, [router.query.groupBy]);
+
+  const handleGroupByChange = useCallback(
+    (next: string | null) => {
+      if (onSelectRunId) return; // Don't sync URL in controlled mode
+      const newQuery = { ...router.query };
+      if (next) {
+        if (newQuery.groupBy === next) return;
+        newQuery.groupBy = next;
+      } else {
+        if (!("groupBy" in newQuery)) return;
+        delete newQuery.groupBy;
+      }
+      void router.replace(
+        { pathname: router.pathname, query: newQuery },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [onSelectRunId, router],
+  );
+
   // Handle comparison mode URL sync
   const handleComparisonChange = useCallback(
     (isComparing: boolean, comparedRunIds: string[]) => {
@@ -562,6 +591,8 @@ export function BatchEvaluationResults({
                   onToggleColumn={toggleColumn}
                   comparisonData={comparisonData}
                   targetColors={targetColors}
+                  groupBy={queryGroupBy}
+                  onGroupByChange={handleGroupByChange}
                 />
               </Card.Body>
             </Card.Root>
