@@ -940,7 +940,9 @@ function TeamCard({
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDrawer("createProject");
+                      openDrawer("createProject", {
+                        defaultTeamId: team.id,
+                      });
                     }}
                   >
                     <Plus size={12} />
