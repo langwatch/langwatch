@@ -115,7 +115,7 @@ secured
     "/",
     teamServiceMiddleware,
     describeRoute({
-      description: "Create a new team",
+      description: "Create a new team that can group projects and members",
     }),
     zValidator("json", createTeamSchema, validationHook),
     async (c) => {
