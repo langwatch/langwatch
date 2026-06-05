@@ -454,7 +454,7 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 ```
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
 
 ```typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -506,6 +506,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+```
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or `make bot` in another terminal) when the test runs.
+
+```typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 ```
 
