@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Heading,
   SimpleGrid,
   Skeleton,
@@ -117,17 +118,19 @@ export function AiToolsPortal() {
               Your AI tools portal
             </Heading>
             {canManageCatalog ? (
-              <Text fontSize="sm" color="fg.muted">
-                No tools published to your org yet. Visit{" "}
-                <Link
-                  href="/settings/governance/tool-catalog"
-                  color="orange.600"
-                >
-                  Settings → Tool Catalog
-                </Link>{" "}
-                to import the starter pack or add tiles individually. The
-                LangWatch CLI below will work for any admin or member.
-              </Text>
+              <>
+                <Text fontSize="sm" color="fg.muted">
+                  No tools published to your org yet. Import the starter
+                  pack or add tiles individually so your team can install
+                  Claude Code, Codex, Cursor and Gemini in one click. The
+                  LangWatch CLI below will work for any admin or member.
+                </Text>
+                <Button colorPalette="orange" asChild marginTop={1}>
+                  <Link href="/settings/governance/tool-catalog">
+                    Add tools to your portal
+                  </Link>
+                </Button>
+              </>
             ) : (
               <Text fontSize="sm" color="fg.muted">
                 Your admin hasn&apos;t added any AI tools to your portal yet.
@@ -186,7 +189,6 @@ function RenderTile({
           config={entry.config as CodingAssistantConfig}
           iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
-          slug={entry.slug}
         />
       );
     case "model_provider": {
