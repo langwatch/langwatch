@@ -1,4 +1,5 @@
 import type { PrismaClient, Project } from "@prisma/client";
+import { RoleBindingScopeType } from "@prisma/client";
 
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyService } from "./api-key.service";
@@ -109,11 +110,26 @@ export class TokenResolver {
     const apiKey = await this.apiKeyService.verify({ token });
     if (!apiKey) return null;
 
-    if (!projectId) return null;
+    // Ingestion keys are self-scoping: a project-scoped, ingest-only credential
+    // (ingestSourceType set) carries its single target project in its
+    // PROJECT-scoped role binding. The OTLP exporter inside a wrapped tool
+    // authenticates with the bearer token alone and supplies no projectId, so
+    // we derive the bound project from the key itself. Ordinary API keys (no
+    // ingestSourceType) keep requiring an explicit projectId — they can be
+    // scoped to many projects and the caller must say which one.
+    let effectiveProjectId = projectId;
+    if (!effectiveProjectId && apiKey.ingestSourceType) {
+      effectiveProjectId =
+        apiKey.roleBindings.find(
+          (b) => b.scopeType === RoleBindingScopeType.PROJECT && b.scopeId,
+        )?.scopeId ?? null;
+    }
+
+    if (!effectiveProjectId) return null;
 
     // Look up the project and verify it belongs to the API key's organization
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId, archivedAt: null },
+      where: { id: effectiveProjectId, archivedAt: null },
       include: {
         team: { select: { id: true, organizationId: true } },
       },

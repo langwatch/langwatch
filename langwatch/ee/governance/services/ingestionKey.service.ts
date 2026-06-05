@@ -59,7 +59,11 @@ export class IngestionKeyService {
     // Hard-cut rotation: revoke any prior live ingest key for this
     // (project, sourceType) so the previous token dies immediately and we
     // never accumulate keys.
-    const prior = await this.apiKeyRepo.findIngestKey({ projectId, sourceType });
+    const prior = await this.apiKeyRepo.findIngestKey({
+      organizationId,
+      projectId,
+      sourceType,
+    });
     if (prior) {
       await this.apiKeys.revoke({
         id: prior.id,
@@ -152,6 +156,7 @@ export class IngestionKeyService {
     if (!workspace) return [];
 
     const keys = await this.apiKeyRepo.findIngestKeysForProject({
+      organizationId,
       projectId: workspace.project.id,
     });
     return keys

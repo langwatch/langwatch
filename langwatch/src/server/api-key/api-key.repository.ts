@@ -74,14 +74,17 @@ export class ApiKeyRepository {
    * accumulate keys.
    */
   async findIngestKey({
+    organizationId,
     projectId,
     sourceType,
   }: {
+    organizationId: string;
     projectId: string;
     sourceType: string;
   }): Promise<ApiKeyWithBindings | null> {
     return this.prisma.apiKey.findFirst({
       where: {
+        organizationId,
         ingestSourceType: sourceType,
         revokedAt: null,
         roleBindings: {
@@ -100,12 +103,15 @@ export class ApiKeyRepository {
    * green-checked across reloads.
    */
   async findIngestKeysForProject({
+    organizationId,
     projectId,
   }: {
+    organizationId: string;
     projectId: string;
   }): Promise<ApiKeyWithBindings[]> {
     return this.prisma.apiKey.findMany({
       where: {
+        organizationId,
         ingestSourceType: { not: null },
         revokedAt: null,
         roleBindings: {
