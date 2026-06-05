@@ -74,7 +74,7 @@ export async function runSeedAnomalyFixture(
     where: {
       organizationId: org.id,
       scopeType: "PRINCIPAL",
-      principalUserId: user.id,
+      scopeId: user.id,
     },
   });
   let budgetId: string;
@@ -97,7 +97,6 @@ export async function runSeedAnomalyFixture(
         organizationId: org.id,
         scopeType: "PRINCIPAL",
         scopeId: user.id,
-        principalUserId: user.id,
         name: `${args.email} dogfood personal budget`,
         description: "Tight cap for live-fire anomaly-detection dogfood",
         window: "MONTH",
