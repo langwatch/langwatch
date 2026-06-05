@@ -77,6 +77,35 @@ export class PrismaGroupRepository implements GroupRepository {
     return this.prisma.group.create({ data });
   }
 
+  async createAtomic({
+    group,
+    bindings,
+    memberIds,
+  }: {
+    group: CreateGroupInput;
+    bindings: CreateBindingInput[];
+    memberIds: string[];
+  }): Promise<Group> {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.group.create({ data: group });
+
+      if (bindings.length > 0) {
+        await tx.roleBinding.createMany({ data: bindings });
+      }
+
+      if (memberIds.length > 0) {
+        await tx.groupMembership.createMany({
+          data: memberIds.map((userId) => ({
+            groupId: created.id,
+            userId,
+          })),
+        });
+      }
+
+      return created;
+    });
+  }
+
   async rename({
     id,
     organizationId,

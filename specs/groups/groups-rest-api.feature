@@ -20,7 +20,8 @@ Feature: Groups REST API
   @unit
   Scenario: GET /api/groups returns paginated results
     When I send GET /api/groups?page=1&limit=10
-    Then the response includes pagination metadata
+    Then the response status is 200
+    And the response includes pagination metadata
 
   @unit
   Scenario: GET /api/groups returns 401 without auth

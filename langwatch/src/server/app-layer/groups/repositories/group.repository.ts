@@ -65,6 +65,12 @@ export interface GroupRepository {
 
   create(data: CreateGroupInput): Promise<Group>;
 
+  createAtomic(params: {
+    group: CreateGroupInput;
+    bindings: CreateBindingInput[];
+    memberIds: string[];
+  }): Promise<Group>;
+
   rename(params: {
     id: string;
     organizationId: string;

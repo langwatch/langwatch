@@ -78,37 +78,26 @@ export class GroupRestService {
       baseSlug,
     });
 
-    const group = await this.repo.create({
-      id: generate(KSUID_RESOURCES.GROUP).toString(),
+    const groupId = generate(KSUID_RESOURCES.GROUP).toString();
+
+    const bindingInputs = (bindings ?? []).map((b) => ({
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       organizationId,
-      name,
-      slug,
+      groupId,
+      role: b.role,
+      customRoleId:
+        b.role === ("CUSTOM" as TeamUserRole)
+          ? (b.customRoleId ?? null)
+          : null,
+      scopeType: b.scopeType,
+      scopeId: b.scopeId,
+    }));
+
+    return this.repo.createAtomic({
+      group: { id: groupId, organizationId, name, slug },
+      bindings: bindingInputs,
+      memberIds: memberIds ?? [],
     });
-
-    if (bindings?.length) {
-      for (const b of bindings) {
-        await this.repo.createBinding({
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          groupId: group.id,
-          role: b.role,
-          customRoleId:
-            b.role === ("CUSTOM" as TeamUserRole)
-              ? (b.customRoleId ?? null)
-              : null,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        });
-      }
-    }
-
-    if (memberIds?.length) {
-      for (const userId of memberIds) {
-        await this.repo.addMember({ groupId: group.id, userId });
-      }
-    }
-
-    return group;
   }
 
   async rename({
