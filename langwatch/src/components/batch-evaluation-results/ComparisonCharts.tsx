@@ -374,6 +374,16 @@ export const ComparisonCharts = ({
     setGroupByBtnRect(rect);
     setGroupByDropdownOpen(true);
   };
+  // Focus-return on close keeps assistive-tech users oriented — without it,
+  // focus disappears into the void when the portaled menu unmounts.
+  const closeMetricsDropdown = () => {
+    setMetricsDropdownOpen(false);
+    metricsBtnRef.current?.focus();
+  };
+  const closeGroupByDropdown = () => {
+    setGroupByDropdownOpen(false);
+    groupByBtnRef.current?.focus();
+  };
 
   const visibleMetrics = controlledVisibleMetrics ?? internalVisibleMetrics;
   const setVisibleMetrics = (metrics: Set<MetricType>) => {
@@ -852,6 +862,8 @@ export const ComparisonCharts = ({
                       : openGroupByDropdown()
                   }
                   data-testid="group-by-button"
+                  aria-haspopup="menu"
+                  aria-expanded={groupByDropdownOpen}
                 >
                   Group by:{" "}
                   {xAxisOptions.find((o) => o.value === xAxisOption)?.label ??
@@ -883,6 +895,14 @@ export const ComparisonCharts = ({
                         overflowY: "auto",
                       }}
                       data-testid="group-by-dropdown"
+                      role="menu"
+                      tabIndex={-1}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          closeGroupByDropdown();
+                        }
+                      }}
                     >
                       <VStack align="stretch" gap={1}>
                         {xAxisOptions.map((opt) => (
@@ -906,6 +926,15 @@ export const ComparisonCharts = ({
                               setXAxisOption(opt.value);
                               setGroupByDropdownOpen(false);
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setXAxisOption(opt.value);
+                                setGroupByDropdownOpen(false);
+                              }
+                            }}
+                            role="menuitem"
+                            tabIndex={0}
                             data-testid={`xaxis-option-${opt.value}`}
                           >
                             <Text
@@ -942,6 +971,8 @@ export const ComparisonCharts = ({
                     : openMetricsDropdown()
                 }
                 data-testid="metrics-selector-button"
+                aria-haspopup="menu"
+                aria-expanded={metricsDropdownOpen}
               >
                 Metrics ({visibleMetrics.size}/{availableMetrics.length})
               </Button>
@@ -974,6 +1005,14 @@ export const ComparisonCharts = ({
                       overflowY: "auto",
                     }}
                     data-testid="metrics-dropdown"
+                    role="menu"
+                    tabIndex={-1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeMetricsDropdown();
+                      }
+                    }}
                   >
                     <VStack align="stretch" gap={1}>
                       {availableMetrics.map((metric) => (
@@ -984,6 +1023,15 @@ export const ComparisonCharts = ({
                           cursor="pointer"
                           _hover={{ bg: "bg.subtle" }}
                           onClick={() => toggleMetric(metric.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleMetric(metric.id);
+                            }
+                          }}
+                          role="menuitem"
+                          tabIndex={0}
+                          aria-checked={visibleMetrics.has(metric.id)}
                         >
                           <Box
                             width="16px"
