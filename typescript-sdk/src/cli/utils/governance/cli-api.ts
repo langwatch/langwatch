@@ -14,6 +14,7 @@
  */
 
 import { type GovernanceConfig } from "./config";
+import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
   CLI_SURFACE_HEADER,
   CLI_SURFACE_VALUE,
@@ -227,6 +228,14 @@ export interface CliBootstrapResponse {
    * field (CLI falls back to a generic line).
    */
   adminEmail?: string | null;
+  /**
+   * Per-(org, tool) path policy map (claude/codex/gemini/opencode/cursor
+   * → {allowVk, allowOtelDirect}). The CLI caches this into
+   * `cfg.tool_policies` so the wrapper gates path selection on the org's
+   * admin choices. `undefined` on legacy servers without the field; the
+   * wrapper then falls back to hardcoded defaults.
+   */
+  toolPolicies?: PlatformToolPolicyMap;
 }
 
 /**

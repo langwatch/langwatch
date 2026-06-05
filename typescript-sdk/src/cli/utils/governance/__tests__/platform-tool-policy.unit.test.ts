@@ -47,4 +47,48 @@ describe("resolvePlatformToolPolicy", () => {
       });
     });
   });
+
+  describe("when a login-cached policy map is present", () => {
+    it("prefers the cached entry over the hardcoded default", () => {
+      const cached = {
+        claude: { allowVk: true, allowOtelDirect: false },
+      };
+      expect(resolvePlatformToolPolicy("claude", cached)).toEqual({
+        allowVk: true,
+        allowOtelDirect: false,
+      });
+    });
+
+    it("can disable the gateway path for a tool the org forced onto OTLP", () => {
+      const cached = {
+        claude: { allowVk: false, allowOtelDirect: true },
+      };
+      expect(resolvePlatformToolPolicy("claude", cached)).toEqual({
+        allowVk: false,
+        allowOtelDirect: true,
+      });
+    });
+
+    it("falls back to the hardcoded default for a tool the cache omits", () => {
+      const cached = {
+        claude: { allowVk: false, allowOtelDirect: false },
+      };
+      // cursor not in the cache -> hardcoded default (OTLP off).
+      expect(resolvePlatformToolPolicy("cursor", cached)).toEqual({
+        allowVk: true,
+        allowOtelDirect: false,
+      });
+    });
+
+    it("falls back to defaults when the cache is empty (offline / legacy CLI)", () => {
+      expect(resolvePlatformToolPolicy("claude", {})).toEqual({
+        allowVk: true,
+        allowOtelDirect: true,
+      });
+      expect(resolvePlatformToolPolicy("claude", undefined)).toEqual({
+        allowVk: true,
+        allowOtelDirect: true,
+      });
+    });
+  });
 });

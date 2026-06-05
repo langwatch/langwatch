@@ -73,6 +73,13 @@ export interface WrapperModeResult {
   clears?: string[];
   /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
   newKeyMinted?: boolean;
+  /**
+   * Optional one-line notice for the wrapper to print to stderr, set when
+   * the platform policy changed the resolved path (e.g. the org admin turned
+   * direct OTLP off for this tool, so the wrapper routed through the gateway
+   * instead). The member sees why the path differs from the default.
+   */
+  notice?: string;
 }
 
 const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
@@ -100,7 +107,11 @@ export async function resolveWrapperMode(
 ): Promise<WrapperModeResult> {
   const persistedMode = cfg.tool_mode?.[tool];
   const hasVk = !!cfg.default_personal_vk?.secret;
-  const policy = resolvePlatformToolPolicy(tool);
+  // Prefer the per-(org, tool) policy the CLI cached at login
+  // (cfg.tool_policies, from the control plane's PlatformToolPolicyService).
+  // An offline / legacy CLI with no cached map falls back to the hardcoded
+  // defaults inside the resolver.
+  const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
 
   if (!policy.allowVk && !policy.allowOtelDirect) {
     throw new GovernanceCliError(
@@ -110,6 +121,8 @@ export async function resolveWrapperMode(
     );
   }
 
+  let notice: string | undefined;
+
   // EFFECTIVE mode rules:
   //   persisted="gateway"   -> gateway (even if VK absent; preflight surfaces the gap)
   //   persisted="ingestion" -> ingestion
@@ -117,10 +130,12 @@ export async function resolveWrapperMode(
   //     hasVk -> gateway (no surprise: VK users keep current behavior)
   //     no VK -> ingestion (auto-install Path B; closes the "$5 VPS" scenario)
   //
-  // Platform policy then GATES the resolved mode:
-  //   - mode=gateway + !allowVk -> downgrade to ingestion (if allowed) or error
-  //   - mode=ingestion + !allowOtelDirect -> error (no automatic upgrade
-  //     to gateway since the user explicitly opted in or has no VK)
+  // Platform policy then GATES the resolved mode (the both-disabled case
+  // already threw above, so exactly one path is available when a swap is
+  // needed):
+  //   - mode=gateway + !allowVk          -> downgrade to ingestion
+  //   - mode=ingestion + !allowOtelDirect -> route through the gateway
+  //     (never minting an ingestion key the admin disabled)
   let mode: WrapperMode =
     persistedMode === "gateway"
       ? "gateway"
@@ -135,11 +150,18 @@ export async function resolveWrapperMode(
   // cursor (allowVk=true, allowOtelDirect=false) keep working via
   // gateway when no VK is yet configured (preflight surfaces the
   // missing VK separately, same as before this gate existed).
+  //
+  // The direct-OTLP gate sits ABOVE the ingestion-key mint below: when
+  // the admin disabled direct OTLP for this tool, the wrapper never
+  // reaches mintIngestionKey; it routes through the gateway (allowVk is
+  // guaranteed true here, since the both-disabled case threw above).
   if (mode === "gateway" && !policy.allowVk) {
     mode = "ingestion";
+    notice = `langwatch: gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
   }
   if (mode === "ingestion" && !policy.allowOtelDirect) {
     mode = "gateway";
+    notice = `langwatch: direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
   }
 
   if (mode === "gateway") {
@@ -164,19 +186,32 @@ export async function resolveWrapperMode(
         codexConfigPath: gw.path,
         codexProfilePath: gw.profilePath,
         extraArgs: ["--profile", gw.profile],
+        notice,
       };
     }
-    return { mode, vars: gatewayVars, clears: gatewayClears };
+    return { mode, vars: gatewayVars, clears: gatewayClears, notice };
   }
 
-  // INGESTION mode: ensure binding + (for codex) toml.
+  // INGESTION mode: ensure key + (for codex) toml.
   const sourceType = SOURCE_TYPE_BY_TOOL[tool];
   if (!sourceType) {
     // No ingestion template defined for this tool (cursor is the
     // current example — GUI app, no useful OTel). Fall through to
     // gateway shape; the existing preflight will tell the user
     // what's missing.
-    return { mode: "gateway", vars: gatewayVars, clears: gatewayClears };
+    return { mode: "gateway", vars: gatewayVars, clears: gatewayClears, notice };
+  }
+
+  // Defense-in-depth: the direct-OTLP gate above already routes to the
+  // gateway when allowOtelDirect is off, so this mint is unreachable in
+  // that case. Guard it explicitly so a future refactor of the gate can
+  // never silently mint an ingestion key the admin disabled.
+  if (!policy.allowOtelDirect) {
+    throw new GovernanceCliError(
+      403,
+      "otel_direct_disabled",
+      `Direct OTLP ingestion is disabled for '${tool}' by your org admin. Ask them to enable allow_otel_direct, or run with the gateway path.`,
+    );
   }
 
   // Reuse a cached personal ingest key (sk-lw-*) for this source when
@@ -247,7 +282,7 @@ export async function resolveWrapperMode(
     // Best-effort cache — failure to persist doesn't block this run.
   }
 
-  return { mode, vars, codexConfigPath, newKeyMinted: minted };
+  return { mode, vars, codexConfigPath, newKeyMinted: minted, notice };
 }
 
 function buildOtelEnvBlock(

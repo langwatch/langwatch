@@ -346,4 +346,96 @@ describe("resolveWrapperMode", () => {
       );
     });
   });
+
+  describe("when the cached policy disables direct OTLP for a tool", () => {
+    /**
+     * An org admin turned direct OTLP off for claude. A member with no
+     * VK would normally auto-resolve to ingestion (Path B). The policy
+     * gate sits ABOVE the mint: the wrapper must route through the
+     * gateway instead and never mint an ingestion key.
+     */
+    it("routes through the gateway and does NOT mint an ingestion key", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: false } },
+      });
+      const out = await resolveWrapperMode(cfg, "claude", {
+        ANTHROPIC_BASE_URL: "http://gw.example.com",
+      });
+
+      expect(out.mode).toBe("gateway");
+      expect(out.newKeyMinted).toBeUndefined();
+      expect(out.notice).toContain("direct OTLP ingestion is disabled");
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+
+    it("still mints for a tool the cache leaves on direct OTLP", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-codex-token",
+        prefix: "sk-lw-code",
+        endpoint: "http://app.example.com/api/otel",
+      });
+
+      // claude is forced off, codex is untouched (defaults to both-on).
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: false } },
+      });
+      const out = await resolveWrapperMode(cfg, "codex", {});
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.newKeyMinted).toBe(true);
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "codex",
+      );
+    });
+  });
+
+  describe("when the cached policy disables the gateway path for a tool", () => {
+    /**
+     * The admin forced claude onto direct OTLP (allowVk false). A
+     * member WITH a VK would normally auto-resolve to gateway; the gate
+     * downgrades to ingestion and surfaces why.
+     */
+    it("downgrades to ingestion and surfaces the policy notice", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-claude-token",
+        prefix: "sk-lw-clau",
+        endpoint: "http://app.example.com/api/otel",
+      });
+
+      const cfg = baseCfg({
+        default_personal_vk: { id: "vk1", secret: "lw_vk_secret" },
+        tool_policies: { claude: { allowVk: false, allowOtelDirect: true } },
+      });
+      const out = await resolveWrapperMode(cfg, "claude", {
+        ANTHROPIC_BASE_URL: "http://gw.example.com",
+        ANTHROPIC_AUTH_TOKEN: "lw_vk_secret",
+      });
+
+      expect(out.mode).toBe("ingestion");
+      expect(out.notice).toContain("gateway path is disabled");
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "Authorization=Bearer sk-lw-claude-token",
+      );
+    });
+  });
+
+  describe("when the cached policy disables both paths for a tool", () => {
+    it("throws a tool-disabled error with an admin hint", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: false, allowOtelDirect: false } },
+      });
+
+      await expect(
+        resolveWrapperMode(cfg, "claude", {}),
+      ).rejects.toThrow(/disabled in the platform policy/);
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -70,6 +70,7 @@ import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { costCentersRouter } from "@ee/governance/routers/costCenters";
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
 import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
+import { platformToolPolicyRouter } from "@ee/governance/routers/platformToolPolicy";
 import { governanceRouter } from "@ee/governance/routers/governance";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
@@ -146,6 +147,7 @@ const coreRouters = {
   costCenters: costCentersRouter,
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
+  platformToolPolicy: platformToolPolicyRouter,
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,

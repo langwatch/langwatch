@@ -374,6 +374,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.exit(2);
   }
 
+  // Surface any platform-policy path change (e.g. the org admin turned
+  // direct OTLP off for this tool, so the wrapper routed through the
+  // gateway instead) so the member sees why the path differs.
+  if (modeResult.notice) {
+    process.stderr.write(`${modeResult.notice}\n`);
+  }
+
   if (modeResult.mode === "gateway") {
     const probe = await preflightWrapper(cfg, tool);
     if (!probe.ok) {
