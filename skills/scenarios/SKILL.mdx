@@ -310,6 +310,36 @@ audio_effects=[
 ]
 ```
 
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
+| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
+| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
+| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
+| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+```typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+```
+
+For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
 The default `UserSimulatorAgent` system prompt encodes a text-chat style ("very short inputs, few words, all lowercase, like talking to chatgpt") which TTS-renders robotic. Always nudge the persona toward natural spoken sentences:

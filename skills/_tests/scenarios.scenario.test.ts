@@ -789,4 +789,73 @@ describe("Scenarios Skill", () => {
     },
     900_000
   );
+
+  it.skipIf(isCI)(
+    "creates voice scenario tests for a TypeScript voice agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-voice-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-voice")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
+        name: "TypeScript voice agent scenario tests",
+        description:
+          "Adding voice scenario tests to a TypeScript OpenAI Realtime voice agent project using the LangWatch Scenario framework's voice adapters.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created voice scenario test files using the LangWatch Scenario framework's voice support",
+              "Agent used a voice adapter (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / composableAgent) rather than a plain text agent",
+              "Agent used the `langwatch scenario-docs voice/...` CLI command to read the voice docs",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add agent simulation tests for my voice agent. It's a voice bot, so the tests need to drive real audio, not text."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
+
+            const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
+            expect(
+              testFiles.length,
+              `Expected at least one .test.ts or .spec.ts file in ${tempFolder}`
+            ).toBeGreaterThan(0);
+
+            const testContent = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+
+            expect(testContent).toContain("@langwatch/scenario");
+            expect(testContent).toMatch(/scenario\.run\(/);
+
+            // Verify a voice adapter is used rather than a plain text agent
+            expect(testContent).toMatch(
+              /(openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)/
+            );
+
+            // Verify the simulator was configured with a voice
+            expect(testContent).toMatch(/voice\s*:/);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
+
 });
