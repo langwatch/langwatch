@@ -291,4 +291,54 @@ secured
     },
   );
 
+// ── API Key management ───────────────────────────────────────────────────────
+
+secured
+  .access(requires("project:view"))
+  .get(
+    "/:id/api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Get the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      return c.json({ apiKey: project.apiKey });
+    },
+  );
+
+secured
+  .access(requires("project:manage"))
+  .post(
+    "/:id/regenerate-api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Regenerate the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+      const { prisma } = await import("~/server/db");
+      const { generateApiKey } = await import("~/server/utils/apiKeyGenerator");
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      const newApiKey = generateApiKey();
+      await prisma.project.update({
+        where: { id },
+        data: { apiKey: newApiKey },
+      });
+
+      return c.json({ apiKey: newApiKey });
+    },
+  );
+
 export const app = secured.hono;

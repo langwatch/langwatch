@@ -1,4 +1,9 @@
-import type { Organization } from "@prisma/client";
+import {
+  RoleBindingScopeType,
+  TeamUserRole,
+  type Organization,
+} from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -8,9 +13,11 @@ import {
 } from "~/server/app-layer/teams/team.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createOrgApp, requires } from "~/server/api/security";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
-import { NotFoundError } from "../../shared/errors";
+import { BadRequestError, NotFoundError } from "../../shared/errors";
 import { handleTeamError } from "./error-handler";
 
 patchZodOpenapi();
@@ -26,6 +33,11 @@ const createTeamSchema = z.object({
 
 const updateTeamSchema = z.object({
   name: z.string().min(1).max(255).optional(),
+});
+
+const addMemberSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+  role: z.nativeEnum(TeamUserRole).optional().default(TeamUserRole.MEMBER),
 });
 
 function validationHook(
@@ -211,6 +223,139 @@ secured
         name: team.name,
         archivedAt: team.archivedAt,
       });
+    },
+  );
+
+// ── Members ──────────────────────────────────────────────────────────────────
+
+secured
+  .access(requires("team:view"))
+  .get(
+    "/:id/members",
+    teamServiceMiddleware,
+    describeRoute({ description: "List members of a team" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("teamService") as TeamRestService;
+
+      const team = await service.getById({ id, organizationId: organization.id });
+      if (!team) throw new NotFoundError("Team not found");
+
+      const bindings = await prisma.roleBinding.findMany({
+        where: {
+          organizationId: organization.id,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: id,
+          userId: { not: null },
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      return c.json({
+        data: bindings.map((b) => ({
+          userId: b.userId,
+          name: b.user?.name ?? null,
+          email: b.user?.email ?? null,
+          role: b.role,
+        })),
+      });
+    },
+  );
+
+secured
+  .access(requires("team:manage"))
+  .post(
+    "/:id/members",
+    teamServiceMiddleware,
+    describeRoute({ description: "Add a member to a team" }),
+    zValidator("json", addMemberSchema, validationHook),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
+      const service = c.get("teamService") as TeamRestService;
+
+      const team = await service.getById({ id, organizationId: organization.id });
+      if (!team) throw new NotFoundError("Team not found");
+
+      const orgMember = await prisma.organizationUser.findFirst({
+        where: { organizationId: organization.id, userId: body.userId },
+        select: { userId: true },
+      });
+      if (!orgMember) {
+        throw new BadRequestError("User must belong to the organization");
+      }
+
+      await prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: organization.id,
+          userId: body.userId,
+          role: body.role,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: id,
+        },
+      });
+
+      return c.json({ success: true }, 201);
+    },
+  );
+
+secured
+  .access(requires("team:manage"))
+  .delete(
+    "/:id/members/:userId",
+    teamServiceMiddleware,
+    describeRoute({ description: "Remove a member from a team" }),
+    async (c) => {
+      const { id, userId } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("teamService") as TeamRestService;
+
+      const team = await service.getById({ id, organizationId: organization.id });
+      if (!team) throw new NotFoundError("Team not found");
+
+      const binding = await prisma.roleBinding.findFirst({
+        where: {
+          organizationId: organization.id,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: id,
+          userId,
+        },
+      });
+      if (!binding) throw new NotFoundError("Member not found on this team");
+
+      await prisma.roleBinding.delete({ where: { id: binding.id } });
+      return c.json({ success: true });
+    },
+  );
+
+// ── Projects ─────────────────────────────────────────────────────────────────
+
+secured
+  .access(requires("team:view"))
+  .get(
+    "/:id/projects",
+    teamServiceMiddleware,
+    describeRoute({ description: "List projects in a team" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("teamService") as TeamRestService;
+
+      const team = await service.getById({ id, organizationId: organization.id });
+      if (!team) throw new NotFoundError("Team not found");
+
+      const projects = await prisma.project.findMany({
+        where: { teamId: id, archivedAt: null, kind: { not: "internal_governance" } },
+        select: { id: true, name: true, slug: true, createdAt: true, updatedAt: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return c.json({ data: projects });
     },
   );
 
