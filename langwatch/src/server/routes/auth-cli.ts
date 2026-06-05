@@ -1317,6 +1317,7 @@ secured.access(CLI_POLICY).get(
       user_ingestion_bindings: rows.map((b) => ({
         id: b.id,
         template_id: b.templateId,
+        source_type: b.sourceType,
         user_id: b.userId,
         organization_id: b.organizationId,
         personal_project_id: b.personalProjectId,
@@ -1328,9 +1329,18 @@ secured.access(CLI_POLICY).get(
   },
 );
 
-const installBindingSchema = z.object({
-  template_id: z.string().min(1),
-});
+const installBindingSchema = z
+  .object({
+    // Template-backed install (legacy catalog templates like claude_cowork).
+    template_id: z.string().min(1).optional(),
+    // Template-free install for the unified coding assistants (claude /
+    // codex / gemini / opencode) — the `langwatch <tool>` wrapper passes
+    // the tool's source slug instead of a template row.
+    source_type: z.string().min(1).optional(),
+  })
+  .refine((d) => Boolean(d.template_id) || Boolean(d.source_type), {
+    message: "either template_id or source_type is required",
+  });
 
 secured.access(CLI_POLICY).post(
   "/governance/user-ingestion-bindings",
@@ -1364,6 +1374,7 @@ secured.access(CLI_POLICY).post(
         callerUserId: tokenRecord.user_id,
         organizationId: tokenRecord.organization_id,
         templateId: parsed.data.template_id,
+        sourceType: parsed.data.source_type,
         surface: "cli",
       });
       return c.json(
@@ -1371,6 +1382,7 @@ secured.access(CLI_POLICY).post(
           user_ingestion_binding: {
             id: result.binding.id,
             template_id: result.binding.templateId,
+            source_type: result.binding.sourceType,
             user_id: result.binding.userId,
             organization_id: result.binding.organizationId,
             personal_project_id: result.binding.personalProjectId,
