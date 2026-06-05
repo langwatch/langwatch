@@ -15,7 +15,6 @@ describe("STARTER_PACK_TILES", () => {
   describe("given the opencode coding-assistant tile", () => {
     const opencode = STARTER_PACK_TILES.find((t) => t.slug === "opencode");
 
-    /** @scenario A platform coding assistant never appears as an ingestion template */
     it("is seeded as a coding_assistant tile", () => {
       expect(opencode).toBeDefined();
       expect(opencode?.type).toBe("coding_assistant");

@@ -33,13 +33,8 @@
 
 export interface BindingProvenance {
   bindingId: string;
-  /** Null for template-free coding-assistant bindings — when null the
-   *  `langwatch.template.id` attr is omitted (nothing to stamp). */
-  templateId: string | null;
-  /** Canonical tool slug (e.g. `claude_code`) — always set; stamped as
-   *  `langwatch.source`. Stable across template-existence, which is why
-   *  it (not templateSlug) drives the source attr. */
-  sourceType: string;
+  templateId: string;
+  templateSlug: string;
   /** Org id of the bound personal project — feeds the no-spy policy lookup. */
   organizationId: string;
 }
@@ -144,22 +139,13 @@ export function stampBindingProvenanceOnLogRequest(
 function buildProvenanceAttributes(
   provenance: BindingProvenance,
 ): OtlpAttribute[] {
-  const attrs: OtlpAttribute[] = [
+  return [
+    { key: PROVENANCE_ATTR_TEMPLATE_ID, value: { stringValue: provenance.templateId } },
     { key: PROVENANCE_ATTR_BINDING_ID, value: { stringValue: provenance.bindingId } },
-    // langwatch.source is the canonical tool slug; template-free bindings
-    // still have a stable source even though they carry no template row.
-    { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.sourceType } },
+    { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.templateSlug } },
     { key: PROVENANCE_ATTR_ORIGIN, value: { stringValue: BINDING_ORIGIN_VALUE } },
     { key: PROVENANCE_ATTR_ORGANIZATION_ID, value: { stringValue: provenance.organizationId } },
   ];
-  // Only template-backed bindings (e.g. claude_cowork) carry a template id.
-  if (provenance.templateId !== null) {
-    attrs.unshift({
-      key: PROVENANCE_ATTR_TEMPLATE_ID,
-      value: { stringValue: provenance.templateId },
-    });
-  }
-  return attrs;
 }
 
 function stripProvenanceKeys(attrs: OtlpAttribute[]): OtlpAttribute[] {

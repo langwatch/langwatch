@@ -23,7 +23,7 @@ import {
 const PROVENANCE = {
   bindingId: "uib-123",
   templateId: "tmpl-456",
-  sourceType: "claude_code",
+  templateSlug: "claude_code",
   organizationId: "org-789",
 };
 
@@ -113,26 +113,6 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
         const count = attrs.filter((a: any) => a.key === key).length;
         expect(count).toBe(1);
       }
-    });
-  });
-
-  describe("when the binding is template-free (coding assistant)", () => {
-    it("omits langwatch.template.id and stamps langwatch.source from sourceType", () => {
-      const req: any = { resourceSpans: [{ resource: { attributes: [] } }] };
-      stampBindingProvenanceOnTraceRequest(req, {
-        bindingId: "uib-cc",
-        templateId: null,
-        sourceType: "claude_code",
-        organizationId: "org-789",
-      });
-      const attrs = req.resourceSpans[0].resource.attributes;
-      // No template row, so no template id is stamped.
-      expect(findAttr(attrs, PROVENANCE_ATTR_TEMPLATE_ID)).toBeUndefined();
-      // Source still resolves from the canonical tool slug.
-      expect(findAttr(attrs, PROVENANCE_ATTR_SOURCE)).toBe("claude_code");
-      expect(findAttr(attrs, PROVENANCE_ATTR_BINDING_ID)).toBe("uib-cc");
-      expect(findAttr(attrs, PROVENANCE_ATTR_ORIGIN)).toBe(BINDING_ORIGIN_VALUE);
-      expect(findAttr(attrs, PROVENANCE_ATTR_ORGANIZATION_ID)).toBe("org-789");
     });
   });
 

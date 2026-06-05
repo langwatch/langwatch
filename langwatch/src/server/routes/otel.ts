@@ -380,7 +380,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         stampBindingProvenanceOnTraceRequest(traceRequest as unknown as Parameters<typeof stampBindingProvenanceOnTraceRequest>[0], {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
-          sourceType: resolved.sourceType,
+          templateSlug: resolved.templateSlug,
           organizationId: resolved.organizationId,
         });
       }
@@ -466,7 +466,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         stampBindingProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampBindingProvenanceOnLogRequest>[0], {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
-          sourceType: resolved.sourceType,
+          templateSlug: resolved.templateSlug,
           organizationId: resolved.organizationId,
         });
       }

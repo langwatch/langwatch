@@ -77,10 +77,7 @@ export class BindingAlreadyExistsError extends Error {
 export interface BindingRow {
   id: string;
   userId: string;
-  /** Null for template-free coding-assistant bindings. */
-  templateId: string | null;
-  /** Canonical tool slug; always set (install identity with personalProjectId). */
-  sourceType: string;
+  templateId: string;
   personalProjectId: string;
   organizationId: string;
   bindingAccessTokenPrefix: string;
@@ -122,7 +119,6 @@ export class UserIngestionBindingService {
     callerUserId,
     organizationId,
     templateId,
-    sourceType: sourceTypeInput,
     encryptedCredential,
     surface,
   }: {
@@ -133,37 +129,30 @@ export class UserIngestionBindingService {
      *  is preserved: Project.ownerUserId === callerUserId is asserted
      *  inside requireOwnedPersonalProject. */
     organizationId: string;
-    /** Template-backed install (e.g. claude_cowork). Mutually exclusive
-     *  with `sourceType`: the binding mirrors the template's sourceType. */
-    templateId?: string;
-    /** Template-free install for the unified coding assistants
-     *  (claude / codex / gemini / opencode). The CLI passes the tool's
-     *  canonical source slug; no IngestionTemplate row is required. */
-    sourceType?: string;
+    templateId: string;
     encryptedCredential?: Prisma.InputJsonValue;
     /** Audit-trail attribution per umbrella spec @audit-uniform. */
     surface?: GovernanceCallSurface;
   }): Promise<InstallBindingResult> {
-    if (!templateId && !sourceTypeInput) {
-      throw new Error("install requires either templateId or sourceType");
-    }
-
     const project = await this.requireOwnedPersonalProject({
       callerUserId,
       organizationId,
     });
+    const template = await this.requireVisibleTemplate({
+      templateId,
+      organizationId: project.organizationId,
+    });
 
-    // Template-backed installs mirror the template's sourceType;
-    // template-free CLI installs carry the slug the wrapper passed.
-    const template = templateId
-      ? await this.requireVisibleTemplate({
-          templateId,
-          organizationId: project.organizationId,
-        })
-      : null;
-    const sourceType = template?.sourceType ?? sourceTypeInput;
-    if (!sourceType) {
-      throw new Error("install could not resolve a sourceType");
+    const existing = await this.bindingRepo.findUniqueByUserAndTemplate(
+      this.prisma,
+      {
+        userId: callerUserId,
+        templateId: template.id,
+        select: { id: true, archivedAt: true },
+      },
+    );
+    if (existing && !existing.archivedAt) {
+      throw new BindingAlreadyExistsError();
     }
 
     const issued = issueBindingToken();
@@ -176,38 +165,31 @@ export class UserIngestionBindingService {
         : encryptCredential(encryptedCredential);
 
     const binding = await this.prisma.$transaction(async (tx) => {
-      // Race-safe upsert keyed on the (personalProjectId, sourceType)
-      // UNIQUE. update = rotate the token in place (and revive a
-      // soft-archived row, clearing archivedAt); create = mint fresh.
-      // Two concurrent installs can't both create — the loser hits the
-      // unique and falls into update. Keying per personal project scopes
-      // the binding to one (user, org), so multi-org never collides.
-      const upserted = await this.bindingRepo.upsertByProjectAndSource(tx, {
-        personalProjectId: project.id,
-        sourceType,
-        create: {
-          userId: callerUserId,
-          templateId: template?.id ?? null,
-          sourceType,
-          personalProjectId: project.id,
-          organizationId: project.organizationId,
-          bindingAccessTokenHash: issued.hash,
-          bindingAccessTokenPrefix: issued.prefix,
-          encryptedCredential: storedCredential,
-        },
-        update: {
-          // (personalProjectId, sourceType) is the upsert key — never
-          // moved. Rotate the token + revive if archived.
-          templateId: template?.id ?? null,
-          organizationId: project.organizationId,
-          bindingAccessTokenHash: issued.hash,
-          bindingAccessTokenPrefix: issued.prefix,
-          encryptedCredential: storedCredential,
-          enabled: true,
-          archivedAt: null,
-          lastSeenAt: null,
-        },
-      });
+      // If a soft-archived row exists, revive it with new token + clear
+      // archivedAt rather than violating the (userId, templateId) UNIQUE.
+      const upserted = existing
+        ? await this.bindingRepo.updateById(tx, {
+            id: existing.id,
+            data: {
+              personalProjectId: project.id,
+              organizationId: project.organizationId,
+              bindingAccessTokenHash: issued.hash,
+              bindingAccessTokenPrefix: issued.prefix,
+              encryptedCredential: storedCredential,
+              enabled: true,
+              archivedAt: null,
+              lastSeenAt: null,
+            },
+          })
+        : await this.bindingRepo.create(tx, {
+            userId: callerUserId,
+            templateId: template.id,
+            personalProjectId: project.id,
+            organizationId: project.organizationId,
+            bindingAccessTokenHash: issued.hash,
+            bindingAccessTokenPrefix: issued.prefix,
+            encryptedCredential: storedCredential,
+          });
 
       await this.auditRepo.emit(tx, {
         userId: callerUserId,
@@ -217,9 +199,8 @@ export class UserIngestionBindingService {
         targetKind: "user_ingestion_binding",
         targetId: upserted.id,
         metadata: {
-          templateId: template?.id ?? null,
-          templateSlug: template?.slug ?? null,
-          sourceType,
+          templateId: template.id,
+          templateSlug: template.slug,
           surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
@@ -354,10 +335,7 @@ export class UserIngestionBindingService {
   }): Promise<{
     bindingId: string;
     userId: string;
-    /** Null for template-free coding-assistant bindings. */
-    templateId: string | null;
-    /** Canonical tool slug — always set; the stable provenance source. */
-    sourceType: string;
+    templateId: string;
     personalProjectId: string;
     organizationId: string;
   } | null> {
@@ -380,7 +358,6 @@ export class UserIngestionBindingService {
       bindingId: binding.id,
       userId: binding.userId,
       templateId: binding.templateId,
-      sourceType: binding.sourceType,
       personalProjectId: binding.personalProjectId,
       organizationId: binding.organizationId,
     };
@@ -440,7 +417,7 @@ export class UserIngestionBindingService {
   }: {
     templateId: string;
     organizationId: string;
-  }): Promise<{ id: string; slug: string; sourceType: string }> {
+  }): Promise<{ id: string; slug: string }> {
     // Cross-bind safety: the user-side surface only sees platform
     // defaults OR org-authored rows for THIS org. Cross-org probes
     // collapse to NotFound. Routed through the IngestionTemplate
@@ -453,19 +430,14 @@ export class UserIngestionBindingService {
     if (!template || !template.enabled) {
       throw new IngestionTemplateNotFoundError();
     }
-    return {
-      id: template.id,
-      slug: template.slug,
-      sourceType: template.sourceType,
-    };
+    return { id: template.id, slug: template.slug };
   }
 }
 
 function toRow(b: {
   id: string;
   userId: string;
-  templateId: string | null;
-  sourceType: string;
+  templateId: string;
   personalProjectId: string;
   organizationId: string;
   bindingAccessTokenPrefix: string;
@@ -478,7 +450,6 @@ function toRow(b: {
     id: b.id,
     userId: b.userId,
     templateId: b.templateId,
-    sourceType: b.sourceType,
     personalProjectId: b.personalProjectId,
     organizationId: b.organizationId,
     bindingAccessTokenPrefix: b.bindingAccessTokenPrefix,
