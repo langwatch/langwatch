@@ -326,34 +326,19 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
       );
     });
 
-    it("rotates the token in place when a binding already exists for the same template", async () => {
+    it("returns 409 when an active binding already exists for the same template", async () => {
       const first = await api.post(
         "/api/governance/user-ingestion-bindings",
         { template_id: testTemplateId },
       );
       expect(first.status).toBe(201);
-      const firstBody = (await first.json()) as {
-        binding: { id: string };
-        token: string;
-      };
 
       const dup = await api.post("/api/governance/user-ingestion-bindings", {
         template_id: testTemplateId,
       });
-      // The install is idempotent per (personal project, source): a repeat
-      // rotates the token in place instead of raising binding_already_exists.
-      expect(dup.status).toBe(201);
-      const dupBody = (await dup.json()) as {
-        binding: { id: string };
-        token: string;
-      };
-      expect(dupBody.binding.id).toBe(firstBody.binding.id);
-      expect(dupBody.token).not.toBe(firstBody.token);
-
-      // Exactly one binding remains for the user — no duplicate row.
-      const list = await api.get("/api/governance/user-ingestion-bindings");
-      const afterList = (await list.json()) as { data: unknown[] };
-      expect(afterList.data).toHaveLength(1);
+      expect(dup.status).toBe(409);
+      const body = (await dup.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("binding_already_exists");
     });
 
     it("returns 404 for a nonexistent template", async () => {

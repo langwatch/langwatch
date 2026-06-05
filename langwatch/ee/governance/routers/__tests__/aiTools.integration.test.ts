@@ -433,7 +433,7 @@ describe("aiToolsRouter integration", () => {
         const result = await callerFor(adminUserId).aiTools.importStarterPack({
           organizationId: freshOrgId,
         });
-        expect(result.created).toBe(9); // 5 coding assistants + 4 model providers
+        expect(result.created).toBe(8); // 4 coding assistants + 4 model providers
         expect(result.updated).toBe(0);
         expect(result.skipped).toBe(0);
 
@@ -450,7 +450,6 @@ describe("aiToolsRouter integration", () => {
           "gemini",
           "google",
           "openai",
-          "opencode",
         ]);
 
         // Idempotency: re-importing must not duplicate.
@@ -459,11 +458,11 @@ describe("aiToolsRouter integration", () => {
         });
         expect(second.created).toBe(0);
         expect(second.updated).toBe(0);
-        expect(second.skipped).toBe(9);
+        expect(second.skipped).toBe(8);
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(9);
+        expect(after).toHaveLength(8);
       } finally {
         await prisma.aiToolEntry
           .deleteMany({ where: { organizationId: freshOrgId } })
@@ -585,12 +584,12 @@ describe("aiToolsRouter integration", () => {
         });
         expect(result.updated).toBe(1); // Claude Code merged in place
         expect(result.skipped).toBe(1); // Cursor admin-curated icon preserved
-        expect(result.created).toBe(7); // remaining starter set inserted
+        expect(result.created).toBe(6); // remaining starter set inserted
 
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(9); // no duplicate row created
+        expect(after).toHaveLength(8); // no duplicate row created
 
         const claudeRows = after.filter(
           (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",
