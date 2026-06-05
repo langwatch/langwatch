@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { CompanyWideIngestionPanel } from "@ee/governance/dashboard/components/CompanyWideIngestionPanel";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 
@@ -426,6 +427,8 @@ function IngestionSourcesPage() {
             )}
           </VStack>
         </HStack>
+
+        <CompanyWideIngestionPanel />
 
         <SourceComposerDrawer
           isOpen={composing}
