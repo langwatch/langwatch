@@ -67,12 +67,6 @@ const EXEMPT_MODELS = [
    */
   "CostCenter",
   /**
-   * Per-(org, tool) CLI path policy. Organization-level, no projectId
-   * column; PlatformToolPolicyService always scopes by organizationId.
-   * See cli-tool-mode-policy.feature.
-   */
-  "PlatformToolPolicy",
-  /**
    * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
    * - GatewayBudget: org-level (scopeType + scopeId identifies which
    *   target); no projectId column by design.
