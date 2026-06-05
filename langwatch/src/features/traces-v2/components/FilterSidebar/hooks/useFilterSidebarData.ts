@@ -529,6 +529,15 @@ function buildFacetItems(
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
   const labels = new Map(cat.topValues.map((v) => [v.value, v.label]));
+  // Evaluator-only — every other facet skips this map entirely. We
+  // forward the descriptor's per-value aggregates onto FacetItem so
+  // the sidebar drilldown for `evaluator:<id>` can show pass/fail /
+  // score-range without a second round-trip.
+  const aggregates = new Map(
+    cat.topValues
+      .filter((v) => v.aggregates !== undefined)
+      .map((v) => [v.value, v.aggregates!]),
+  );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
     fallback: cat.topValues.map((v) => v.value),
@@ -545,6 +554,7 @@ function buildFacetItems(
     dotColor: dotColorFor(value),
     dimmed,
     synthetic,
+    aggregates: aggregates.get(value),
   }));
 }
 

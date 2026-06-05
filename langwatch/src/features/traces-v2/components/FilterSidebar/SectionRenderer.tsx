@@ -6,6 +6,7 @@ import {
 } from "~/server/app-layer/traces/query-language/queries";
 import { AttributesSection } from "./AttributesSection";
 import { NONE_TOGGLE_VALUE } from "./constants";
+import { EvaluatorDrilldown } from "./EvaluatorDrilldown";
 import { FacetSection } from "./FacetSection";
 import { RangeSection } from "./RangeSection";
 import type {
@@ -81,6 +82,24 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         }
       : undefined;
 
+    // Evaluator section gets an inline drilldown rendered under each
+    // ACTIVE evaluator row — verdict pills, score range, label flag —
+    // sourced from the `aggregates` the discover endpoint already
+    // attached to each evaluator value. No second query.
+    const renderActiveRowExtras =
+      section.key === "evaluator"
+        ? (item: FacetItem) =>
+            item.aggregates ? (
+              <EvaluatorDrilldown
+                item={item}
+                ast={ast}
+                toggleFacet={toggleFacet}
+                setRange={setRange}
+                removeRange={removeRange}
+              />
+            ) : null
+        : undefined;
+
     return (
       <FacetSection
         title={section.label}
@@ -96,6 +115,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         orGroupId={orGroupId}
         orPeers={orPeers}
         orMemberValues={orMemberValues}
+        renderActiveRowExtras={renderActiveRowExtras}
       />
     );
   }

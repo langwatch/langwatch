@@ -67,7 +67,19 @@ export interface SectionBase {
 
 export interface CategoricalSection extends SectionBase {
   kind: "cat";
-  topValues: { value: string; label?: string; count: number }[];
+  topValues: {
+    value: string;
+    label?: string;
+    count: number;
+    /**
+     * Forwarded from the discover response. Only set on the evaluator
+     * facet (its query builder emits the matching SQL aggregates) —
+     * other facets leave it absent. Surfaced here so the sidebar's
+     * drilldown can read per-evaluator pass/fail / score range
+     * without firing a second query.
+     */
+    aggregates?: FacetItemAggregates;
+  }[];
 }
 
 export interface RangeSectionData extends SectionBase {

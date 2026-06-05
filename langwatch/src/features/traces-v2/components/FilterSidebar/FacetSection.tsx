@@ -33,6 +33,16 @@ interface FacetSectionProps {
   orGroupId?: string;
   orPeers?: readonly string[];
   orMemberValues?: ReadonlySet<string>;
+  /**
+   * Optional per-row extras renderer. Invoked for any row whose value
+   * is currently active (i.e. surfaced via `pinnedContent`). The
+   * returned node is rendered immediately below the active row so the
+   * extras read as a continuation of the row's UI. The evaluator
+   * section uses this to inline a drilldown (verdict pills, score
+   * range slider) under each active evaluator without firing a second
+   * server query. Returns `null` to skip extras for a given item.
+   */
+  renderActiveRowExtras?: (item: FacetItem) => React.ReactNode;
 }
 
 export const FacetSection: React.FC<FacetSectionProps> = ({
@@ -49,6 +59,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   orGroupId,
   orPeers,
   orMemberValues,
+  renderActiveRowExtras,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -159,19 +170,24 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       pinnedContent={
         activeItems.length > 0 ? (
           <VStack gap={0.5} align="stretch">
-            {activeItems.map((item) => (
-              <FacetRow
-                key={item.value}
-                item={item}
-                state={getValueState(item.value)}
-                maxCount={maxCount}
-                onToggle={handleToggle}
-                orGroupId={
-                  orMemberValues?.has(item.value) ? orGroupId : undefined
-                }
-                field={field}
-              />
-            ))}
+            {activeItems.map((item) => {
+              const extras = renderActiveRowExtras?.(item);
+              return (
+                <Box key={item.value}>
+                  <FacetRow
+                    item={item}
+                    state={getValueState(item.value)}
+                    maxCount={maxCount}
+                    onToggle={handleToggle}
+                    orGroupId={
+                      orMemberValues?.has(item.value) ? orGroupId : undefined
+                    }
+                    field={field}
+                  />
+                  {extras}
+                </Box>
+              );
+            })}
           </VStack>
         ) : undefined
       }
