@@ -132,10 +132,7 @@ export async function runUnifiedLoginFlow(
         console.log(line);
       }
       console.log();
-      console.log(chalk.gray(`  Gateway:   ${cfg.gateway_url}`));
       console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
-
-      await maybeOfferShellRcPersist(cfg);
 
       return cfg;
     }
