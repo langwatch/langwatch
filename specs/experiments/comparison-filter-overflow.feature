@@ -19,6 +19,7 @@ Feature: Experiment comparison filter controls stay fully visible
     Then the dropdown shows every available grouping option
     And no option is clipped by the chart container edge
 
+  @unimplemented
   Scenario: Long metric names do not push the dropdown off-screen
     Given the experiment has evaluators with long names
     When I open the Metrics selector near the right edge of the viewport
@@ -31,6 +32,7 @@ Feature: Experiment comparison filter controls stay fully visible
     Then the dropdown does not exceed the viewport height
     And I can scroll within the dropdown to reach every option
 
+  @unimplemented
   Scenario: Dropdown closes when clicking outside
     When I open the Metrics selector
     And I click outside the dropdown

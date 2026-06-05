@@ -109,6 +109,7 @@ describe("ComparisonCharts filter overflow regression (issue #4631)", () => {
 
   describe("given a 3-run x 6-evaluator experiment", () => {
     describe("when the Metrics selector is opened", () => {
+      /** @scenario Metrics dropdown is fully visible when opened */
       it("renders the dropdown outside the ComparisonCharts subtree", async () => {
         const user = userEvent.setup();
         const { chartsRoot } = renderHeavyComparison();
@@ -122,6 +123,7 @@ describe("ComparisonCharts filter overflow regression (issue #4631)", () => {
         expect(chartsRoot.contains(dropdown)).toBe(false);
       });
 
+      /** @scenario Tall option list scrolls inside the dropdown */
       it("constrains its own height so long lists do not exceed the viewport", async () => {
         const user = userEvent.setup();
         renderHeavyComparison();
@@ -140,6 +142,7 @@ describe("ComparisonCharts filter overflow regression (issue #4631)", () => {
     });
 
     describe("when the Group by selector is opened", () => {
+      /** @scenario Group-by dropdown is fully visible when opened */
       it("renders the dropdown outside the ComparisonCharts subtree", async () => {
         const user = userEvent.setup();
         const { chartsRoot } = renderHeavyComparison();
