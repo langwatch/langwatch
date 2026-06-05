@@ -12,6 +12,8 @@ import {
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createOrgApp, requires } from "~/server/api/security";
+import { prisma } from "~/server/db";
+import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
@@ -323,8 +325,6 @@ secured
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
-      const { prisma } = await import("~/server/db");
-      const { generateApiKey } = await import("~/server/utils/apiKeyGenerator");
 
       const project = await service.getWithTeam(id);
       if (!project || project.team.organizationId !== organization.id) {

@@ -289,16 +289,27 @@ secured
         throw new BadRequestError("User must belong to the organization");
       }
 
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: organization.id,
-          userId: body.userId,
-          role: body.role,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: id,
-        },
-      });
+      try {
+        await prisma.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: organization.id,
+            userId: body.userId,
+            role: body.role,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: id,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          (error as { code: string }).code === "P2002"
+        ) {
+          throw new BadRequestError("User is already a member of this team");
+        }
+        throw error;
+      }
 
       return c.json({ success: true }, 201);
     },
