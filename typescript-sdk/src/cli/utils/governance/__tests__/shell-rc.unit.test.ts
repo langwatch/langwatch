@@ -16,9 +16,9 @@ const cfg: GovernanceConfig = {
   gateway_url: "http://gw.example.com",
   control_plane_url: "http://app.example.com",
   default_personal_vk: { id: "vk_x", secret: "vk-lw-test", prefix: "vk-lw-" },
-  default_personal_ingestion_tokens: {
-    claude_code: { id: "ik_c", secret: "ik-lw-claude", prefix: "ik-lw-" },
-    codex: { id: "ik_co", secret: "ik-lw-codex", prefix: "ik-lw-" },
+  default_personal_ingest_keys: {
+    claude_code: { id: "ik_c", secret: "sk-lw-claude", prefix: "sk-lw-" },
+    codex: { id: "ik_co", secret: "sk-lw-codex", prefix: "sk-lw-" },
   },
 };
 

@@ -7,11 +7,10 @@
  *   1. `/api/auth/cli/governance/*` — CLI-specific read proxies for
  *      activity monitor + status that pre-date the public REST
  *      surface. Read-only.
- *   2. `/api/governance/*` — the public REST contract Sergey shipped
- *      at 0bb951160 / 5275e7e11. Full CRUD on IngestionTemplate +
- *      UserIngestionBinding. The CLI sends
- *      `X-LangWatch-Surface: cli` so audit rows land with
- *      `metadata.surface = 'cli'` per @audit-uniform.
+ *   2. `/api/governance/*` — the public REST contract for
+ *      IngestionTemplate CRUD plus the device-session ingestion-key
+ *      mint route. The CLI sends `X-LangWatch-Surface: cli` so audit
+ *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
  */
 
 import { type GovernanceConfig } from "./config";
@@ -262,8 +261,7 @@ export async function getCliBootstrap(
 
 // ── Public REST: /api/governance/* ─────────────────────────────────────────
 //
-// Sergey's Hono routes at 0bb951160 (templates) + 5275e7e11 (bindings).
-// Wire shape locked at 1839d9f54 + 60f769498 (snake_case in/out).
+// IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.
 // All mutating calls send X-LangWatch-Surface: cli per @audit-uniform.
 
 export interface IngestionTemplateRow {
@@ -278,17 +276,6 @@ export interface IngestionTemplateRow {
   ottl_rules: string;
   platform_published: boolean;
   enabled: boolean;
-}
-
-export interface UserIngestionBindingRow {
-  id: string;
-  template_id: string;
-  user_id: string;
-  organization_id: string;
-  personal_project_id: string;
-  binding_access_token_prefix: string;
-  enabled: boolean;
-  created_at: string;
 }
 
 type RestMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -362,25 +349,33 @@ async function requestREST<T>(
   return (await res.json()) as T;
 }
 
-// IngestionTemplate verbs ----------------------------------------------------
+// Ingestion key minting ------------------------------------------------------
 
-export async function listIngestionTemplates(
+/**
+ * Mint a personal-project ingest-only ApiKey (the `sk-lw-<...>` shape)
+ * for a wrapped tool. Returns the plaintext key (shown once) plus the
+ * OTLP endpoint the caller should point the tool's exporter at.
+ *
+ * Device-session adapter route under /api/auth/cli/governance/* so the
+ * wrapper's auto-mint flow works with the device-session
+ * cfg.access_token (lw_at_*). The public REST mounted under
+ * createProjectApp rejects Bearer access tokens with 401, so the CLI
+ * uses the mirror route, same as the (now-retired) binding flow did.
+ */
+export async function mintIngestionKey(
   cfg: GovernanceConfig,
+  sourceType: string,
   options: CliApiOptions = {},
-): Promise<IngestionTemplateRow[]> {
-  // Device-session adapter route — the public REST at
-  // /api/governance/ingestion-templates is mounted under createProjectApp
-  // and rejects Bearer access tokens with 401. wrapper-mode's auto-install
-  // flow has to work with the device-session cfg.access_token, so call the
-  // mirror route under /api/auth/cli/governance/* which accepts lw_at_*.
-  const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
+): Promise<{ token: string; prefix: string; endpoint: string }> {
+  return requestREST<{ token: string; prefix: string; endpoint: string }>(
     cfg,
-    "GET",
-    "/api/auth/cli/governance/ingestion-templates",
-    options,
+    "POST",
+    "/api/auth/cli/governance/ingestion-key",
+    { ...options, body: { source_type: sourceType }, mutating: true },
   );
-  return body.ingestion_templates;
 }
+
+// IngestionTemplate verbs ----------------------------------------------------
 
 export async function adminListIngestionTemplates(
   cfg: GovernanceConfig,
@@ -474,67 +469,4 @@ export async function cloneIngestionTemplateFromPlatform(
     },
   );
   return body.ingestion_template;
-}
-
-// UserIngestionBinding verbs ------------------------------------------------
-
-export async function listUserIngestionBindings(
-  cfg: GovernanceConfig,
-  options: CliApiOptions = {},
-): Promise<UserIngestionBindingRow[]> {
-  // Device-session adapter route — see listIngestionTemplates above.
-  const body = await requestREST<{
-    user_ingestion_bindings: UserIngestionBindingRow[];
-  }>(
-    cfg,
-    "GET",
-    "/api/auth/cli/governance/user-ingestion-bindings",
-    options,
-  );
-  return body.user_ingestion_bindings;
-}
-
-export async function installUserIngestionBinding(
-  cfg: GovernanceConfig,
-  templateId: string,
-  options: CliApiOptions = {},
-): Promise<{
-  user_ingestion_binding: UserIngestionBindingRow;
-  binding_access_token: string;
-}> {
-  return requestREST(
-    cfg,
-    "POST",
-    "/api/auth/cli/governance/user-ingestion-bindings",
-    { ...options, body: { template_id: templateId }, mutating: true },
-  );
-}
-
-export async function uninstallUserIngestionBinding(
-  cfg: GovernanceConfig,
-  bindingId: string,
-  options: CliApiOptions = {},
-): Promise<{ ok: true }> {
-  return requestREST<{ ok: true }>(
-    cfg,
-    "DELETE",
-    `/api/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}`,
-    { ...options, mutating: true },
-  );
-}
-
-export async function rotateUserIngestionBindingToken(
-  cfg: GovernanceConfig,
-  bindingId: string,
-  options: CliApiOptions = {},
-): Promise<{
-  user_ingestion_binding: UserIngestionBindingRow;
-  binding_access_token: string;
-}> {
-  return requestREST(
-    cfg,
-    "POST",
-    `/api/auth/cli/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}/rotate`,
-    { ...options, mutating: true },
-  );
 }

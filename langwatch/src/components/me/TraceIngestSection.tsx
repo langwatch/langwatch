@@ -30,11 +30,11 @@ import { api } from "~/utils/api";
  * iconography is resolved client-side from a slug map since v1 platform
  * defaults ship with iconAsset=NULL.
  *
- * Install fires `api.userIngestionBindings.install` mutation. The
- * plaintext ik-lw-<base32> token is shown ONCE in the drawer and stored
- * in component state for the session — bindings list query tells us
- * which templates are installed (drives green-check), but the token
- * doesn't survive page reload (matches "shown once" UX).
+ * Install fires `api.ingestionKey.install` mutation. The plaintext
+ * sk-lw- token is shown ONCE in the drawer and stored in component state
+ * for the session — the ingestion-keys list query tells us which sources
+ * are connected (drives green-check), but the token doesn't survive page
+ * reload (matches "shown once" UX).
  *
  * raw_otlp_advanced is rendered as a SEPARATE static tile (no
  * IngestionTemplate row, no install). It deep-links to
@@ -73,15 +73,15 @@ export function TraceIngestSection() {
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-  const bindingsQuery = api.userIngestionBindings.list.useQuery(
+  const keysQuery = api.ingestionKey.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
   const utils = api.useUtils();
-  const installMutation = api.userIngestionBindings.install.useMutation({
+  const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
-      void utils.userIngestionBindings.list.invalidate();
+      void utils.ingestionKey.list.invalidate();
     },
     onError: (err) => {
       toaster.create({
@@ -91,9 +91,9 @@ export function TraceIngestSection() {
       });
     },
   });
-  const rotateMutation = api.userIngestionBindings.rotateToken.useMutation({
+  const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
-      void utils.userIngestionBindings.list.invalidate();
+      void utils.ingestionKey.list.invalidate();
     },
     onError: (err) => {
       toaster.create({
@@ -116,17 +116,23 @@ export function TraceIngestSection() {
   >({});
 
   const templates = templatesQuery.data ?? [];
-  const bindings = bindingsQuery.data ?? [];
+  const keys = keysQuery.data ?? [];
 
-  const bindingByTemplateId = new Map(bindings.map((b) => [b.templateId, b]));
+  /** Connected ingestion keys, keyed by the source they were minted for. */
+  const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
   const openTemplate = openSlug
     ? templates.find((t) => t.slug === openSlug) ?? null
     : null;
 
-  const handleInstall = async (templateId: string, slug: string) => {
+  const handleInstall = async (
+    sourceType: string,
+    templateId: string,
+    slug: string,
+  ) => {
     try {
       const result = await installMutation.mutateAsync({
         organizationId: orgId,
+        sourceType,
         templateId,
       });
       setInstallResults((s) => ({
@@ -138,11 +144,16 @@ export function TraceIngestSection() {
     }
   };
 
-  const handleRotate = async (bindingId: string, slug: string) => {
+  const handleRotate = async (
+    sourceType: string,
+    templateId: string,
+    slug: string,
+  ) => {
     try {
       const result = await rotateMutation.mutateAsync({
         organizationId: orgId,
-        bindingId,
+        sourceType,
+        templateId,
       });
       setInstallResults((s) => ({
         ...s,
@@ -153,15 +164,19 @@ export function TraceIngestSection() {
     }
   };
 
-  const handleTileClick = (templateId: string, slug: string) => {
+  const handleTileClick = (
+    sourceType: string,
+    templateId: string,
+    slug: string,
+  ) => {
     setOpenSlug(slug);
-    const isAlreadyBound = bindingByTemplateId.has(templateId);
+    const isAlreadyConnected = keyBySourceType.has(sourceType);
     if (
-      !isAlreadyBound &&
+      !isAlreadyConnected &&
       !installResults[slug] &&
       !installMutation.isPending
     ) {
-      void handleInstall(templateId, slug);
+      void handleInstall(sourceType, templateId, slug);
     }
   };
 
@@ -196,7 +211,7 @@ export function TraceIngestSection() {
               <TileSkeleton key={`skeleton-${idx}`} />
             ))
           : templates.map((t) => {
-              const binding = bindingByTemplateId.get(t.id);
+              const connected = keyBySourceType.has(t.sourceType);
               const meta = TILE_META[t.slug] ?? {
                 icon: FALLBACK_ICON,
                 subtitle: t.description ?? t.sourceType,
@@ -208,8 +223,8 @@ export function TraceIngestSection() {
                   label={t.displayName}
                   subtitle={meta.subtitle}
                   icon={meta.icon}
-                  installed={!!binding}
-                  onClick={() => handleTileClick(t.id, t.slug)}
+                  installed={connected}
+                  onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
                 />
               );
             })}
@@ -232,16 +247,25 @@ export function TraceIngestSection() {
           isInstalling={installMutation.isPending || rotateMutation.isPending}
           installError={
             installMutation.error?.message &&
-            installMutation.variables?.templateId === openTemplate.id
+            installMutation.variables?.sourceType === openTemplate.sourceType
               ? installMutation.error.message
               : rotateMutation.error?.message ?? null
           }
-          hasExistingBinding={bindingByTemplateId.has(openTemplate.id)}
-          onInstall={() => void handleInstall(openTemplate.id, openTemplate.slug)}
-          onRotate={() => {
-            const existing = bindingByTemplateId.get(openTemplate.id);
-            if (existing) void handleRotate(existing.id, openTemplate.slug);
-          }}
+          hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
+          onInstall={() =>
+            void handleInstall(
+              openTemplate.sourceType,
+              openTemplate.id,
+              openTemplate.slug,
+            )
+          }
+          onRotate={() =>
+            void handleRotate(
+              openTemplate.sourceType,
+              openTemplate.id,
+              openTemplate.slug,
+            )
+          }
           onMarkInstalled={handleMarkInstalled}
         />
       )}

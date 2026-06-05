@@ -6,7 +6,7 @@
  * v1 ships ONE real template (claude_cowork), `organizationId IS NULL`
  * so it appears in every org's catalog. The /me Trace Ingest tile
  * `raw_otlp_advanced` is a client-side discovery card — it deep-links to the personal OTLP endpoint panel
- * and does NOT mint a UserIngestionBinding, so it intentionally has no
+ * and does NOT mint an ingestion key, so it intentionally has no
  * IngestionTemplate row (see Andre PM call at 348936e4f).
  *
  * The platform's coding assistants (claude_code / codex / cursor / gemini /

@@ -2,10 +2,7 @@ import chalk from "chalk";
 
 import {
   GovernanceCliError,
-  installUserIngestionBinding,
-  listIngestionTemplates,
-  listUserIngestionBindings,
-  rotateUserIngestionBindingToken,
+  mintIngestionKey,
 } from "@/cli/utils/governance/cli-api";
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
@@ -14,7 +11,7 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
  * `langwatch ingest install <tool>` — Path B activation flow.
  *
  * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
- * Installs the user's IngestionTemplate binding, prints the OTLP
+ * Mints the user's personal ingest key (sk-lw-*), prints the OTLP
  * export block, and — for codex specifically — idempotently merges
  * the [otel] activation block into ~/.codex/config.toml so the user
  * pastes nothing manual.
@@ -52,11 +49,10 @@ export interface InstallOptions {
 
 interface InstallReport {
   tool: SupportedTool;
-  template_id: string;
-  template_slug: string;
+  source_type: string;
   endpoint: string;
   ingestion_token: string;
-  token_action: "minted" | "rotated";
+  token_prefix: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
   env_block: string[];
@@ -110,47 +106,21 @@ async function runInstall(
   tool: SupportedTool,
   options: InstallOptions,
 ): Promise<InstallReport> {
-  const templates = await listIngestionTemplates(cfg);
-  const template = templates.find((t) => t.slug === tool);
-  if (!template) {
-    throw new GovernanceCliError(
-      404,
-      "template_not_found",
-      `No IngestionTemplate found with slug '${tool}'. The catalog seed may not have run on this control plane yet.`,
-    );
-  }
-
-  // Mint a fresh binding OR rotate the existing one. Both paths
-  // yield a plaintext ik-lw-* token that we can write straight into
-  // the export block. We deliberately rotate rather than fetching a
-  // stored secret because the secret is only ever visible at mint
-  // time — re-running the install command should always leave the
-  // user with a working token.
-  const existing = await listUserIngestionBindings(cfg);
-  const prior = existing.find((b) => b.template_id === template.id);
-
-  let token: string;
-  let action: "minted" | "rotated";
-  if (prior) {
-    const r = await rotateUserIngestionBindingToken(cfg, prior.id);
-    token = r.binding_access_token;
-    action = "rotated";
-  } else {
-    const r = await installUserIngestionBinding(cfg, template.id);
-    token = r.binding_access_token;
-    action = "minted";
-  }
-
-  const endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
+  // Mint a fresh personal ingest key (sk-lw-*) for this tool's
+  // source_type. The plaintext key is only ever visible at mint
+  // time, so re-running the install command always leaves the user
+  // with a working key written straight into the export block. The
+  // SupportedTool slug doubles as the source_type the mint route
+  // expects (claude_code / codex / gemini / opencode).
+  const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
   const report: InstallReport = {
     tool,
-    template_id: template.id,
-    template_slug: template.slug,
+    source_type: tool,
     endpoint,
     ingestion_token: token,
-    token_action: action,
+    token_prefix: prefix,
     env_block: envBlock,
   };
 
@@ -249,9 +219,8 @@ function buildEnvBlock(
 }
 
 function renderHumanReport(report: InstallReport): void {
-  const verb = report.token_action === "minted" ? "Installed" : "Rotated";
   process.stdout.write(
-    `${chalk.green("✓")} ${verb} ingestion binding for ${chalk.bold(report.tool)}\n`,
+    `${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`,
   );
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);

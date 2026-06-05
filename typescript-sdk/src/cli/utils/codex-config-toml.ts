@@ -31,7 +31,7 @@ const END = "# <<< langwatch otel end <<<";
 export interface CodexOtelBlockInputs {
   /** Full OTLP endpoint, e.g. https://app.langwatch.ai/api/otel */
   endpoint: string;
-  /** Plaintext ik-lw-<base32> ingestion token. */
+  /** Plaintext personal ingest key (sk-lw-<...>). */
   ingestionToken: string;
   /** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
   environment?: string;

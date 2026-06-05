@@ -27,22 +27,20 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
-   * Personal ingestion keys (the ik-lw-<base32> shape minted by
-   * `/api/governance/user-ingestion-bindings`), keyed by the
-   * IngestionTemplate slug (`claude_code` / `codex` / `gemini` /
-   * `opencode`). One token per template so different wrapped tools
-   * surface as their own ingestion source in /me + /messages.
+   * Personal ingest keys (the project-scoped ingest-only ApiKey
+   * `sk-lw-<...>` shape minted by `/api/auth/cli/governance/ingestion-key`),
+   * keyed by the tool's source_type slug (`claude_code` / `codex` /
+   * `gemini` / `opencode`). One key per source so different wrapped
+   * tools surface as their own ingestion source in /me + /messages.
    *
    * When the right key is present for a wrapped tool, the
-   * `langwatch <tool>` wrapper additionally injects the standard
-   * OTEL_*_EXPORTER env vars pointing at `<control_plane>/api/otel`
-   * with this key as the Authorization bearer. When unset, the
-   * wrapper falls back to the gateway-only env shape (existing
-   * behavior, no regression).
+   * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER
+   * env vars pointing at the OTLP endpoint with this key as the
+   * Authorization bearer (reusing the cache instead of re-minting).
    *
    * Unset until the wrapper's first auto-mint for that tool.
    */
-  default_personal_ingestion_tokens?: Record<
+  default_personal_ingest_keys?: Record<
     string,
     { id?: string; secret?: string; prefix?: string }
   >;
@@ -63,10 +61,10 @@ export interface GovernanceConfig {
    *                  the AI Gateway via base-URL swap (full server-
    *                  side I/O + cost capture, no client OTel).
    *   "ingestion" — Path B: enable the tool's native OTel exporter
-   *                  pointed at /api/otel + mint the user's
-   *                  UserIngestionBinding token. For codex this
-   *                  also writes the [otel] block to
-   *                  ~/.codex/config.toml automatically.
+   *                  pointed at /api/otel + mint the user's personal
+   *                  ingest key (sk-lw-*). For codex this also writes
+   *                  the [otel] block to ~/.codex/config.toml
+   *                  automatically.
    *   "ask"       — re-prompt on the next `langwatch <tool>`. The
    *                  default when this key is absent.
    *

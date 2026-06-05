@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildEnvSnippet } from "../IngestionTemplateInstallDrawer";
 
 const ENDPOINT = "https://app.langwatch.ai/api/otel";
-const TOKEN = "ik-lw-TEST_TOKEN";
+const TOKEN = "sk-lw-TEST_TOKEN";
 
 describe("buildEnvSnippet", () => {
   describe("when the template slug is claude_code", () => {

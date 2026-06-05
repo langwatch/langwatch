@@ -15,8 +15,6 @@
  *   - langwatch.organization_id (feeds the no-spy policy org lookup)
  *   - langwatch.template.id     (only when the key carries an ingestionTemplateId,
  *                               e.g. claude_cowork)
- *
- * Replaces the retired bindingProvenance.utils.ts (UserIngestionBinding).
  */
 
 export interface IngestKeyProvenance {

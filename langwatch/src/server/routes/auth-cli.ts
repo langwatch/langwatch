@@ -50,13 +50,7 @@ import { ActivityMonitorService } from "@ee/governance/services/activity-monitor
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
-import {
-  BindingAlreadyExistsError,
-  BindingNotFoundError,
-  IngestionTemplateNotFoundError,
-  PersonalProjectMissingError,
-  UserIngestionBindingService,
-} from "@ee/governance/services/userIngestionBinding.service";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -1241,17 +1235,16 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
-// Ingestion templates + user-ingestion-bindings — device-session adapters.
+// Ingestion templates + ingestion keys — device-session adapters.
 // ---------------------------------------------------------------------------
 // `langwatch <tool>` wrapper-mode (typescript-sdk/.../wrapper-mode.ts) calls
 // these from a device-session context (Bearer lw_at_*). The public REST at
-// /api/governance/{ingestion-templates,user-ingestion-bindings} is mounted
-// under createProjectApp and rejects device tokens with 401; these adapter
-// routes resolve organizationId+userId from the validated access token and
-// delegate to the same services. Wire shape matches what cli-api.ts already
-// expects (snake_case ingestion_templates / user_ingestion_bindings /
-// user_ingestion_binding / binding_access_token keys), distinct from the
-// project-API-key REST's { data: [...] } shape.
+// /api/governance/ingestion-templates is mounted under createProjectApp and
+// rejects device tokens with 401; these adapter routes resolve
+// organizationId+userId from the validated access token and delegate to the
+// same services. Wire shape matches what cli-api.ts expects (snake_case
+// ingestion_templates), distinct from the project-API-key REST's
+// { data: [...] } shape.
 // ---------------------------------------------------------------------------
 
 secured.access(CLI_POLICY).get(
@@ -1292,48 +1285,23 @@ secured.access(CLI_POLICY).get(
   },
 );
 
-secured.access(CLI_POLICY).get(
-  "/governance/user-ingestion-bindings",
-  async (c: Context) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
-    );
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description:
-            "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const service = UserIngestionBindingService.create(prisma);
-    const rows = await service.listForCaller({
-      callerUserId: tokenRecord.user_id,
-      organizationId: tokenRecord.organization_id,
-    });
-    return c.json({
-      user_ingestion_bindings: rows.map((b) => ({
-        id: b.id,
-        template_id: b.templateId,
-        user_id: b.userId,
-        organization_id: b.organizationId,
-        personal_project_id: b.personalProjectId,
-        binding_access_token_prefix: b.bindingAccessTokenPrefix,
-        enabled: b.enabled,
-        created_at: b.createdAt.toISOString(),
-      })),
-    });
-  },
-);
-
-const installBindingSchema = z.object({
-  template_id: z.string().min(1),
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/governance/ingestion-key
+// ---------------------------------------------------------------------------
+// Mints (rotating in place) a personal-project ingestion key for the
+// device-session caller, replacing the retired binding install/rotate
+// adapters. The unified `langwatch <tool>` CLI Path B calls this to obtain a
+// write-only `sk-lw-` token + the OTLP endpoint, then points the tool's OTLP
+// exporter at it. `source_type` carries the tool slug stamped as
+// `langwatch.source` provenance. Body: { source_type }. Returns
+// { token, prefix, endpoint } where endpoint = `${baseUrl}/api/otel`.
+// ---------------------------------------------------------------------------
+const mintIngestionKeySchema = z.object({
+  source_type: z.string().min(1),
 });
 
 secured.access(CLI_POLICY).post(
-  "/governance/user-ingestion-bindings",
+  "/governance/ingestion-key",
   async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
@@ -1348,7 +1316,7 @@ secured.access(CLI_POLICY).post(
         401,
       );
     }
-    const parsed = installBindingSchema.safeParse(await c.req.json());
+    const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json(
         {
@@ -1358,114 +1326,32 @@ secured.access(CLI_POLICY).post(
         400,
       );
     }
-    const service = UserIngestionBindingService.create(prisma);
+    const service = IngestionKeyService.create(prisma);
     try {
-      const result = await service.install({
-        callerUserId: tokenRecord.user_id,
+      const result = await service.ensureForPersonalProject({
+        userId: tokenRecord.user_id,
         organizationId: tokenRecord.organization_id,
-        templateId: parsed.data.template_id,
-        surface: "cli",
+        sourceType: parsed.data.source_type,
       });
       return c.json(
         {
-          user_ingestion_binding: {
-            id: result.binding.id,
-            template_id: result.binding.templateId,
-            user_id: result.binding.userId,
-            organization_id: result.binding.organizationId,
-            personal_project_id: result.binding.personalProjectId,
-            binding_access_token_prefix:
-              result.binding.bindingAccessTokenPrefix,
-            enabled: result.binding.enabled,
-            created_at: result.binding.createdAt.toISOString(),
-          },
-          binding_access_token: result.token,
+          token: result.token,
+          prefix: result.prefix,
+          endpoint: `${controlPlaneBaseUrl()}/api/otel`,
         },
         201,
       );
     } catch (err) {
-      if (err instanceof IngestionTemplateNotFoundError) {
-        return c.json(
-          { error: "not_found", error_description: "Template not found" },
-          404,
-        );
-      }
-      if (err instanceof BindingAlreadyExistsError) {
-        return c.json(
-          { error: "conflict", error_description: "Binding already exists" },
-          409,
-        );
-      }
-      if (err instanceof PersonalProjectMissingError) {
-        return c.json(
-          {
-            error: "precondition_failed",
-            error_description: "Personal project missing for caller",
-          },
-          412,
-        );
-      }
-      throw err;
-    }
-  },
-);
-
-secured.access(CLI_POLICY).post(
-  "/governance/user-ingestion-bindings/:id/rotate",
-  async (c: Context) => {
-    const tokenRecord = await validateAccessToken(
-      c.req.header("Authorization"),
-    );
-    if (!tokenRecord) {
+      // No personal project for the caller yet — surface as a precondition
+      // so the CLI can prompt the user to finish workspace setup.
       return c.json(
         {
-          error: "unauthorized",
+          error: "precondition_failed",
           error_description:
-            "Bearer access token is missing, malformed, or expired",
+            err instanceof Error ? err.message : "Could not mint ingestion key",
         },
-        401,
+        412,
       );
-    }
-    const bindingId = c.req.param("id");
-    if (!bindingId) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description: "binding id is required",
-        },
-        400,
-      );
-    }
-    const service = UserIngestionBindingService.create(prisma);
-    try {
-      const result = await service.rotateToken({
-        callerUserId: tokenRecord.user_id,
-        organizationId: tokenRecord.organization_id,
-        bindingId,
-        surface: "cli",
-      });
-      return c.json({
-        user_ingestion_binding: {
-          id: result.binding.id,
-          template_id: result.binding.templateId,
-          user_id: result.binding.userId,
-          organization_id: result.binding.organizationId,
-          personal_project_id: result.binding.personalProjectId,
-          binding_access_token_prefix:
-            result.binding.bindingAccessTokenPrefix,
-          enabled: result.binding.enabled,
-          created_at: result.binding.createdAt.toISOString(),
-        },
-        binding_access_token: result.token,
-      });
-    } catch (err) {
-      if (err instanceof BindingNotFoundError) {
-        return c.json(
-          { error: "not_found", error_description: "Binding not found" },
-          404,
-        );
-      }
-      throw err;
     }
   },
 );

@@ -1,7 +1,7 @@
 /**
  * Mode-resolution tests for the wrapper. Exercises the in-memory
  * decision tree (gateway vs ingestion) without touching the real
- * cli-api: the install/list/rotate calls are mocked at module
+ * cli-api: the ingestion-key mint call is mocked at module
  * boundary, the codex-config-toml writer is overridden via test
  * harness redirect to a tmpdir.
  */
@@ -26,10 +26,7 @@ vi.mock("../cli-api", async () => {
   const actual = await vi.importActual<typeof cliApi>("../cli-api");
   return {
     ...actual,
-    listIngestionTemplates: vi.fn(),
-    listUserIngestionBindings: vi.fn(),
-    installUserIngestionBinding: vi.fn(),
-    rotateUserIngestionBindingToken: vi.fn(),
+    mintIngestionKey: vi.fn(),
   };
 });
 
@@ -100,63 +97,37 @@ describe("resolveWrapperMode", () => {
      * codex` and have it Just Work via Path B without first
      * remembering to invoke a separate install command.
      */
-    it("falls through to ingestion mode and mints a new binding", async () => {
+    it("falls through to ingestion mode and mints a new key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_codex",
-          slug: "codex",
-          source_type: "codex",
-          display_name: "Codex",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b1", template_id: "tpl_codex" },
-        binding_access_token: "ik-lw-test-token",
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-test-token",
+        prefix: "sk-lw-test",
+        endpoint: "http://app.example.com/api/otel",
       });
 
       const out = await resolveWrapperMode(baseCfg(), "codex", {});
 
       expect(out.mode).toBe("ingestion");
-      expect(out.newBindingMinted).toBe(true);
+      expect(out.newKeyMinted).toBe(true);
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "codex",
+      );
       expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
         "http://app.example.com/api/otel",
       );
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-test-token",
+        "Authorization=Bearer sk-lw-test-token",
       );
       expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
     });
 
     it("writes the [otel] block to the codex config.toml as a side effect", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_codex",
-          slug: "codex",
-          source_type: "codex",
-          display_name: "Codex",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b1", template_id: "tpl_codex" },
-        binding_access_token: "ik-lw-test-token",
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-test-token",
+        prefix: "sk-lw-test",
+        endpoint: "http://app.example.com/api/otel",
       });
 
       const out = await resolveWrapperMode(baseCfg(), "codex", {});
@@ -168,44 +139,26 @@ describe("resolveWrapperMode", () => {
       // Wrapper writes [otel.trace_exporter.otlp-http] so traces emit.
       expect(contents).toContain("[otel.trace_exporter.otlp-http]");
       // Authorization header must NOT land on disk.
-      expect(contents).not.toContain("ik-lw-test-token");
+      expect(contents).not.toContain("sk-lw-test-token");
     });
 
-    it("rotates the binding when one already exists rather than minting again", async () => {
+    it("reuses the cached key rather than minting again when one is already stored", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_codex",
-          slug: "codex",
-          source_type: "codex",
-          display_name: "Codex",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "b_prior", template_id: "tpl_codex" },
-      ]);
-      (cliApi.rotateUserIngestionBindingToken as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b_prior", template_id: "tpl_codex" },
-        binding_access_token: "ik-lw-rotated",
-      });
 
-      const out = await resolveWrapperMode(baseCfg(), "codex", {});
+      const cfg = baseCfg({
+        default_personal_ingest_keys: {
+          codex: { secret: "sk-lw-cached", prefix: "sk-lw-cach" },
+        },
+      });
+      const out = await resolveWrapperMode(cfg, "codex", {});
 
       expect(out.mode).toBe("ingestion");
-      expect(out.newBindingMinted).toBe(false);
-      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-rotated");
-      expect(cliApi.installUserIngestionBinding).not.toHaveBeenCalled();
-      expect(cliApi.rotateUserIngestionBindingToken).toHaveBeenCalledWith(
-        expect.any(Object),
-        "b_prior",
+      expect(out.newKeyMinted).toBe(false);
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("sk-lw-cached");
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
       );
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
     });
   });
 
@@ -218,25 +171,10 @@ describe("resolveWrapperMode", () => {
      */
     it("uses ingestion mode and skips the gateway envs", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_codex",
-          slug: "codex",
-          source_type: "codex",
-          display_name: "Codex",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b1", template_id: "tpl_codex" },
-        binding_access_token: "ik-lw-pinned",
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-pinned",
+        prefix: "sk-lw-pinn",
+        endpoint: "http://app.example.com/api/otel",
       });
 
       const cfg = baseCfg({
@@ -247,7 +185,7 @@ describe("resolveWrapperMode", () => {
 
       expect(out.mode).toBe("ingestion");
       expect(out.vars.OPENAI_BASE_URL).toBeUndefined();
-      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-pinned");
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("sk-lw-pinned");
     });
   });
 
@@ -328,31 +266,20 @@ describe("resolveWrapperMode", () => {
      */
     it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_claude",
-          slug: "claude_code",
-          source_type: "claude_code",
-          display_name: "Claude Code",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b_c", template_id: "tpl_claude" },
-        binding_access_token: "ik-lw-claude-test-token",
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-claude-test-token",
+        prefix: "sk-lw-clau",
+        endpoint: "http://app.example.com/api/otel",
       });
 
       const cfg = baseCfg({ tool_mode: { claude: "ingestion" } });
       const out = await resolveWrapperMode(cfg, "claude", {});
 
       expect(out.mode).toBe("ingestion");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "claude_code",
+      );
       expect(out.vars.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
       expect(out.vars.OTEL_LOG_USER_PROMPTS).toBe("1");
       expect(out.vars.OTEL_LOG_TOOL_DETAILS).toBe("1");
@@ -362,7 +289,7 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.OTEL_LOGS_EXPORTER).toBe("otlp");
       expect(out.vars.OTEL_METRICS_EXPORTER).toBe("otlp");
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
-        "Authorization=Bearer ik-lw-claude-test-token",
+        "Authorization=Bearer sk-lw-claude-test-token",
       );
     });
   });
@@ -397,25 +324,10 @@ describe("resolveWrapperMode", () => {
      */
     it("sets all 6 gemini telemetry knobs required for OTLP traces + log records", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([
-        {
-          id: "tpl_gemini",
-          slug: "gemini",
-          source_type: "gemini",
-          display_name: "Gemini",
-          description: null,
-          icon_asset: null,
-          credential_schema: null,
-          ottl_rules: "",
-          platform_published: true,
-          enabled: true,
-          organization_id: null,
-        },
-      ]);
-      (cliApi.listUserIngestionBindings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      (cliApi.installUserIngestionBinding as ReturnType<typeof vi.fn>).mockResolvedValue({
-        user_ingestion_binding: { id: "b_g", template_id: "tpl_gemini" },
-        binding_access_token: "ik-lw-gemini-test-token",
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-gemini-test-token",
+        prefix: "sk-lw-gemi",
+        endpoint: "http://app.example.com/api/otel",
       });
 
       const cfg = baseCfg({ tool_mode: { gemini: "ingestion" } });
@@ -430,7 +342,7 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.GEMINI_TELEMETRY_OTLP_ENDPOINT).toMatch(/\/api\/otel$/);
       expect(out.vars.GEMINI_TELEMETRY_LOG_PROMPTS).toBe("true");
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
-        "Authorization=Bearer ik-lw-gemini-test-token",
+        "Authorization=Bearer sk-lw-gemini-test-token",
       );
     });
   });

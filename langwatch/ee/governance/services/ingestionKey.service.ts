@@ -18,11 +18,11 @@ import { PersonalWorkspaceService } from "./personalWorkspace.service";
  *     (genuinely write-only — see ingest-api-key-lifecycle.feature).
  *   - `userId = null`: it is a project credential, not a user credential, so it
  *     behaves identically for personal and team projects. Authorization to mint
- *     is enforced by the caller (router), mirroring the retired binding router.
+ *     is enforced by the caller (router).
  *
- * This replaces UserIngestionBinding. Rotation is hard-cut: minting revokes any
- * prior live ingest key for the same (project, sourceType) before creating the
- * new one, so a tool never accumulates keys.
+ * Rotation is hard-cut: minting revokes any prior live ingest key for the same
+ * (project, sourceType) before creating the new one, so a tool never
+ * accumulates keys.
  */
 export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
@@ -123,5 +123,45 @@ export class IngestionKeyService {
       sourceType,
       ingestionTemplateId,
     });
+  }
+
+  /**
+   * Lists the live ingestion keys in the caller's personal project for the
+   * given org. Returns one row per connected source (sourceType +
+   * ingestionTemplateId), so the /me Trace Ingest grid can render
+   * green-checked tiles that survive a reload. The plaintext token is never
+   * returned here — only mint/rotate reveal it once.
+   */
+  async listForPersonalProject({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<
+    {
+      apiKeyId: string;
+      sourceType: string;
+      ingestionTemplateId: string | null;
+    }[]
+  > {
+    const workspace = await this.personalWorkspace.findExisting({
+      userId,
+      organizationId,
+    });
+    if (!workspace) return [];
+
+    const keys = await this.apiKeyRepo.findIngestKeysForProject({
+      projectId: workspace.project.id,
+    });
+    return keys
+      .filter((k): k is typeof k & { ingestSourceType: string } =>
+        Boolean(k.ingestSourceType),
+      )
+      .map((k) => ({
+        apiKeyId: k.id,
+        sourceType: k.ingestSourceType,
+        ingestionTemplateId: k.ingestionTemplateId,
+      }));
   }
 }

@@ -93,6 +93,30 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * Lists every live ingestion key (`ingestSourceType IS NOT NULL`, not
+   * revoked) whose role binding is project-scoped to `projectId`. Powers
+   * the /me Trace Ingest installed-state lookup so a connected tile stays
+   * green-checked across reloads.
+   */
+  async findIngestKeysForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.prisma.apiKey.findMany({
+      where: {
+        ingestSourceType: { not: null },
+        revokedAt: null,
+        roleBindings: {
+          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+        },
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   async findByLookupId({
     lookupId,
   }: {

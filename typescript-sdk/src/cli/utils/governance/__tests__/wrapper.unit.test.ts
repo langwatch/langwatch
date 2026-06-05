@@ -154,11 +154,11 @@ describe("envForTool", () => {
   it("never injects OTEL_*_EXPORTER for any wrapped tool (gateway captures I/O; OTLP would double-trace)", () => {
     const cfgWithIk: GovernanceConfig = {
       ...cfg,
-      default_personal_ingestion_tokens: {
-        claude_code: { id: "ik_c", secret: "ik-lw-x", prefix: "ik-lw-" },
-        codex: { id: "ik_co", secret: "ik-lw-y", prefix: "ik-lw-" },
-        gemini: { id: "ik_g", secret: "ik-lw-z", prefix: "ik-lw-" },
-        opencode: { id: "ik_o", secret: "ik-lw-w", prefix: "ik-lw-" },
+      default_personal_ingest_keys: {
+        claude_code: { id: "ik_c", secret: "sk-lw-x", prefix: "sk-lw-" },
+        codex: { id: "ik_co", secret: "sk-lw-y", prefix: "sk-lw-" },
+        gemini: { id: "ik_g", secret: "sk-lw-z", prefix: "sk-lw-" },
+        opencode: { id: "ik_o", secret: "sk-lw-w", prefix: "sk-lw-" },
       },
     };
     for (const tool of ["claude", "codex", "gemini", "cursor", "opencode"]) {

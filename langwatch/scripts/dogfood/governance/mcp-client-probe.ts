@@ -54,17 +54,17 @@ void (async () => {
     "governance_ingestion_templates_update_ottl_rules",
     "governance_ingestion_templates_clone_from_platform",
     "governance_ingestion_templates_archive",
-    "governance_user_ingestion_bindings_list",
-    "governance_user_ingestion_bindings_install",
-    "governance_user_ingestion_bindings_uninstall",
-    "governance_user_ingestion_bindings_rotate",
+    "governance_ingestion_keys_list",
+    "governance_ingestion_keys_mint",
   ];
   const missing = expected.filter((n) => !governanceTools.some((t) => t.name === n));
   if (missing.length > 0) {
     console.error(`[probe] MISSING tools: ${missing.join(", ")}`);
     process.exit(1);
   }
-  console.error("[probe] all 11 expected governance tools registered ✓");
+  console.error(
+    `[probe] all ${expected.length} expected governance tools registered ✓`,
+  );
 
   // Read tool: governance_ingestion_templates_list works on
   // project-apiKey-only sessions (see governance-tools.ts requireRead).

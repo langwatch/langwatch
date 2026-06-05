@@ -393,9 +393,9 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   } else {
     // ingestion mode side-effect feedback so the user sees what
     // the wrapper just did on their behalf.
-    if (modeResult.newBindingMinted) {
+    if (modeResult.newKeyMinted) {
       process.stderr.write(
-        `langwatch: minted a personal ingestion token for ${tool}.\n`,
+        `langwatch: minted a personal ingestion key for ${tool}.\n`,
       );
     }
     if (modeResult.codexConfigPath) {

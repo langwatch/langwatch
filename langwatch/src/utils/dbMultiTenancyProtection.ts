@@ -165,17 +165,6 @@ const EXEMPT_MODELS = [
    * mutation.
    */
   "IngestionTemplate",
-  /**
-   * UserIngestionBinding carries personalProjectId, but admin-side
-   * queries walk by organizationId (admin viewing all bindings in
-   * their org). User-side queries are scoped by userId. Service layer
-   * authorises by userId === caller for user-side ops, and by
-   * organizationId membership for admin-side ops; the cross-bind
-   * structural-impossibility guard (input shape MUST NOT accept
-   * personalProjectId) keeps user-side ops from binding into another
-   * user's project.
-   */
-  "UserIngestionBinding",
 ];
 
 /**

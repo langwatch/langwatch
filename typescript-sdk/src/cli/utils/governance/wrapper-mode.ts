@@ -9,10 +9,10 @@
  *     envForTool(). Gateway captures I/O server-side; no OTel
  *     emission from the child.
  *   - Path B (ingestion): no VK (Claude Max-style subscription,
- *     user explicitly opted in) -> mint/rotate the user's
- *     UserIngestionBinding for this template, write the [otel]
- *     activation block to ~/.codex/config.toml (codex only),
- *     return the OTel exporter env block for the child.
+ *     user explicitly opted in) -> mint (or reuse a cached) personal
+ *     ingest key (sk-lw-*) for this tool, write the [otel] activation
+ *     block to ~/.codex/config.toml (codex only), return the OTel
+ *     exporter env block for the child.
  *
  * The two modes are mutually exclusive per the no-double-trace
  * rule — gateway capture + OTel emission of the same call would
@@ -32,13 +32,7 @@ import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import {
-  GovernanceCliError,
-  installUserIngestionBinding,
-  listIngestionTemplates,
-  listUserIngestionBindings,
-  rotateUserIngestionBindingToken,
-} from "./cli-api";
+import { GovernanceCliError, mintIngestionKey } from "./cli-api";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
@@ -77,8 +71,8 @@ export interface WrapperModeResult {
    * work as expected").
    */
   clears?: string[];
-  /** True when the wrapper minted a fresh binding (vs reused an existing). */
-  newBindingMinted?: boolean;
+  /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
+  newKeyMinted?: boolean;
 }
 
 const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
@@ -185,32 +179,28 @@ export async function resolveWrapperMode(
     return { mode: "gateway", vars: gatewayVars, clears: gatewayClears };
   }
 
-  const templates = await listIngestionTemplates(cfg);
-  const template = templates.find((t) => t.slug === sourceType);
-  if (!template) {
-    throw new GovernanceCliError(
-      404,
-      "ingestion_template_not_found",
-      `No IngestionTemplate found with slug '${sourceType}'. The catalog seed may not have run on this control plane yet.`,
-    );
-  }
-
-  const bindings = await listUserIngestionBindings(cfg);
-  const prior = bindings.find((b) => b.template_id === template.id);
-
+  // Reuse a cached personal ingest key (sk-lw-*) for this source when
+  // present; otherwise mint a fresh one. The mint route returns the
+  // plaintext key once, so we persist it to the per-tool cache below
+  // and read it back on subsequent invocations rather than re-minting.
+  const cached = cfg.default_personal_ingest_keys?.[sourceType];
   let token: string;
+  let prefix: string | undefined;
+  let endpoint: string;
   let minted: boolean;
-  if (prior) {
-    const r = await rotateUserIngestionBindingToken(cfg, prior.id);
-    token = r.binding_access_token;
+  if (cached?.secret) {
+    token = cached.secret;
+    prefix = cached.prefix;
+    endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
     minted = false;
   } else {
-    const r = await installUserIngestionBinding(cfg, template.id);
-    token = r.binding_access_token;
+    const r = await mintIngestionKey(cfg, sourceType);
+    token = r.token;
+    prefix = r.prefix;
+    endpoint = r.endpoint;
     minted = true;
   }
 
-  const endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
   const vars = buildOtelEnvBlock(tool, endpoint, token);
 
   let codexConfigPath: string | undefined;
@@ -238,18 +228,26 @@ export async function resolveWrapperMode(
     setOpencodeOpenTelemetryFlag();
   }
 
-  // Persist mode so the next invocation skips re-deriving it.
+  // Persist mode + (when freshly minted) the ingest key so the next
+  // invocation skips re-deriving the mode and reuses the cached key
+  // instead of minting again.
   const next: GovernanceConfig = {
     ...cfg,
     tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" },
   };
+  if (minted) {
+    next.default_personal_ingest_keys = {
+      ...(cfg.default_personal_ingest_keys ?? {}),
+      [sourceType]: { secret: token, prefix },
+    };
+  }
   try {
     saveConfig(next);
   } catch {
     // Best-effort cache — failure to persist doesn't block this run.
   }
 
-  return { mode, vars, codexConfigPath, newBindingMinted: minted };
+  return { mode, vars, codexConfigPath, newKeyMinted: minted };
 }
 
 function buildOtelEnvBlock(

@@ -157,7 +157,6 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PromptTag",
   "ScimToken",
   "Subscription",
-  "UserIngestionBinding",
 ];
 
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] =

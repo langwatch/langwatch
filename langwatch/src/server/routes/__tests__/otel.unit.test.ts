@@ -223,20 +223,30 @@ describe("classifyTokenType", () => {
     });
   });
 
-  describe("when given an ingestion-key prefix", () => {
-    it("classifies ik-lw-… tokens as ingestion_key", () => {
-      // Real-shape token from a UserIngestionBinding: ik-lw- + 48-char body.
+  describe("when given an ingestion key", () => {
+    it("classifies it as legacy (ingestion keys are ordinary sk-lw- keys)", () => {
+      // An ingestion key is one row of the single ApiKey primitive, so it
+      // wears the sk-lw- prefix; the ingest discriminator lives on the
+      // resolved ApiKey row, not the token shape.
       expect(
-        classifyTokenType(
-          "ik-lw-WgdPxNGmczBPUunjT350X9ywK9EKyO9MEYcFBdmKxnoLGUdz",
-        ),
-      ).toBe("ingestion_key");
+        classifyTokenType("sk-lw-aBcDeF12_WgdPxNGmczBPUunjT350X9ywK9EKyO9M"),
+      ).toBe("legacy");
     });
   });
 
   describe("when given anything else", () => {
     it("returns unknown for an arbitrary string", () => {
       expect(classifyTokenType("abc123")).toBe("unknown");
+    });
+
+    it("returns unknown for a retired ik-lw- binding token shape", () => {
+      // The binding subsystem is gone; a stale ik-lw- token no longer has a
+      // dedicated class and falls through to unknown.
+      expect(
+        classifyTokenType(
+          "ik-lw-WgdPxNGmczBPUunjT350X9ywK9EKyO9MEYcFBdmKxnoLGUdz",
+        ),
+      ).toBe("unknown");
     });
 
     it("returns unknown for an empty string", () => {
