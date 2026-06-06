@@ -1,3 +1,7 @@
+import {
+  extractAssistantTextFromResponseBody,
+  isConversationalQuerySource,
+} from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -17,6 +21,15 @@ export const SPRING_AI_SCOPE_NAMES = new Set([
 export const CLAUDE_CODE_SCOPE_NAMES = new Set([
   "com.anthropic.claude_code.events",
 ]);
+
+/**
+ * Codex's instrumentation scope varies across versions (codex_exec
+ * service.name in 0.131, just `codex` in some 0.13x builds), so we
+ * gate on the event.name prefix instead — every cost-bearing event
+ * codex emits is named `codex.<thing>` and that's stable across
+ * builds.
+ */
+const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 /**
  * Priority: root > explicit > last-finishing.
@@ -63,14 +76,72 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
   }
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
-    const prompt = data.attributes.prompt;
-    if (prompt && typeof prompt === "string") {
-      return { input: prompt, output: null };
+    // Gate on event.name === "user_prompt" specifically. Without this
+    // gate ANY claude_code log record with a `prompt` attribute wins,
+    // including internal subagent calls (e.g. a Bash tool subagent
+    // emitting `prompt:"env"`) which pollute the trace input with the
+    // shell command instead of the user's real prompt. The
+    // OTEL_LOG_USER_PROMPTS=1 env (set by the langwatch wrapper) is
+    // what gets the user prompt onto the wire — and it lands on the
+    // user_prompt event, never on tool/subagent events.
+    if (data.attributes["event.name"] === "user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (prompt && typeof prompt === "string") {
+        return { input: prompt, output: null };
+      }
+    }
+    // OTEL_LOG_RAW_API_BODIES=1 emits a `claude_code.api_response_body`
+    // log record per turn carrying the FULL anthropic /v1/messages
+    // response body. The assistant's reply text lives in
+    // `body.content[]` where `type === "text"`. We extract the
+    // concatenated text and return it as ComputedOutput so trace
+    // summaries render real assistant replies instead of NULL.
+    //
+    // Gate on query_source: claude emits api_response_body for its
+    // non-conversational utility calls too (prompt_suggestion autosuggest,
+    // generate_session_title), whose text is NOT the assistant's reply.
+    // Because ComputedOutput is last-write-wins, an unfiltered title or
+    // autosuggest clobbers the real reply — so only lift from genuine
+    // conversation turns. This mirrors the gate in claudeCode.ts's
+    // liftApiResponseBody (the canonical span path); both reuse the same
+    // isConversationalQuerySource allowlist so the two output paths agree.
+    if (
+      data.attributes["event.name"] === "api_response_body" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
+      const responseText = extractAssistantTextFromResponseBody(
+        data.attributes.body,
+      );
+      if (responseText !== null) {
+        return { input: null, output: responseText };
+      }
+    }
+  }
+
+  // Codex emits the user's text on a separate codex.user_prompt event.
+  // Cost-bearing codex.sse_event events carry no prompt — input lift
+  // happens here so the fold can pair it with the model/token lift
+  // from extractCodexSseEventMetrics on the same trace.
+  const codexEventName = data.attributes["event.name"];
+  if (
+    typeof codexEventName === "string" &&
+    codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX)
+  ) {
+    if (codexEventName === "codex.user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (typeof prompt === "string" && prompt.length > 0) {
+        return { input: prompt, output: null };
+      }
     }
   }
 
   return { input: null, output: null };
 }
+
 
 /**
  * Accumulates computed input/output across spans using priority rules:

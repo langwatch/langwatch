@@ -640,6 +640,15 @@ function SecretRevealModal({
   // surfaces as one named trace in the listing. Pre-build the shell export
   // block so admins paste once instead of stitching seven lines off the docs
   // page.
+  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
+  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
+  // metadata-only: tokens, cost, durations, tool sizes-in-bytes — but
+  // no user prompt text, no assistant response text, no tool I/O
+  // content. With them on, langwatch.input + langwatch.output lift
+  // verbatim from claude's api_request + api_response_body events.
+  // Payload risk is bounded: claude caps api_request_body +
+  // api_response_body at 60KB INLINE per event; the langwatch receiver
+  // adds a defense-in-depth content cap on top.
   const claudeCodeEnvBlock = isClaudeCode
     ? [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
@@ -647,6 +656,10 @@ function SecretRevealModal({
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
         `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_LOG_USER_PROMPTS=1`,
+        `export OTEL_LOG_TOOL_DETAILS=1`,
+        `export OTEL_LOG_TOOL_CONTENT=1`,
+        `export OTEL_LOG_RAW_API_BODIES=1`,
         `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
         `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
       ].join("\n")

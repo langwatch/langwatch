@@ -20,16 +20,42 @@ import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
+import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
+import { resolveWrapperMode } from "./wrapper-mode";
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
   vars: Record<string, string>;
+  /**
+   * Env-var names to STRIP from the inherited parent environment
+   * before spawning the tool. Used to scrub legacy credentials the
+   * user has exported in their shell (e.g. ANTHROPIC_API_KEY set
+   * from a previous direct-Anthropic workflow) that would otherwise
+   * race with the gateway-routed auth (ANTHROPIC_AUTH_TOKEN) we
+   * inject — claude-code 2.x detects both and warns
+   * "auth may not work as expected", so we have to actively unset
+   * the conflicting twin rather than just pile on top of it.
+   * Unset BEFORE the merge so a tool that intentionally sets both
+   * (opencode for provider auto-detect) still wins.
+   */
+  clears?: string[];
 }
 
 /**
  * Mirror of the Go CLI's env-injection map. The wrapped tools
  * read these standard env vars (Anthropic, OpenAI, Google) and
  * route through the gateway with the user's personal VK as bearer.
+ *
+ * Gateway-only on purpose: when the VK is on the API path the
+ * gateway already captures every request + response server-side
+ * (full I/O, exact cost). Injecting OTEL_* on top would make the
+ * wrapped tool emit its own telemetry for the SAME calls = double
+ * trace + double cost in /messages. The OTLP ingest path is for
+ * users who can't go through the gateway at all (Claude Max
+ * subscription, no swappable API key); they paste the OTEL env
+ * block from the /me drawer manually. See
+ * docs/ai-governance/track-your-claude-code-usage.mdx (Path A vs
+ * Path B).
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   const gw = cfg.gateway_url.replace(/\/+$/, "");
@@ -37,13 +63,22 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   if (!auth) return { vars: {} };
   switch (tool) {
     case "claude":
+      // claude-code (2.1.x) appends `/v1/messages` to ANTHROPIC_BASE_URL itself.
+      // Clear the legacy ANTHROPIC_API_KEY twin: claude-code warns
+      // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may
+      // not work as expected" when both are present (the gateway route
+      // uses AUTH_TOKEN; API_KEY is left over from pre-langwatch direct
+      // SDK usage). Stripping it leaves only the gateway-routed creds
+      // on the child env.
       return {
         vars: {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
+        clears: ["ANTHROPIC_API_KEY"],
       };
     case "codex":
+      // codex 0.134 appends `/v1/chat/completions` itself.
       return {
         vars: {
           OPENAI_BASE_URL: gw,
@@ -51,6 +86,10 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
         },
       };
     case "cursor":
+      // Same warning surface as claude: Anthropic SDKs nested in
+      // cursor's runtime will read ANTHROPIC_API_KEY in preference to
+      // ANTHROPIC_AUTH_TOKEN if both are set, bypassing the gateway.
+      // Scrub the legacy key.
       return {
         vars: {
           OPENAI_BASE_URL: gw,
@@ -58,25 +97,49 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
           ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
+        clears: ["ANTHROPIC_API_KEY"],
       };
     case "gemini":
+      // gemini-cli 0.46-preview honours `GOOGLE_GEMINI_BASE_URL`
+      // (verified empirically in the bundled binary). It POSTs to
+      // `{BASE}/v1beta/models/{model}:generateContent`, prepending
+      // the `/v1beta/` itself. The base must therefore be the bare
+      // gateway URL without the API version suffix; an earlier guess
+      // of `${gw}/v1beta` doubled the prefix to `/v1beta/v1beta/` and
+      // the gateway 404'd the routing call, surfacing as
+      // "Unexpected end of JSON input" on the cli side.
+      // `GOOGLE_GENAI_API_BASE` is NOT read by gemini-cli (separate
+      // guess that silently no-op'd in earlier wrapper revisions).
       return {
         vars: {
-          GOOGLE_GENAI_API_BASE: gw,
+          GOOGLE_GEMINI_BASE_URL: gw,
           GEMINI_API_KEY: auth,
+          GOOGLE_API_KEY: auth,
         },
       };
     case "opencode":
-      // opencode is multi-provider — it reads the standard
-      // OPENAI_*/ANTHROPIC_* env vars depending on which model the
-      // user selected at the prompt. Mirror cursor's both-pairs
-      // injection so any provider the user hops to lands at our gw.
+      // opencode 1.x is multi-provider; under the hood it uses the
+      // Vercel AI SDK, which appends `/messages` and `/chat/completions`
+      // to the configured base URL WITHOUT prepending `/v1`. So opencode
+      // needs the base to ALREADY include `/v1`, unlike claude-code +
+      // codex which append it themselves. Verified via `--log-level
+      // DEBUG` — opencode hit `${ANTHROPIC_BASE_URL}/messages` and
+      // got a gateway 404 because the gateway exposes `/v1/messages`.
+      //
+      // Also: opencode's provider auto-detection at init time gates on
+      // ANTHROPIC_API_KEY (NOT ANTHROPIC_AUTH_TOKEN, which claude-code
+      // uses). Without it, opencode logs `providerID=openai found` /
+      // `providerID=opencode found` but NOT anthropic, then fails any
+      // `--model anthropic/...` invocation with ProviderModelNotFoundError.
+      // Set both so anthropic is detected AND the gateway gets the VK on
+      // the wire (the AI SDK forwards x-api-key from ANTHROPIC_API_KEY).
       return {
         vars: {
-          OPENAI_BASE_URL: gw,
+          OPENAI_BASE_URL: `${gw}/v1`,
           OPENAI_API_KEY: auth,
-          ANTHROPIC_BASE_URL: gw,
+          ANTHROPIC_BASE_URL: `${gw}/v1`,
           ANTHROPIC_AUTH_TOKEN: auth,
+          ANTHROPIC_API_KEY: auth,
         },
       };
     default:
@@ -300,19 +363,85 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.exit(2);
   }
 
-  const probe = await preflightWrapper(cfg, tool);
-  if (!probe.ok) {
-    process.stderr.write(probe.message ?? "preflight failed\n");
+  const toolEnv = envForTool(cfg, tool);
+  const gatewayVars = toolEnv.vars;
+  const gatewayClears = toolEnv.clears ?? [];
+  let modeResult;
+  try {
+    modeResult = await resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears);
+  } catch (err) {
+    process.stderr.write(`mode resolution failed: ${(err as Error).message}\n`);
     process.exit(2);
   }
 
-  const env = { ...process.env, ...envForTool(cfg, tool).vars };
+  // Surface any platform-policy path change (e.g. the org admin turned
+  // direct OTLP off for this tool, so the wrapper routed through the
+  // gateway instead) so the member sees why the path differs.
+  if (modeResult.notice) {
+    process.stderr.write(`${modeResult.notice}\n`);
+  }
+
+  if (modeResult.mode === "gateway") {
+    const probe = await preflightWrapper(cfg, tool);
+    if (!probe.ok) {
+      process.stderr.write(probe.message ?? "preflight failed\n");
+      process.exit(2);
+    }
+    if (modeResult.codexConfigPath) {
+      process.stderr.write(
+        `langwatch: wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
+      );
+    }
+    if (modeResult.codexProfilePath) {
+      process.stderr.write(
+        `langwatch: wrote profile body to ${modeResult.codexProfilePath}.\n`,
+      );
+    }
+  } else {
+    // ingestion mode side-effect feedback so the user sees what
+    // the wrapper just did on their behalf.
+    if (modeResult.newKeyMinted) {
+      process.stderr.write(
+        `langwatch: minted a personal ingestion key for ${tool}.\n`,
+      );
+    }
+    if (modeResult.codexConfigPath) {
+      process.stderr.write(
+        `langwatch: wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
+      );
+    }
+
+    // Path B only: offer to persist the OTLP telemetry exports so a future
+    // plain `<tool>` (without the langwatch wrapper) captures
+    // automatically. Gated on ingestion mode + opt-out remembered. Runs
+    // BEFORE spawn so the prompt still owns stdin.
+    await maybeOfferIngestionShellRcPersist({
+      cfg,
+      tool,
+      vars: modeResult.vars,
+    });
+  }
+
+  // Scrub conflicting twins from the inherited parent env BEFORE merging
+  // our vars in. The clears list per tool exists because legacy creds
+  // exported in the user's shell (e.g. ANTHROPIC_API_KEY from direct
+  // Anthropic SDK usage) would otherwise race with the gateway-routed
+  // ANTHROPIC_AUTH_TOKEN we set, surfacing as the claude-code warning
+  // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may not
+  // work as expected" and, worse, occasionally letting the SDK pick the
+  // wrong credential.
+  const parentEnv = { ...process.env };
+  for (const key of modeResult.clears ?? []) {
+    delete parentEnv[key];
+  }
+  const env = { ...parentEnv, ...modeResult.vars };
+  const finalArgs = [...(modeResult.extraArgs ?? []), ...args];
   // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
   // bare spawn() can't resolve them without a shell. shell:true is safe
   // here because `tool` is whitelisted (claude/codex/cursor/gemini) and
   // `args` is forwarded from the user's own terminal invocation — same
   // trust boundary as if they'd typed `claude …` directly.
-  const child = spawn(tool, args, {
+  const child = spawn(tool, finalArgs, {
     stdio: "inherit",
     env,
     shell: process.platform === "win32",

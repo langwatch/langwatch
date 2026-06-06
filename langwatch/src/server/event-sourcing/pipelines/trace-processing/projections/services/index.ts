@@ -11,5 +11,6 @@ export {
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
 } from "./trace-io-accumulation.service";
+export { liftCanonicalAttributesFromLogRecord } from "./log-extractor-driver";
 export { TracePromptAccumulationService } from "./trace-prompt-accumulation.service";
 export { TraceNameResolutionService } from "./trace-name-resolution.service";

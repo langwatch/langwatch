@@ -2,8 +2,9 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
   As a personal-project user with a tool that has no LangWatch-side OAuth
   (e.g. Claude Code on Anthropic 20x subscription)
   I want to install the platform-published claude_code template, point my
-  upstream tool at the binding endpoint, and see traces land in /me/traces
-  with the canonical gen_ai.* shape — cost / tokens / model populated
+  upstream tool at the ingest endpoint with an ingestion key, and see traces
+  land in /me/traces with the canonical gen_ai.* shape — cost / tokens /
+  model populated
   So that my personal-workspace observability matches the shape I'd get
   from a gateway-VK-proxied tool, without LangWatch participating in the
   upstream tool's OAuth flow
@@ -11,24 +12,26 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
   Per gateway.md "client-side OAuth, server-side OTLP":
     Claude Code holds the user's Anthropic OAuth session locally.
     LangWatch never participates in that OAuth flow.
-    The user's LangWatch-side credential is just the binding access token
-    (`ik-lw-<base32>`), which they paste into OTEL_EXPORTER_OTLP_HEADERS.
+    The user's LangWatch-side credential is just an ingestion key
+    (`sk-lw-<...>`) — an ApiKey scoped to one project with a write-only,
+    ingest-only role — which they paste into OTEL_EXPORTER_OTLP_HEADERS.
 
-  Per the locked v1 contract:
-    Receiver flow: prefix-discriminate → SHA256 hash lookup → defense-in-depth
-    re-verify (project.isPersonal && team.ownerUserId === binding.userId) →
-    tenantId = binding.personalProjectId → apply template.ottlRules WITH
-    principal-field guard → post-OTTL receiver-stamp authoritative attribution
-    + provenance keys → handoff to trace pipeline.
+  Per the locked contract:
+    Receiver flow: prefix-discriminate `sk-lw` → apiKey verify → ceiling to
+    ingest-only (traces:create) → tenantId = the key's bound project → apply
+    template.ottlRules WITH principal-field guard (only when the key carries a
+    templateId) → post-OTTL receiver-stamp authoritative attribution +
+    provenance keys (langwatch.api_key.id, langwatch.origin = ingest_key) →
+    handoff to trace pipeline.
 
   Background:
     Given organization "acme" exists
     And user "jane@acme.com" has personal project "personal-jane"
     And the platform IngestionTemplate "claude_code" exists with canonical
         OTTL rules mapping anthropic.usage.* → gen_ai.usage.*
-    And jane has installed the claude_code template, holding binding
-        access token `ik-lw-TOKEN_JANE` and OTLP endpoint
-        `https://app.langwatch.ai/v1/traces`
+    And jane has installed the claude_code template, holding ingestion key
+        `sk-lw-KEY_JANE` (bound to "personal-jane", carrying the claude_code
+        templateId) and OTLP endpoint `https://app.langwatch.ai/v1/traces`
 
   # ---------------------------------------------------------------------------
   # Happy path — first personal trace
@@ -36,7 +39,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
 
   @bdd @personal-project-ingest @happy-path
   Scenario: Claude Code emits a trace; it lands at /me/traces with canonical shape
-    Given jane has set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-TOKEN_JANE"
+    Given jane has set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-KEY_JANE"
     When jane runs Claude Code locally and it emits a span with attributes:
       | attribute                       | value                  |
       | gen_ai.system                   | "anthropic"            |
@@ -46,11 +49,11 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
       | claude.code.session_id          | "abc123"               |
     Then the receiver:
       | step | action                                                        |
-      | 1    | prefix-discriminates `ik-lw-*`                                  |
-      | 2    | SHA256-hash-lookup → finds jane's binding                      |
-      | 3    | defense-in-depth re-verify (isPersonal + team.ownerUserId)     |
-      | 4    | sets tenantId = "personal-jane" (binding.personalProjectId)    |
-      | 5    | applies template.ottlRules (anthropic.usage.* → gen_ai.usage.*)|
+      | 1    | prefix-discriminates `sk-lw-*` → apiKey verification path       |
+      | 2    | verifies the key (HMAC + pepper) → finds jane's ingestion key   |
+      | 3    | ceilings to ingest-only (role grants only traces:create)       |
+      | 4    | sets tenantId = "personal-jane" (the key's bound project)      |
+      | 5    | applies template.ottlRules (anthropic.usage.* → gen_ai.usage.*) — the key carries the claude_code templateId |
       | 6    | post-OTTL stamps attribution + provenance keys (receiver-authoritative) |
       | 7    | handoff to trace pipeline                                      |
     And the trace lands at /me/traces with:
@@ -62,9 +65,10 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
       | langwatch.user.id                  | jane.id (receiver-stamped, NOT template-stamped)|
       | langwatch.project.id               | "personal-jane" (receiver-stamped)              |
       | langwatch.template.id              | claude_code-template-id (receiver-stamped)      |
-      | langwatch.user_ingestion_binding.id | jane's binding id (receiver-stamped)           |
+      | langwatch.api_key.id               | jane's ingestion key id (receiver-stamped)      |
+      | langwatch.origin                   | "ingest_key" (receiver-stamped)                 |
       | langwatch.source                   | "claude_code" (receiver-stamped post-OTTL)      |
-    And the binding's `lastSeenAt` is updated to the trace's timestamp
+    And the ingestion key's `lastUsedAt` is updated to the trace's timestamp
 
   # ---------------------------------------------------------------------------
   # Cost / tokens / model — receiver-derived from template OTTL outputs
@@ -72,7 +76,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
 
   @bdd @personal-project-ingest @cost-token-model
   Scenario: cost.usd > 0 AND token counts populated AND model name correct
-    Given jane has fired one Claude Code trace through the binding
+    Given jane has fired one Claude Code trace through the ingestion key
     When the trace appears in /me/traces
     Then `gen_ai.usage.input_tokens` is greater than 0
     And `gen_ai.usage.output_tokens` is greater than 0
@@ -89,11 +93,11 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
   @bdd @personal-project-ingest @cross-user-isolation
   Scenario: User A's traces are visible only on user A's /me/traces
     Given user "ben@acme.com" has personal project "personal-ben"
-    And ben has installed claude_code, holding token `ik-lw-TOKEN_BEN`
-    When jane fires 5 Claude Code traces using `ik-lw-TOKEN_JANE`
-    And ben fires 3 Claude Code traces using `ik-lw-TOKEN_BEN`
-    Then jane's /me/traces shows 5 traces (her bindings only)
-    And ben's /me/traces shows 3 traces (his bindings only)
+    And ben has installed claude_code, holding ingestion key `sk-lw-KEY_BEN`
+    When jane fires 5 Claude Code traces using `sk-lw-KEY_JANE`
+    And ben fires 3 Claude Code traces using `sk-lw-KEY_BEN`
+    Then jane's /me/traces shows 5 traces (her ingestion keys only)
+    And ben's /me/traces shows 3 traces (his ingestion keys only)
     And neither user sees the other's traces under any filter
 
   # ---------------------------------------------------------------------------
@@ -102,7 +106,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
 
   @bdd @personal-project-ingest @source-filter
   Scenario: User can filter /me/traces by source slug
-    Given jane has bindings for both claude_code AND cursor
+    Given jane has ingestion keys for both claude_code AND cursor
     And jane has fired 3 traces from each
     When jane filters /me/traces by `langwatch.source = "claude_code"`
     Then she sees the 3 claude_code traces

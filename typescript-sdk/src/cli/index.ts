@@ -301,7 +301,7 @@ program
   });
 
 program
-  .command("opencode", { hidden: true })
+  .command("opencode")
   .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -410,10 +410,35 @@ ingestCmd
     }
   });
 
+// `langwatch ingest install <tool>` — hidden primitive used by CI /
+// devcontainer / scripted setups. The user surface is
+// `langwatch <tool>` (the wrapper auto-resolves Path A vs Path B
+// per cfg.tool_mode + VK presence). Kept registered so existing
+// scripts continue to work and so reviewers can find the install
+// helper from the help with `--help --all` if needed.
+ingestCmd
+  .command("install <tool>", { hidden: true })
+  .description(
+    "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
+  )
+  .option("--env-only", "skip the codex config.toml write; print exports only")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (
+      tool: string,
+      options: { envOnly?: boolean; json?: boolean },
+    ) => {
+      const { installCommand } = await import(
+        "./commands/ingestion/install.js"
+      );
+      await installCommand(tool, options);
+    },
+  );
+
 const governanceCmd = program
   .command("governance")
   .description(
-    "Manage governance resources (ingestion templates, user ingestion bindings) from the CLI. Mirrors the public REST surface at /api/governance/* — every mutating call lands an audit row with metadata.surface='cli'.",
+    "Manage governance resources (ingestion templates) from the CLI. Mirrors the public REST surface at /api/governance/* — every mutating call lands an audit row with metadata.surface='cli'.",
   );
 
 governanceCmd
@@ -435,17 +460,6 @@ governanceCmd
 const templatesCmd = governanceCmd
   .command("ingestion-templates")
   .description("CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.");
-
-templatesCmd
-  .command("list")
-  .description("List enabled ingestion templates visible to the caller's org (platform + org-authored).")
-  .option("--json", "emit machine-readable JSON")
-  .action(async (options: { json?: boolean }) => {
-    const { listCommand } = await import(
-      "./commands/governance/ingestion-templates.js"
-    );
-    await listCommand(options);
-  });
 
 templatesCmd
   .command("admin-list")
@@ -536,56 +550,6 @@ templatesCmd
       await cloneFromPlatformCommand(sourceTemplateId, options);
     },
   );
-
-// ── User ingestion bindings (caller's own bindings) ───────────────────────
-
-const bindingsCmd = governanceCmd
-  .command("user-ingestion-bindings")
-  .description("Caller-scoped binding CRUD. Mutations require a User-bound PAT (legacy project tokens 403).");
-
-bindingsCmd
-  .command("list")
-  .description("List the caller's installed bindings.")
-  .option("--json", "emit machine-readable JSON")
-  .action(async (options: { json?: boolean }) => {
-    const { listCommand } = await import(
-      "./commands/governance/user-ingestion-bindings.js"
-    );
-    await listCommand(options);
-  });
-
-bindingsCmd
-  .command("install <templateId>")
-  .description("Install a binding for an ingestion template. Returns the lwub_* token (shown once).")
-  .option("--json", "emit machine-readable JSON")
-  .action(async (templateId: string, options: { json?: boolean }) => {
-    const { installCommand } = await import(
-      "./commands/governance/user-ingestion-bindings.js"
-    );
-    await installCommand(templateId, options);
-  });
-
-bindingsCmd
-  .command("uninstall <bindingId>")
-  .description("Soft-archive a binding. Existing traces retained; new emits 401.")
-  .option("--json", "emit machine-readable JSON")
-  .action(async (bindingId: string, options: { json?: boolean }) => {
-    const { uninstallCommand } = await import(
-      "./commands/governance/user-ingestion-bindings.js"
-    );
-    await uninstallCommand(bindingId, options);
-  });
-
-bindingsCmd
-  .command("rotate <bindingId>")
-  .description("Rotate the binding's access token (hard-cut: previous token invalidated immediately).")
-  .option("--json", "emit machine-readable JSON")
-  .action(async (bindingId: string, options: { json?: boolean }) => {
-    const { rotateCommand } = await import(
-      "./commands/governance/user-ingestion-bindings.js"
-    );
-    await rotateCommand(bindingId, options);
-  });
 
 // Add prompt command group
 const promptCmd = program

@@ -13,6 +13,7 @@ import (
 
 type ctxKey struct{}
 type spanCtxKey struct{}
+type clientSessionIDKey struct{}
 
 // WithTraceParent stashes the customer's raw traceparent header value on the
 // context. The middleware should call this after extracting (and stripping) the
@@ -28,6 +29,27 @@ func WithTraceParent(ctx context.Context, traceparent string) context.Context {
 // Returns empty string if none was set.
 func TraceParent(ctx context.Context) string {
 	if v, ok := ctx.Value(ctxKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// WithClientSessionID stashes the upstream tool's own session / conversation id
+// (lifted from a request header by the middleware) so EndSpan can stamp it as
+// gen_ai.conversation.id on the customer span. Without this the gateway path
+// has no thread id at all — the wrapped tool (claude-code, codex, opencode)
+// sends one on every request but it is otherwise dropped here.
+func WithClientSessionID(ctx context.Context, sessionID string) context.Context {
+	if sessionID == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, clientSessionIDKey{}, sessionID)
+}
+
+// ClientSessionID retrieves the upstream tool session id from the context.
+// Returns empty string if none was set.
+func ClientSessionID(ctx context.Context) string {
+	if v, ok := ctx.Value(clientSessionIDKey{}).(string); ok {
 		return v
 	}
 	return ""

@@ -106,7 +106,6 @@ model User {
   gatewayGuardrailsUpdated GatewayGuardrail[]      @relation("GatewayGuardrailUpdatedBy")
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
-  userIngestionBindings   UserIngestionBinding[]
   pinnedTraces            PinnedTrace[]
 }
 
@@ -286,7 +285,6 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
-  userIngestionBindings  UserIngestionBinding[]
 
   @@index([ssoProvider])
 }
@@ -415,7 +413,6 @@ model Project {
   savedViews               SavedView[]
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
-  userIngestionBindings    UserIngestionBinding[]
   pinnedTraces             PinnedTrace[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -461,6 +458,27 @@ model CostCenter {
   updatedAt      DateTime  @default(now()) @updatedAt
   archivedAt     DateTime?
 
+  @@index([organizationId])
+}
+
+/// Per-(organization, tool) override for which `langwatch <tool>` paths the
+/// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
+/// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
+/// row resolves to the hardcoded defaults (both true for claude/codex/gemini/
+/// opencode; cursor allows the gateway path only), so the policy is purely
+/// additive: disabling a path is an explicit admin choice. The CLI caches the
+/// resolved map at login and gates path selection on it.
+/// See specs/ai-gateway/governance/cli-tool-mode-policy.feature.
+model PlatformToolPolicy {
+  id              String   @id @default(nanoid())
+  organizationId  String
+  toolSlug        String
+  allowVk         Boolean  @default(true)
+  allowOtelDirect Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, toolSlug])
   @@index([organizationId])
 }
 
@@ -1693,12 +1711,29 @@ model ApiKey {
   expiresAt       DateTime?
   lastUsedAt      DateTime?
   revokedAt       DateTime?
+
+  /// Non-null marks this key as an "ingestion key": a project-scoped,
+  /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
+  /// installs) mint for OTLP Path B. The slug (claude_code / codex / gemini /
+  /// opencode / claude_cowork) is stamped as `langwatch.source` provenance on
+  /// every span the key authorizes. NULL for normal API / service keys.
+  ingestSourceType String?
+
+  /// Set only for ingestion keys derived from an admin IngestionTemplate
+  /// (e.g. claude_cowork). Drives receiver OTTL application + the
+  /// `langwatch.template.id` provenance stamp. NULL for unified-CLI tools
+  /// (which have no template) and for normal keys. Column ref only (no FK,
+  /// per the app-layer-integrity convention); resolved by the ingest-key service.
+  ingestionTemplateId String?
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 
   @@index([userId])
   @@index([organizationId])
   @@index([lookupId])
+  @@index([ingestSourceType])
+  @@index([ingestionTemplateId])
 }
 
 model BillingMeterCheckpoint {
@@ -2400,8 +2435,9 @@ model AiToolEntryTeam {
 
 /// Admin/platform-curated catalog row for upstream OTLP normalization.
 /// Owns the OTTL transform that reshapes a specific upstream tool's
-/// span shape into canonical gen_ai conventions. Users install via
-/// UserIngestionBinding to land traces in their personal project.
+/// span shape into canonical gen_ai conventions. Users connect via an
+/// ingestion key (an ingest-only ApiKey carrying ingestionTemplateId) to
+/// land traces in their personal project.
 ///
 /// `organizationId` NULL = platform-published default (always-visible
 /// across every org). NOT NULL = org-authored (visible only within
@@ -2438,12 +2474,11 @@ model IngestionTemplate {
 
   /// Discriminator for what (if any) extra credential metadata the
   /// install drawer captures from the user:
-  ///   null              → otlp_token-only (drawer auto-issues binding
-  ///                       token, no input form)
-  ///   `static_api_key`  → drawer captures the user's upstream tool
-  ///                       API key into UserIngestionBinding.encryptedCredential
+  ///   null              → otlp_token-only (drawer auto-issues the
+  ///                       ingestion key, no input form)
+  ///   `static_api_key`  → drawer captures the user's upstream tool API key
   ///   `agent_id`        → drawer captures an agent identifier (e.g.
-  ///                       Cursor agentId) into the same column
+  ///                       Cursor agentId)
   /// String not enum so v2 shapes (oauth_redirect / s3_bucket) ship
   /// without a migration.
   credentialSchema String?
@@ -2463,8 +2498,7 @@ model IngestionTemplate {
   platformPublished Boolean @default(false)
 
   /// Admin/platform enable. False = hidden from /me catalog. Existing
-  /// UserIngestionBindings continue to land traces; new installs are
-  /// blocked.
+  /// ingestion keys continue to land traces; new installs are blocked.
   enabled Boolean @default(true)
 
   archivedAt  DateTime?
@@ -2473,84 +2507,9 @@ model IngestionTemplate {
   createdById String?
   updatedById String?
 
-  bindings UserIngestionBinding[]
-
   @@unique([organizationId, slug])
   @@index([organizationId, archivedAt])
   @@index([sourceType])
-}
-
-/// User-managed binding from an IngestionTemplate to the user's personal
-/// project. Holds the `ik-lw-<base32>` binding access token (hashed) the
-/// user pastes into their upstream tool's OTLP exporter Bearer auth.
-///
-/// Cross-bind guard is service-layer (structural-impossibility): the
-/// service input shape MUST NOT accept personalProjectId. Server resolves
-/// from `getPersonalProjectForUser(userId)` at install time, so a caller
-/// cannot bind to another user's project even with the right templateId.
-///
-/// Hard-cut rotation v1: `bindingAccessTokenHash` is replaced in-place
-/// on rotate, no grace window. Receiver returns a structured 'binding
-/// rejected' state surfaced as a /me Trace Ingest tile banner.
-///
-/// Spec: specs/ai-gateway/governance/user-ingestion-binding-lifecycle.feature
-///       specs/ai-gateway/governance/template-cross-bind-guard.feature
-model UserIngestionBinding {
-  id String @id @default(nanoid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  templateId String
-  template   IngestionTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
-
-  /// Server-resolved at install (NOT input-accepted). Always points at
-  /// the user's personal Project (`Project.isPersonal=true` AND
-  /// `Project.team.ownerUserId === userId`). Receiver re-verifies at
-  /// auth time as defense-in-depth.
-  personalProjectId String
-  personalProject   Project @relation(fields: [personalProjectId], references: [id], onDelete: Cascade)
-
-  /// Denormalised for tenancy index — equals
-  /// `personalProject.team.organizationId`. Lets admin views query
-  /// bindings within an org without a 2-table join.
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  /// SHA256 hex of the `ik-lw-<base32>` token. Receiver auth path:
-  /// SHA256(incoming Bearer) → indexed lookup. Single source of truth
-  /// for binding auth.
-  bindingAccessTokenHash String @unique
-
-  /// First 8 characters of the token, displayed in /me Trace Ingest tile
-  /// for "is this the right token" recognition. Never used for auth.
-  bindingAccessTokenPrefix String
-
-  /// Optional credential metadata captured at install time when the
-  /// template's credentialSchema is `static_api_key` or `agent_id`.
-  /// NULL when credentialSchema is null (otlp_token-only templates).
-  /// Encrypted at rest via the same pepper-derived KEK as VirtualKey
-  /// secrets. NOT used for receiver auth.
-  encryptedCredential Json?
-
-  /// User-side toggle. False = receiver rejects bound traces; tile shows
-  /// 'Binding disabled — re-enable to resume'.
-  enabled Boolean @default(true)
-
-  /// Last successful trace landed timestamp. Surfaces in /me as
-  /// "last trace 2 minutes ago" + admin-side as "is this binding live".
-  /// NOT a per-trace audit row (volume).
-  lastSeenAt DateTime?
-
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-
-  @@unique([userId, templateId])
-  @@index([organizationId, archivedAt])
-  @@index([userId, archivedAt])
-  @@index([templateId])
-  @@index([personalProjectId])
 }
 
 // GatewayProviderCredential + VirtualKeyProviderCredential were both

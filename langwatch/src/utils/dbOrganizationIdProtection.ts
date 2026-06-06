@@ -154,10 +154,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "CostCenter",
   "GatewayCacheRule",
   "IngestionSource",
+  // Per-(org, tool) CLI path policy. Read/written only through
+  // PlatformToolPolicyService, which always passes organizationId
+  // explicitly; not behind the middleware guard.
+  "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
   "Subscription",
-  "UserIngestionBinding",
 ];
 
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] =

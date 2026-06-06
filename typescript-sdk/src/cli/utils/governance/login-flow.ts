@@ -106,6 +106,15 @@ export async function runUnifiedLoginFlow(
         saveConfig(cfg);
       }
 
+      // Cache the org's per-tool path policy so the `langwatch <tool>`
+      // wrapper gates path selection on the admin's choices offline.
+      // Older servers omit the field; the wrapper then falls back to
+      // the hardcoded defaults.
+      if (bootstrap?.toolPolicies) {
+        cfg.tool_policies = bootstrap.toolPolicies;
+        saveConfig(cfg);
+      }
+
       console.log();
       const ceremonyLines = formatLoginCeremony({
         email: cfg.user?.email ?? result.user.email,
@@ -124,8 +133,8 @@ export async function runUnifiedLoginFlow(
         console.log(line);
       }
       console.log();
-      console.log(chalk.gray(`  Gateway:   ${cfg.gateway_url}`));
       console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+
       return cfg;
     }
 
@@ -268,6 +277,13 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
     // browser failure shouldn't break login — user can paste manually
   }
 }
+
+// The post-login shell-rc persist offer was removed when `langwatch
+// login` became auth-only: the device session in config.json is
+// already authoritative, so login never edits the shell rc. The
+// persist offer now lives in the `langwatch <tool>` wrapper and fires
+// only in ingestion mode (maybeOfferIngestionShellRcPersist in
+// shell-rc.ts), framed as installing telemetry.
 
 // Type-only re-exports so callers can import the shapes from this
 // module without reaching into device-flow.ts.

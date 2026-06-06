@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -6,14 +8,50 @@ import type { DeepPartial } from "~/utils/types";
 import {
   piiRedactionLevelSchema,
   type RecordLogCommandData,
+  type RecordSpanCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import {
+  instrumentationScopeSchema,
+  type OtlpAnyValue,
+  type OtlpInstrumentationScope,
+  type OtlpResource,
+  resourceSchema,
+} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  type ClaudeCodeLogRecordInput,
+  convertClaudeCodeLogsToSpans,
+  isClaudeCodeConvertibleLog,
+} from "./claude-code-log-to-span";
+
+/**
+ * Claude Code 2.1.x emits its OTLP logs with NO trace context — the
+ * standard exporter does not carry a current span when these fire
+ * since the cost-bearing api_request events are not wrapped in one.
+ * Without a trace_id+span_id the receiver writes empty-id rows and
+ * the fold projection skips them, so /me/traces shows nothing.
+ *
+ * Synthesizing stable ids from the event's own correlation keys
+ * (session.id groups every turn into one trace; prompt.id +
+ * event.name + event.sequence make each event a distinct row) lets
+ * the existing fold + I/O extractors do their job unchanged.
+ */
+const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
+
+/**
+ * Codex's instrumentation scope varies across builds (codex 0.131
+ * uses `codex_exec`, 0.13x sometimes just `codex`), so the
+ * synthesizer below gates on the event.name prefix (`codex.*`)
+ * which is stable across versions.
+ */
+const CODEX_EVENT_NAME_PREFIX = "codex.";
+
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
+  recordSpan: (data: RecordSpanCommandData) => Promise<void>;
 }
 
 export class LogRequestCollectionService {
@@ -49,12 +87,26 @@ export class LogRequestCollectionService {
         let droppedCount = 0;
         let failedCount = 0;
 
+        // claude_code model-call log records (api_request /
+        // api_request_body / api_response_body) are trapped here and
+        // converted into gen_ai spans after the loop — they are NOT
+        // written to stored_log_records (no double-write). See
+        // claude-code-log-to-span.ts.
+        const claudeConvertibles: ClaudeCodeLogRecordInput[] = [];
+
+        // Clean user-typed text per prompt.id, harvested from the co-batched
+        // claude_code `user_prompt` events (which stay on the log path). The
+        // converter prefers this over a truncated, unparseable api_request_body
+        // when stamping the synthesized span's input. See claude-code-log-to-span.ts.
+        const claudePromptTextById = new Map<string, string>();
+
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
 
           const resourceAttrs = normalizeOtlpAttributeMap(
             resourceLog.resource?.attributes,
           );
+          const otlpResource = parseOtlpResource(resourceLog.resource);
 
           for (const scopeLog of resourceLog.scopeLogs) {
             if (!scopeLog?.logRecords) continue;
@@ -63,6 +115,7 @@ export class LogRequestCollectionService {
               (scopeLog.scope?.name as string | undefined) ?? "";
             const scopeVersion =
               (scopeLog.scope?.version as string | undefined) ?? null;
+            const otlpScope = parseOtlpScope(scopeLog.scope);
 
             for (const logRecord of scopeLog.logRecords) {
               if (!logRecord) {
@@ -85,16 +138,31 @@ export class LogRequestCollectionService {
                 // exporter is the canonical caller). Store an empty
                 // string instead; downstream join-to-span queries simply
                 // find no correlation, which is the correct semantics.
-                const traceId = logRecord.traceId
+                const wireTraceId = logRecord.traceId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.traceId as string | Uint8Array,
                     ) ?? ""
                   : "";
-                const spanId = logRecord.spanId
+                const wireSpanId = logRecord.spanId
                   ? TraceRequestUtils.normalizeOtlpId(
                       logRecord.spanId as string | Uint8Array,
                     ) ?? ""
                   : "";
+
+                const logAttrs = normalizeOtlpAttributeMap(
+                  logRecord.attributes,
+                );
+                const claudeIds = synthesizeClaudeCodeIdsIfMissing({
+                  scopeName,
+                  wireTraceId,
+                  wireSpanId,
+                  attrs: logAttrs,
+                });
+                const { traceId, spanId } = synthesizeCodexIdsIfMissing({
+                  wireTraceId: claudeIds.traceId,
+                  wireSpanId: claudeIds.spanId,
+                  attrs: logAttrs,
+                });
 
                 const timeUnixMs = logRecord.timeUnixNano
                   ? TraceRequestUtils.convertUnixNanoToUnixMs(
@@ -107,9 +175,36 @@ export class LogRequestCollectionService {
                     )
                   : Date.now();
 
-                const logAttrs = normalizeOtlpAttributeMap(
-                  logRecord.attributes,
-                );
+                // Harvest the clean user-typed prompt text (keyed by prompt.id)
+                // so the converter can use it as the span input when the matching
+                // api_request_body is truncated. user_prompt stays on the log path.
+                if (
+                  scopeName === CLAUDE_CODE_EVENT_SCOPE &&
+                  logAttrs["event.name"] === "user_prompt"
+                ) {
+                  const promptId = logAttrs["prompt.id"];
+                  const promptText = logAttrs.prompt;
+                  if (promptId && promptText) {
+                    claudePromptTextById.set(promptId, promptText);
+                  }
+                }
+
+                // claude_code model-call events: trap + convert to a gen_ai
+                // span after the loop; do NOT write them as log records. The
+                // `body` content lives in the `body` attribute for these
+                // events, which is already in logAttrs.
+                if (isClaudeCodeConvertibleLog(scopeName, logAttrs["event.name"])) {
+                  claudeConvertibles.push({
+                    traceId,
+                    spanId,
+                    timeUnixMs,
+                    eventName: logAttrs["event.name"]!,
+                    attrs: logAttrs,
+                    resource: otlpResource,
+                    instrumentationScope: otlpScope,
+                  });
+                  continue;
+                }
 
                 await this.deps.recordLog({
                   tenantId,
@@ -143,12 +238,153 @@ export class LogRequestCollectionService {
           }
         }
 
+        // Convert the trapped claude_code model-call logs into gen_ai spans
+        // and feed them through the normal span pipeline. The existing span
+        // fold lifts model / tokens / cost / input / output.
+        let convertedSpanCount = 0;
+        if (claudeConvertibles.length > 0) {
+          const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
+          const spans = convertClaudeCodeLogsToSpans(
+            claudeConvertibles,
+            claudePromptTextById,
+          );
+          for (const synthesized of spans) {
+            try {
+              await this.deps.recordSpan({
+                tenantId,
+                span: synthesized.span,
+                resource: synthesized.resource,
+                instrumentationScope: synthesized.instrumentationScope,
+                piiRedactionLevel: redaction,
+                occurredAt: Date.now(),
+              });
+              convertedSpanCount++;
+            } catch (error) {
+              failedCount++;
+              this.logger.error(
+                { error, tenantId, traceId: synthesized.span.traceId },
+                "Error recording converted claude_code span",
+              );
+            }
+          }
+        }
+
         span.setAttribute("logs.ingestion.successes", collectedCount);
         span.setAttribute("logs.ingestion.drops", droppedCount);
         span.setAttribute("logs.ingestion.failures", failedCount);
+        span.setAttribute(
+          "logs.ingestion.claude_code_spans",
+          convertedSpanCount,
+        );
       },
     );
   }
+}
+
+function parseOtlpResource(resource: unknown): OtlpResource | null {
+  const parsed = resourceSchema.safeParse(resource);
+  return parsed.success ? parsed.data : null;
+}
+
+function parseOtlpScope(scope: unknown): OtlpInstrumentationScope | null {
+  const parsed = instrumentationScopeSchema.safeParse(scope);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Synthesize trace_id + span_id for claude_code log records that
+ * arrive without trace context (the normal case — Claude Code 2.1.x
+ * emits its api_request / user_prompt events outside any active
+ * span). Returns the wire ids unchanged for any other scope, or when
+ * the wire ids ARE present.
+ *
+ * Stability contract:
+ *   - trace_id = sha256(session.id) truncated to 32 hex.
+ *     Every turn of a single Claude Code session collapses into
+ *     one trace row — matches the /me/traces UX user expects.
+ *   - span_id = sha256(session.id || ':' || prompt.id || ':' ||
+ *     event.name || ':' || event.sequence) truncated to 16 hex.
+ *     Each event (user_prompt + api_request + tool_decision + …)
+ *     becomes its own log row under that trace, idempotent under
+ *     re-ingest through the stored_log_records ReplacingMergeTree.
+ *
+ * When session.id is missing we leave the ids empty rather than
+ * inventing them — the record still lands in stored_log_records
+ * with empty trace context (the c56eced2d behavior), and a future
+ * caller with session.id will get correlated correctly.
+ */
+function synthesizeClaudeCodeIdsIfMissing(args: {
+  scopeName: string;
+  wireTraceId: string;
+  wireSpanId: string;
+  attrs: Record<string, string>;
+}): { traceId: string; spanId: string } {
+  const { scopeName, wireTraceId, wireSpanId, attrs } = args;
+  if (scopeName !== CLAUDE_CODE_EVENT_SCOPE) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  if (wireTraceId && wireSpanId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const sessionId = attrs["session.id"];
+  if (!sessionId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const promptId = attrs["prompt.id"] ?? "";
+  const eventName = attrs["event.name"] ?? "";
+  const eventSequence = attrs["event.sequence"] ?? "";
+  const traceId = wireTraceId
+    ? wireTraceId
+    : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+  const spanId = wireSpanId
+    ? wireSpanId
+    : createHash("sha256")
+        .update(`${sessionId}:${promptId}:${eventName}:${eventSequence}`)
+        .digest("hex")
+        .slice(0, 16);
+  return { traceId, spanId };
+}
+
+/**
+ * Codex equivalent of synthesizeClaudeCodeIdsIfMissing. Codex emits
+ * its events (codex.user_prompt / codex.sse_event /
+ * codex.conversation_starts) under a `conversation.id` that groups
+ * a multi-turn chat into one trace. Each event gets its own span id
+ * derived from (conversation.id, event.name, event.sequence) so the
+ * fold sees them as distinct rows under the same trace.
+ *
+ * Scope-agnostic by design: codex's instrumentation scope varies
+ * (`codex_exec` in 0.131, `codex` in 0.13x). We gate on the
+ * event.name prefix instead, which is stable.
+ */
+function synthesizeCodexIdsIfMissing(args: {
+  wireTraceId: string;
+  wireSpanId: string;
+  attrs: Record<string, string>;
+}): { traceId: string; spanId: string } {
+  const { wireTraceId, wireSpanId, attrs } = args;
+  if (wireTraceId && wireSpanId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const eventName = attrs["event.name"] ?? "";
+  if (!eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const conversationId = attrs["conversation.id"];
+  if (!conversationId) {
+    return { traceId: wireTraceId, spanId: wireSpanId };
+  }
+  const eventSequence = attrs["event.sequence"] ?? "";
+  const traceId = wireTraceId
+    ? wireTraceId
+    : createHash("sha256").update(conversationId).digest("hex").slice(0, 32);
+  const spanId = wireSpanId
+    ? wireSpanId
+    : createHash("sha256")
+        .update(`${conversationId}:${eventName}:${eventSequence}`)
+        .digest("hex")
+        .slice(0, 16);
+  return { traceId, spanId };
 }
 
 /**

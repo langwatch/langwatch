@@ -179,13 +179,26 @@ const logger = createLogger("langwatch:ingest");
 /**
  * Cost-event extraction via OTTL.
  *
- * Every push-mode source carries `parserConfig.ottlStatements` (the
- * composer auto-fills the canonical starter for known source types
- * and admins paste their own for `otel_generic`). The receiver
- * round-trips the original payload through the aigateway's
- * `/internal/transform` (which embeds `pkg/ottl`), re-parses the
- * mutated payload, and reads canonical `langwatch.*` fields via
- * `extractCanonicalCostEvents`.
+ * Runtime invariant (preserved across the platform-native lift
+ * refactor in 713a36ed5..7b6fb20c0): OTTL is the future-extensible
+ * catch-all surface, NOT a per-source-type opt-in at runtime. Any
+ * IngestionSource whose `parserConfig.ottlStatements` is non-empty
+ * gets the round-trip through the aigateway's `/internal/transform`
+ * regardless of `sourceType`. The platform-known tools (claude_code,
+ * codex, gemini, opencode, cursor) have their dedicated receiver-
+ * side native TS extractors under canonicalisation/extractors/, but
+ * an admin can still attach OTTL statements to those rows and they
+ * will apply on top — useful for custom field mappings, in-house
+ * derived attributes, or correcting upstream wire-shape drift.
+ *
+ * The UI gate (OTTL_ENABLED_SOURCE_TYPES in ottlStarterTemplates.ts)
+ * controls whether the admin composer SHOWS the OTTL editor for a
+ * given sourceType. Today it is "otel_generic" only. The runtime
+ * pipeline below does NOT consult that gate — it acts purely on the
+ * statements present on the source's parserConfig.
+ *
+ * `/v1/traces` (span-shaped ingestion) is a future extension point
+ * for the same OTTL catch-all surface.
  *
  * On gateway/transform errors, falls back to canonical extraction
  * over the un-mutated payload so the receiver still 202-acks the

@@ -22,7 +22,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   Per ingestion-templates-catalog.feature + admin-trace-access.feature:
     No-spy mode applies to EVERY trace ingestion path uniformly:
       • gateway VK proxy traces
-      • UserIngestionBinding traces (ik-lw-*)
+      • ingestion-key traces (sk-lw-*, ingest-only ApiKey)
       • IngestionSource pull/push traces
       • Direct OTLP project apiKey traces
     Per-path opt-out is NOT supported — the org-level mode is authoritative.
@@ -31,7 +31,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
     Given organization "acme-privacy" exists
     And admin "carol@acme-privacy.com" has the `organization:manage` permission
     And the org has at least one personal project, one team project, and
-        active gateway VKs / IngestionSources / UserIngestionBindings
+        active gateway VKs / IngestionSources / ingestion keys
 
   # ---------------------------------------------------------------------------
   # Mode setting + audit
@@ -97,38 +97,39 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   # ---------------------------------------------------------------------------
 
   @bdd @no-spy-mode @cross-path @binding-routed
-  Scenario: strip_io applies to UserIngestionBinding-routed traces
+  Scenario: strip_io applies to ingestion-key-routed traces
     Given the org's mode is "strip_io"
     And user "jane@acme-privacy.com" has installed the claude_code template
-        and holds binding token `ik-lw-TOKEN_JANE`
-    When jane fires a trace through `ik-lw-TOKEN_JANE`
+        and holds ingestion key `sk-lw-KEY_JANE`
+    When jane fires a trace through `sk-lw-KEY_JANE`
     Then the trace lands at /me/traces with:
       | attribute                       | value                                                       |
       | gen_ai.usage.* + cost.usd       | populated                                                    |
-      | langwatch.origin                | "binding" (receiver-stamped — bindingProvenance 5-key set)   |
-      | langwatch.organization_id       | acme-privacy.id (receiver-stamped — bindingProvenance)       |
-      | langwatch.template.id           | claude_code template id (receiver-stamped — bindingProvenance) |
-      | langwatch.binding.id            | jane's binding id (receiver-stamped — bindingProvenance)     |
-      | langwatch.source                | "claude_code" (receiver-stamped — bindingProvenance)         |
+      | langwatch.origin                | "ingest_key" (receiver-stamped — ingestKeyProvenance 5-key set) |
+      | langwatch.organization_id       | acme-privacy.id (receiver-stamped — ingestKeyProvenance)     |
+      | langwatch.template.id           | claude_code template id (receiver-stamped — ingestKeyProvenance) |
+      | langwatch.api_key.id            | jane's ingestion key id (receiver-stamped — ingestKeyProvenance) |
+      | langwatch.source                | "claude_code" (receiver-stamped — ingestKeyProvenance)       |
       | gen_ai.request.messages         | stripped                                                     |
       | gen_ai.response.choices         | stripped                                                     |
-    # v1 scope fence: the receiver re-stamps the 5-key bindingProvenance
+    # v1 scope fence: the receiver re-stamps the 5-key ingestKeyProvenance
     # set authoritatively (origin / organization_id / source / template.id
-    # / binding.id). The 16-key B6 attribution set (langwatch.user.id /
+    # / api_key.id). The 16-key B6 attribution set (langwatch.user.id /
     # team.id / organization.id / project.id / tenant_id) is NOT receiver-
-    # restamped on binding-routed traces in v1 — that's v1.1+ deferred
+    # restamped on ingestion-key-routed traces in v1 — that's v1.1+ deferred
     # work (per MO ruling on Ariana's gap-#6 surfacing post-fc6d54100).
     # Until v1.1+ ships, attribution-key forge attempts in OTLP payloads
-    # survive intact through the receiver on the binding path; defense
-    # rests on the binding token's receiver-resolved tenancy plus the
-    # 5-key bindingProvenance stamp that locks origin + organization_id.
+    # survive intact through the receiver on the ingest-key path; defense
+    # rests on the ingestion key's ingest-only ceiling + receiver-resolved
+    # tenancy plus the 5-key ingestKeyProvenance stamp that locks
+    # origin + organization_id.
     #
     # Defense against compliance hole: per-trace stripping must consult
-    # the trace's effective Organization (resolved from
-    # binding.personalProject.team.organizationId), not just the
-    # personalProject's piiRedactionLevel. Spec assertion locks the
-    # invariant so future refactors of the receiver pipeline don't
-    # silently drop the org-level mode lookup.
+    # the trace's effective Organization (resolved from the ingestion
+    # key's project.team.organizationId), not just the personalProject's
+    # piiRedactionLevel. Spec assertion locks the invariant so future
+    # refactors of the receiver pipeline don't silently drop the org-level
+    # mode lookup.
 
   @bdd @no-spy-mode @cross-path @gateway-vk
   Scenario: strip_io applies to gateway VK proxy traces

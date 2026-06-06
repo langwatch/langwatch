@@ -21,4 +21,8 @@ const (
 	AttrGenAIUsageTotal         = "gen_ai.usage.total_tokens"
 	AttrGenAIUsageCacheRead     = "gen_ai.usage.cache_read.input_tokens"
 	AttrGenAIUsageCacheCreate   = "gen_ai.usage.cache_creation.input_tokens"
+	// AttrGenAIConversationID is the wrapped tool's own session / thread id,
+	// lifted from a request header (claude-code / codex / opencode) so the
+	// gateway-path trace carries a real conversation id the fold groups on.
+	AttrGenAIConversationID = "gen_ai.conversation.id"
 )

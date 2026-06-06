@@ -168,33 +168,6 @@ describe("governance MCP tools — audit-uniform contract", () => {
     });
   });
 
-  describe("when an MCP tool installs a binding", () => {
-    it("emits gateway.user_ingestion_binding.installed with metadata.surface=mcp", async () => {
-      const mock = mockMcpServer();
-      registerGovernanceMcpTools(mock as any, {
-        prisma,
-        apiKey: API_KEY,
-        callerUserId: ADMIN_ID,
-      });
-      const out = await call(
-        mock,
-        "governance_user_ingestion_bindings_install",
-        { template_id: PLATFORM_TEMPLATE_ID },
-      );
-      expect(out).not.toMatch(/^FORBIDDEN|^AUTH_REQUIRED/);
-
-      const audit = await prisma.auditLog.findFirst({
-        where: {
-          organizationId: ORG_ID,
-          action: "gateway.user_ingestion_binding.installed",
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      expect(audit).not.toBeNull();
-      expect(audit?.metadata).toMatchObject({ surface: "mcp" });
-    });
-  });
-
   describe("when an MCP write tool runs without callerUserId", () => {
     it("returns AUTH_REQUIRED instead of attempting the service call", async () => {
       const mock = mockMcpServer();

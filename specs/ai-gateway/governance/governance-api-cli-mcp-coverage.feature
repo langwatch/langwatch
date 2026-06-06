@@ -51,7 +51,7 @@ Feature: AI Gateway Governance — API + CLI + MCP coverage (agentic-first parit
       | anomaly-rules         |
       | ingestion-sources     |
       | ingestion-templates   |
-      | user-ingestion-bindings |
+      | ingestion-keys        |
       | role-bindings         |
       | ai-tool-entries       |
       | members               |
@@ -80,7 +80,7 @@ Feature: AI Gateway Governance — API + CLI + MCP coverage (agentic-first parit
     Then the service calls `AnomalyRulesRepository.insert({ ... })` for the DB write
     And the repository is the only layer that touches `prisma.anomalyRule.*`
     And the service NEVER directly imports `prisma`
-    # Mirrors the existing pattern in IngestionTemplate / UserIngestionBinding
+    # Mirrors the existing pattern in IngestionTemplate / ingestion-key (ApiKey)
     # services from this PR (Lane-S 60ae9847a + 3f7f25104).
 
   # ---------------------------------------------------------------------------
