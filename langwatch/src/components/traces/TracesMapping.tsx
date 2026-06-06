@@ -5,6 +5,7 @@ import {
   GridItem,
   HStack,
   NativeSelect,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,6 +15,7 @@ import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
+import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -69,6 +71,20 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
   },
   {} as Record<string, string[]>,
 );
+
+type KeyOption = { key: string; label: string };
+
+/** Dedupe {key,label} options by key, preserving first-seen order. */
+const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
+  const seen = new Set<string>();
+  const result: KeyOption[] = [];
+  for (const option of options) {
+    if (!option || seen.has(option.key)) continue;
+    seen.add(option.key);
+    result.push(option);
+  }
+  return result;
+};
 
 export const TracesMapping = ({
   titles,
@@ -191,6 +207,48 @@ export const TracesMapping = ({
     [traceMappingState, setTraceMapping],
   );
   const mapping = traceMappingState.mapping;
+
+  // Only the spans and metadata sources draw from project-wide names. Fetch the
+  // 30-day distinct field-name list lazily — only when such a column is actually
+  // being mapped — so merely opening the drawer/wizard (or any other place that
+  // renders this component) doesn't trigger the heavier ClickHouse scan when no
+  // span/metadata column is in play.
+  const needsProjectFieldNames = useMemo(
+    () =>
+      Object.values(mapping).some(
+        (m) => m.source === "spans" || m.source === "metadata",
+      ),
+    [mapping],
+  );
+  const {
+    spanNames: projectSpanNames,
+    metadataKeys: projectMetadataKeys,
+    isLoading: projectFieldNamesLoading,
+  } = useProjectSpanNames({
+    projectId: project?.id,
+    enabled: needsProjectFieldNames,
+  });
+
+  // Span / metadata dropdowns should offer every name the project produced in
+  // the last 30 days, not just the names on the loaded trace(s) — otherwise a
+  // span that exists elsewhere in the project cannot be selected for mapping.
+  const mergeProjectKeyOptions = useCallback(
+    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
+      const projectOptions =
+        source === "spans"
+          ? projectSpanNames
+          : source === "metadata"
+            ? projectMetadataKeys
+            : [];
+      if (projectOptions.length === 0) {
+        return baseOptions;
+      }
+      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      );
+    },
+    [projectSpanNames, projectMetadataKeys],
+  );
 
   // Check if any column uses a server-only source (e.g. formatted_trace)
   const needsFormattedDigest = useMemo(
@@ -452,12 +510,27 @@ export const TracesMapping = ({
             "subkeys" in traceMappingDefinition &&
             source !== "threads" &&
             source !== "threads_until_current"
-              ? key === "" && source === "spans"
-                ? defaultSpanSubkeys
+              ? source === "spans"
+                ? // Spans always expose the same subfields. Offer them for any
+                  // span name — including project-wide names that aren't on the
+                  // loaded trace, where subkey discovery would otherwise be empty.
+                  dedupeKeyOptions([
+                    ...defaultSpanSubkeys,
+                    ...(key
+                      ? traceMappingDefinition.subkeys(traces_, key, {
+                          annotationScoreOptions: getAnnotationScoreOptions.data,
+                        })
+                      : []),
+                  ])
                 : traceMappingDefinition.subkeys(traces_, key!, {
                     annotationScoreOptions: getAnnotationScoreOptions.data,
                   })
               : undefined;
+
+          // The spans/metadata key dropdown waits on the project-wide name list.
+          const isLoadingFieldNames =
+            projectFieldNamesLoading &&
+            (source === "spans" || source === "metadata");
 
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
@@ -618,7 +691,10 @@ export const TracesMapping = ({
                               borderRight={0}
                               marginLeft="12px"
                             />
-                            <NativeSelect.Root width="full">
+                            <NativeSelect.Root
+                              width="full"
+                              disabled={isLoadingFieldNames}
+                            >
                               <NativeSelect.Field
                                 onChange={(e) => {
                                   setTraceMappingState((prev) => ({
@@ -634,32 +710,46 @@ export const TracesMapping = ({
                                 }}
                                 value={key}
                               >
-                                {/* "* (any span)" option - matches all spans */}
-                                <option value="">
-                                  {source === "spans"
-                                    ? "* (any span)"
-                                    : source === "metadata"
-                                      ? "* (all metadata)"
-                                      : "* (any)"}
-                                </option>
-                                {traceMappingDefinition
-                                  .keys(traces_)
-                                  .map(
-                                    ({
-                                      key,
-                                      label,
-                                    }: {
-                                      key: string;
-                                      label: string;
-                                    }) => (
+                                {/* While project-wide names load, show a single
+                                    placeholder so users don't pick from an
+                                    incomplete (trace-only) list. */}
+                                {isLoadingFieldNames ? (
+                                  <option value="">
+                                    {source === "spans"
+                                      ? "Loading span names…"
+                                      : "Loading metadata keys…"}
+                                  </option>
+                                ) : (
+                                  <>
+                                    {/* "* (any span)" option - matches all spans */}
+                                    <option value="">
+                                      {source === "spans"
+                                        ? "* (any span)"
+                                        : source === "metadata"
+                                          ? "* (all metadata)"
+                                          : "* (any)"}
+                                    </option>
+                                    {mergeProjectKeyOptions(
+                                      source,
+                                      traceMappingDefinition.keys(traces_),
+                                    ).map(({ key, label }: KeyOption) => (
                                       <option key={key} value={key}>
                                         {label}
                                       </option>
-                                    ),
-                                  )}
+                                    ))}
+                                  </>
+                                )}
                               </NativeSelect.Field>
                               <NativeSelect.Indicator />
                             </NativeSelect.Root>
+                            {isLoadingFieldNames && (
+                              <Spinner
+                                size="sm"
+                                flexShrink={0}
+                                marginTop="8px"
+                                color="fg.muted"
+                              />
+                            )}
                           </HStack>
                         )}
                       {subkeys && subkeys.length > 0 && (

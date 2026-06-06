@@ -231,14 +231,17 @@ describe("memory-safety", () => {
     );
 
     describe("when the field discovery query SQL is inspected", () => {
+      // A bounded LIMIT is either a literal number or a named numeric constant
+      // interpolated into the query (e.g. `LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}`).
+      // Both keep the query bounded, which is what memory-safety requires.
+      const BOUNDED_LIMIT = /\bLIMIT\s+(?:\d+|\$\{[A-Z0-9_]+\})/g;
+
       /** @scenario Field discovery query includes a LIMIT clause */
       it("span names query includes a LIMIT clause followed by a number", () => {
         expect(getDistinctFieldNamesBody).not.toBeNull();
         // The body contains two queries (span names + metadata keys).
         // Verify at least two LIMIT occurrences so both are covered.
-        const limitMatches = getDistinctFieldNamesBody![0].match(
-          /\bLIMIT\s+\d+/g,
-        );
+        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
         expect(limitMatches).not.toBeNull();
         expect(limitMatches!.length).toBeGreaterThanOrEqual(1);
       });
@@ -246,9 +249,7 @@ describe("memory-safety", () => {
       it("metadata keys query includes a LIMIT clause followed by a number", () => {
         expect(getDistinctFieldNamesBody).not.toBeNull();
         // Both the span-names and metadata-keys queries must have LIMIT.
-        const limitMatches = getDistinctFieldNamesBody![0].match(
-          /\bLIMIT\s+\d+/g,
-        );
+        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
         expect(limitMatches).not.toBeNull();
         expect(limitMatches!.length).toBeGreaterThanOrEqual(2);
       });

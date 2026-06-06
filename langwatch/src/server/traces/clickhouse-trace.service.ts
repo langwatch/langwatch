@@ -54,6 +54,25 @@ interface ClickHouseScrollCursor {
 }
 
 /**
+ * Upper bound on distinct field names (span names, metadata keys) returned for
+ * the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
+ * in healthy projects (hundreds), so this only guards against pathological
+ * cardinality (e.g. dynamic IDs baked into span names) flooding the response.
+ * Set well above any real project so every name is offered for mapping rather
+ * than alphabetically truncated.
+ */
+const DISTINCT_FIELD_NAMES_LIMIT = 10_000;
+
+/**
+ * Upper bound on spans returned per trace by the spans-join read path. The REST
+ * collector no longer caps spans per trace (#4629), so this read cap must be
+ * high enough not to truncate real agentic traces while still protecting the
+ * read path from a pathologically large trace's full span payload. A trace that
+ * actually reaches this many spans is logged as a potential truncation.
+ */
+const MAX_SPANS_PER_TRACE = 10_000;
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -1169,7 +1188,7 @@ export class ClickHouseTraceService {
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
               ORDER BY SpanName ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1197,7 +1216,7 @@ export class ClickHouseTraceService {
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1866,7 +1885,7 @@ export class ClickHouseTraceService {
             GROUP BY TenantId, TraceId, SpanId
           )
         ORDER BY t.TraceId, t.StartTime ASC
-        LIMIT 200 BY t.TraceId
+        LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds, ...spanTimeParams },
             format: "JSONEachRow",
@@ -1907,6 +1926,17 @@ export class ClickHouseTraceService {
           const spans = spansByTrace.get(row.TraceId) ?? [];
           spans.push(this.mapSpanRow(row, projectId));
           spansByTrace.set(row.TraceId, spans);
+        }
+
+        // Surface (rather than silently swallow) traces large enough to hit the
+        // per-trace span cap — their span list may be truncated.
+        for (const [traceId, spans] of spansByTrace) {
+          if (spans.length >= MAX_SPANS_PER_TRACE) {
+            this.logger.warn(
+              { projectId, traceId, spanCount: spans.length, cap: MAX_SPANS_PER_TRACE },
+              "Trace reached the per-trace span cap; span list may be truncated",
+            );
+          }
         }
 
         // Build the tracesMap by combining summaries + spans
