@@ -501,16 +501,42 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // wrapper flag (`--lw-path`). Any mode-specific prepends (e.g. codex
   // `--profile langwatch-gateway`) lead.
   const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
-  // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
-  // bare spawn() can't resolve them without a shell. shell:true is safe
-  // here because `tool` is whitelisted (claude/codex/cursor/gemini) and
-  // `args` is forwarded from the user's own terminal invocation - same
-  // trust boundary as if they'd typed `claude …` directly.
-  const child = spawn(tool, finalArgs, {
-    stdio: "inherit",
-    env,
-    shell: process.platform === "win32",
-  });
+
+  // Resolve the tool the way the user's own shell would: route it through
+  // their interactive login shell (zsh/bash) so aliases AND functions are
+  // honored - e.g. `alias claude='claude --dangerously-skip-permissions'`,
+  // not just the bare PATH binary. `-i` sources the rc file where aliases
+  // live; the wrapper's env (mode vars + clears) is re-applied *after* that
+  // so a user's rc can't clobber the gateway / OTLP wiring. Args ride
+  // positional params ("$@") and are never re-quoted. `tool` is whitelisted
+  // (claude/codex/cursor/gemini/opencode) so the command string is safe.
+  const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
+  const aliasShell =
+    process.platform !== "win32" && (shellName === "zsh" || shellName === "bash")
+      ? process.env.SHELL!
+      : null;
+
+  let child;
+  if (aliasShell) {
+    const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+    const reapply = [
+      ...(modeResult.clears ?? []).map((k) => `unset ${k}`),
+      ...Object.entries(modeResult.vars).map(([k, v]) => `export ${k}=${q(v)}`),
+    ].join("; ");
+    const command = `${reapply ? `${reapply}; ` : ""}${tool} "$@"`;
+    child = spawn(aliasShell, ["-i", "-c", command, tool, ...finalArgs], {
+      stdio: "inherit",
+      env,
+    });
+  } else {
+    // Windows (npm installs the tools as `.cmd` shims, so resolve via the
+    // shell) or a shell we don't special-case (fish, etc.): spawn directly.
+    child = spawn(tool, finalArgs, {
+      stdio: "inherit",
+      env,
+      shell: process.platform === "win32",
+    });
+  }
   child.on("error", (err) => {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       process.stderr.write(
