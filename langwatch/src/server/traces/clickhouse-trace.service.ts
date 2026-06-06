@@ -1235,7 +1235,42 @@ export class ClickHouseTraceService {
             label: row.key,
           }));
 
-          return { spanNames, metadataKeys };
+          // Get distinct evaluator names from evaluation_runs. Dedupe by
+          // evaluator id (an evaluator can be renamed over time) and keep the
+          // most recent name. The dropdown maps the id and shows the name.
+          const evalResult = await clickHouseClient.query({
+            query: `
+              SELECT
+                EvaluatorId AS id,
+                argMax(EvaluatorName, ScheduledAt) AS name
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND EvaluatorId != ''
+              GROUP BY EvaluatorId
+              ORDER BY name ASC
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
+            `,
+            query_params: {
+              tenantId: projectId,
+              startDate,
+              endDate,
+            },
+            format: "JSONEachRow",
+          });
+
+          const evalRows = (await evalResult.json()) as Array<{
+            id: string;
+            name: string | null;
+          }>;
+
+          const evaluationNames = evalRows.map((row) => ({
+            key: row.id,
+            label: row.name ?? row.id,
+          }));
+
+          return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
           this.logger.error(
             {

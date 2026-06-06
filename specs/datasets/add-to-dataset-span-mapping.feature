@@ -10,6 +10,16 @@ Feature: Span field mapping when adding traces to a dataset
   # project-wide name list silently capped their results. A customer reported a
   # span name that clearly exists on a recent trace not being offered for
   # mapping. These scenarios pin the expected behaviour so it cannot regress.
+  #
+  # The same trace-only limitation applied to the "evaluations" and "events"
+  # sources: their dropdowns only listed evaluators / event types present on the
+  # open trace, so ones that occurred elsewhere in the project could not be
+  # mapped. They now also draw from the project's last 30 days.
+  #
+  # Evaluator names come from the same getDistinctFieldNames query as spans and
+  # metadata. Event types come from a separate, bounded source (the analytics
+  # event-type filter options) because they live only inside the heavy
+  # stored_spans span-attributes map, which that query must not scan.
 
   Background:
     Given I am on a project that has produced traces over the last 30 days
@@ -52,3 +62,29 @@ Feature: Span field mapping when adding traces to a dataset
     Given a single trace contains more than two hundred spans
     When that trace is loaded with its spans for mapping
     Then all of its spans are returned, none are dropped
+
+  # ============================================================================
+  # Evaluations and events also offer project-wide names, not just the open trace's
+  # ============================================================================
+
+  Scenario: Evaluator names from the project are offered even when absent from the open trace
+    Given an evaluator named "PII Check" ran somewhere in my project in the last 30 days
+    And the trace I opened the "Add to Dataset" drawer on was not scored by that evaluator
+    When I select "evaluations" as the source for a column
+    Then "PII Check" is offered as an evaluation to map
+
+  Scenario: Selecting a project evaluator lets me map its result subfields
+    Given an evaluator ran in my project but not on the open trace
+    When I select "evaluations" as the source and choose that evaluator
+    Then I can map its passed, score, label, details, status and error subfields
+
+  Scenario: All distinct evaluator names are returned even for projects with thousands of them
+    Given my project has more than one thousand distinct evaluator names in the last 30 days
+    When the available evaluator names are fetched for mapping
+    Then every distinct evaluator name is returned, none are dropped
+
+  Scenario: Event types from the project are offered even when absent from the open trace
+    Given an event of type "thumbs_up" was tracked somewhere in my project in the last 30 days
+    And the trace I opened the "Add to Dataset" drawer on has no such event
+    When I select "events" as the source for a column
+    Then "thumbs_up" is offered as an event type to map

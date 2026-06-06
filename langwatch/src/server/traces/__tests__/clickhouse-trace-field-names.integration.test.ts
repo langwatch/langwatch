@@ -120,6 +120,38 @@ async function insertTraceSummaries(
   });
 }
 
+function makeEvaluationRunRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ProjectionId: `proj-${nanoid()}`,
+    TenantId: tenantId,
+    EvaluationId: `eval-${nanoid()}`,
+    Version: "v1",
+    EvaluatorId: `evaluator-${nanoid()}`,
+    EvaluatorType: "custom/test",
+    EvaluatorName: "test-evaluator",
+    TraceId: `trace-${nanoid()}`,
+    Status: "processed",
+    LastProcessedEventId: `evt-${nanoid()}`,
+    ScheduledAt: new Date(now),
+    CreatedAt: new Date(now),
+    UpdatedAt: new Date(now),
+    LastEventOccurredAt: new Date(now),
+    ...overrides,
+  };
+}
+
+async function insertEvaluationRuns(
+  ch: ClickHouseClient,
+  rows: ReturnType<typeof makeEvaluationRunRow>[],
+) {
+  await ch.insert({
+    table: "evaluation_runs",
+    values: rows,
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}
+
 const openProtections: Protections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,
@@ -167,6 +199,10 @@ afterAll(async () => {
     });
     await ch.exec({
       query: `ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}`,
+      query_params: { tenantId },
+    });
+    await ch.exec({
+      query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}`,
       query_params: { tenantId },
     });
   }
@@ -239,6 +275,43 @@ describe("ClickHouse field-name queries (integration)", () => {
 
         expect(keys.has(`meta-key-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(true);
         expect(keys.has("meta-key-0000")).toBe(true);
+      });
+    });
+
+    describe("when the project has more than a thousand distinct evaluator names", () => {
+      beforeAll(async () => {
+        // Distinct evaluator id + name pairs spread across many traces, so the
+        // names live project-wide rather than on any single open trace.
+        await insertEvaluationRuns(
+          ch,
+          Array.from({ length: LARGE_NAME_COUNT }, (_, i) =>
+            makeEvaluationRunRow({
+              EvaluatorId: `evaluator-${pad(i)}`,
+              EvaluatorName: `evaluator-name-${pad(i)}`,
+            }),
+          ),
+        );
+      });
+
+      /** @scenario All distinct evaluator names are returned even for projects with thousands of them */
+      it("returns every distinct evaluator name, none dropped", async () => {
+        const result = await service.getDistinctFieldNames(
+          tenantId,
+          now - 60_000,
+          now + 60_000,
+        );
+
+        expect(result).not.toBeNull();
+        const ids = new Set(result!.evaluationNames.map((e) => e.key));
+        const labels = new Set(result!.evaluationNames.map((e) => e.label));
+
+        expect(ids.size).toBe(LARGE_NAME_COUNT);
+        expect(ids.has(`evaluator-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(true);
+        expect(ids.has("evaluator-0000")).toBe(true);
+        // The key is the evaluator id, the label its human-readable name.
+        expect(labels.has(`evaluator-name-${pad(LARGE_NAME_COUNT - 1)}`)).toBe(
+          true,
+        );
       });
     });
   });
