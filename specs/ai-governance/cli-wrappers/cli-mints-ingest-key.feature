@@ -4,15 +4,15 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
   I want the wrapper to obtain a project-scoped ingestion key and inject it
   into the wrapped tool's OTLP exporter
   So that the tool's telemetry lands in my personal project with one command,
-  using the same `sk-lw-` ingestion-key credential the dashboard shows me
+  using the same `ik-lw-` ingestion-key credential the dashboard shows me
 
   Context (replaces the retired binding flow):
-    Path B no longer mints an `ik-lw-` UserIngestionBinding. The wrapper asks
+    Path B no longer mints the retired UserIngestionBinding. The wrapper asks
     the control plane for the personal project's ingestion key for the tool's
     sourceType (SOURCE_TYPE_BY_TOOL: claude->claude_code, codex->codex,
-    gemini->gemini, opencode->opencode), an ApiKey(keyType="ingest"). The token
-    is cached in ~/.langwatch/config.json and injected as
-    `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-..."`.
+    gemini->gemini, opencode->opencode), an ApiKey(keyType="ingest") with the
+    `ik-lw-` prefix. The token is cached in ~/.langwatch/config.json and
+    injected as `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-..."`.
 
   Background:
     Given the user has completed `langwatch login` (device-flow) for org "acme"
@@ -24,15 +24,15 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
     When the user runs `langwatch claude`
     Then the wrapper resolves mode = ingestion (no VK present)
     And it fetches the personal-project ingestion key for sourceType "claude_code"
-    And the key is an `sk-lw-` ApiKey(keyType="ingest") bound to "personal-jane"
-    And the wrapper sets OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <sk-lw token>"
+    And the key is an `ik-lw-` ApiKey(keyType="ingest") bound to "personal-jane"
+    And the wrapper sets OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ik-lw token>"
     And the token is cached in ~/.langwatch/config.json (mode 0600)
 
   @bdd @cli-wrappers @ingest-key @reuse
   Scenario: A second run reuses the cached ingest key without re-minting
     Given a prior `langwatch claude` cached an ingestion key
     When the user runs `langwatch claude` again
-    Then the wrapper reuses the cached `sk-lw-` token
+    Then the wrapper reuses the cached `ik-lw-` token
     And it does NOT mint a new key
 
   @bdd @cli-wrappers @ingest-key @per-tool

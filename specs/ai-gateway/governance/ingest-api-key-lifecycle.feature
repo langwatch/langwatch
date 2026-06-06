@@ -8,12 +8,14 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   type to learn or migrate
 
   Why one primitive (replaces the retired UserIngestionBinding):
-    There is ONE credential primitive: ApiKey (`sk-lw-{lookupId}_{secret}`,
-    HMAC-SHA256 + pepper). An "ingestion key" is an ApiKey with
+    There is ONE credential primitive: ApiKey (HMAC-SHA256 + pepper, split
+    `{prefix}{lookupId}_{secret}` format). An "ingestion key" is an ApiKey with
     `keyType = "ingest"` plus a single project-scoped RoleBinding granting the
-    system "Ingest Only" role (permissions = ["traces:create"] only). The
-    `ik-lw-` binding token, its plain-SHA256 hash, and the
-    user_ingestion_binding resolver branch are GONE.
+    system "Ingest Only" role (permissions = ["traces:create"] only). Ingest
+    keys carry an `ik-lw-` prefix (vs full-access `sk-lw-`) purely for
+    identifiability; resolution is identical (lookup by lookupId). The retired
+    UserIngestionBinding primitive — a separate `ik-lw-` token with its own
+    plain-SHA256 hash and resolver branch — is GONE.
 
   Why ingest-only is genuinely write-only:
     `traces:create` gates exactly the three trace-WRITE endpoints (the OTLP
@@ -51,7 +53,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
       | scopeType     | PROJECT                        |
       | scopeId       | "personal-jane"                |
       | customRole    | "Ingest Only" (traces:create)  |
-    And the plaintext token is shown exactly once with the `sk-lw-` prefix
+    And the plaintext token is shown exactly once with the `ik-lw-` prefix
     And re-requesting the same (project, sourceType) rotates in place, never 409
 
   @bdd @ingest-api-key @issue @structural-impossibility
@@ -90,7 +92,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   Scenario: Rotating an ingestion key revokes the previous token immediately
     Given jane has an ingestion key with token T_OLD
     When jane rotates the key
-    Then a new token T_NEW is issued and shown one-time with the `sk-lw-` prefix
+    Then a new token T_NEW is issued and shown one-time with the `ik-lw-` prefix
     And `hashedSecret` is updated to HMAC-SHA256(T_NEW's secret)
     When jane's upstream tool emits a trace using T_OLD
     Then the receiver returns 401 (token miss, no enumeration)
@@ -172,7 +174,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When the caller mints a company-wide ingestion key with sourceType "copilot_studio"
     Then an ingest-only ApiKey is created bound to the org's hidden Governance Project
     And the response carries the token once plus the OTLP endpoint to paste into the tool
-    # The sysadmin pastes the sk-lw- key into Copilot Studio's OTLP endpoint field;
+    # The sysadmin pastes the ik-lw- key into Copilot Studio's OTLP endpoint field;
     # the whole company's telemetry then pushes into the single Governance Project.
 
   @bdd @ingest-api-key @company-wide @isolation

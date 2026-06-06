@@ -120,7 +120,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         projectId: PROJECT_ID,
         sourceType: "claude_code",
       });
-      expect(issued.token).toMatch(/^sk-lw-/);
+      expect(issued.token).toMatch(/^ik-lw-/);
 
       // The OTLP exporter inside the wrapped tool sends the bearer token
       // alone — no projectId. The key must resolve to its bound project.
@@ -222,7 +222,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         organizationId: ORG_ID,
         sourceType: "copilot_studio",
       });
-      expect(issued.token).toMatch(/^sk-lw-/);
+      expect(issued.token).toMatch(/^ik-lw-/);
 
       // The OTLP exporter inside the company-wide tool (Copilot Studio) sends
       // the bearer token alone; it must resolve to the hidden Governance

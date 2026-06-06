@@ -102,7 +102,7 @@ describe("IngestionKey ownership + list visibility", () => {
         projectId: PROJECT_ID,
         sourceType: "claude_code",
       });
-      expect(issued.token).toMatch(/^sk-lw-/);
+      expect(issued.token).toMatch(/^ik-lw-/);
 
       const row = await apiKeyRepo.findById({ id: issued.apiKeyId });
       expect(row?.userId).toBe(USER_A);
