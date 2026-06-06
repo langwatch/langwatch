@@ -165,27 +165,6 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # Same primitive, same ingest-only role; not a personal-only concept.
 
   # ---------------------------------------------------------------------------
-  # Company-wide push ingestion — one key for the whole org's Governance Project
-  # ---------------------------------------------------------------------------
-
-  @bdd @ingest-api-key @company-wide
-  Scenario: A sysadmin mints one company-wide push ingestion key
-    Given the caller has ingestionSources:manage on "acme"
-    When the caller mints a company-wide ingestion key with sourceType "copilot_studio"
-    Then an ingest-only ApiKey is created bound to the org's hidden Governance Project
-    And the response carries the token once plus the OTLP endpoint to paste into the tool
-    # The sysadmin pastes the ik-lw- key into Copilot Studio's OTLP endpoint field;
-    # the whole company's telemetry then pushes into the single Governance Project.
-
-  @bdd @ingest-api-key @company-wide @isolation
-  Scenario: The company-wide key resolves to the Governance Project with no projectId
-    Given a company-wide ingestion key bound to "acme"'s Governance Project
-    When a tool emits OTLP authenticated by the bearer token alone
-    Then the receiver resolves it to the Governance Project (its single bound project)
-    And the spans are stamped langwatch.source / api_key.id / origin=ingest_key
-    And the key cannot write into any other project
-
-  # ---------------------------------------------------------------------------
   # List visibility: personal ingest keys are private to their owner
   # ---------------------------------------------------------------------------
 
@@ -194,9 +173,9 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Given jane and ben each hold a personal ingestion key in "acme"
     When ben opens Settings > API Keys as a non-admin member
     Then ben sees his own ingestion key but not jane's
-    And ben does not see the org's company-wide ingestion keys
+    And ben does not see org-owned (userId-null) ingestion keys
     # Personal ingest keys are user-owned, so the API-key list scopes them to
-    # their owner; company-wide keys stay admin-only.
+    # their owner; org-owned ingest keys stay admin-only.
 
   # ---------------------------------------------------------------------------
   # Activity tracking — lastUsedAt, not audit volume

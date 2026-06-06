@@ -5,22 +5,21 @@ import type { PrismaClient } from "@prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 
-import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
 /**
  * Issues and rotates "ingestion keys": project-scoped, ingest-only ApiKeys.
  *
- * An ingestion key is one row of the single ApiKey primitive (`sk-lw-`,
+ * An ingestion key is one row of the single ApiKey primitive (`ik-lw-` prefix,
  * HMAC+pepper) with:
  *   - `ingestSourceType` set to the tool slug (claude_code / codex / gemini /
  *     opencode / claude_cowork) — stamped as `langwatch.source` provenance.
  *   - a single PROJECT-scoped CUSTOM role binding granting only `traces:create`
  *     (genuinely write-only — see ingest-api-key-lifecycle.feature).
  *   - `userId` = the owning user for personal-project keys (so the API-key list
- *     scopes them to their owner), or `null` for company-wide governance-project
- *     keys (a genuine org service credential). Authorization to mint is enforced
- *     by the caller (router); ownership only governs list visibility.
+ *     scopes them to their owner), or `null` for an org service key. Authorization
+ *     to mint is enforced by the caller (router); ownership only governs list
+ *     visibility.
  *
  * Rotation is hard-cut: minting revokes any prior live ingest key for the same
  * (project, sourceType) before creating the new one, so a tool never
@@ -137,76 +136,6 @@ export class IngestionKeyService {
       sourceType,
       ingestionTemplateId,
     });
-  }
-
-  /**
-   * Issues (rotating in place) a COMPANY-WIDE push ingestion key bound to the
-   * org's hidden Governance Project. A sysadmin pastes this single `sk-lw-` key
-   * into a company-wide tool's OTLP endpoint (e.g. Microsoft Copilot Studio's
-   * "OTLP endpoint" field) so the whole company's telemetry pushes into one
-   * governed project. Same ingest-only `traces:create` scope as a personal
-   * key, just bound to the Governance Project instead of a personal one.
-   * Authorization (an org ingestion-source admin) is enforced by the router.
-   */
-  async ensureForOrganizationGovernanceProject({
-    callerUserId,
-    organizationId,
-    sourceType,
-    ingestionTemplateId = null,
-  }: {
-    callerUserId: string;
-    organizationId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-  }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
-    const govProject = await ensureHiddenGovernanceProject(
-      this.prisma,
-      organizationId,
-    );
-    return this.ensureForProject({
-      callerUserId,
-      // Company-wide key: a genuine org service credential, not user-owned.
-      ownerUserId: null,
-      organizationId,
-      projectId: govProject.id,
-      sourceType,
-      ingestionTemplateId,
-    });
-  }
-
-  /**
-   * Lists the live company-wide ingestion keys bound to the org's Governance
-   * Project, so the admin UI renders connected sources without re-revealing
-   * the token. Only mint/rotate ever surface the plaintext token.
-   */
-  async listForOrganizationGovernanceProject({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<
-    {
-      apiKeyId: string;
-      sourceType: string;
-      ingestionTemplateId: string | null;
-    }[]
-  > {
-    const govProject = await ensureHiddenGovernanceProject(
-      this.prisma,
-      organizationId,
-    );
-    const keys = await this.apiKeyRepo.findIngestKeysForProject({
-      organizationId,
-      projectId: govProject.id,
-    });
-    return keys
-      .filter((k): k is typeof k & { ingestSourceType: string } =>
-        Boolean(k.ingestSourceType),
-      )
-      .map((k) => ({
-        apiKeyId: k.id,
-        sourceType: k.ingestSourceType,
-        ingestionTemplateId: k.ingestionTemplateId,
-      }));
   }
 
   /**
