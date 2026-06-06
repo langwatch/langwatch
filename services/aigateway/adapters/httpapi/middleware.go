@@ -90,6 +90,12 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 			r.Header.Del("Traceparent")
 			r.Header.Del("Tracestate")
 
+			// Stash the wrapped tool's own session / conversation id. claude-code,
+			// codex and opencode each send theirs as a request header on the
+			// gateway (Path A) path; the emitter stamps it as gen_ai.conversation.id
+			// so the trace has a real thread id instead of nothing.
+			ctx = customertracebridge.WithClientSessionID(ctx, clientSessionIDFromHeaders(r.Header))
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -118,6 +124,28 @@ func extractToken(r *http.Request) string {
 	// place the SDK would normally put a Google API key.
 	if k := r.Header.Get("X-Goog-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
+	}
+	return ""
+}
+
+// clientSessionIDFromHeaders lifts the wrapped tool's own session / conversation
+// id from the request headers. Each CLI sends it under a different header:
+//   - claude-code: X-Claude-Code-Session-Id
+//   - opencode:    X-Session-Affinity
+//   - codex:       Session-Id (mirrors body prompt_cache_key + x-codex-turn-metadata)
+//
+// gemini-cli sends no per-conversation id on the gateway wire (only a stable
+// device id), so it returns empty there and that trace has no thread id. First
+// non-empty header wins; the value is returned verbatim.
+func clientSessionIDFromHeaders(h http.Header) string {
+	for _, name := range []string{
+		"X-Claude-Code-Session-Id",
+		"X-Session-Affinity",
+		"Session-Id",
+	} {
+		if v := strings.TrimSpace(h.Get(name)); v != "" {
+			return v
+		}
 	}
 	return ""
 }

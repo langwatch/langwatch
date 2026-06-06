@@ -189,6 +189,11 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
 	}
+	// The wrapped tool's own session / conversation id, so multi-turn gateway
+	// traces group under a stable thread instead of having no thread id at all.
+	if sessionID := clientSessionID(ctx, params); sessionID != "" {
+		attrs = append(attrs, attribute.String(gatewaytracer.AttrGenAIConversationID, sessionID))
+	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +
 	// error class so the trace renders as an error instead of silently dropping
@@ -280,6 +285,34 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 		return nil, nil
 	}
 	return tid, sid
+}
+
+// clientSessionID resolves the wrapped tool's own session / conversation id.
+// Header first (stashed on the context by the gateway middleware: claude-code
+// X-Claude-Code-Session-Id, opencode X-Session-Affinity, codex Session-Id),
+// then a request-body fallback for the two tools that also echo it inline so
+// the id survives even if a future middleware change stops forwarding the
+// header. Empty when the tool sends no per-conversation id on the gateway wire
+// (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
+func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
+	if id := ClientSessionID(ctx); id != "" {
+		return id
+	}
+	switch params.RequestType {
+	case domain.RequestTypeMessages:
+		// claude-code: body.metadata.user_id is a JSON string carrying session_id.
+		if userID := gjson.GetBytes(params.RequestBody, "metadata.user_id").String(); userID != "" {
+			if sid := gjson.Get(userID, "session_id").String(); sid != "" {
+				return sid
+			}
+		}
+	case domain.RequestTypeResponses:
+		// codex: body.prompt_cache_key is the per-session cache key == session id.
+		if sid := gjson.GetBytes(params.RequestBody, "prompt_cache_key").String(); sid != "" {
+			return sid
+		}
+	}
+	return ""
 }
 
 // extractInputMessages returns the JSON-encoded messages array from the request body.
