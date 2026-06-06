@@ -114,40 +114,6 @@ kubectl -n langwatch get deploy langwatch-app -o jsonpath='{.spec.template.spec.
 # → https://gateway.your-corp.com
 ```
 
-## 6. Distribute the unified `langwatch` CLI to your team
-
-```bash
-# One-liner for the IT-bot Slack message:
-npx @langwatch/sdk@latest login --device --url https://<your-host>
-```
-
-Devs run that once. They get a short-lived `lw_at_*` access token
-plus a personal `vk-lw-*` virtual key, both bound to their SSO
-identity. Then any of the wrapped tools "just work":
-
-```bash
-langwatch claude       # Claude Code with org-managed keys
-langwatch codex        # Codex CLI
-langwatch cursor       # Cursor with custom endpoint
-langwatch init-shell   # Eval-able shell snippet with ANTHROPIC_BASE_URL etc.
-```
-
-The CLI calls `GET /api/auth/cli/budget/status` before exec'ing the
-underlying tool, a 402 short-circuits with a branded budget error
-so devs aren't surprised mid-session.
-
-## 7. Off-board cleanly when someone leaves
-
-Personal teams are deactivated through the same admin path as the
-user themselves:
-
-- **Settings → Organization → Members → ...**, choose Remove.
-- The user's personal team and projects stay in the audit log for
-  compliance retention but every personal VK is revoked
-  synchronously. New gateway calls return `401 vk_revoked`.
-- Their refresh + access tokens in Redis are invalidated so a
-  cached CLI session can't keep working past the off-boarding.
-
 ## What to read next
 
 - [Helm chart](./helm): chart structure, secrets, upgrade procedure.
