@@ -72,6 +72,21 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
 ];
 
 /**
+ * Roots scanned for Python `test_*.py` files. Python-side scenarios
+ * (langevals scorers, langwatch_nlp Studio executor) use the same
+ * `@scenario` token as TS/Go; binding is satisfied when the next
+ * non-blank, non-comment line is a `def test_...` function. Without
+ * this scan path, scenarios pinned to langevals scorers or the legacy
+ * python NLP service would have no way to satisfy parity short of a
+ * misleading TS stub.
+ */
+const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
+  "langevals",
+  "langwatch_nlp",
+  "langwatch_server",
+];
+
+/**
  * Feature files whose unbound `@unit` / `@integration` scenarios are
  * tolerated (non-fatal) during migration. These files still parse; their
  * counts surface in the `legacy` block of `--json` output and in the
@@ -96,6 +111,7 @@ const LEGACY_UNBOUND: string[] = [
 const TEST_FILE_RE = /\.test\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
+const PYTHON_TEST_FILE_RE = /^test_.+\.py$/;
 const FEATURE_FILE_RE = /\.feature$/;
 const SKIP_DIR = new Set(["node_modules", ".next", "dist", "build"]);
 
@@ -384,6 +400,111 @@ function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   return bindings;
 }
 
+/**
+ * Python binding form (block-comment matching the TS form, OR a hash
+ * comment matching the Bats form — either is valid):
+ *
+ *   # @scenario "Boolean values match their numeric and string equivalents"
+ *   def test_langeval_exact_match_js_loose_equality_match(...):
+ *       ...
+ *
+ * The block-comment ANNOTATION_RE picks up `# @scenario <title>` because
+ * the regex isn't comment-syntax aware — it matches the token wherever
+ * it appears. Proximity check then requires the next non-blank,
+ * non-comment line to begin with `def test_`.
+ */
+function isFollowedByPythonTestFunc(src: string, start: number): boolean {
+  const len = src.length;
+  let i = start;
+  while (i < len) {
+    const ch = src[i];
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "#") {
+      const nl = src.indexOf("\n", i);
+      if (nl === -1) return false;
+      i = nl + 1;
+      continue;
+    }
+    if (ch === "@") {
+      // Skip Python decorators, including parenthesised multi-line forms
+      // like @pytest.mark.parametrize("a,b", [...]) that span many lines.
+      let j = i + 1;
+      while (j < len && src[j] !== "\n" && src[j] !== "(") j++;
+      if (j < len && src[j] === "(") {
+        let depth = 1;
+        j++;
+        while (j < len && depth > 0) {
+          const c = src[j];
+          if (c === "(") depth++;
+          else if (c === ")") depth--;
+          j++;
+        }
+      }
+      while (j < len && src[j] !== "\n") j++;
+      i = j + 1;
+      continue;
+    }
+    const rest = src.slice(i);
+    return /^(?:async\s+)?def\s+test_[A-Za-z0-9_]*\s*\(/.test(rest);
+  }
+  return false;
+}
+
+const PYTHON_HASH_ANNOTATION_RE =
+  /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
+
+function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
+  const bindings: CollectedBinding[] = [];
+  const files: string[] = [];
+  for (const r of testRoots) {
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n))
+    );
+  }
+
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+
+    // Block-comment form (mirrors TS / Go).
+    let m: RegExpExecArray | null;
+    ANNOTATION_RE.lastIndex = 0;
+    while ((m = ANNOTATION_RE.exec(src)) !== null) {
+      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+      if (!title) continue;
+      if (!isFollowedByPythonTestFunc(src, m.index + m[0].length)) continue;
+      const line = src.slice(0, m.index).split("\n").length;
+      bindings.push({
+        title,
+        ref: { file: relative(REPO_ROOT, file), line },
+      });
+    }
+
+    // Hash-comment form (mirrors Bats).
+    const lines = src.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const hm = line.match(PYTHON_HASH_ANNOTATION_RE);
+      if (!hm) continue;
+      const title = (hm[1] ?? hm[2] ?? "").trim();
+      if (!title) continue;
+      // Use the same proximity check as the block form. Walk from the
+      // start of the next line.
+      const lineStartOffset =
+        lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
+      if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
+      bindings.push({
+        title,
+        ref: { file: relative(REPO_ROOT, file), line: i + 1 },
+      });
+    }
+  }
+
+  return bindings;
+}
+
 function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
@@ -539,6 +660,7 @@ function main(): void {
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
+    ...collectPythonBindings(DEFAULT_PYTHON_TEST_ROOTS),
   ];
   const bindingsByTitle = indexByTitle(bindings);
 

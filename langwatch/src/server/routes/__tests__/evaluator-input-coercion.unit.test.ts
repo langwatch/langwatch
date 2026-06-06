@@ -16,6 +16,9 @@ const evaluate = (params: Record<string, unknown>) =>
 
 describe("getEvaluatorDataForParams coercion", () => {
   describe("when an upstream target output is a boolean", () => {
+    /** @scenario Downstream evaluator receives a boolean target output without rejection */
+    /** @scenario Non-string target outputs are coerced to the evaluator's declared input type */
+    /** @scenario Online evaluation request with a boolean trace metadata mapping runs without rejection */
     it("coerces true to the string 'true' on output", () => {
       const result = evaluate({ output: true, expected_output: "1" });
       expect(result.type).toBe("default");
@@ -60,6 +63,7 @@ describe("getEvaluatorDataForParams coercion", () => {
   });
 
   describe("when the upstream target output is null", () => {
+    /** @scenario Null target outputs are preserved, not coerced into a string */
     it("preserves null rather than coercing to the string 'null'", () => {
       const result = evaluate({ output: null, expected_output: "anything" });
       if (result.type !== "default") throw new Error("unreachable");

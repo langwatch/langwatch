@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+/** @scenario Non-string upstream outputs are coerced before dispatch */
 func TestCoerceScalar(t *testing.T) {
 	cases := []struct {
 		name string
@@ -69,6 +70,7 @@ func TestCoerceDataPreservesContextsAndConversation(t *testing.T) {
 	}
 }
 
+/** @scenario Null upstream values are preserved, not coerced into a string */
 func TestCoerceDataNil(t *testing.T) {
 	if got := coerceData(nil); got != nil {
 		t.Fatalf("coerceData(nil) = %v, want nil", got)

@@ -10,7 +10,7 @@ import (
 // the langevals string-input schema expects. Parity with
 // langwatch_nlp/studio/field_parser.py `autoparse_field_value` for
 // `FieldType.str`: strings pass through, nil is preserved, every other shape
-// is serialised to its JSON form.
+// is serialized to its JSON form.
 //
 // This restores at the Studio workflow boundary what the Python NLP era
 // hid behind autoparse; without it a workflow that pipes a bool-emitting

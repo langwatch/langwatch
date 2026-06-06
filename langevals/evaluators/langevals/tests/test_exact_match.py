@@ -137,6 +137,7 @@ def test_langeval_exact_match_numbers_not_match():
     assert result.passed == False
 
 
+# @scenario "Boolean values match their numeric and string equivalents"
 @pytest.mark.parametrize(
     "output,expected",
     [
@@ -156,6 +157,7 @@ def test_langeval_exact_match_js_loose_equality_match(output, expected):
     assert result.passed is True, f"expected {output!r} == {expected!r} under loose semantics"
 
 
+# @scenario "Mismatched values do not falsely match"
 @pytest.mark.parametrize(
     "output,expected",
     [
@@ -172,6 +174,7 @@ def test_langeval_exact_match_js_loose_equality_mismatch(output, expected):
     assert result.passed is False, f"expected {output!r} != {expected!r} under loose semantics"
 
 
+# @scenario "Non-numeric, non-boolean strings still use the existing transform chain"
 def test_langeval_exact_match_transform_chain_still_applies_for_text():
     """JS-loose layer must not short-circuit the existing trim/punct/case chain
     when both sides are free-form text."""
@@ -187,6 +190,7 @@ def test_langeval_exact_match_transform_chain_still_applies_for_text():
     assert result.passed == True
 
 
+# @scenario "The float-equality short-circuit still applies for numeric strings"
 def test_langeval_exact_match_float_short_circuit_still_applies():
     entry = ExactMatchEntry(output="1.50", expected_output="1.5")
     evaluator = ExactMatchEvaluator(settings=ExactMatchSettings())

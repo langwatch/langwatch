@@ -4,7 +4,7 @@
  *
  * Parity with langwatch_nlp/studio/field_parser.py `autoparse_field_value` for
  * `FieldType.str`: strings pass through, null/undefined are preserved, every
- * other shape is JSON-serialised. The batch and online paths already apply the
+ * other shape is JSON-serialized. The batch and online paths already apply the
  * same semantics via tracesMapping.ts `tryAndConvertTo`; this helper exists so
  * the workbench REST live-execute path produces an identical string before the
  * Zod schema rejects it.
