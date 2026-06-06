@@ -536,7 +536,6 @@ export const userRouter = createTRPCRouter({
           },
           dailyBuckets: [],
           breakdownByModel: [],
-          recentActivity: [],
         };
       }
 
@@ -550,45 +549,36 @@ export const userRouter = createTRPCRouter({
 
       const usage = new PersonalUsageService();
 
-      // Run the four queries in parallel — they're independent and the
-      // CH server happily multiplexes. Cuts wall time roughly in half
-      // for the dashboard initial-render p95.
-      // userId threaded so PersonalUsageService can union ingestion-
-      // source ledger rows (Claude Code OTLP, etc.) keyed on
-      // PRINCIPAL-scope budgets where ScopeId=userId. Without it, the
-      // /me dashboard misses third-party traffic landing in the hidden
-      // governance project tenant. Recent activity stays gateway-only
-      // for now — that surface needs LogRecord-tenant duplication, not
-      // just ledger-row union (Lane-B follow-up).
-      const [summary, dailyBuckets, breakdownByModel, recentActivity] =
-        await Promise.all([
-          usage.summary({
-            personalProjectId: workspace.project.id,
-            window,
-            userId,
-          }),
-          usage.dailyBuckets({
-            personalProjectId: workspace.project.id,
-            window,
-            userId,
-          }),
-          usage.breakdownByModel({
-            personalProjectId: workspace.project.id,
-            window,
-            userId,
-          }),
-          usage.recentActivity({
-            personalProjectId: workspace.project.id,
-            window,
-            userId,
-          }),
-        ]);
+      // Run the rollup queries in parallel — they're independent and the
+      // CH server happily multiplexes. userId is threaded so
+      // PersonalUsageService can union ingestion-source ledger rows
+      // (Claude Code OTLP, etc.) keyed on PRINCIPAL-scope budgets where
+      // ScopeId=userId. Without it, the /me dashboard misses third-party
+      // traffic landing in the hidden governance project tenant. Recent
+      // activity itself is read directly from the personal project tenant
+      // by the /me table (tracesV2.list), so it isn't fetched here.
+      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
+        usage.summary({
+          personalProjectId: workspace.project.id,
+          window,
+          userId,
+        }),
+        usage.dailyBuckets({
+          personalProjectId: workspace.project.id,
+          window,
+          userId,
+        }),
+        usage.breakdownByModel({
+          personalProjectId: workspace.project.id,
+          window,
+          userId,
+        }),
+      ]);
 
       return {
         summary,
         dailyBuckets,
         breakdownByModel,
-        recentActivity,
       };
     }),
 

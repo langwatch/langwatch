@@ -15,6 +15,7 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
+import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 
@@ -34,7 +35,8 @@ function MyUsagePage() {
     budget,
     spendByDay,
     spendByTool,
-    recentActivity,
+    personalProjectId,
+    personalProjectSlug,
     organizationName,
   } = ctx;
 
@@ -195,34 +197,13 @@ function MyUsagePage() {
         </SectionCard>
 
         <SectionCard title="Recent activity">
-          {recentActivity.length === 0 ? (
-            <EmptyState message="No requests yet" />
+          {personalProjectId && personalProjectSlug ? (
+            <PersonalRecentTracesTable
+              projectId={personalProjectId}
+              projectSlug={personalProjectSlug}
+            />
           ) : (
-            <VStack align="stretch" gap={1}>
-              {recentActivity.map((row) => (
-                <HStack
-                  key={row.id}
-                  paddingY={2}
-                  paddingX={2}
-                  borderRadius="sm"
-                  _hover={{ backgroundColor: "bg.muted" }}
-                  fontSize="sm"
-                >
-                  <Text minWidth="60px" color="fg.muted" fontVariantNumeric="tabular-nums">
-                    {row.occurredAt}
-                  </Text>
-                  <Text minWidth="80px" fontWeight="medium">
-                    {row.toolName}
-                  </Text>
-                  <Text flex={1} color="fg.muted" truncate>
-                    {row.summary}
-                  </Text>
-                  <Text minWidth="80px" textAlign="right" fontVariantNumeric="tabular-nums">
-                    {fmtUsd(row.costUsd)}
-                  </Text>
-                </HStack>
-              ))}
-            </VStack>
+            <EmptyState message="No requests yet" />
           )}
         </SectionCard>
       </VStack>

@@ -16,14 +16,6 @@ export type PersonalSummary = {
   mostUsedModel: { name: string; usagePct: number } | null;
 };
 
-export type PersonalRecentActivityRow = {
-  id: string;
-  occurredAt: string;
-  toolName: string;
-  summary: string;
-  costUsd: number;
-};
-
 export type PersonalApiKeyRow = {
   id: string;
   label: string;
@@ -70,7 +62,9 @@ export type PersonalContext = {
   budget: PersonalBudgetState;
   spendByDay: Array<{ day: string; usd: number }>;
   spendByTool: Array<{ tool: string; usd: number }>;
-  recentActivity: PersonalRecentActivityRow[];
+  /** Personal project the /me recent-activity table reads from + deep-links into. */
+  personalProjectId: string | null;
+  personalProjectSlug: string | null;
   apiKeys: PersonalApiKeyRow[];
 };
 
@@ -204,14 +198,9 @@ export function usePersonalContext(): PersonalContext {
         tool: row.label,
         usd: row.spentUsd,
       })) ?? [],
-    recentActivity:
-      personalUsageQuery.data?.recentActivity.map((row) => ({
-        id: row.traceId,
-        occurredAt: row.occurredAt,
-        toolName: row.models[0] ?? "—",
-        summary: row.preview,
-        costUsd: row.spentUsd,
-      })) ?? [],
+    personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
+    personalProjectSlug:
+      personalContextQuery.data?.workspace.project.slug ?? null,
     apiKeys,
   };
 }

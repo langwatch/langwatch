@@ -63,15 +63,6 @@ export interface PersonalUsageBreakdown {
   requests: number;
 }
 
-export interface PersonalRecentActivity {
-  traceId: string;
-  occurredAt: string;
-  models: string[];
-  spentUsd: number;
-  /** First ~120 chars of the input — useful for the activity list summary. */
-  preview: string;
-}
-
 export interface PersonalUsageQueryInput {
   personalProjectId: string;
   /** Defaults to start-of-current-month → now if omitted. */
@@ -111,14 +102,6 @@ export interface PersonalUsageQueryInput {
  * but the Scope/ScopeId pair narrows to the user's principal slice
  * cleanly.
  */
-/**
- * CH stores Scope as the lowercase form emitted by `scopeToClickHouse`
- * (budget.clickhouse.repository.ts:539). Reader queries must match.
- * Ariana caught the original 'PRINCIPAL' uppercase literal returning
- * zero rows — the writer maps `GatewayBudgetScopeType.PRINCIPAL` →
- * `"principal"` before insert.
- */
-const PRINCIPAL_SCOPE = "principal";
 
 export class PersonalUsageService {
   /**
@@ -429,149 +412,6 @@ export class PersonalUsageService {
         label: r.Label,
         spentUsd: Number(r.SpentUsd) || 0,
         requests: Number(r.Requests) || 0,
-      }));
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Recent traces (last N) — drives the "Recent activity" list on
-   * /me. Returns rich-enough rows to render summary + cost without
-   * a follow-up trace fetch.
-   */
-  async recentActivity(
-    input: PersonalUsageQueryInput,
-    limit = 10,
-  ): Promise<PersonalRecentActivity[]> {
-    const window = input.window ?? defaultLast14DaysWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
-    if (!client) return [];
-
-    // Inner alias must be `LatestOccurredAt` (not `OccurredAt`) so it
-    // doesn't shadow the table column in WHERE — even inside a subquery,
-    // ClickHouse's parser flags `argMax(OccurredAt, UpdatedAt) AS
-    // OccurredAt` colliding with `WHERE OccurredAt >= ...` as
-    // ILLEGAL_AGGREGATION (code 184: "Aggregate function ... is found in
-    // WHERE in query"). Outer SELECT re-projects to `OccurredAt` so the
-    // wire shape stays stable.
-    const result = await client.query({
-      query: `
-        SELECT TraceId, LatestOccurredAt AS OccurredAt, Models, SpentUsd, Preview
-        FROM (
-          SELECT
-            TraceId,
-            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(Models, UpdatedAt)     AS Models,
-            argMax(TotalCost, UpdatedAt)  AS SpentUsd,
-            argMax(ComputedInput, UpdatedAt) AS Preview
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          GROUP BY TraceId
-        )
-        ORDER BY OccurredAt DESC
-        LIMIT {lim:UInt32}
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: input.personalProjectId,
-        fromMs: window.start.getTime(),
-        toMs: window.end.getTime(),
-        lim: limit,
-      },
-      format: "JSONEachRow",
-    });
-
-    type RawActivity = {
-      TraceId: string;
-      OccurredAt: string;
-      Models: string[];
-      SpentUsd: number;
-      Preview: string | null;
-    };
-    const rows = (await result.json()) as RawActivity[];
-    const gateway: PersonalRecentActivity[] = rows.map((r) => ({
-      traceId: r.TraceId,
-      occurredAt: r.OccurredAt,
-      models: r.Models ?? [],
-      spentUsd: Number(r.SpentUsd) || 0,
-      preview: (r.Preview ?? "").slice(0, 120),
-    }));
-
-    // Ingestion-source ledger union: per-request rows for the user's
-    // PRINCIPAL-scope ledger entries (Claude Code OTLP / future
-    // OTLP-only sources). The ledger row carries Model + AmountUSD +
-    // OccurredAt + GatewayRequestId — enough for a list entry.
-    // Preview is empty since OTLP events don't carry chat content;
-    // the UI side surfaces an empty preview as "via OTLP" annotation.
-    let merged = gateway;
-    if (input.userId) {
-      const ingestion = await this.queryIngestionPrincipalActivity(client, {
-        userId: input.userId,
-        window,
-        limit,
-      });
-      // Sort-merge: oldest-first windows are uncommon, ORDER BY
-      // OccurredAt DESC is the contract. Both inputs are already
-      // sorted; concat + re-sort + truncate is fine for the ~10-row
-      // limit and avoids a manual two-pointer merge.
-      merged = [...gateway, ...ingestion]
-        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-        .slice(0, limit);
-    }
-    return merged;
-  }
-
-  private async queryIngestionPrincipalActivity(
-    client: ClickHouseClient,
-    params: { userId: string; window: PersonalUsageWindow; limit: number },
-  ): Promise<PersonalRecentActivity[]> {
-    if (!isClickHouseEnabled()) return [];
-    try {
-      const result = await client.query({
-        query: `
-          SELECT
-            GatewayRequestId AS RequestId,
-            OccurredAt,
-            Model,
-            AmountUSD AS SpentUsd
-          FROM gateway_budget_ledger_events
-          WHERE Scope = '${PRINCIPAL_SCOPE}'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-          ORDER BY OccurredAt DESC
-          LIMIT {lim:UInt32}
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-          lim: params.limit,
-        },
-        format: "JSONEachRow",
-      });
-      type Raw = {
-        RequestId: string;
-        OccurredAt: string;
-        Model: string;
-        SpentUsd: number;
-      };
-      const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        // GatewayRequestId is the per-request idempotency key the
-        // receiver wrote (Claude Code's `request_id` from the
-        // api_request event). Distinguishable from gateway-VK trace
-        // ids by shape (`req_…` for Anthropic) — Lane-B can branch
-        // the row chrome on it if it wants the "via OTLP" annotation.
-        traceId: r.RequestId,
-        occurredAt: r.OccurredAt,
-        models: r.Model ? [r.Model] : [],
-        spentUsd: Number(r.SpentUsd) || 0,
-        preview: "",
       }));
     } catch {
       return [];
