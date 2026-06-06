@@ -166,6 +166,19 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] =
   Object.keys(ORG_SCOPED_MODELS);
 
+/**
+ * Every model that carries an organizationId column: the union of the guarded
+ * regime and the deliberately-deferred exemptions. The partition test below
+ * proves this equals exactly the org-bearing set from the Prisma datamodel, so
+ * it is the single source of truth guardProjectId derives its org-scoped
+ * exemptions from - an org-scoped model is, by definition, not project-scoped,
+ * so it must never be hand-listed in the projectId guard's exempt buckets.
+ */
+export const ORG_BEARING_MODEL_NAMES: readonly string[] = [
+  ...ORG_SCOPED_MODEL_NAMES,
+  ...ORG_TENANCY_EXEMPT,
+];
+
 const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   if (!where || typeof where !== "object") return;
   if (typeof where.organizationId === "string") acc.add(where.organizationId);
