@@ -136,9 +136,17 @@ const msToUnixNano = (ms: number): string =>
  * Convert a batch of trapped claude_code log records into gen_ai spans.
  * Records are grouped by traceId, the triplet is joined per the determinism
  * rules above, and any orphan part still becomes its own (marked) span.
+ *
+ * `promptTextById` maps a `prompt.id` to the clean user-typed text from the
+ * co-batched `user_prompt` event (which stays on the log path, so it is passed
+ * in rather than found among `records`). claude-code truncates large
+ * `api_request_body` payloads inline (`body_truncated=true`, ~64KB), which makes
+ * the body unparseable — without this the span input would fall back to the raw
+ * truncated JSON blob. The clean user_prompt text is the genuine turn input.
  */
 export function convertClaudeCodeLogsToSpans(
   records: ClaudeCodeLogRecordInput[],
+  promptTextById: ReadonlyMap<string, string> = new Map(),
 ): SynthesizedClaudeSpan[] {
   const byTrace = new Map<string, ClaudeCodeLogRecordInput[]>();
   for (const record of records) {
@@ -149,7 +157,7 @@ export function convertClaudeCodeLogsToSpans(
 
   const out: SynthesizedClaudeSpan[] = [];
   for (const traceRecords of byTrace.values()) {
-    out.push(...convertOneTrace(traceRecords));
+    out.push(...convertOneTrace(traceRecords, promptTextById));
   }
   return out;
 }
@@ -166,6 +174,7 @@ const bySequence = (
 
 function convertOneTrace(
   records: ClaudeCodeLogRecordInput[],
+  promptTextById: ReadonlyMap<string, string>,
 ): SynthesizedClaudeSpan[] {
   const anchors = records
     .filter((r) => r.eventName === "api_request")
@@ -207,16 +216,16 @@ function convertOneTrace(
     const body = bodyIdx >= 0 ? bodies[bodyIdx]! : null;
     if (bodyIdx >= 0) usedBodies.add(bodyIdx);
 
-    spans.push(buildCollapsedSpan(anchor, body, response));
+    spans.push(buildCollapsedSpan(anchor, body, response, promptTextById));
   }
 
   // Orphans (cross-batch split): emit each remaining part as its own marked
   // span so no converted content is silently dropped.
   bodies.forEach((body, i) => {
-    if (!usedBodies.has(i)) spans.push(buildOrphanSpan(body));
+    if (!usedBodies.has(i)) spans.push(buildOrphanSpan(body, promptTextById));
   });
   responses.forEach((response, i) => {
-    if (!usedResponses.has(i)) spans.push(buildOrphanSpan(response));
+    if (!usedResponses.has(i)) spans.push(buildOrphanSpan(response, promptTextById));
   });
 
   return spans;
@@ -235,10 +244,29 @@ function baseAttrs(record: ClaudeCodeLogRecordInput): OtlpKeyValue[] {
   return attrs;
 }
 
+/**
+ * Resolve the span's input text from an api_request_body record. Prefers the
+ * latest user turn parsed out of the request body; when claude truncated the
+ * body inline (`body_truncated=true`, ~64KB cap) it is unparseable, so fall
+ * back to the clean co-batched `user_prompt` text (joined by prompt.id) BEFORE
+ * the raw truncated blob — the user_prompt text is the genuine turn input.
+ */
+function resolveInputText(
+  body: ClaudeCodeLogRecordInput,
+  promptTextById: ReadonlyMap<string, string>,
+): string | null {
+  return (
+    extractUserTextFromRequestBody(body.attrs.body) ??
+    asNonEmpty(promptTextById.get(body.attrs["prompt.id"] ?? "")) ??
+    asNonEmpty(body.attrs.body)
+  );
+}
+
 function buildCollapsedSpan(
   anchor: ClaudeCodeLogRecordInput,
   body: ClaudeCodeLogRecordInput | null,
   response: ClaudeCodeLogRecordInput | null,
+  promptTextById: ReadonlyMap<string, string>,
 ): SynthesizedClaudeSpan {
   const attrs = baseAttrs(anchor);
   const model = asNonEmpty(anchor.attrs.model);
@@ -273,12 +301,11 @@ function buildCollapsedSpan(
   if (cost !== null) attrs.push(dblAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, cost));
 
   // INPUT text from the request body (best-effort: the body is often claude-
-  // truncated for large contexts, so fall back to the raw capped body so the
-  // content still reaches the span rather than being dropped).
+  // truncated for large contexts; resolveInputText falls back to the clean
+  // user_prompt text, then the raw capped body, so content still reaches the
+  // span rather than being dropped).
   if (body) {
-    const inputText =
-      extractUserTextFromRequestBody(body.attrs.body) ??
-      asNonEmpty(body.attrs.body);
+    const inputText = resolveInputText(body, promptTextById);
     if (inputText) {
       attrs.push(
         strAttr(
@@ -324,6 +351,7 @@ function buildCollapsedSpan(
 
 function buildOrphanSpan(
   record: ClaudeCodeLogRecordInput,
+  promptTextById: ReadonlyMap<string, string>,
 ): SynthesizedClaudeSpan {
   const attrs = baseAttrs(record);
   attrs.push(boolAttr("claude_code.orphan", true));
@@ -336,9 +364,7 @@ function buildOrphanSpan(
   }
 
   if (record.eventName === "api_request_body") {
-    const inputText =
-      extractUserTextFromRequestBody(record.attrs.body) ??
-      asNonEmpty(record.attrs.body);
+    const inputText = resolveInputText(record, promptTextById);
     if (inputText) {
       attrs.push(
         strAttr(

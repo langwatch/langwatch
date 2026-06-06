@@ -94,6 +94,12 @@ export class LogRequestCollectionService {
         // claude-code-log-to-span.ts.
         const claudeConvertibles: ClaudeCodeLogRecordInput[] = [];
 
+        // Clean user-typed text per prompt.id, harvested from the co-batched
+        // claude_code `user_prompt` events (which stay on the log path). The
+        // converter prefers this over a truncated, unparseable api_request_body
+        // when stamping the synthesized span's input. See claude-code-log-to-span.ts.
+        const claudePromptTextById = new Map<string, string>();
+
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
 
@@ -169,6 +175,20 @@ export class LogRequestCollectionService {
                     )
                   : Date.now();
 
+                // Harvest the clean user-typed prompt text (keyed by prompt.id)
+                // so the converter can use it as the span input when the matching
+                // api_request_body is truncated. user_prompt stays on the log path.
+                if (
+                  scopeName === CLAUDE_CODE_EVENT_SCOPE &&
+                  logAttrs["event.name"] === "user_prompt"
+                ) {
+                  const promptId = logAttrs["prompt.id"];
+                  const promptText = logAttrs.prompt;
+                  if (promptId && promptText) {
+                    claudePromptTextById.set(promptId, promptText);
+                  }
+                }
+
                 // claude_code model-call events: trap + convert to a gen_ai
                 // span after the loop; do NOT write them as log records. The
                 // `body` content lives in the `body` attribute for these
@@ -224,7 +244,10 @@ export class LogRequestCollectionService {
         let convertedSpanCount = 0;
         if (claudeConvertibles.length > 0) {
           const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
-          const spans = convertClaudeCodeLogsToSpans(claudeConvertibles);
+          const spans = convertClaudeCodeLogsToSpans(
+            claudeConvertibles,
+            claudePromptTextById,
+          );
           for (const synthesized of spans) {
             try {
               await this.deps.recordSpan({

@@ -322,6 +322,97 @@ describe("convertClaudeCodeLogsToSpans", () => {
     });
   });
 
+  describe("when the api_request_body is truncated (unparseable)", () => {
+    // claude-code truncates large request bodies inline (body_truncated=true,
+    // ~64KB), so JSON.parse fails and extractUserTextFromRequestBody yields null.
+    const truncated =
+      '{"model":"claude-opus-4-8","messages":[{"role":"user","content":[{"type":"text","text":"Tur';
+
+    const build = (promptTextById?: Map<string, string>) =>
+      convertClaudeCodeLogsToSpans(
+        [
+          rec({
+            eventName: "api_request",
+            spanId: "aaaaaaaaaaaaaaaa",
+            attrs: {
+              "event.name": "api_request",
+              "session.id": "sess_t",
+              model: "claude-opus-4-8",
+              input_tokens: "2",
+              output_tokens: "15",
+              request_id: "req_t",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_42",
+            },
+          }),
+          rec({
+            eventName: "api_request_body",
+            spanId: "bbbbbbbbbbbbbbbb",
+            attrs: {
+              "event.name": "api_request_body",
+              model: "claude-opus-4-8",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_42",
+              body_truncated: "true",
+              body: truncated,
+            },
+          }),
+        ],
+        promptTextById,
+      );
+
+    it("uses the clean co-batched user_prompt text instead of the raw truncated blob", () => {
+      const { span } = build(
+        new Map([
+          ["p_42", "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else."],
+        ]),
+      )[0]!;
+      expect(attr(span, "gen_ai.prompt")).toEqual({
+        stringValue: "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else.",
+      });
+    });
+
+    it("falls back to the raw body when no user_prompt text is available (never dropped)", () => {
+      const { span } = build(new Map())[0]!;
+      expect(attr(span, "gen_ai.prompt")).toEqual({ stringValue: truncated });
+    });
+  });
+
+  describe("when the api_request_body parses AND a user_prompt text exists", () => {
+    it("prefers the parsed body's latest user turn over the user_prompt map", () => {
+      const spans = convertClaudeCodeLogsToSpans(
+        [
+          rec({
+            eventName: "api_request",
+            spanId: "aaaaaaaaaaaaaaaa",
+            attrs: {
+              "event.name": "api_request",
+              model: "m",
+              request_id: "req_p",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_1",
+            },
+          }),
+          rec({
+            eventName: "api_request_body",
+            spanId: "bbbbbbbbbbbbbbbb",
+            attrs: {
+              "event.name": "api_request_body",
+              model: "m",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_1",
+              body: requestBody("parsed body text"),
+            },
+          }),
+        ],
+        new Map([["p_1", "user_prompt text"]]),
+      );
+      expect(attr(spans[0]!.span, "gen_ai.prompt")).toEqual({
+        stringValue: "parsed body text",
+      });
+    });
+  });
+
   describe("idempotency", () => {
     it("produces byte-identical spans for the same input twice", () => {
       const input: ClaudeCodeLogRecordInput[] = [
