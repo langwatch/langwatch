@@ -67,11 +67,12 @@ export interface CustomersAndLabelsResult {
  * Evaluation entries carry the evaluator id as `key` and its display name as
  * `label`; the other arrays use the name for both.
  *
- * Event types are intentionally not included: they live only inside the heavy
- * `stored_spans.SpanAttributes` map (the trace_summaries event columns were
- * dropped in migration 00025), so a project-wide scan would materialise that
- * column — exactly the OOM/IO vector the memory-safety guard protects against.
- * The events dropdown keeps deriving its options from the loaded trace.
+ * Event types are intentionally not included here: they live only inside the
+ * heavy `stored_spans.SpanAttributes` map (the trace_summaries event columns
+ * were dropped in migration 00025), so scanning them in this query would
+ * materialise that column — exactly the OOM/IO vector the memory-safety guard
+ * protects against. The events dropdown instead gets its project-wide options
+ * from the bounded analytics event-type filter query (see useProjectEventTypes).
  */
 export interface DistinctFieldNamesResult {
   spanNames: Array<{ key: string; label: string }>;

@@ -40,6 +40,10 @@ vi.mock("~/hooks/useProjectSpanNames", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useProjectEventTypes", () => ({
+  useProjectEventTypes: () => ({ eventTypes: [], isLoading: false, error: null }),
+}));
+
 vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));

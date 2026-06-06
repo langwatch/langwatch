@@ -11,14 +11,15 @@ Feature: Span field mapping when adding traces to a dataset
   # span name that clearly exists on a recent trace not being offered for
   # mapping. These scenarios pin the expected behaviour so it cannot regress.
   #
-  # The same trace-only limitation applied to the "evaluations" source: its
-  # dropdown only listed evaluators present on the open trace, so an evaluator
-  # that ran elsewhere in the project could not be mapped. It now also draws
-  # from the project's last 30 days, mirroring spans and metadata.
+  # The same trace-only limitation applied to the "evaluations" and "events"
+  # sources: their dropdowns only listed evaluators / event types present on the
+  # open trace, so ones that occurred elsewhere in the project could not be
+  # mapped. They now also draw from the project's last 30 days.
   #
-  # The "events" source stays trace-derived on purpose: event types live only
-  # inside the heavy stored_spans span-attributes map, so a project-wide scan
-  # would not be memory-safe.
+  # Evaluator names come from the same getDistinctFieldNames query as spans and
+  # metadata. Event types come from a separate, bounded source (the analytics
+  # event-type filter options) because they live only inside the heavy
+  # stored_spans span-attributes map, which that query must not scan.
 
   Background:
     Given I am on a project that has produced traces over the last 30 days
@@ -63,7 +64,7 @@ Feature: Span field mapping when adding traces to a dataset
     Then all of its spans are returned, none are dropped
 
   # ============================================================================
-  # Evaluations also offer project-wide names, not just the open trace's
+  # Evaluations and events also offer project-wide names, not just the open trace's
   # ============================================================================
 
   Scenario: Evaluator names from the project are offered even when absent from the open trace
@@ -81,3 +82,9 @@ Feature: Span field mapping when adding traces to a dataset
     Given my project has more than one thousand distinct evaluator names in the last 30 days
     When the available evaluator names are fetched for mapping
     Then every distinct evaluator name is returned, none are dropped
+
+  Scenario: Event types from the project are offered even when absent from the open trace
+    Given an event of type "thumbs_up" was tracked somewhere in my project in the last 30 days
+    And the trace I opened the "Add to Dataset" drawer on has no such event
+    When I select "events" as the source for a column
+    Then "thumbs_up" is offered as an event type to map

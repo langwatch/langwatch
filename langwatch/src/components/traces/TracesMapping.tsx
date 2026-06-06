@@ -16,6 +16,7 @@ import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
 import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
+import { useProjectEventTypes } from "../../hooks/useProjectEventTypes";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -76,11 +77,14 @@ type KeyOption = { key: string; label: string };
 
 /**
  * Sources whose key dropdowns are expanded with the project's distinct field
- * names from the last 30 days (not just the names on the loaded trace).
+ * names from the last 30 days (not just the names on the loaded trace), served
+ * by getDistinctFieldNames / useProjectSpanNames.
  *
- * Events are deliberately absent: their types live only inside the heavy
- * stored_spans.SpanAttributes map, so a project-wide scan is not memory-safe
- * (see DistinctFieldNamesResult). The events dropdown stays trace-derived.
+ * Events are not in this list because their types are not served from
+ * getDistinctFieldNames (they live only in the heavy stored_spans.SpanAttributes
+ * map, which that query must not scan). They get the same project-wide treatment
+ * through a separate, bounded source — useProjectEventTypes, which reuses the
+ * analytics event-type filter options query.
  */
 const PROJECT_FIELD_NAME_SOURCES: string[] = [
   "spans",
@@ -103,6 +107,7 @@ const FIELD_NAME_LOADING_LABEL: Record<string, string> = {
   spans: "Loading span names…",
   metadata: "Loading metadata keys…",
   evaluations: "Loading evaluations…",
+  events: "Loading event types…",
 };
 
 /** Label for the "match everything" option at the top of a source's dropdown. */
@@ -110,6 +115,7 @@ const FIELD_NAME_ANY_LABEL: Record<string, string> = {
   spans: "* (any span)",
   metadata: "* (all metadata)",
   evaluations: "* (any evaluation)",
+  events: "* (any event)",
 };
 
 /** Dedupe {key,label} options by key, preserving first-seen order. */
@@ -246,8 +252,8 @@ export const TracesMapping = ({
   );
   const mapping = traceMappingState.mapping;
 
-  // The spans, metadata, evaluations and events sources draw from project-wide
-  // names. Fetch the 30-day distinct field-name list lazily — only when such a
+  // The spans, metadata and evaluations sources draw their project-wide names
+  // from getDistinctFieldNames. Fetch that 30-day list lazily — only when such a
   // column is actually being mapped — so merely opening the drawer/wizard (or
   // any other place that renders this component) doesn't trigger the heavier
   // ClickHouse scan when none of those sources is in play.
@@ -268,10 +274,24 @@ export const TracesMapping = ({
     enabled: needsProjectFieldNames,
   });
 
+  // Events get the same project-wide treatment from a separate bounded source
+  // (the analytics event-type filter options), gated the same way.
+  const needsProjectEventTypes = useMemo(
+    () => Object.values(mapping).some((m) => m.source === "events"),
+    [mapping],
+  );
+  const {
+    eventTypes: projectEventTypes,
+    isLoading: projectEventTypesLoading,
+  } = useProjectEventTypes({
+    projectId: project?.id,
+    enabled: needsProjectEventTypes,
+  });
+
   // These dropdowns should offer every name the project produced in the last 30
   // days, not just the names on the loaded trace(s) — otherwise a span (or
-  // evaluator) that exists elsewhere in the project cannot be selected for
-  // mapping.
+  // evaluator, or event type) that exists elsewhere in the project cannot be
+  // selected for mapping.
   const mergeProjectKeyOptions = useCallback(
     (source: string, baseOptions: KeyOption[]): KeyOption[] => {
       const projectOptions =
@@ -281,7 +301,9 @@ export const TracesMapping = ({
             ? projectMetadataKeys
             : source === "evaluations"
               ? projectEvaluationNames
-              : [];
+              : source === "events"
+                ? projectEventTypes
+                : [];
       if (projectOptions.length === 0) {
         return baseOptions;
       }
@@ -289,7 +311,12 @@ export const TracesMapping = ({
         a.label.localeCompare(b.label),
       );
     },
-    [projectSpanNames, projectMetadataKeys, projectEvaluationNames],
+    [
+      projectSpanNames,
+      projectMetadataKeys,
+      projectEvaluationNames,
+      projectEventTypes,
+    ],
   );
 
   // Check if any column uses a server-only source (e.g. formatted_trace)
@@ -579,11 +606,13 @@ export const TracesMapping = ({
                   : computeSubkeys(key!)
               : undefined;
 
-          // The spans/metadata/evaluations key dropdown waits on the
-          // project-wide name list.
+          // The key dropdown waits on whichever project-wide list feeds it:
+          // getDistinctFieldNames for spans/metadata/evaluations, the event-type
+          // options for events.
           const isLoadingFieldNames =
-            projectFieldNamesLoading &&
-            PROJECT_FIELD_NAME_SOURCES.includes(source);
+            (projectFieldNamesLoading &&
+              PROJECT_FIELD_NAME_SOURCES.includes(source)) ||
+            (projectEventTypesLoading && source === "events");
 
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
