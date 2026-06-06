@@ -457,6 +457,7 @@ describe("inferEvaluatorMappings", () => {
     });
   });
 
+  /** @scenario Target output wins over a same-named dataset column for "output" */
   it("prioritizes target output over dataset column for output field", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("output"), // Dataset also has "output"
@@ -583,6 +584,7 @@ describe("inferEvaluatorMappings", () => {
   // ==========================================================================
 
   describe("when the locked side has no matching column", () => {
+    /** @scenario "output" never falls back to a dataset column */
     it("leaves an `output` mapping empty rather than falling back to a same-named dataset column", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("output"), // dataset has output, target does not
@@ -599,6 +601,7 @@ describe("inferEvaluatorMappings", () => {
       expect(mappings.output).toBeUndefined();
     });
 
+    /** @scenario "expected_output" never picks the runner output */
     it("leaves an `expected_output` mapping empty rather than falling back to a same-named target output", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("irrelevant"),
@@ -617,6 +620,7 @@ describe("inferEvaluatorMappings", () => {
       expect(mappings.expected_output).toBeUndefined();
     });
 
+    /** @scenario "input" never picks the runner output */
     it("leaves an `input` mapping empty rather than falling back to a same-named target output", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("irrelevant"),
