@@ -68,6 +68,38 @@ export class SpanCostService {
     };
   }
 
+  /**
+   * Per-span cache + reasoning token counts, read from the same canonical
+   * keys the drawer popover looks at. These are summed across the trace's
+   * spans by the fold (the raw keys never reach the trace attribute map),
+   * so "Cache write" and "Cache read" reflect the whole turn rather than
+   * the last span — where, for Anthropic, the cache write is always zero.
+   */
+  extractCacheTokens(span: NormalizedSpan): {
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
+    reasoningTokens: number;
+  } {
+    const attrs = span.spanAttributes;
+    const firstPositive = (...keys: string[]): number => {
+      for (const key of keys) {
+        const n = coerceToNumber(attrs[key]);
+        if (n !== null && n > 0) return n;
+      }
+      return 0;
+    };
+    return {
+      cacheReadTokens: firstPositive(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        "gen_ai.usage.cached_tokens",
+      ),
+      cacheCreationTokens: firstPositive(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      ),
+      reasoningTokens: firstPositive(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS),
+    };
+  }
+
   extractTokenTiming(span: NormalizedSpan): {
     timeToFirstToken: number | null;
     timeToLastToken: number | null;
