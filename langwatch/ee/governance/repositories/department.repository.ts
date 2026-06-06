@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Repository for CostCenter row access. Every `prisma.costCenter.*` call
+ * Repository for Department row access. Every `prisma.department.*` call
  * lives here; the service delegates through it and owns validation, org
  * scoping, and assignment orchestration.
  *
- * Spec: specs/ai-gateway/governance/cost-centers.feature
+ * Spec: specs/ai-gateway/governance/departments.feature
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
-export class CostCenterRepository {
+export class DepartmentRepository {
   findAll(client: Client, params: { organizationId: string }) {
-    return client.costCenter.findMany({
+    return client.department.findMany({
       where: { organizationId: params.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
     });
@@ -24,7 +24,7 @@ export class CostCenterRepository {
     client: Client,
     params: { id: string; organizationId: string },
   ) {
-    return client.costCenter.findFirst({
+    return client.department.findFirst({
       where: {
         id: params.id,
         organizationId: params.organizationId,
@@ -37,7 +37,7 @@ export class CostCenterRepository {
     client: Client,
     params: { organizationId: string; name: string },
   ) {
-    return client.costCenter.create({
+    return client.department.create({
       data: { organizationId: params.organizationId, name: params.name },
     });
   }
@@ -46,14 +46,14 @@ export class CostCenterRepository {
     client: Client,
     params: { id: string; organizationId: string; name: string },
   ) {
-    return client.costCenter.updateMany({
+    return client.department.updateMany({
       where: { id: params.id, organizationId: params.organizationId },
       data: { name: params.name },
     });
   }
 
   archive(client: Client, params: { id: string; organizationId: string }) {
-    return client.costCenter.updateMany({
+    return client.department.updateMany({
       where: { id: params.id, organizationId: params.organizationId },
       data: { archivedAt: new Date() },
     });

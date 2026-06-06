@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { CostCenterEditDrawer } from "~/components/settings/CostCenterEditDrawer";
+import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
@@ -22,53 +22,53 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
-type CostCenter = RouterOutputs["costCenters"]["list"][number];
+type Department = RouterOutputs["departments"]["list"][number];
 
-function CostCentersPage() {
+function DepartmentsPage() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
 
   const utils = api.useUtils();
-  const listQuery = api.costCenters.list.useQuery(
+  const listQuery = api.departments.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
   const refresh = async () => {
-    await utils.costCenters.list.invalidate({ organizationId: orgId });
+    await utils.departments.list.invalidate({ organizationId: orgId });
   };
 
   const [newName, setNewName] = useState("");
-  const createMutation = api.costCenters.create.useMutation({
+  const createMutation = api.departments.create.useMutation({
     onSuccess: async () => {
       setNewName("");
-      toaster.create({ title: "Cost center created", type: "success" });
+      toaster.create({ title: "Department created", type: "success" });
       await refresh();
     },
     onError: (e) =>
       toaster.create({ title: "Create failed", description: e.message, type: "error" }),
   });
 
-  const costCenters = listQuery.data ?? [];
-  const hasCostCenters = costCenters.length > 0;
+  const departments = listQuery.data ?? [];
+  const hasDepartments = departments.length > 0;
 
   return (
-    <GovernanceLayout pageTitle="Cost Centers · AI Governance · LangWatch">
+    <GovernanceLayout pageTitle="Departments · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
             <Link href="/governance" color="blue.600">
               ← AI Governance
             </Link>{" "}
-            · Cost centers
+            · Departments
           </Text>
-          <Heading size="md">Cost centers</Heading>
+          <Heading size="md">Departments</Heading>
           <Text color="fg.muted" fontSize="sm" maxW="2xl">
-            A cost center is an accounting label for spend. Assign people,
-            teams, and projects to one, and spend rolls up by cost center
-            across the org, including personal AI use. Cost centers never
+            A department is an accounting label for spend. Assign people,
+            teams, and projects to one, and spend rolls up by department
+            across the org, including personal AI use. Departments never
             grant or restrict access.
           </Text>
         </VStack>
@@ -80,7 +80,7 @@ function CostCentersPage() {
           padding={4}
         >
           <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
-            Create a cost center
+            Create a department
           </Text>
           <HStack>
             <Input
@@ -115,14 +115,14 @@ function CostCentersPage() {
           </HStack>
         </Box>
 
-        <CostCenterList
+        <DepartmentList
           orgId={orgId}
-          costCenters={costCenters}
+          departments={departments}
           isLoading={listQuery.isLoading}
           onChanged={refresh}
         />
 
-        {hasCostCenters && <AssignmentGuide />}
+        {hasDepartments && <AssignmentGuide />}
       </VStack>
     </GovernanceLayout>
   );
@@ -152,27 +152,27 @@ function AssignmentGuide() {
           textTransform="uppercase"
           letterSpacing="wider"
         >
-          Assigning cost centers
+          Assigning departments
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Assign people and teams to a cost center where you already manage
-          them. Spend rolls up by cost center, including personal AI use.
+          Assign people and teams to a department where you already manage
+          them. Spend rolls up by department, including personal AI use.
         </Text>
       </Box>
       <AssignmentLink
         href="/settings/members"
         title="People"
-        description="A person's spend, including personal AI use, rolls up to their cost center. Assign each member from the members page."
+        description="A person's spend, including personal AI use, rolls up to their department. Assign each member from the members page."
       />
       <AssignmentLink
         href="/settings/teams"
         title="Teams"
-        description="A team cost center is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
+        description="A team department is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
       />
       <AssignmentLink
         href="/settings/teams"
         title="Projects"
-        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's cost center. Assign each project from the teams page, next to its team."
+        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's department. Assign each project from the teams page, next to its team."
       />
     </VStack>
   );
@@ -212,23 +212,23 @@ function AssignmentLink({
   );
 }
 
-function CostCenterList({
+function DepartmentList({
   orgId,
-  costCenters,
+  departments,
   isLoading,
   onChanged,
 }: {
   orgId: string;
-  costCenters: CostCenter[];
+  departments: Department[];
   isLoading: boolean;
   onChanged: () => Promise<void>;
 }) {
-  const [editing, setEditing] = useState<CostCenter | null>(null);
-  const [archiving, setArchiving] = useState<CostCenter | null>(null);
+  const [editing, setEditing] = useState<Department | null>(null);
+  const [archiving, setArchiving] = useState<Department | null>(null);
 
-  const archiveMutation = api.costCenters.archive.useMutation({
+  const archiveMutation = api.departments.archive.useMutation({
     onSuccess: async () => {
-      toaster.create({ title: "Cost center archived", type: "success" });
+      toaster.create({ title: "Department archived", type: "success" });
       setArchiving(null);
       await onChanged();
     },
@@ -258,31 +258,31 @@ function CostCenterList({
           textTransform="uppercase"
           letterSpacing="wider"
         >
-          Cost centers
+          Departments
         </Box>
         {isLoading ? (
           <Box padding={4}>
             <Spinner />
           </Box>
-        ) : costCenters.length === 0 ? (
+        ) : departments.length === 0 ? (
           <Box padding={4} color="fg.muted" fontSize="sm">
-            No cost centers yet. Create one above to start attributing spend.
+            No departments yet. Create one above to start attributing spend.
           </Box>
         ) : (
-          costCenters.map((cc) => (
-            <CostCenterRow
-              key={cc.id}
-              costCenter={cc}
-              onEdit={() => setEditing(cc)}
-              onArchive={() => setArchiving(cc)}
+          departments.map((dept) => (
+            <DepartmentRow
+              key={dept.id}
+              department={dept}
+              onEdit={() => setEditing(dept)}
+              onArchive={() => setArchiving(dept)}
             />
           ))
         )}
       </VStack>
 
-      <CostCenterEditDrawer
+      <DepartmentEditDrawer
         organizationId={orgId}
-        costCenter={editing}
+        department={editing}
         onOpenChange={(open) => {
           if (!open) setEditing(null);
         }}
@@ -296,8 +296,8 @@ function CostCenterList({
         onOpenChange={(open) => {
           if (!open) setArchiving(null);
         }}
-        title={`Archive ${archiving?.name ?? "cost center"}?`}
-        message="Spend already attributed to this cost center rolls up under Unassigned. The cost center stops appearing in the assignment pickers."
+        title={`Archive ${archiving?.name ?? "department"}?`}
+        message="Spend already attributed to this department rolls up under Unassigned. The department stops appearing in the assignment pickers."
         confirmLabel="Archive"
         tone="warning"
         loading={archiveMutation.isLoading}
@@ -311,12 +311,12 @@ function CostCenterList({
   );
 }
 
-function CostCenterRow({
-  costCenter,
+function DepartmentRow({
+  department,
   onEdit,
   onArchive,
 }: {
-  costCenter: CostCenter;
+  department: Department;
   onEdit: () => void;
   onArchive: () => void;
 }) {
@@ -329,7 +329,7 @@ function CostCenterRow({
       fontSize="sm"
       justifyContent="space-between"
     >
-      <Text fontWeight="medium">{costCenter.name}</Text>
+      <Text fontWeight="medium">{department.name}</Text>
       <Menu.Root>
         <Menu.Trigger asChild>
           <Button variant="ghost" size="xs" aria-label="Actions">
@@ -354,5 +354,5 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
 })(
   withPermissionGuard("organization:manage", {
     bypassOnboardingRedirect: true,
-  })(CostCentersPage),
+  })(DepartmentsPage),
 );

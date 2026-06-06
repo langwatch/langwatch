@@ -6,7 +6,7 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-// Omit the Json field — Prisma's output type (JsonValue | null) is structurally
+// Omit the Json field - Prisma's output type (JsonValue | null) is structurally
 // incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).
 // Excluding it lets the factory output be spread directly into prisma.*.create()
 // while Prisma applies the column default (NULL).
@@ -38,5 +38,5 @@ export const projectFactory = Factory.define<
   isPersonal: false,
   ownerUserId: null,
   presenceEnabled: false,
-  costCenterId: null,
+  departmentId: null,
 }));

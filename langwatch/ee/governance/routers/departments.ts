@@ -1,30 +1,30 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * tRPC router for cost centers: org-scoped CRUD plus assignment of users,
+ * tRPC router for departments: org-scoped CRUD plus assignment of users,
  * teams, and projects. Reads gate on `governance:view`, writes on
- * `governance:manage`. Pure accounting — never an access gate.
+ * `governance:manage`. Pure accounting - never an access gate.
  *
- * Spec: specs/ai-gateway/governance/cost-centers.feature
+ * Spec: specs/ai-gateway/governance/departments.feature
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
-  CostCenterAssignmentTargetNotFoundError,
-  CostCenterNotFoundError,
-  CostCenterService,
-} from "@ee/governance/services/cost-center/costCenter.service";
+  DepartmentAssignmentTargetNotFoundError,
+  DepartmentNotFoundError,
+  DepartmentService,
+} from "@ee/governance/services/department/department.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-export const costCentersRouter = createTRPCRouter({
+export const departmentsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("governance:view"))
     .query(async ({ ctx, input }) => {
-      return await CostCenterService.create(ctx.prisma).getAll({
+      return await DepartmentService.create(ctx.prisma).getAll({
         organizationId: input.organizationId,
       });
     }),
@@ -33,7 +33,7 @@ export const costCentersRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("governance:view"))
     .query(async ({ ctx, input }) => {
-      return await CostCenterService.create(ctx.prisma).getAssignments({
+      return await DepartmentService.create(ctx.prisma).getAssignments({
         organizationId: input.organizationId,
       });
     }),
@@ -47,7 +47,7 @@ export const costCentersRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
-      return await CostCenterService.create(ctx.prisma).create({
+      return await DepartmentService.create(ctx.prisma).create({
         organizationId: input.organizationId,
         name: input.name,
       });
@@ -64,7 +64,7 @@ export const costCentersRouter = createTRPCRouter({
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await CostCenterService.create(ctx.prisma).rename({
+        return await DepartmentService.create(ctx.prisma).rename({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -79,7 +79,7 @@ export const costCentersRouter = createTRPCRouter({
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
       try {
-        await CostCenterService.create(ctx.prisma).archive({
+        await DepartmentService.create(ctx.prisma).archive({
           id: input.id,
           organizationId: input.organizationId,
         });
@@ -94,13 +94,13 @@ export const costCentersRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         userId: z.string(),
-        costCenterId: z.string().nullable(),
+        departmentId: z.string().nullable(),
       }),
     )
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
       try {
-        await CostCenterService.create(ctx.prisma).assignUser(input);
+        await DepartmentService.create(ctx.prisma).assignUser(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
@@ -112,13 +112,13 @@ export const costCentersRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         teamId: z.string(),
-        costCenterId: z.string().nullable(),
+        departmentId: z.string().nullable(),
       }),
     )
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
       try {
-        await CostCenterService.create(ctx.prisma).assignTeam(input);
+        await DepartmentService.create(ctx.prisma).assignTeam(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
@@ -130,13 +130,13 @@ export const costCentersRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         projectId: z.string(),
-        costCenterId: z.string().nullable(),
+        departmentId: z.string().nullable(),
       }),
     )
     .use(checkOrganizationPermission("governance:manage"))
     .mutation(async ({ ctx, input }) => {
       try {
-        await CostCenterService.create(ctx.prisma).assignProject(input);
+        await DepartmentService.create(ctx.prisma).assignProject(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
@@ -146,8 +146,8 @@ export const costCentersRouter = createTRPCRouter({
 
 function mapError(err: unknown): TRPCError {
   if (
-    err instanceof CostCenterNotFoundError ||
-    err instanceof CostCenterAssignmentTargetNotFoundError
+    err instanceof DepartmentNotFoundError ||
+    err instanceof DepartmentAssignmentTargetNotFoundError
   ) {
     return new TRPCError({ code: "NOT_FOUND", message: err.message });
   }

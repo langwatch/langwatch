@@ -151,7 +151,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.
   "BillingMeterCheckpoint",
-  "CostCenter",
+  "Department",
   "GatewayCacheRule",
   "IngestionSource",
   // Per-(org, tool) CLI path policy. Read/written only through

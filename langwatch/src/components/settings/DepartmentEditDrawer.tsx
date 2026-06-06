@@ -5,28 +5,28 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
-type CostCenterRow = { id: string; name: string };
+type DepartmentRow = { id: string; name: string };
 
-export function CostCenterEditDrawer({
+export function DepartmentEditDrawer({
   organizationId,
-  costCenter,
+  department,
   onOpenChange,
   onSaved,
 }: {
   organizationId: string;
-  costCenter: CostCenterRow | null;
+  department: DepartmentRow | null;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
 
   useEffect(() => {
-    if (costCenter) {
-      setName(costCenter.name);
+    if (department) {
+      setName(department.name);
     }
-  }, [costCenter]);
+  }, [department]);
 
-  const renameMutation = api.costCenters.rename.useMutation();
+  const renameMutation = api.departments.rename.useMutation();
 
   const close = () => {
     if (renameMutation.isLoading) return;
@@ -34,7 +34,7 @@ export function CostCenterEditDrawer({
   };
 
   const submit = async () => {
-    if (!costCenter) return;
+    if (!department) return;
     const trimmed = name.trim();
     if (!trimmed) {
       toaster.create({ title: "Name is required", type: "error" });
@@ -43,10 +43,10 @@ export function CostCenterEditDrawer({
     try {
       await renameMutation.mutateAsync({
         organizationId,
-        id: costCenter.id,
+        id: department.id,
         name: trimmed,
       });
-      toaster.create({ title: "Cost center renamed", type: "success" });
+      toaster.create({ title: "Department renamed", type: "success" });
       onSaved();
       onOpenChange(false);
     } catch (error) {
@@ -59,14 +59,14 @@ export function CostCenterEditDrawer({
 
   return (
     <Drawer.Root
-      open={!!costCenter}
+      open={!!department}
       onOpenChange={() => close()}
       placement="end"
       size="md"
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>Edit cost center</Drawer.Title>
+          <Drawer.Title>Edit department</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -100,7 +100,7 @@ export function CostCenterEditDrawer({
               colorPalette="orange"
               onClick={() => void submit()}
               loading={renameMutation.isLoading}
-              disabled={!name.trim() || name.trim() === costCenter?.name}
+              disabled={!name.trim() || name.trim() === department?.name}
             >
               Save changes
             </Button>

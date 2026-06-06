@@ -3,21 +3,21 @@ import { NativeSelect } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
-import type { CostCenterOption } from "./useCostCenterColumn";
+import type { DepartmentOption } from "./useDepartmentColumn";
 
 /**
- * Inline single-select that assigns a person / team / project to a cost
- * center where it is already managed (members page, teams page, project
- * settings). Single-valued: picking a center replaces the previous one,
+ * Inline single-select that assigns a person / team / project to a
+ * department where it is already managed (members page, teams page, project
+ * settings). Single-valued: picking a department replaces the previous one,
  * "Unassigned" clears it. Owns the assign mutation so call sites only pass
  * the current value + the option list.
  */
-export function CostCenterPicker({
+export function DepartmentPicker({
   organizationId,
   kind,
   entityId,
   value,
-  costCenters,
+  departments,
   onAssigned,
   width,
 }: {
@@ -25,7 +25,7 @@ export function CostCenterPicker({
   kind: "user" | "team" | "project";
   entityId: string;
   value: string | null;
-  costCenters: CostCenterOption[];
+  departments: DepartmentOption[];
   onAssigned: () => Promise<unknown> | void;
   /**
    * Fixed width override. Members-table usage leaves this unset and relies on
@@ -34,35 +34,35 @@ export function CostCenterPicker({
    */
   width?: string;
 }) {
-  const assignUser = api.costCenters.assignUser.useMutation();
-  const assignTeam = api.costCenters.assignTeam.useMutation();
-  const assignProject = api.costCenters.assignProject.useMutation();
+  const assignUser = api.departments.assignUser.useMutation();
+  const assignTeam = api.departments.assignTeam.useMutation();
+  const assignProject = api.departments.assignProject.useMutation();
 
   const isPending =
     assignUser.isPending || assignTeam.isPending || assignProject.isPending;
 
-  const assign = async (costCenterId: string | null) => {
+  const assign = async (departmentId: string | null) => {
     try {
       if (kind === "user") {
         await assignUser.mutateAsync({
           organizationId,
           userId: entityId,
-          costCenterId,
+          departmentId,
         });
       } else if (kind === "team") {
         await assignTeam.mutateAsync({
           organizationId,
           teamId: entityId,
-          costCenterId,
+          departmentId,
         });
       } else {
         await assignProject.mutateAsync({
           organizationId,
           projectId: entityId,
-          costCenterId,
+          departmentId,
         });
       }
-      toaster.create({ title: "Cost center updated", type: "success" });
+      toaster.create({ title: "Department updated", type: "success" });
       await onAssigned();
     } catch (e) {
       toaster.create({
@@ -86,9 +86,9 @@ export function CostCenterPicker({
         }
       >
         <option value="">Unassigned</option>
-        {costCenters.map((cc) => (
-          <option key={cc.id} value={cc.id}>
-            {cc.name}
+        {departments.map((dept) => (
+          <option key={dept.id} value={dept.id}>
+            {dept.name}
           </option>
         ))}
       </NativeSelect.Field>

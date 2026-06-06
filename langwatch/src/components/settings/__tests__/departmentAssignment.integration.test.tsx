@@ -1,29 +1,29 @@
 /**
  * @vitest-environment jsdom
  *
- * Binds the cost-center assignment UI scenarios from
- * specs/ai-gateway/governance/cost-centers.feature: the cost-centers page
- * manages centers and links out, the picker assigns from the members /
- * teams surfaces, and the control only appears once cost centers exist.
+ * Binds the department assignment UI scenarios from
+ * specs/ai-gateway/governance/departments.feature: the departments page
+ * manages departments and links out, the picker assigns from the members /
+ * teams surfaces, and the control only appears once departments exist.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { ffEnabled, costCenterList, assignments, mutations } = vi.hoisted(() => ({
+const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(() => ({
   ffEnabled: { current: true },
-  costCenterList: {
-    current: [{ id: "cc_mkt", name: "Marketing" }] as Array<{
+  departmentList: {
+    current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
       id: string;
       name: string;
     }>,
   },
   assignments: {
     current: {
-      users: [] as Array<{ id: string; name: string; costCenterId: string | null }>,
-      teams: [] as Array<{ id: string; name: string; costCenterId: string | null }>,
-      projects: [] as Array<{ id: string; name: string; costCenterId: string | null }>,
+      users: [] as Array<{ id: string; name: string; departmentId: string | null }>,
+      teams: [] as Array<{ id: string; name: string; departmentId: string | null }>,
+      projects: [] as Array<{ id: string; name: string; departmentId: string | null }>,
     },
   },
   mutations: {
@@ -47,14 +47,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
-      costCenters: {
+      departments: {
         list: { invalidate: vi.fn() },
         assignments: { invalidate: vi.fn() },
       },
     }),
-    costCenters: {
+    departments: {
       list: {
-        useQuery: () => ({ data: costCenterList.current, isLoading: false }),
+        useQuery: () => ({ data: departmentList.current, isLoading: false }),
       },
       assignments: {
         useQuery: () => ({ data: assignments.current, isLoading: false }),
@@ -110,11 +110,11 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
-const { default: CostCentersPage } = await import(
-  "~/pages/settings/governance/cost-centers"
+const { default: DepartmentsPage } = await import(
+  "~/pages/settings/governance/departments"
 );
-const { CostCenterPicker } = await import("../CostCenterPicker");
-const { useCostCenterColumn } = await import("../useCostCenterColumn");
+const { DepartmentPicker } = await import("../DepartmentPicker");
+const { useDepartmentColumn } = await import("../useDepartmentColumn");
 
 function renderWithChakra(node: ReactNode) {
   return render(
@@ -122,21 +122,21 @@ function renderWithChakra(node: ReactNode) {
   );
 }
 
-describe("cost-center assignment UI", () => {
+describe("department assignment UI", () => {
   afterEach(cleanup);
   beforeEach(() => {
     vi.clearAllMocks();
     ffEnabled.current = true;
-    costCenterList.current = [{ id: "cc_mkt", name: "Marketing" }];
+    departmentList.current = [{ id: "dept_mkt", name: "Marketing" }];
     assignments.current = { users: [], teams: [], projects: [] };
   });
 
-  describe("given the cost-centers page", () => {
-    /** @scenario The cost-centers page manages centers and links out to assign them */
-    it("manages centers and links to the members and teams pages instead of listing every person", () => {
-      renderWithChakra(<CostCentersPage />);
+  describe("given the departments page", () => {
+    /** @scenario The departments page manages departments and links out to assign them */
+    it("manages departments and links to the members and teams pages instead of listing every person", () => {
+      renderWithChakra(<DepartmentsPage />);
 
-      expect(screen.getByText("Create a cost center")).toBeDefined();
+      expect(screen.getByText("Create a department")).toBeDefined();
       expect(
         screen.getByRole("link", { name: /People/i }).getAttribute("href"),
       ).toBe("/settings/members");
@@ -154,17 +154,17 @@ describe("cost-center assignment UI", () => {
   });
 
   describe("given a member row on the members page", () => {
-    /** @scenario A member is assigned to a cost center from the members page */
-    it("assigns the chosen cost center to that user", () => {
+    /** @scenario A member is assigned to a department from the members page */
+    it("assigns the chosen department to that user", () => {
       renderWithChakra(
-        <CostCenterPicker
+        <DepartmentPicker
           organizationId="org-1"
           kind="user"
           entityId="user_robin"
           value={null}
-          costCenters={[
+          departments={[
             {
-              id: "cc_mkt",
+              id: "dept_mkt",
               name: "Marketing",
               organizationId: "org-1",
               createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -176,29 +176,29 @@ describe("cost-center assignment UI", () => {
       );
 
       fireEvent.change(screen.getByRole("combobox"), {
-        target: { value: "cc_mkt" },
+        target: { value: "dept_mkt" },
       });
 
       expect(mutations.assignUser).toHaveBeenCalledWith({
         organizationId: "org-1",
         userId: "user_robin",
-        costCenterId: "cc_mkt",
+        departmentId: "dept_mkt",
       });
     });
   });
 
   describe("given a team row on the teams page", () => {
-    /** @scenario A team is assigned to a cost center from the teams page */
-    it("assigns the chosen cost center to that team", () => {
+    /** @scenario A team is assigned to a department from the teams page */
+    it("assigns the chosen department to that team", () => {
       renderWithChakra(
-        <CostCenterPicker
+        <DepartmentPicker
           organizationId="org-1"
           kind="team"
           entityId="team_platform"
           value={null}
-          costCenters={[
+          departments={[
             {
-              id: "cc_eng",
+              id: "dept_eng",
               name: "Engineering",
               organizationId: "org-1",
               createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -210,30 +210,30 @@ describe("cost-center assignment UI", () => {
       );
 
       fireEvent.change(screen.getByRole("combobox"), {
-        target: { value: "cc_eng" },
+        target: { value: "dept_eng" },
       });
 
       expect(mutations.assignTeam).toHaveBeenCalledWith({
         organizationId: "org-1",
         teamId: "team_platform",
-        costCenterId: "cc_eng",
+        departmentId: "dept_eng",
       });
     });
   });
 
   describe("given the governance flag is on", () => {
-    /** @scenario The cost-center control appears only once cost centers are configured */
-    it("hides the control until the first cost center exists, then shows it", () => {
+    /** @scenario The department control appears only once departments are configured */
+    it("hides the control until the first department exists, then shows it", () => {
       function Harness() {
-        const cc = useCostCenterColumn("org-1");
-        return <div data-testid="show">{String(cc.show)}</div>;
+        const dept = useDepartmentColumn("org-1");
+        return <div data-testid="show">{String(dept.show)}</div>;
       }
 
-      costCenterList.current = [];
+      departmentList.current = [];
       const { rerender } = renderWithChakra(<Harness />);
       expect(screen.getByTestId("show").textContent).toBe("false");
 
-      costCenterList.current = [{ id: "cc_mkt", name: "Marketing" }];
+      departmentList.current = [{ id: "dept_mkt", name: "Marketing" }];
       rerender(
         <ChakraProvider value={defaultSystem}>
           <Harness />

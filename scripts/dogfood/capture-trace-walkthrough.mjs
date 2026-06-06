@@ -196,7 +196,7 @@ async function login(page) {
         ["settings/governance", "10-admin-governance-overview"],
         ["settings/governance/ingestion-sources", "11-admin-ingestion-sources"],
         ["settings/governance/tool-catalog", "12-admin-tool-catalog"],
-        ["settings/governance/cost-centers", "13-admin-cost-centers"],
+        ["settings/governance/departments", "13-admin-departments"],
         ["settings/governance/users", "14-admin-users"],
         ["settings/governance/teams", "15-admin-teams"],
         ["settings/governance/anomaly-rules", "16-admin-anomaly-rules"],

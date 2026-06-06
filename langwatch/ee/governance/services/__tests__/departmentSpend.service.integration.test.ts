@@ -1,13 +1,13 @@
 /**
  * @vitest-environment node
  *
- * spendByCostCenter — the bird's-eye widening (the #5 fix). Reads spend
+ * spendByDepartment - the bird's-eye widening (the #5 fix). Reads spend
  * across EVERY project in the org (not just the governance ingestion
- * silo) and rolls it up by the cost center resolved per trace. Seeds
+ * silo) and rolls it up by the department resolved per trace. Seeds
  * ClickHouse directly so the read path is deterministic without the
  * trace pipeline.
  *
- * Binds the @birds-eye scenarios of cost-centers.feature.
+ * Binds the @birds-eye scenarios of departments.feature.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type Organization } from "@prisma/client";
@@ -74,8 +74,8 @@ async function insertTraceSummary(
   });
 }
 
-describe("ActivityMonitorService.spendByCostCenter", () => {
-  const ns = `ccspend-${nanoid(8)}`;
+describe("ActivityMonitorService.spendByDepartment", () => {
+  const ns = `deptspend-${nanoid(8)}`;
   let ch: ClickHouseClient;
   let org: Organization;
   let crossOrg: Organization;
@@ -101,17 +101,17 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
       data: { name: `${ns}-x`, slug: `org-x-${ns}` },
     });
 
-    const engineering = await prisma.costCenter.create({
+    const engineering = await prisma.department.create({
       data: { organizationId: org.id, name: "Engineering" },
     });
-    const marketing = await prisma.costCenter.create({
+    const marketing = await prisma.department.create({
       data: { organizationId: org.id, name: "Marketing" },
     });
     engineeringId = engineering.id;
     marketingId = marketing.id;
-    // Same-named cost center in the other org — proves the rollup keys on
+    // Same-named department in the other org - proves the rollup keys on
     // this org's ids, never a name collision across orgs.
-    const crossEngineering = await prisma.costCenter.create({
+    const crossEngineering = await prisma.department.create({
       data: { organizationId: crossOrg.id, name: "Engineering" },
     });
 
@@ -140,11 +140,11 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
         language: "en",
         framework: "openai",
         apiKey: `key-agent-${ns}`,
-        costCenterId: engineeringId,
+        departmentId: engineeringId,
       },
     });
-    // The personal project has no cost center — robin's personal traces
-    // attribute by robin's own cost center, not the project's.
+    // The personal project has no department - robin's personal traces
+    // attribute by robin's own department, not the project's.
     const personalProject = await prisma.project.create({
       data: {
         name: `personal-${ns}`,
@@ -163,7 +163,7 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
         language: "en",
         framework: "openai",
         apiKey: `key-x-${ns}`,
-        costCenterId: crossEngineering.id,
+        departmentId: crossEngineering.id,
       },
     });
     agentProjectId = agentProject.id;
@@ -178,13 +178,13 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
         organizationId: org.id,
         userId: ROBIN,
         role: "MEMBER",
-        costCenterId: marketingId,
+        departmentId: marketingId,
       },
     });
 
     const inWindow = new Date(Date.now() - 12 * 60 * 60 * 1000);
 
-    // Robin's personal AI use → Marketing (his own cost center).
+    // Robin's personal AI use → Marketing (his own department).
     await insertTraceSummary(ch, personalProjectId, {
       traceId: `tr-robin-${nanoid()}`,
       occurredAt: inWindow,
@@ -198,15 +198,15 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
       totalCost: 3.0,
       attrs: {},
     });
-    // A principal user with no cost center anywhere, in a project with no
-    // cost center → Unassigned.
+    // A principal user with no department anywhere, in a project with no
+    // department → Unassigned.
     await insertTraceSummary(ch, personalProjectId, {
       traceId: `tr-stranger-${nanoid()}`,
       occurredAt: inWindow,
       totalCost: 1.0,
       attrs: { [USER_KEY]: STRANGER_EMAIL },
     });
-    // Cross-org spend under a like-named "Engineering" cost center.
+    // Cross-org spend under a like-named "Engineering" department.
     await insertTraceSummary(ch, crossProjectId, {
       traceId: `tr-cross-${nanoid()}`,
       occurredAt: inWindow,
@@ -226,7 +226,7 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
       .deleteMany({ where: { organizationId: org.id } })
       .catch(() => undefined);
     await prisma.user.deleteMany({ where: { id: ROBIN } }).catch(() => undefined);
-    await prisma.costCenter
+    await prisma.department
       .deleteMany({ where: { organizationId: { in: [org.id, crossOrg.id] } } })
       .catch(() => undefined);
     await prisma.organization
@@ -238,15 +238,15 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
   });
 
   describe("given spend across personal, team, and agent projects", () => {
-    /** @scenario Spend by cost center aggregates across every project in the org */
-    it("rolls personal, agent, and unattributed spend up by cost center across all projects", async () => {
+    /** @scenario Spend by department aggregates across every project in the org */
+    it("rolls personal, agent, and unattributed spend up by department across all projects", async () => {
       const service = ActivityMonitorService.create(prisma);
-      const rows = await service.spendByCostCenter({
+      const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
       });
 
-      const byName = new Map(rows.map((r) => [r.costCenterName, r]));
+      const byName = new Map(rows.map((r) => [r.departmentName, r]));
       expect(byName.get("Engineering")?.spendUsd).toBeCloseTo(3.0, 2);
       expect(byName.get("Marketing")?.spendUsd).toBeCloseTo(2.0, 2);
       expect(byName.get("Unassigned")?.spendUsd).toBeCloseTo(1.0, 2);
@@ -258,36 +258,36 @@ describe("ActivityMonitorService.spendByCostCenter", () => {
     });
   });
 
-  describe("given another org with spend under a like-named cost center", () => {
-    /** @scenario Spend-by-cost-center query stays tenant-isolated */
+  describe("given another org with spend under a like-named department", () => {
+    /** @scenario Spend-by-department query stays tenant-isolated */
     it("never includes the other org's spend in this org's rollup", async () => {
       const service = ActivityMonitorService.create(prisma);
-      const rows = await service.spendByCostCenter({
+      const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
       });
       const total = rows.reduce((sum, r) => sum + r.spendUsd, 0);
-      // The cross-org $50 must not leak — primary's total stays at $6.
+      // The cross-org $50 must not leak - primary's total stays at $6.
       expect(total).toBeLessThan(10);
       // The Engineering row is this org's $3 agent spend, not the cross
-      // org's $50 under its own like-named Engineering center.
-      const engineering = rows.find((r) => r.costCenterId === engineeringId);
+      // org's $50 under its own like-named Engineering department.
+      const engineering = rows.find((r) => r.departmentId === engineeringId);
       expect(engineering?.spendUsd).toBeCloseTo(3.0, 2);
     });
   });
 
-  describe("given members with personal spend in different cost centers", () => {
-    /** @scenario Marketing-versus-engineering comparison reads from cost centers */
-    it("shows each cost center's combined personal and project spend", async () => {
+  describe("given members with personal spend in different departments", () => {
+    /** @scenario Marketing-versus-engineering comparison reads from departments */
+    it("shows each department's combined personal and project spend", async () => {
       const service = ActivityMonitorService.create(prisma);
-      const rows = await service.spendByCostCenter({
+      const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
       });
-      const marketing = rows.find((r) => r.costCenterId === marketingId);
-      const engineering = rows.find((r) => r.costCenterId === engineeringId);
+      const marketing = rows.find((r) => r.departmentId === marketingId);
+      const engineering = rows.find((r) => r.departmentId === engineeringId);
       // Marketing carries robin's personal AI use; Engineering carries the
-      // team's agent project. The comparison reads cost centers, not RBAC.
+      // team's agent project. The comparison reads departments, not RBAC.
       expect(marketing?.spendUsd).toBeCloseTo(2.0, 2);
       expect(engineering?.spendUsd).toBeCloseTo(3.0, 2);
     });

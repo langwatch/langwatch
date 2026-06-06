@@ -21,14 +21,14 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "../MenuLink";
 
 /**
- * Layout for `/governance` — wraps DashboardLayout in `orgScope` mode
+ * Layout for `/governance` - wraps DashboardLayout in `orgScope` mode
  * (no project picker in the header, replaced with an org-name chip
  * + "Organization-scoped" indicator) and renders a thin org-level
  * sub-navigation in the left column.
  *
  * The four sub-routes are admin-config surfaces under `/settings/...`
  * (Ingestion Sources, Anomaly Rules, Routing Policies). They keep
- * SettingsLayout chrome on their own pages — the GovernanceLayout
+ * SettingsLayout chrome on their own pages - the GovernanceLayout
  * left rail is just the entry point for the daily-use home.
  *
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
@@ -99,11 +99,11 @@ export default function GovernanceLayout({
                   Tool Catalog
                 </MenuLink>
                 <MenuLink
-                  href="/settings/governance/cost-centers"
-                  includePath="/settings/governance/cost-centers"
+                  href="/settings/governance/departments"
+                  includePath="/settings/governance/departments"
                   icon={<Wallet size={14} />}
                 >
-                  Cost Centers
+                  Departments
                 </MenuLink>
               </VStack>
               <Box paddingX={3} paddingTop={4}>
