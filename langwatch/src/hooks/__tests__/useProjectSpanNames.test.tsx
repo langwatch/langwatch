@@ -36,7 +36,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames(undefined));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: undefined }));
 
     expect(result.current.spanNames).toEqual([]);
     expect(result.current.metadataKeys).toEqual([]);
@@ -51,7 +51,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.spanNames).toEqual([]);
@@ -71,7 +71,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     expect(result.current.spanNames).toHaveLength(3);
     expect(result.current.spanNames.map((s) => s.key)).toContain(
@@ -92,7 +92,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     expect(result.current.spanNames).toEqual([]);
   });
@@ -104,7 +104,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    renderHook(() => useProjectSpanNames("project-123"));
+    renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,7 +127,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    renderHook(() => useProjectSpanNames(undefined));
+    renderHook(() => useProjectSpanNames({ projectId: undefined }));
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.anything(),
@@ -145,7 +145,7 @@ describe("useProjectSpanNames", () => {
     });
 
     renderHook(() =>
-      useProjectSpanNames("project-123", { enabled: false }),
+      useProjectSpanNames({ projectId: "project-123", enabled: false }),
     );
 
     expect(mockUseQuery).toHaveBeenCalledWith(
@@ -164,7 +164,7 @@ describe("useProjectSpanNames", () => {
     });
 
     renderHook(() =>
-      useProjectSpanNames("project-123", { enabled: true }),
+      useProjectSpanNames({ projectId: "project-123", enabled: true }),
     );
 
     expect(mockUseQuery).toHaveBeenCalledWith(
@@ -183,7 +183,7 @@ describe("useProjectSpanNames", () => {
       error: mockError,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     expect(result.current.error).toBe(mockError);
     expect(result.current.spanNames).toEqual([]);
@@ -203,7 +203,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     const keys = result.current.metadataKeys.map((k) => k.key);
     expect(keys).toContain("user_id");
@@ -227,7 +227,7 @@ describe("useProjectSpanNames", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useProjectSpanNames("project-123"));
+    const { result } = renderHook(() => useProjectSpanNames({ projectId: "project-123" }));
 
     const keys = result.current.metadataKeys.map((k) => k.key);
     expect(keys).not.toContain("custom");

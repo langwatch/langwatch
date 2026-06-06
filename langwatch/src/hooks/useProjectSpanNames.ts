@@ -11,13 +11,16 @@ import { api } from "../utils/api";
  * being mapped) should pass `enabled: false` until it is actually needed.
  *
  * @param projectId - The project ID to fetch field names from
- * @param options.enabled - Gate the query (default true); combined with projectId presence
+ * @param enabled - Gate the query (default true); combined with projectId presence
  * @returns Object with spanNames, metadataKeys arrays, isLoading state, and error if any
  */
-export function useProjectSpanNames(
-  projectId: string | undefined,
-  options?: { enabled?: boolean }
-) {
+export function useProjectSpanNames({
+  projectId,
+  enabled = true,
+}: {
+  projectId: string | undefined;
+  enabled?: boolean;
+}) {
   // Use last 30 days as default date range
   const endDate = useMemo(() => Date.now(), []);
   const startDate = useMemo(
@@ -32,7 +35,7 @@ export function useProjectSpanNames(
       endDate,
     },
     {
-      enabled: !!projectId && (options?.enabled ?? true),
+      enabled: !!projectId && enabled,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     }

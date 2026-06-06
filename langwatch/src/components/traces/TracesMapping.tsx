@@ -224,7 +224,10 @@ export const TracesMapping = ({
     spanNames: projectSpanNames,
     metadataKeys: projectMetadataKeys,
     isLoading: projectFieldNamesLoading,
-  } = useProjectSpanNames(project?.id, { enabled: needsProjectFieldNames });
+  } = useProjectSpanNames({
+    projectId: project?.id,
+    enabled: needsProjectFieldNames,
+  });
 
   // Span / metadata dropdowns should offer every name the project produced in
   // the last 30 days, not just the names on the loaded trace(s) — otherwise a
