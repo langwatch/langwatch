@@ -516,6 +516,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       ? process.env.SHELL!
       : null;
 
+  const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
+
   let child;
   if (aliasShell) {
     const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -523,7 +525,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       ...(modeResult.clears ?? []).map((k) => `unset ${k}`),
       ...Object.entries(modeResult.vars).map(([k, v]) => `export ${k}=${q(v)}`),
     ].join("; ");
-    const command = `${reapply ? `${reapply}; ` : ""}${tool} "$@"`;
+    // Resolve the tool inside the same login shell before handing over so a
+    // missing tool surfaces our actionable message rather than a bare
+    // `command not found`. `command -v` honors the aliases/functions/PATH the
+    // spawn below would use. The direct-spawn branch relies on ENOENT instead.
+    const guard = `command -v -- ${q(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${q(notFoundMessage)} >&2; exit 127; }`;
+    const command = `${reapply ? `${reapply}; ` : ""}${guard}; ${tool} "$@"`;
     child = spawn(aliasShell, ["-i", "-c", command, tool, ...finalArgs], {
       stdio: "inherit",
       env,
@@ -539,9 +546,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   }
   child.on("error", (err) => {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      process.stderr.write(
-        `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)\n`,
-      );
+      process.stderr.write(`${notFoundMessage}\n`);
       process.exit(127);
     }
     process.stderr.write(`exec ${tool}: ${err.message}\n`);
