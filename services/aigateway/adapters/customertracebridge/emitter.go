@@ -311,6 +311,9 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 		if sid := gjson.GetBytes(params.RequestBody, "prompt_cache_key").String(); sid != "" {
 			return sid
 		}
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough:
+		// No inline session id on these request shapes; the header lifted above
+		// (when present) is the only source.
 	}
 	return ""
 }
