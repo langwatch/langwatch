@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GovernanceConfig } from "../config";
 import {
   buildExportBlock,
+  buildOtelExportBlock,
   detectShell,
   isShellAlreadyConfigured,
   persistBlockToRc,
@@ -74,13 +75,13 @@ describe("buildExportBlock", () => {
     // direct CLI invocation. claude-code + cursor prepend /v1 themselves
     // so the /v1-less base is what they need. opencode does NOT prepend
     // /v1 (Vercel AI SDK), so direct `opencode` (without `langwatch`
-    // wrapper) would 404 against shell-rc'd vars — opencode users must
+    // wrapper) would 404 against shell-rc'd vars - opencode users must
     // route through the wrapper, which sets the /v1-suffixed values
     // per-tool. Documented gap; same as gemini-via-shell-rc requiring
     // `langwatch gemini` for telemetry capture.
     const matches = block.match(/^export ANTHROPIC_BASE_URL=/gm) ?? [];
     expect(matches.length).toBe(1);
-    // No OTEL_*_EXPORTER injection — the wrapper is gateway-only.
+    // No OTEL_*_EXPORTER injection - the wrapper is gateway-only.
     // The gateway captures full I/O server-side, so injecting OTEL
     // would double-trace. Path A install (OTLP) is a separate flow.
     expect(block).not.toMatch(/OTEL_TRACES_EXPORTER/);
@@ -98,6 +99,54 @@ describe("buildExportBlock", () => {
       default_personal_vk: undefined,
     };
     expect(buildExportBlock(noVk, "zsh")).toBe("");
+  });
+});
+
+describe("buildOtelExportBlock", () => {
+  // The exact OTEL_* env block the Path B wrapper computes for a claude
+  // run. Shape mirrors buildOtelEnvBlock in wrapper-mode.ts.
+  const otelVars: Record<string, string> = {
+    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+    OTEL_TRACES_EXPORTER: "otlp",
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+    OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-token",
+    OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
+  };
+
+  describe("given a zsh shell", () => {
+    it("emits one export line per env var, order preserved, header value quoted", () => {
+      const block = buildOtelExportBlock(otelVars, "zsh");
+      const lines = block.split("\n");
+      expect(lines[0]).toBe("export CLAUDE_CODE_ENABLE_TELEMETRY=1");
+      expect(lines).toContain("export OTEL_TRACES_EXPORTER=otlp");
+      expect(lines).toContain(
+        "export OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+      );
+      // The header value has a space, so it must be single-quoted.
+      expect(block).toContain(
+        "export OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'",
+      );
+      // service.name attr has no whitespace -> no quoting needed.
+      expect(block).toContain(
+        "export OTEL_RESOURCE_ATTRIBUTES=service.name=claude-code",
+      );
+    });
+  });
+
+  describe("given a fish shell", () => {
+    it("emits set -gx lines instead of export", () => {
+      const block = buildOtelExportBlock(otelVars, "fish");
+      expect(block).toMatch(/^set -gx CLAUDE_CODE_ENABLE_TELEMETRY 1/m);
+      expect(block).toContain(
+        "set -gx OTEL_EXPORTER_OTLP_HEADERS 'Authorization=Bearer sk-lw-token'",
+      );
+    });
+  });
+
+  describe("given an empty env map", () => {
+    it("returns an empty string", () => {
+      expect(buildOtelExportBlock({}, "zsh")).toBe("");
+    });
   });
 });
 
@@ -164,7 +213,7 @@ describe("persistBlockToRc", () => {
     expect(content).toMatch(/export FOO=bar/);
   });
 
-  it("is idempotent — a second run replaces the block in place, not duplicates it", () => {
+  it("is idempotent - a second run replaces the block in place, not duplicates it", () => {
     persistBlockToRc("zsh", "export FOO=bar");
     persistBlockToRc("zsh", "export FOO=baz");
     const content = fs.readFileSync(rcPath("zsh"), "utf8");
@@ -173,5 +222,30 @@ describe("persistBlockToRc", () => {
     expect(beginCount).toBe(1);
     expect(content).toMatch(/export FOO=baz/);
     expect(content).not.toMatch(/export FOO=bar/);
+  });
+
+  it("re-writing the OTEL telemetry block replaces it in place, never duplicating", () => {
+    const first = buildOtelExportBlock(
+      {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-old",
+      },
+      "zsh",
+    );
+    const second = buildOtelExportBlock(
+      {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-new",
+      },
+      "zsh",
+    );
+    persistBlockToRc("zsh", first);
+    persistBlockToRc("zsh", second);
+    const content = fs.readFileSync(rcPath("zsh"), "utf8");
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
+      .length;
+    expect(beginCount).toBe(1);
+    expect(content).toContain("Authorization=Bearer sk-lw-new");
+    expect(content).not.toContain("sk-lw-old");
   });
 });

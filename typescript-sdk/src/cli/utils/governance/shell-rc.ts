@@ -5,8 +5,8 @@
  * `langwatch <tool>` as a wrapper.
  *
  * Spec for bug-bash item 1:
- *   1.2 — after login, OFFER to persist the export block. Y/n/never.
- *   1.3 — Remember choice. Stay quiet inside an already-configured
+ *   1.2 - after login, OFFER to persist the export block. Y/n/never.
+ *   1.3 - Remember choice. Stay quiet inside an already-configured
  *         shell (env already has the gateway vars set).
  *
  * Design notes:
@@ -15,7 +15,7 @@
  *     blocks).
  *   - "never" persists `shell_rc_preference: "skip"` on the config
  *     so future logins on this machine stay quiet.
- *   - "not now" (n) does NOT persist — the next login re-asks. The
+ *   - "not now" (n) does NOT persist - the next login re-asks. The
  *     in-shell quietness comes from the already-configured detect.
  *   - Detect "already configured" by checking process.env for both
  *     ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN. If either is
@@ -46,7 +46,7 @@ export type DetectedShell = "zsh" | "bash" | "fish";
  * Best-effort shell detection from $SHELL. Falls back to zsh on
  * macOS (default since Catalina) and bash on Linux. Returns null
  * when running under an unsupported shell (cmd, powershell, etc.)
- * — the persist flow skips entirely in that case.
+ * - the persist flow skips entirely in that case.
  */
 export function detectShell(): DetectedShell | null {
   const raw = (process.env.SHELL ?? "").toLowerCase();
@@ -114,6 +114,29 @@ function quote(s: string): string {
 }
 
 /**
+ * Format an env-var map into a shell export block (body only, no
+ * begin/end markers) for the given shell. fish uses `set -gx KEY VALUE`;
+ * posix shells (zsh / bash) use `export KEY=VALUE`. Values are quoted via
+ * the same posix-safe quoter the rest of this module uses.
+ *
+ * Used for the Path B (ingestion) telemetry exports: pass the exact
+ * OTEL_EXPORTER_OTLP_* env the wrapper computed for the run so a plain
+ * `<tool>` (without the `langwatch` prefix) inherits it. Order follows
+ * the map's insertion order so the block is stable across runs.
+ */
+export function buildOtelExportBlock(
+  vars: Record<string, string>,
+  shell: DetectedShell,
+): string {
+  const entries = Object.entries(vars);
+  const fmt =
+    shell === "fish"
+      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
+      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
+  return entries.map(fmt).join("\n");
+}
+
+/**
  * Append (or replace, if the marker block already exists) the
  * export block to the shell rc file. Creates the file if missing.
  * Idempotent: a second run replaces the block in place rather
@@ -134,7 +157,7 @@ export function persistBlockToRc(
   try {
     existing = fs.readFileSync(file, "utf8");
   } catch {
-    // ENOENT — fresh file
+    // ENOENT - fresh file
   }
 
   const marker = new RegExp(
@@ -194,7 +217,7 @@ export async function askPersistChoice(
  * so the user can install the tool's OTLP telemetry exports into their
  * shell rc. Once persisted, a plain `<tool>` invocation (without the
  * `langwatch` wrapper) inherits the OTEL_EXPORTER_OTLP_* env and captures
- * automatically — which is the whole point of "installing" the telemetry.
+ * automatically - which is the whole point of "installing" the telemetry.
  *
  * Unlike the login-time gateway offer, this persists the exact OTEL env
  * the wrapper just computed for this run (`vars`), not the gateway block.
@@ -211,18 +234,13 @@ export async function maybeOfferIngestionShellRcPersist({
   vars: Record<string, string>;
 }): Promise<void> {
   if (cfg.shell_rc_preference === "skip") return;
-  // Already wired up — the OTLP exporter env is present in this shell.
+  // Already wired up - the OTLP exporter env is present in this shell.
   if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
   const shell = detectShell();
   if (!shell) return;
-  const entries = Object.entries(vars);
-  if (entries.length === 0) return;
+  if (Object.keys(vars).length === 0) return;
 
-  const fmt =
-    shell === "fish"
-      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
-      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
-  const block = entries.map(fmt).join("\n");
+  const block = buildOtelExportBlock(vars, shell);
 
   const target = rcPath(shell);
   console.log();

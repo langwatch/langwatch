@@ -8,7 +8,7 @@
  *
  * On Unix we use spawn() with stdio:'inherit'; signals (Ctrl-C,
  * SIGTERM) propagate via the child process group. We do NOT use
- * execve replacement — Node's child_process never replaces the
+ * execve replacement - Node's child_process never replaces the
  * current process, but this is functionally equivalent for the
  * end-user (same exit code, same terminal handling) and works on
  * Windows where execve doesn't exist.
@@ -18,10 +18,12 @@ import { spawn } from "node:child_process";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
-import { getCliBootstrap } from "./cli-api";
+import { getCliBootstrap, GovernanceCliError } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
+import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
+import { parseLwPath, resolveWrapperPath } from "./wrapper-path-choice";
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -32,7 +34,7 @@ export interface ToolEnv {
    * user has exported in their shell (e.g. ANTHROPIC_API_KEY set
    * from a previous direct-Anthropic workflow) that would otherwise
    * race with the gateway-routed auth (ANTHROPIC_AUTH_TOKEN) we
-   * inject — claude-code 2.x detects both and warns
+   * inject - claude-code 2.x detects both and warns
    * "auth may not work as expected", so we have to actively unset
    * the conflicting twin rather than just pile on top of it.
    * Unset BEFORE the merge so a tool that intentionally sets both
@@ -123,7 +125,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
       // to the configured base URL WITHOUT prepending `/v1`. So opencode
       // needs the base to ALREADY include `/v1`, unlike claude-code +
       // codex which append it themselves. Verified via `--log-level
-      // DEBUG` — opencode hit `${ANTHROPIC_BASE_URL}/messages` and
+      // DEBUG` - opencode hit `${ANTHROPIC_BASE_URL}/messages` and
       // got a gateway 404 because the gateway exposes `/v1/messages`.
       //
       // Also: opencode's provider auto-detection at init time gates on
@@ -149,7 +151,7 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
 
 /**
  * Provider families the tool needs upstream. Used by `preflightWrapper`
- * to verify the org has at least one matching provider configured —
+ * to verify the org has at least one matching provider configured -
  * otherwise the gateway can authenticate the VK but has nothing to
  * route the request to, surfacing as a confusing tool-side error.
  *
@@ -194,11 +196,11 @@ function renderContactFooter(adminEmail: string | null | undefined): string {
  * Pre-exec probe for `langwatch <tool>` wrappers. Three layered checks,
  * each gracefully degrading rather than blocking on transient hiccups:
  *
- *   1. `cfg.default_personal_vk?.secret` present — without it the
+ *   1. `cfg.default_personal_vk?.secret` present - without it the
  *      wrapper would silently inject no env vars and the underlying
  *      tool would call the upstream provider directly (api.anthropic.com
- *      etc.), surfacing as the wrong error or — when there's stale
- *      env from a prior session — a confusing ConnectionRefused
+ *      etc.), surfacing as the wrong error or - when there's stale
+ *      env from a prior session - a confusing ConnectionRefused
  *      against a stale base URL.
  *   2. `GET <gateway_url>/healthz` reachable. Catches "data plane not
  *      running" and bad `LANGWATCH_GATEWAY_URL` overrides. Fatal: if
@@ -341,12 +343,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       process.exit(1);
     }
     if (!isLoggedIn(cfg)) {
-      process.stderr.write("login did not complete — exiting\n");
+      process.stderr.write("login did not complete - exiting\n");
       process.exit(1);
     }
   }
 
-  // Budget pre-check — render Screen-8 box + exit 2 BEFORE exec.
+  // Budget pre-check - render Screen-8 box + exit 2 BEFORE exec.
   const exceeded = await checkBudget(cfg);
   if (exceeded) {
     process.stderr.write(renderBudgetExceeded(exceeded));
@@ -356,10 +358,32 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         saveConfig(cfg);
       } catch {
         // Config write failure shouldn't change the spec'd exit
-        // code — the next `langwatch request-increase` falls back
+        // code - the next `langwatch request-increase` falls back
         // to the static page.
       }
     }
+    process.exit(2);
+  }
+
+  // Strip the wrapper-only `--lw-path` flag from the args BEFORE anything
+  // forwards them to the real tool, and resolve any explicit override.
+  // Everything else stays verbatim + in order for the child invocation.
+  const { args: toolArgs, override: pathOverride } = parseLwPath(args);
+
+  // Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
+  // (and remembers the answer) only when the org policy allows BOTH paths,
+  // stdin/stdout is a TTY, and there's no pinned preference / override.
+  // Runs BEFORE env injection + spawn so the prompt owns stdin.
+  let pathChoice;
+  try {
+    pathChoice = await resolveWrapperPath({
+      cfg,
+      tool,
+      args: toolArgs,
+      override: pathOverride,
+    });
+  } catch (err) {
+    process.stderr.write(`path selection failed: ${(err as Error).message}\n`);
     process.exit(2);
   }
 
@@ -368,10 +392,48 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   const gatewayClears = toolEnv.clears ?? [];
   let modeResult;
   try {
-    modeResult = await resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears);
+    modeResult = await resolveWrapperMode(
+      cfg,
+      tool,
+      gatewayVars,
+      gatewayClears,
+      pathChoice.mode,
+    );
   } catch (err) {
-    process.stderr.write(`mode resolution failed: ${(err as Error).message}\n`);
-    process.exit(2);
+    // Path B (ingestion) setup can fail at mint time - e.g. the user has
+    // no personal workspace yet, or the control plane is unreachable. If
+    // the gateway path is allowed for this tool, surface a clear message
+    // and fall back to it rather than dead-ending. The both-paths-off
+    // `tool_disabled` policy error is NOT a mint failure, so it never
+    // falls back; it exits with the admin hint.
+    const isToolDisabled =
+      err instanceof GovernanceCliError && err.code === "tool_disabled";
+    const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
+    if (pathChoice.mode === "ingestion" && policy.allowVk && !isToolDisabled) {
+      process.stderr.write(
+        `langwatch: couldn't set up direct OTLP ingestion for ${tool} ` +
+          `(${(err as Error).message}). Falling back to the gateway path.\n`,
+      );
+      try {
+        modeResult = await resolveWrapperMode(
+          cfg,
+          tool,
+          gatewayVars,
+          gatewayClears,
+          "gateway",
+        );
+      } catch (err2) {
+        process.stderr.write(
+          `mode resolution failed: ${(err2 as Error).message}\n`,
+        );
+        process.exit(2);
+      }
+    } else {
+      process.stderr.write(
+        `mode resolution failed: ${(err as Error).message}\n`,
+      );
+      process.exit(2);
+    }
   }
 
   // Surface any platform-policy path change (e.g. the org admin turned
@@ -435,11 +497,14 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     delete parentEnv[key];
   }
   const env = { ...parentEnv, ...modeResult.vars };
-  const finalArgs = [...(modeResult.extraArgs ?? []), ...args];
+  // Forward the user's args verbatim and in order, minus the stripped
+  // wrapper flag (`--lw-path`). Any mode-specific prepends (e.g. codex
+  // `--profile langwatch-gateway`) lead.
+  const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
   // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
   // bare spawn() can't resolve them without a shell. shell:true is safe
   // here because `tool` is whitelisted (claude/codex/cursor/gemini) and
-  // `args` is forwarded from the user's own terminal invocation — same
+  // `args` is forwarded from the user's own terminal invocation - same
   // trust boundary as if they'd typed `claude …` directly.
   const child = spawn(tool, finalArgs, {
     stdio: "inherit",
@@ -449,7 +514,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   child.on("error", (err) => {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       process.stderr.write(
-        `${tool} not found in PATH — install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)\n`,
+        `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)\n`,
       );
       process.exit(127);
     }
