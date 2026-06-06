@@ -18,16 +18,22 @@
  * to stored_log_records (no double-write, no double-count): the span is the
  * single source of truth.
  *
- * Every OTHER claude_code event (user_prompt, hook_*, mcp_server_connection,
- * plugin_loaded, any unknown event.name) stays on the normal log path,
- * untouched — see CLAUDE_CODE_CONVERTIBLE_EVENTS.
+ * The claude_code tool events (tool_decision / tool_result) are trapped too
+ * and converted into `tool` spans (one per tool_use_id) by
+ * convertClaudeCodeToolLogsToSpans, so the agent's Bash / Edit / Read calls
+ * show up as waterfall nodes. Every OTHER claude_code event (user_prompt,
+ * hook_*, mcp_server_connection, plugin_loaded, any unknown event.name) stays
+ * on the normal log path, untouched — see CLAUDE_CODE_CONVERTIBLE_EVENTS /
+ * CLAUDE_CODE_TOOL_EVENTS.
  *
- * Join determinism (both keys verified against real OTLP on 2026-06-05):
- *   - OUTPUT: api_request <-> api_response_body by exact request_id (both carry it).
- *   - INPUT:  api_request <-> api_request_body by (model, query_source) consume-once
- *             in time order — api_request_body has NO request_id on the wire, and
- *             query_source is part of the key so a generate_session_title body can
- *             never cross-pair with a repl_main_thread request.
+ * Join determinism (verified against real OTLP):
+ *   - OUTPUT: api_request <-> api_response_body by exact request_id (both carry
+ *             it). Both are logged at call END, so they co-batch and join.
+ *   - INPUT:  api_request <-> api_request_body by (model, query_source)
+ *             consume-once in time order — api_request_body has NO request_id on
+ *             the wire, and query_source is part of the key so a
+ *             generate_session_title body never cross-pairs with a
+ *             repl_main_thread request.
  *
  * Cost: handled entirely by the existing span pipeline. Anthropic models are on
  * our static price table, so computeSpanCost prices the span from tokens
@@ -35,13 +41,21 @@
  * existing reserved fallback key (priority 3), so a future claude model not yet
  * on the table is still costed from Anthropic's own figure. No pipeline change.
  *
- * Known v1 limitation (cross-batch): claude logs the three events synchronously
- * post-response, so they co-batch and join in-request. A retry/network reorder
- * that splits the triplet across OTLP export batches yields orphan parts; each
- * orphan still becomes its own gen_ai span (marked `claude_code.orphan=true`) so
- * nothing is silently dropped — it just isn't collapsed into one span for that
- * turn. Cross-batch dedup is a tracked follow-up, not a silent loss.
+ * Cross-batch split: api_request_body is logged at call START, the api_request
+ * anchor + api_response_body at call END. For any call longer than the OTLP
+ * export interval (every tool-using turn) the body lands in a different export
+ * batch than its anchor, and with no request_id it can't be re-paired across
+ * batches. An orphan body is therefore DROPPED rather than emitted as a
+ * duplicate, input-less span: the turn's input is already on the trace via the
+ * co-batched user_prompt event, and the tool spans show what the call did.
+ * Anchor + response co-batch (both at call END), so the output stays joined; a
+ * rare orphan response still becomes its own marked span (claude_code.orphan)
+ * rather than lose the reply. Restoring per-span input on cross-batch-split
+ * calls would need a stateful join buffer — a tracked follow-up, deliberately
+ * not new receiver-side Redis state.
  */
+
+import { createHash } from "node:crypto";
 
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type {
@@ -70,6 +84,25 @@ export const CLAUDE_CODE_CONVERTIBLE_EVENTS: ReadonlySet<string> = new Set([
   "api_response_body",
 ]);
 
+/**
+ * The two claude_code log events that describe one tool invocation and are
+ * trapped+converted into a single `tool` span: `tool_decision` (the moment
+ * claude chose to run a tool — permission decision + source) and
+ * `tool_result` (the terminal event carrying tool name, input, duration, and
+ * success). Without this the Bash/Edit/Read calls a coding turn makes never
+ * appear as waterfall nodes — the trace shows the model spans but not what
+ * the agent actually DID, which is most of the value of an agent trace.
+ *
+ * Paired by `tool_use_id` (both carry it). The tool_result alone is enough to
+ * build a complete span; tool_decision only enriches it with the
+ * permission-decision provenance, so a cross-batch split that separates the
+ * two still yields a usable tool span.
+ */
+export const CLAUDE_CODE_TOOL_EVENTS: ReadonlySet<string> = new Set([
+  "tool_decision",
+  "tool_result",
+]);
+
 export function isClaudeCodeConvertibleLog(
   scopeName: string,
   eventName: string | undefined,
@@ -78,6 +111,17 @@ export function isClaudeCodeConvertibleLog(
     scopeName === CLAUDE_CODE_EVENT_SCOPE &&
     eventName !== undefined &&
     CLAUDE_CODE_CONVERTIBLE_EVENTS.has(eventName)
+  );
+}
+
+export function isClaudeCodeToolLog(
+  scopeName: string,
+  eventName: string | undefined,
+): boolean {
+  return (
+    scopeName === CLAUDE_CODE_EVENT_SCOPE &&
+    eventName !== undefined &&
+    CLAUDE_CODE_TOOL_EVENTS.has(eventName)
   );
 }
 
@@ -219,13 +263,23 @@ function convertOneTrace(
     spans.push(buildCollapsedSpan(anchor, body, response, promptTextById));
   }
 
-  // Orphans (cross-batch split): emit each remaining part as its own marked
-  // span so no converted content is silently dropped.
-  bodies.forEach((body, i) => {
-    if (!usedBodies.has(i)) spans.push(buildOrphanSpan(body, promptTextById));
-  });
+  // Orphan api_request_body (cross-batch split): claude logs the request body
+  // at call START and the api_request anchor at call END, so for any call
+  // longer than the OTLP export interval (every tool-using turn) the body and
+  // anchor land in different batches and the body can't pair — it carries no
+  // request_id to converge on. Emitting it as its own span produced a
+  // confusing DUPLICATE of the model call (input but no tokens/cost/output)
+  // that also sorted before the anchor in the waterfall ("output earlier than
+  // input"). Drop it: the turn's input is already on the trace via the
+  // co-batched `user_prompt` event, and the tool spans show what the call did.
+  // (Restoring per-span input on cross-batch-split calls needs a stateful join
+  // buffer — a tracked follow-up, deliberately not new receiver-side state.)
+
+  // Orphan api_response_body: the response is logged at call END alongside the
+  // anchor, so it rarely splits; when it does it still carries the assistant's
+  // reply, so emit it as its own marked span rather than lose the output.
   responses.forEach((response, i) => {
-    if (!usedResponses.has(i)) spans.push(buildOrphanSpan(response, promptTextById));
+    if (!usedResponses.has(i)) spans.push(buildOrphanResponseSpan(response));
   });
 
   return spans;
@@ -320,6 +374,25 @@ function resolveInputMessages(
   return JSON.stringify(capped);
 }
 
+/**
+ * The span's waterfall name. Conversational turns are named by model (matching
+ * the gateway / Path A convention). Non-conversational utility calls
+ * (generate_session_title, prompt_suggestion, …) are named by their
+ * query_source instead: a turn fans out into the main reply PLUS a couple of
+ * these housekeeping calls, and naming all of them "claude-opus-4-8" left the
+ * waterfall with mysterious-looking model spans that carry no conversation. The
+ * query_source name says what the call was FOR.
+ */
+function claudeSpanName(
+  model: string | null,
+  querySource: string | null,
+): string {
+  if (querySource && !isConversationalQuerySource(querySource)) {
+    return querySource;
+  }
+  return model ?? "llm";
+}
+
 function buildCollapsedSpan(
   anchor: ClaudeCodeLogRecordInput,
   body: ClaudeCodeLogRecordInput | null,
@@ -395,7 +468,7 @@ function buildCollapsedSpan(
     span: makeSpan({
       traceId: anchor.traceId,
       spanId: anchor.spanId,
-      name: model ?? "llm",
+      name: claudeSpanName(model, asNonEmpty(anchor.attrs.query_source)),
       startMs,
       endMs,
       attributes: attrs,
@@ -405,9 +478,16 @@ function buildCollapsedSpan(
   };
 }
 
-function buildOrphanSpan(
+/**
+ * Build a marked span for an orphan api_response_body — a response whose
+ * api_request anchor landed in a different export batch. Rare, because the
+ * response and anchor are both logged at call END and so co-batch; when it
+ * does split, the response still carries the assistant's reply, so it becomes
+ * its own span rather than losing the output. The `claude_code.orphan` marker
+ * distinguishes it from a fully-joined call.
+ */
+function buildOrphanResponseSpan(
   record: ClaudeCodeLogRecordInput,
-  promptTextById: ReadonlyMap<string, string>,
 ): SynthesizedClaudeSpan {
   const attrs = baseAttrs(record);
   attrs.push(boolAttr("claude_code.orphan", true));
@@ -421,20 +501,11 @@ function buildOrphanSpan(
 
   appendProvenanceAttrs(attrs, record);
 
-  if (record.eventName === "api_request_body") {
-    const inputMessages = resolveInputMessages(record, promptTextById);
-    if (inputMessages) {
-      attrs.push(strAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages));
-    }
-  } else if (record.eventName === "api_response_body") {
-    const querySource = asNonEmpty(record.attrs.query_source);
-    if (isConversationalQuerySource(querySource)) {
-      const outputText = extractAssistantTextFromResponseBody(
-        record.attrs.body,
-      );
-      if (outputText) {
-        attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
-      }
+  const querySource = asNonEmpty(record.attrs.query_source);
+  if (isConversationalQuerySource(querySource)) {
+    const outputText = extractAssistantTextFromResponseBody(record.attrs.body);
+    if (outputText) {
+      attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
     }
   }
 
@@ -443,7 +514,7 @@ function buildOrphanSpan(
     span: makeSpan({
       traceId: record.traceId,
       spanId: record.spanId,
-      name: model ?? "llm",
+      name: claudeSpanName(model, querySource),
       startMs: record.timeUnixMs,
       endMs: record.timeUnixMs,
       attributes: attrs,
@@ -483,5 +554,165 @@ function makeSpan({
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+  };
+}
+
+/**
+ * tool_decision / tool_result attributes already lifted onto canonical
+ * gen_ai.tool.* keys (or used for timing). Everything else is copied verbatim
+ * under `claude_code.*` so no tool telemetry claude emits (success,
+ * duration_ms, decision, *_size_bytes, …) is dropped.
+ */
+const CLAUDE_TOOL_HANDLED_ATTRS = new Set<string>([
+  "tool_name", // -> gen_ai.tool.name + span name
+  "tool_use_id", // -> gen_ai.tool.call.id
+  "tool_input", // -> gen_ai.tool.call.arguments
+  "tool_parameters", // -> gen_ai.tool.call.arguments (fallback)
+  "session.id", // -> gen_ai.conversation.id + langwatch.thread.id
+  "service.name", // already implied (claude_code)
+  "event.name",
+]);
+
+/**
+ * Convert claude_code tool events (tool_decision + tool_result) into `tool`
+ * spans — one per tool invocation, keyed by `tool_use_id`. Without these the
+ * waterfall shows the model calls but never the Bash / Edit / Read invocations
+ * the agent actually ran, which is most of the value of an agent trace. See
+ * CLAUDE_CODE_TOOL_EVENTS.
+ *
+ * The command lands on `gen_ai.tool.call.arguments`, NOT `langwatch.input`: a
+ * synthesized claude span is parentless (a "root" to the trace-IO fold), and
+ * that fold reads langwatch.input / gen_ai.input.messages — putting the shell
+ * command there would hijack the trace's headline input (the exact
+ * subagent-pollution failure the user_prompt gate already guards against). The
+ * gen_ai.tool.* keys keep the command on the span for the drawer without
+ * touching the trace summary.
+ */
+export function convertClaudeCodeToolLogsToSpans(
+  records: ClaudeCodeLogRecordInput[],
+): SynthesizedClaudeSpan[] {
+  const byTrace = new Map<string, ClaudeCodeLogRecordInput[]>();
+  for (const record of records) {
+    const list = byTrace.get(record.traceId);
+    if (list) list.push(record);
+    else byTrace.set(record.traceId, [record]);
+  }
+
+  const out: SynthesizedClaudeSpan[] = [];
+  for (const traceRecords of byTrace.values()) {
+    // Pair decision + result by tool_use_id. Either may be absent on a
+    // cross-batch split; tool_result alone is enough for a complete span.
+    const byToolUseId = new Map<
+      string,
+      {
+        decision: ClaudeCodeLogRecordInput | null;
+        result: ClaudeCodeLogRecordInput | null;
+      }
+    >();
+    for (const record of [...traceRecords].sort(bySequence)) {
+      const toolUseId = asNonEmpty(record.attrs.tool_use_id);
+      if (!toolUseId) continue;
+      const entry = byToolUseId.get(toolUseId) ?? {
+        decision: null,
+        result: null,
+      };
+      if (record.eventName === "tool_result") entry.result = record;
+      else if (record.eventName === "tool_decision") entry.decision = record;
+      byToolUseId.set(toolUseId, entry);
+    }
+
+    for (const [toolUseId, { decision, result }] of byToolUseId) {
+      const span = buildToolSpan(toolUseId, decision, result);
+      if (span) out.push(span);
+    }
+  }
+  return out;
+}
+
+function buildToolSpan(
+  toolUseId: string,
+  decision: ClaudeCodeLogRecordInput | null,
+  result: ClaudeCodeLogRecordInput | null,
+): SynthesizedClaudeSpan | null {
+  // tool_result is the terminal event and carries name + input + duration +
+  // success, so it's the primary; tool_decision only enriches with the
+  // permission-decision provenance.
+  const primary = result ?? decision;
+  if (!primary) return null;
+
+  const toolName =
+    asNonEmpty(result?.attrs.tool_name) ??
+    asNonEmpty(decision?.attrs.tool_name) ??
+    "tool";
+
+  const attrs: OtlpKeyValue[] = [
+    strAttr(ATTR_KEYS.SPAN_TYPE, "tool"),
+    strAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, "execute_tool"),
+    strAttr(ATTR_KEYS.GEN_AI_TOOL_NAME, toolName),
+    strAttr(ATTR_KEYS.GEN_AI_TOOL_CALL_ID, toolUseId),
+  ];
+
+  const sessionId =
+    asNonEmpty(result?.attrs["session.id"]) ??
+    asNonEmpty(decision?.attrs["session.id"]);
+  if (sessionId) {
+    attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId));
+    attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
+  }
+
+  // The actual command / params. tool_input (on tool_result) is the clean tool
+  // call; tool_parameters is the fallback.
+  const callArguments =
+    asNonEmpty(result?.attrs.tool_input) ??
+    asNonEmpty(decision?.attrs.tool_parameters) ??
+    asNonEmpty(result?.attrs.tool_parameters);
+  if (callArguments) {
+    attrs.push(
+      strAttr(
+        ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS,
+        capPayloadString(callArguments, undefined, "claude_tool_arguments"),
+      ),
+    );
+  }
+
+  // Every remaining tool attribute (success, duration_ms, decision,
+  // *_size_bytes, …) under claude_code.*. Merge decision-then-result so the
+  // result's value wins on overlap and no key is emitted twice.
+  const merged: Record<string, string> = {
+    ...(decision?.attrs ?? {}),
+    ...(result?.attrs ?? {}),
+  };
+  for (const [key, value] of Object.entries(merged)) {
+    if (CLAUDE_TOOL_HANDLED_ATTRS.has(key)) continue;
+    const clean = asNonEmpty(value);
+    if (clean) attrs.push(strAttr(`claude_code.${key}`, clean));
+  }
+
+  // Timing: tool_result.duration_ms anchored at the result time; without a
+  // result, the decision time (zero-duration).
+  const endMs = primary.timeUnixMs;
+  const durationMs = asNumber(result?.attrs.duration_ms) ?? 0;
+  const startMs = result
+    ? Math.max(0, endMs - durationMs)
+    : (decision?.timeUnixMs ?? endMs);
+
+  // Deterministic id from tool_use_id so decision + result converge on one
+  // span (idempotent under re-ingest through the stored_spans RMT).
+  const spanId = createHash("sha256")
+    .update(`${primary.traceId}:tool:${toolUseId}`)
+    .digest("hex")
+    .slice(0, 16);
+
+  return {
+    span: makeSpan({
+      traceId: primary.traceId,
+      spanId,
+      name: toolName,
+      startMs,
+      endMs,
+      attributes: attrs,
+    }),
+    resource: primary.resource,
+    instrumentationScope: primary.instrumentationScope,
   };
 }

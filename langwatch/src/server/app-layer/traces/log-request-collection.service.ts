@@ -24,7 +24,9 @@ import {
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
+  convertClaudeCodeToolLogsToSpans,
   isClaudeCodeConvertibleLog,
+  isClaudeCodeToolLog,
 } from "./claude-code-log-to-span";
 
 /**
@@ -93,6 +95,12 @@ export class LogRequestCollectionService {
         // written to stored_log_records (no double-write). See
         // claude-code-log-to-span.ts.
         const claudeConvertibles: ClaudeCodeLogRecordInput[] = [];
+
+        // claude_code tool log records (tool_decision / tool_result) are
+        // trapped here and converted into `tool` spans after the loop, so the
+        // Bash / Edit / Read calls a turn makes appear as waterfall nodes.
+        // Also kept off the log path (the span is the single source of truth).
+        const claudeToolConvertibles: ClaudeCodeLogRecordInput[] = [];
 
         // Clean user-typed text per prompt.id, harvested from the co-batched
         // claude_code `user_prompt` events (which stay on the log path). The
@@ -206,6 +214,21 @@ export class LogRequestCollectionService {
                   continue;
                 }
 
+                // claude_code tool events: trap + convert to a `tool` span
+                // after the loop; do NOT write them as log records.
+                if (isClaudeCodeToolLog(scopeName, logAttrs["event.name"])) {
+                  claudeToolConvertibles.push({
+                    traceId,
+                    spanId,
+                    timeUnixMs,
+                    eventName: logAttrs["event.name"]!,
+                    attrs: logAttrs,
+                    resource: otlpResource,
+                    instrumentationScope: otlpScope,
+                  });
+                  continue;
+                }
+
                 await this.deps.recordLog({
                   tenantId,
                   traceId,
@@ -238,17 +261,21 @@ export class LogRequestCollectionService {
           }
         }
 
-        // Convert the trapped claude_code model-call logs into gen_ai spans
+        // Convert the trapped claude_code model-call + tool logs into spans
         // and feed them through the normal span pipeline. The existing span
-        // fold lifts model / tokens / cost / input / output.
+        // fold lifts model / tokens / cost / input / output; tool spans surface
+        // the agent's Bash / Edit / Read invocations in the waterfall.
         let convertedSpanCount = 0;
-        if (claudeConvertibles.length > 0) {
-          const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
-          const spans = convertClaudeCodeLogsToSpans(
+        const synthesizedSpans = [
+          ...convertClaudeCodeLogsToSpans(
             claudeConvertibles,
             claudePromptTextById,
-          );
-          for (const synthesized of spans) {
+          ),
+          ...convertClaudeCodeToolLogsToSpans(claudeToolConvertibles),
+        ];
+        if (synthesizedSpans.length > 0) {
+          const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
+          for (const synthesized of synthesizedSpans) {
             try {
               await this.deps.recordSpan({
                 tenantId,

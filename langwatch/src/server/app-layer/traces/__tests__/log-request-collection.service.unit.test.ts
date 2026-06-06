@@ -442,6 +442,47 @@ describe("LogRequestCollectionService", () => {
       expect(recordSpan).toHaveBeenCalledTimes(1);
     });
 
+    it("drops tool events from the log path and emits a tool span instead", async () => {
+      const { service, recordLog, recordSpan } = makeService();
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: scopeLogs([
+          {
+            timeUnixNano: "1700000002000000000",
+            body: { stringValue: "claude_code.tool_result" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "tool_result" } },
+              { key: "session.id", value: { stringValue: "sess_conv" } },
+              { key: "prompt.id", value: { stringValue: "p_1" } },
+              { key: "event.sequence", value: { stringValue: "38" } },
+              { key: "tool_name", value: { stringValue: "Bash" } },
+              { key: "tool_use_id", value: { stringValue: "toolu_x" } },
+              { key: "success", value: { stringValue: "true" } },
+              { key: "duration_ms", value: { stringValue: "714" } },
+              {
+                key: "tool_input",
+                value: { stringValue: '{"command":"echo test"}' },
+              },
+            ],
+          },
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(recordLog).not.toHaveBeenCalled();
+      expect(recordSpan).toHaveBeenCalledTimes(1);
+      const data = recordSpan.mock.calls[0]![0]!;
+      expect(attrOf(data, "langwatch.span.type")).toEqual({
+        stringValue: "tool",
+      });
+      expect(attrOf(data, "gen_ai.tool.name")).toEqual({ stringValue: "Bash" });
+      expect(attrOf(data, "gen_ai.tool.call.id")).toEqual({
+        stringValue: "toolu_x",
+      });
+      expect(data.span.name).toBe("Bash");
+    });
+
     it("is idempotent: the same api_request yields the same span id on re-ingest", async () => {
       const { service, recordSpan } = makeService();
       const batch = scopeLogs([apiRequest("1", "req_c")]);

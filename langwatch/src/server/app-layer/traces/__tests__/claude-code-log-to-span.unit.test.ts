@@ -3,7 +3,9 @@ import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processin
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
+  convertClaudeCodeToolLogsToSpans,
   isClaudeCodeConvertibleLog,
+  isClaudeCodeToolLog,
 } from "../claude-code-log-to-span";
 
 const TRACE = "a3c6656cf433e97549f654034be02955";
@@ -568,6 +570,95 @@ describe("convertClaudeCodeLogsToSpans", () => {
     });
   });
 
+  describe("when an api_request_body is orphaned across batches", () => {
+    // api_request_body is logged at call START, the api_request anchor at call
+    // END; a tool-using turn splits them across export batches. The body has no
+    // request_id, so it can't re-pair — it must be DROPPED, not emitted as a
+    // duplicate, input-less span that also sorts before the anchor in the
+    // waterfall. The turn input is on the trace via user_prompt.
+    it("drops a lone api_request_body instead of emitting an orphan span", () => {
+      const spans = convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request_body",
+          spanId: "b9b9b9b9b9b9b9b9",
+          attrs: {
+            "event.name": "api_request_body",
+            model: "claude-opus-4-8",
+            query_source: "repl_main_thread",
+            body: requestBody("late conversation body"),
+          },
+        }),
+      ]);
+      expect(spans).toEqual([]);
+    });
+
+    it("emits the anchor (with its output) even when its body split off", () => {
+      // The anchor + its response co-batch (both logged at call END); only the
+      // body landed in the prior batch. The anchor span still carries usage and
+      // the assistant reply — just no per-span input.
+      const spans = convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request",
+          spanId: "a7a7a7a7a7a7a7a7",
+          attrs: {
+            "event.name": "api_request",
+            model: "claude-opus-4-8",
+            input_tokens: "2",
+            output_tokens: "14",
+            request_id: "req_late",
+            query_source: "repl_main_thread",
+          },
+        }),
+        rec({
+          eventName: "api_response_body",
+          spanId: "c7c7c7c7c7c7c7c7",
+          attrs: {
+            "event.name": "api_response_body",
+            request_id: "req_late",
+            query_source: "repl_main_thread",
+            body: responseBody("Done — output was test otlp."),
+          },
+        }),
+      ]);
+      expect(spans).toHaveLength(1);
+      const { span } = spans[0]!;
+      expect(span.spanId).toBe("a7a7a7a7a7a7a7a7");
+      expect(attr(span, "gen_ai.input.messages")).toBeUndefined();
+      expect(attr(span, "gen_ai.completion")).toEqual({
+        stringValue: "Done — output was test otlp.",
+      });
+    });
+  });
+
+  describe("span name for utility vs conversational calls", () => {
+    const nameFor = (querySource: string): unknown => {
+      const { span } = convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request",
+          spanId: "eeeeeeeeeeeeeeee",
+          attrs: {
+            "event.name": "api_request",
+            model: "claude-opus-4-8",
+            request_id: "req_n",
+            query_source: querySource,
+          },
+        }),
+      ])[0]!;
+      return span.name;
+    };
+
+    it("names a conversational call by its model", () => {
+      expect(nameFor("repl_main_thread")).toBe("claude-opus-4-8");
+    });
+
+    it("names utility calls by query_source so they read clearly", () => {
+      // Otherwise the waterfall shows mystery "claude-opus-4-8" spans that carry
+      // no conversation — the user couldn't tell what they were FOR.
+      expect(nameFor("generate_session_title")).toBe("generate_session_title");
+      expect(nameFor("prompt_suggestion")).toBe("prompt_suggestion");
+    });
+  });
+
   describe("idempotency", () => {
     it("produces byte-identical spans for the same input twice", () => {
       const input: ClaudeCodeLogRecordInput[] = [
@@ -593,5 +684,157 @@ describe("convertClaudeCodeLogsToSpans", () => {
 
   it("returns no spans for an empty batch", () => {
     expect(convertClaudeCodeLogsToSpans([])).toEqual([]);
+  });
+});
+
+describe("isClaudeCodeToolLog", () => {
+  it("matches only tool_decision / tool_result under the claude_code scope", () => {
+    const scope = "com.anthropic.claude_code.events";
+    expect(isClaudeCodeToolLog(scope, "tool_decision")).toBe(true);
+    expect(isClaudeCodeToolLog(scope, "tool_result")).toBe(true);
+    expect(isClaudeCodeToolLog(scope, "api_request")).toBe(false);
+    expect(isClaudeCodeToolLog(scope, "user_prompt")).toBe(false);
+    expect(isClaudeCodeToolLog(scope, undefined)).toBe(false);
+    expect(isClaudeCodeToolLog("com.openai.codex.events", "tool_result")).toBe(
+      false,
+    );
+  });
+});
+
+describe("convertClaudeCodeToolLogsToSpans", () => {
+  const TOOL_USE_ID = "toolu_01Cx3rukYCF2Jd2dnWTZQHjv";
+
+  const toolDecision = (over: Partial<ClaudeCodeLogRecordInput> = {}) =>
+    rec({
+      eventName: "tool_decision",
+      spanId: "d1d1d1d1d1d1d1d1",
+      timeUnixMs: 1_700_000_000_845,
+      attrs: {
+        "event.name": "tool_decision",
+        "event.sequence": "37",
+        "session.id": "sess_tool",
+        tool_name: "Bash",
+        tool_use_id: TOOL_USE_ID,
+        decision: "accept",
+        source: "config",
+        tool_parameters: '{"full_command":"echo \\"test otlp\\""}',
+      },
+      ...over,
+    });
+
+  const toolResult = (over: Partial<ClaudeCodeLogRecordInput> = {}) =>
+    rec({
+      eventName: "tool_result",
+      spanId: "f1f1f1f1f1f1f1f1",
+      timeUnixMs: 1_700_000_001_559,
+      attrs: {
+        "event.name": "tool_result",
+        "event.sequence": "38",
+        "session.id": "sess_tool",
+        tool_name: "Bash",
+        tool_use_id: TOOL_USE_ID,
+        success: "true",
+        duration_ms: "714",
+        tool_input: '{"command":"echo \\"test otlp\\""}',
+        tool_result_size_bytes: "9",
+      },
+      ...over,
+    });
+
+  describe("when both tool_decision and tool_result are present", () => {
+    const build = () =>
+      convertClaudeCodeToolLogsToSpans([toolDecision(), toolResult()]);
+
+    it("collapses the pair into ONE tool span keyed by tool_use_id", () => {
+      const spans = build();
+      expect(spans).toHaveLength(1);
+      const { span } = spans[0]!;
+      expect(attr(span, "langwatch.span.type")).toEqual({ stringValue: "tool" });
+      expect(attr(span, "gen_ai.operation.name")).toEqual({
+        stringValue: "execute_tool",
+      });
+      expect(attr(span, "gen_ai.tool.name")).toEqual({ stringValue: "Bash" });
+      expect(attr(span, "gen_ai.tool.call.id")).toEqual({
+        stringValue: TOOL_USE_ID,
+      });
+      expect(span.name).toBe("Bash");
+    });
+
+    it("puts the command on gen_ai.tool.call.arguments, never on the trace-IO keys", () => {
+      const { span } = build()[0]!;
+      // tool_input (the clean tool call) wins over tool_parameters.
+      expect(attr(span, "gen_ai.tool.call.arguments")).toEqual({
+        stringValue: '{"command":"echo \\"test otlp\\""}',
+      });
+      // A tool span is parentless (root) to the trace-IO fold; putting the
+      // shell command on langwatch.input / gen_ai.input.messages would hijack
+      // the trace's headline input.
+      expect(attr(span, "langwatch.input")).toBeUndefined();
+      expect(attr(span, "gen_ai.input.messages")).toBeUndefined();
+      expect(attr(span, "langwatch.output")).toBeUndefined();
+      expect(attr(span, "gen_ai.output.messages")).toBeUndefined();
+    });
+
+    it("captures success + duration + sizes under claude_code.*", () => {
+      const { span } = build()[0]!;
+      expect(attr(span, "claude_code.success")).toEqual({ stringValue: "true" });
+      expect(attr(span, "claude_code.duration_ms")).toEqual({
+        stringValue: "714",
+      });
+      expect(attr(span, "claude_code.decision")).toEqual({
+        stringValue: "accept",
+      });
+      expect(attr(span, "claude_code.tool_result_size_bytes")).toEqual({
+        stringValue: "9",
+      });
+    });
+
+    it("anchors timing on tool_result: start = result_time - duration", () => {
+      const { span } = build()[0]!;
+      // end = 1_700_000_001_559 ms, duration 714 ms -> start = 1_700_000_000_845.
+      expect(span.endTimeUnixNano).toBe("1700000001559000000");
+      expect(span.startTimeUnixNano).toBe("1700000000845000000");
+    });
+
+    it("derives a deterministic span id from tool_use_id (idempotent)", () => {
+      const a = build();
+      const b = convertClaudeCodeToolLogsToSpans([toolResult(), toolDecision()]);
+      // Order-independent + stable: same trace + tool_use_id -> same span id.
+      expect(a[0]!.span.spanId).toBe(b[0]!.span.spanId);
+      expect(a[0]!.span.spanId).not.toBe("d1d1d1d1d1d1d1d1");
+    });
+  });
+
+  describe("when only the tool_result is present (decision split off)", () => {
+    it("still emits a complete tool span", () => {
+      const spans = convertClaudeCodeToolLogsToSpans([toolResult()]);
+      expect(spans).toHaveLength(1);
+      const { span } = spans[0]!;
+      expect(attr(span, "gen_ai.tool.name")).toEqual({ stringValue: "Bash" });
+      expect(attr(span, "gen_ai.tool.call.arguments")).toEqual({
+        stringValue: '{"command":"echo \\"test otlp\\""}',
+      });
+    });
+  });
+
+  describe("when only the tool_decision is present (result not yet arrived)", () => {
+    it("emits a zero-duration tool span at the decision time", () => {
+      const spans = convertClaudeCodeToolLogsToSpans([toolDecision()]);
+      expect(spans).toHaveLength(1);
+      const { span } = spans[0]!;
+      expect(span.startTimeUnixNano).toBe("1700000000845000000");
+      expect(span.endTimeUnixNano).toBe("1700000000845000000");
+    });
+  });
+
+  it("ignores records with no tool_use_id and returns [] for an empty batch", () => {
+    expect(convertClaudeCodeToolLogsToSpans([])).toEqual([]);
+    const noId = convertClaudeCodeToolLogsToSpans([
+      rec({
+        eventName: "tool_result",
+        attrs: { "event.name": "tool_result", tool_name: "Bash" },
+      }),
+    ]);
+    expect(noId).toEqual([]);
   });
 });
