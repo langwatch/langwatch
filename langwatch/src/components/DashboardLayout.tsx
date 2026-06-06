@@ -14,7 +14,6 @@ import {
 import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
 import {
   Activity,
-  Check,
   ChevronDown,
   ChevronRight,
   Info,

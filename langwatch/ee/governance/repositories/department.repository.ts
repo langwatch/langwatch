@@ -47,7 +47,14 @@ export class DepartmentRepository {
     params: { id: string; organizationId: string; name: string },
   ) {
     return client.department.updateMany({
-      where: { id: params.id, organizationId: params.organizationId },
+      // archivedAt: null so an archived row can't be renamed — the service
+      // rename flow reads back through getById (which enforces archivedAt:
+      // null) and would otherwise return null after a successful update count.
+      where: {
+        id: params.id,
+        organizationId: params.organizationId,
+        archivedAt: null,
+      },
       data: { name: params.name },
     });
   }

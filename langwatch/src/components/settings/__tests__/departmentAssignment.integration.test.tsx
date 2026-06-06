@@ -10,6 +10,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Imported at the top: vitest hoists the vi.mock / vi.hoisted calls below above
+// these statements, so the modules under test still resolve the mocks.
+import DepartmentsPage from "~/pages/settings/governance/departments";
+import { DepartmentPicker } from "../DepartmentPicker";
+import { useDepartmentColumn } from "../useDepartmentColumn";
 
 const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(() => ({
   ffEnabled: { current: true },
@@ -109,12 +114,6 @@ vi.mock("~/components/ui/link", () => ({
     </a>
   ),
 }));
-
-const { default: DepartmentsPage } = await import(
-  "~/pages/settings/governance/departments"
-);
-const { DepartmentPicker } = await import("../DepartmentPicker");
-const { useDepartmentColumn } = await import("../useDepartmentColumn");
 
 function renderWithChakra(node: ReactNode) {
   return render(

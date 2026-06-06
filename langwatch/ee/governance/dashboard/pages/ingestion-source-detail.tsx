@@ -777,13 +777,14 @@ function SecretRevealModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     claude
                   </Code>
-                  . To attribute spend to a specific team or department,
-                  also export{" "}
+                  . To attribute spend to a specific team, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…
                   </Code>
-                  {" "}- those land as resource attributes and slot into
+                  {" "}- it lands as a resource attribute and slots into
                   /governance&apos;s spendByTeam without further config.
+                  Department attribution is resolved from the project&apos;s
+                  assignment at read time, not from an OTEL attribute.
                 </Text>
               </VStack>
             )}
