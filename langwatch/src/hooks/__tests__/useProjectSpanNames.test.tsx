@@ -222,7 +222,6 @@ describe("useProjectSpanNames", () => {
           { key: "evaluator-pii", label: "PII Check" },
           { key: "evaluator-toxicity", label: "Toxicity" },
         ],
-        eventTypes: [],
       },
       isLoading: false,
       error: null,
