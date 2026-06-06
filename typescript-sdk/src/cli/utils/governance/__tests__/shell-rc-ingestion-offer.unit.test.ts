@@ -15,19 +15,20 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
+import type * as ConfigModule from "../config";
 
 const answers: string[] = [];
 
 vi.mock("node:readline", () => ({
   createInterface: () => ({
     question: (_q: string, cb: (a: string) => void) => cb(answers.shift() ?? ""),
-    close: () => {},
+    close: () => undefined,
   }),
 }));
 
 const saveConfigMock = vi.fn();
 vi.mock("../config", async () => {
-  const actual = await vi.importActual<typeof import("../config")>("../config");
+  const actual = await vi.importActual<typeof ConfigModule>("../config");
   return { ...actual, saveConfig: saveConfigMock };
 });
 
