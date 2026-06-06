@@ -11,6 +11,7 @@ import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "~/components/ui/dialog";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 import { InstallCliCard } from "../InstallCliCard";
 import { TileIcon } from "./TileIcon";
@@ -30,14 +31,11 @@ export function CodingAssistantTile({
   iconKey,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
 
-  const onCopy = () => {
-    void navigator.clipboard.writeText(config.setupCommand);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  const publicEnv = usePublicEnv();
+  const isSaas = Boolean(publicEnv.data?.IS_SAAS);
+  const baseHost = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
 
   return (
     <Box
@@ -66,29 +64,25 @@ export function CodingAssistantTile({
 
       {expanded && (
         <VStack align="stretch" gap={3} marginTop={4}>
+          {/*
+            Self-hosted CLIs default to app.langwatch.ai, so a self-hosted user
+            must first point the CLI at their own control plane (the endpoint is
+            persisted after the first login). On SaaS the wrapper auto-logs-in to
+            the right place, so no separate step is shown.
+          */}
+          {!isSaas && (
+            <>
+              <Text fontSize="sm" color="fg.muted">
+                Self-hosted? First point the CLI at this instance and sign in:
+              </Text>
+              <CommandRow command={`langwatch login --endpoint ${baseHost}`} />
+            </>
+          )}
+
           <Text fontSize="sm" color="fg.muted">
-            Run this in your terminal:
+            {isSaas ? "Run this in your terminal:" : "Then run:"}
           </Text>
-          <HStack
-            gap={2}
-            padding={2}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="sm"
-            backgroundColor="bg.subtle"
-          >
-            <Code flex={1} backgroundColor="transparent" fontSize="sm">
-              $ {config.setupCommand}
-            </Code>
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label={copied ? "Copied" : "Copy command"}
-              onClick={onCopy}
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </IconButton>
-          </HStack>
+          <CommandRow command={config.setupCommand} />
 
           {config.helperText && (
             <Text fontSize="xs" color="fg.muted">
@@ -126,5 +120,36 @@ export function CodingAssistantTile({
         </Dialog.Content>
       </Dialog.Root>
     </Box>
+  );
+}
+
+function CommandRow({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = () => {
+    void navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <HStack
+      gap={2}
+      padding={2}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="sm"
+      backgroundColor="bg.subtle"
+    >
+      <Code flex={1} backgroundColor="transparent" fontSize="sm">
+        $ {command}
+      </Code>
+      <IconButton
+        size="xs"
+        variant="ghost"
+        aria-label={copied ? "Copied" : "Copy command"}
+        onClick={onCopy}
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </IconButton>
+    </HStack>
   );
 }
