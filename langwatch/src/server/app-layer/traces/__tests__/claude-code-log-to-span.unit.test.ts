@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-
+import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
   isClaudeCodeConvertibleLog,
 } from "../claude-code-log-to-span";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 
 const TRACE = "a3c6656cf433e97549f654034be02955";
 
@@ -44,9 +43,9 @@ describe("isClaudeCodeConvertibleLog", () => {
     expect(isClaudeCodeConvertibleLog(scope, "user_prompt")).toBe(false);
     expect(isClaudeCodeConvertibleLog(scope, "hook_registered")).toBe(false);
     expect(isClaudeCodeConvertibleLog(scope, undefined)).toBe(false);
-    expect(isClaudeCodeConvertibleLog("com.openai.codex.events", "api_request")).toBe(
-      false,
-    );
+    expect(
+      isClaudeCodeConvertibleLog("com.openai.codex.events", "api_request"),
+    ).toBe(false);
   });
 });
 
@@ -105,7 +104,9 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(spans).toHaveLength(1);
       const { span } = spans[0]!;
       expect(attr(span, "langwatch.span.type")).toEqual({ stringValue: "llm" });
-      expect(attr(span, "gen_ai.system")).toEqual({ stringValue: "claude_code" });
+      expect(attr(span, "gen_ai.system")).toEqual({
+        stringValue: "claude_code",
+      });
       expect(attr(span, "gen_ai.request.model")).toEqual({
         stringValue: "claude-opus-4-7",
       });
@@ -113,8 +114,12 @@ describe("convertClaudeCodeLogsToSpans", () => {
 
     it("lifts tokens + cache + cost onto the span", () => {
       const { span } = build()[0]!;
-      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({ intValue: 120 });
-      expect(attr(span, "gen_ai.usage.output_tokens")).toEqual({ intValue: 30 });
+      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({
+        intValue: 120,
+      });
+      expect(attr(span, "gen_ai.usage.output_tokens")).toEqual({
+        intValue: 30,
+      });
       // REGRESSION GUARD: cache_read (~0.1x input) must stay distinct from
       // cache_creation (~1.25x input) — a swap mis-bills by ~12x.
       expect(attr(span, "gen_ai.usage.cache_read.input_tokens")).toEqual({
@@ -124,15 +129,23 @@ describe("convertClaudeCodeLogsToSpans", () => {
         intValue: 1024,
       });
       // cost via the reserved fallback key (priority 3 in computeSpanCost).
-      expect(attr(span, "langwatch.span.cost")).toEqual({ doubleValue: 0.0875 });
+      expect(attr(span, "langwatch.span.cost")).toEqual({
+        doubleValue: 0.0875,
+      });
     });
 
     it("joins input from the body and output from the response", () => {
       const { span } = build()[0]!;
-      expect(attr(span, "gen_ai.prompt")).toEqual({
-        stringValue: "Reply with PONG-Z",
+      // Input is the structured conversation, not a raw-JSON-blob single message.
+      expect(attr(span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([
+          { role: "user", content: "Reply with PONG-Z" },
+        ]),
       });
-      expect(attr(span, "gen_ai.completion")).toEqual({ stringValue: "PONG-Z" });
+      expect(attr(span, "gen_ai.prompt")).toBeUndefined();
+      expect(attr(span, "gen_ai.completion")).toEqual({
+        stringValue: "PONG-Z",
+      });
     });
 
     it("uses the api_request SpanId as the span id (idempotent)", () => {
@@ -180,8 +193,12 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(spans).toHaveLength(1);
       const { span } = spans[0]!;
       // usage still folds (cost is byte-identical to today regardless of gate)
-      expect(attr(span, "langwatch.span.cost")).toEqual({ doubleValue: 0.000512 });
-      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({ intValue: 457 });
+      expect(attr(span, "langwatch.span.cost")).toEqual({
+        doubleValue: 0.000512,
+      });
+      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({
+        intValue: 457,
+      });
       // ...but the utility text is NOT surfaced as the assistant's reply
       expect(attr(span, "gen_ai.completion")).toBeUndefined();
     });
@@ -263,11 +280,13 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(spans).toHaveLength(2);
       const first = spans.find((s) => s.span.spanId === "a1a1a1a1a1a1a1a1")!;
       const second = spans.find((s) => s.span.spanId === "a2a2a2a2a2a2a2a2")!;
-      expect(attr(first.span, "gen_ai.prompt")).toEqual({
-        stringValue: "first input",
+      expect(attr(first.span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([{ role: "user", content: "first input" }]),
       });
-      expect(attr(second.span, "gen_ai.prompt")).toEqual({
-        stringValue: "second input",
+      expect(attr(second.span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([
+          { role: "user", content: "second input" },
+        ]),
       });
     });
   });
@@ -364,17 +383,35 @@ describe("convertClaudeCodeLogsToSpans", () => {
     it("uses the clean co-batched user_prompt text instead of the raw truncated blob", () => {
       const { span } = build(
         new Map([
-          ["p_42", "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else."],
+          [
+            "p_42",
+            "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else.",
+          ],
         ]),
       )[0]!;
-      expect(attr(span, "gen_ai.prompt")).toEqual({
-        stringValue: "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else.",
+      expect(attr(span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([
+          {
+            role: "user",
+            content:
+              "Turn 2: reply with exactly PONG-CLAUDE-B2 and nothing else.",
+          },
+        ]),
       });
     });
 
-    it("falls back to the raw body when no user_prompt text is available (never dropped)", () => {
+    it("drops the input rather than emitting the raw truncated JSON blob", () => {
+      // The old behavior wrapped the raw truncated body as a single user
+      // message, surfacing claude's `[TRUNCATED ...]` marker + the whole
+      // request JSON as the trace input. With no clean user_prompt to fall back
+      // to, the input is simply absent instead.
       const { span } = build(new Map())[0]!;
-      expect(attr(span, "gen_ai.prompt")).toEqual({ stringValue: truncated });
+      expect(attr(span, "gen_ai.input.messages")).toBeUndefined();
+      expect(attr(span, "gen_ai.prompt")).toBeUndefined();
+      // The body string never leaks into any attribute value.
+      for (const a of span.attributes) {
+        expect(a.value.stringValue ?? "").not.toContain(truncated);
+      }
     });
   });
 
@@ -407,8 +444,68 @@ describe("convertClaudeCodeLogsToSpans", () => {
         ],
         new Map([["p_1", "user_prompt text"]]),
       );
-      expect(attr(spans[0]!.span, "gen_ai.prompt")).toEqual({
-        stringValue: "parsed body text",
+      expect(attr(spans[0]!.span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([
+          { role: "user", content: "parsed body text" },
+        ]),
+      });
+    });
+  });
+
+  describe("when the api_request_body is a multi-turn conversation", () => {
+    it("parses system + every turn into the structured input.messages", () => {
+      const body = JSON.stringify({
+        model: "claude-opus-4-8",
+        system: "You are a coding assistant.",
+        messages: [
+          { role: "user", content: "First question" },
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "First answer" }],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Second question" },
+              { type: "tool_result", content: [{ type: "text", text: "42" }] },
+            ],
+          },
+        ],
+      });
+      const spans = convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request",
+          spanId: "aaaaaaaaaaaaaaaa",
+          attrs: {
+            "event.name": "api_request",
+            model: "claude-opus-4-8",
+            request_id: "req_m",
+            query_source: "repl_main_thread",
+          },
+        }),
+        rec({
+          eventName: "api_request_body",
+          spanId: "bbbbbbbbbbbbbbbb",
+          attrs: {
+            "event.name": "api_request_body",
+            model: "claude-opus-4-8",
+            query_source: "repl_main_thread",
+            body,
+          },
+        }),
+      ]);
+      // System prompt + each turn, content flattened to text, in order.
+      expect(attr(spans[0]!.span, "gen_ai.input.messages")).toEqual({
+        stringValue: JSON.stringify([
+          { role: "system", content: "You are a coding assistant." },
+          { role: "user", content: "First question" },
+          { role: "assistant", content: "First answer" },
+          { role: "user", content: "Second question\n\n42" },
+        ]),
+      });
+      // Model is lifted to the span, not buried in the input.
+      expect(attr(spans[0]!.span, "gen_ai.request.model")).toEqual({
+        stringValue: "claude-opus-4-8",
       });
     });
   });

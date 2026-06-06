@@ -52,8 +52,8 @@ import type {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
+  buildInputMessagesFromRequestBody,
   extractAssistantTextFromResponseBody,
-  extractUserTextFromRequestBody,
   isConversationalQuerySource,
 } from "./canonicalisation/extractors/claudeCode";
 
@@ -245,21 +245,34 @@ function baseAttrs(record: ClaudeCodeLogRecordInput): OtlpKeyValue[] {
 }
 
 /**
- * Resolve the span's input text from an api_request_body record. Prefers the
- * latest user turn parsed out of the request body; when claude truncated the
- * body inline (`body_truncated=true`, ~64KB cap) it is unparseable, so fall
- * back to the clean co-batched `user_prompt` text (joined by prompt.id) BEFORE
- * the raw truncated blob — the user_prompt text is the genuine turn input.
+ * Resolve the span's `gen_ai.input.messages` (a JSON array of `{ role, content }`)
+ * from an api_request_body record. Prefers the full conversation parsed out of
+ * the request body (system + every turn); when claude truncated the body inline
+ * (`body_truncated=true`, ~60KB cap) it is unparseable JSON, so fall back to the
+ * clean co-batched `user_prompt` text as the single latest turn. The raw
+ * truncated JSON blob is NEVER used as input — wrapping it as one user message
+ * is what made the trace detail render `{"model":...,"messages":[...]}` instead
+ * of a conversation. Each message's content is capped individually so the array
+ * stays valid JSON. Returns null when nothing usable is available.
  */
-function resolveInputText(
+function resolveInputMessages(
   body: ClaudeCodeLogRecordInput,
   promptTextById: ReadonlyMap<string, string>,
 ): string | null {
-  return (
-    extractUserTextFromRequestBody(body.attrs.body) ??
-    asNonEmpty(promptTextById.get(body.attrs["prompt.id"] ?? "")) ??
-    asNonEmpty(body.attrs.body)
-  );
+  const parsed = buildInputMessagesFromRequestBody(body.attrs.body);
+  let messages: Array<{ role: string; content: string }> | null = parsed;
+  if (!messages) {
+    const fallback = asNonEmpty(
+      promptTextById.get(body.attrs["prompt.id"] ?? ""),
+    );
+    messages = fallback ? [{ role: "user", content: fallback }] : null;
+  }
+  if (!messages) return null;
+  const capped = messages.map((m) => ({
+    role: m.role,
+    content: capPayloadString(m.content, undefined, "claude_input"),
+  }));
+  return JSON.stringify(capped);
 }
 
 function buildCollapsedSpan(
@@ -300,19 +313,14 @@ function buildCollapsedSpan(
   const cost = asNumber(anchor.attrs.cost_usd);
   if (cost !== null) attrs.push(dblAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, cost));
 
-  // INPUT text from the request body (best-effort: the body is often claude-
-  // truncated for large contexts; resolveInputText falls back to the clean
-  // user_prompt text, then the raw capped body, so content still reaches the
-  // span rather than being dropped).
+  // INPUT as a structured `gen_ai.input.messages` conversation parsed from the
+  // request body (system + every turn). When claude truncated the body inline,
+  // resolveInputMessages falls back to the clean user_prompt text as the latest
+  // turn — never the raw JSON blob.
   if (body) {
-    const inputText = resolveInputText(body, promptTextById);
-    if (inputText) {
-      attrs.push(
-        strAttr(
-          ATTR_KEYS.GEN_AI_PROMPT,
-          capPayloadString(inputText, undefined, "claude_input"),
-        ),
-      );
+    const inputMessages = resolveInputMessages(body, promptTextById);
+    if (inputMessages) {
+      attrs.push(strAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages));
     }
   }
 
@@ -364,14 +372,9 @@ function buildOrphanSpan(
   }
 
   if (record.eventName === "api_request_body") {
-    const inputText = resolveInputText(record, promptTextById);
-    if (inputText) {
-      attrs.push(
-        strAttr(
-          ATTR_KEYS.GEN_AI_PROMPT,
-          capPayloadString(inputText, undefined, "claude_input"),
-        ),
-      );
+    const inputMessages = resolveInputMessages(record, promptTextById);
+    if (inputMessages) {
+      attrs.push(strAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages));
     }
   } else if (record.eventName === "api_response_body") {
     const querySource = asNonEmpty(record.attrs.query_source);

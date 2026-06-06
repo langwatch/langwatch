@@ -207,6 +207,94 @@ export function extractAssistantTextFromResponseBody(
  *
  * @internal exported for the log-to-span converter + unit testing
  */
+/**
+ * Flatten one Anthropic message `content` (string OR array of content blocks)
+ * to display text. Text + tool_result blocks contribute their text; tool_use
+ * blocks render as a compact `[tool_use: name]` marker so the turn reads as a
+ * conversation rather than raw JSON; thinking blocks are redacted by Anthropic
+ * and images carry no text, so both are dropped.
+ */
+function contentToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (typeof block === "string") {
+      if (block.length > 0) parts.push(block);
+      continue;
+    }
+    if (!block || typeof block !== "object") continue;
+    const b = block as {
+      type?: unknown;
+      text?: unknown;
+      name?: unknown;
+      content?: unknown;
+    };
+    if (b.type === "text" && typeof b.text === "string") {
+      if (b.text.length > 0) parts.push(b.text);
+    } else if (b.type === "tool_result") {
+      const nested = contentToText(b.content);
+      if (nested.length > 0) parts.push(nested);
+    } else if (b.type === "tool_use" && typeof b.name === "string") {
+      parts.push(`[tool_use: ${b.name}]`);
+    }
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * Parse a claude_code.api_request_body JSON payload (the Anthropic
+ * /v1/messages REQUEST) into the canonical `gen_ai.input.messages` chat array:
+ * the system prompt (when present) followed by every turn as `{ role, content }`
+ * with each message's content flattened to text via {@link contentToText}.
+ *
+ * This is what makes the trace detail render a real multi-turn conversation
+ * instead of a single user message holding the raw request JSON — the failure
+ * mode when the converter fell back to the raw body blob. Returns null when the
+ * body isn't parseable (claude truncates large bodies inline, so the caller
+ * falls back to the clean `user_prompt` text), has no `messages` array, or every
+ * turn flattened to empty.
+ *
+ * @internal exported for the log-to-span converter + unit testing
+ */
+export function buildInputMessagesFromRequestBody(
+  raw: unknown,
+): Array<{ role: string; content: string }> | null {
+  if (raw === null || raw === undefined) return null;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as { system?: unknown; messages?: unknown };
+  if (!Array.isArray(obj.messages)) return null;
+
+  const out: Array<{ role: string; content: string }> = [];
+
+  if (obj.system !== undefined) {
+    const systemText = contentToText(obj.system);
+    if (systemText.length > 0) {
+      out.push({ role: "system", content: systemText });
+    }
+  }
+
+  for (const m of obj.messages) {
+    if (!m || typeof m !== "object") continue;
+    const message = m as { role?: unknown; content?: unknown };
+    const role = typeof message.role === "string" ? message.role : "user";
+    const content = contentToText(message.content);
+    if (content.length === 0) continue;
+    out.push({ role, content });
+  }
+
+  return out.length > 0 ? out : null;
+}
+
 export function extractUserTextFromRequestBody(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   let parsed: unknown = raw;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildInputMessagesFromRequestBody,
   ClaudeCodeExtractor,
   extractAssistantTextFromResponseBody,
   extractUserTextFromRequestBody,
@@ -159,9 +160,7 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
     expect(extractAssistantTextFromResponseBody(42)).toBeNull();
     expect(extractAssistantTextFromResponseBody("")).toBeNull();
     expect(extractAssistantTextFromResponseBody("{not valid json")).toBeNull();
-    expect(
-      extractAssistantTextFromResponseBody(JSON.stringify({})),
-    ).toBeNull();
+    expect(extractAssistantTextFromResponseBody(JSON.stringify({}))).toBeNull();
     expect(
       extractAssistantTextFromResponseBody(
         JSON.stringify({ content: "string-not-array" }),
@@ -227,6 +226,77 @@ describe("extractUserTextFromRequestBody (exported helper)", () => {
     expect(
       extractUserTextFromRequestBody(
         JSON.stringify({ messages: [{ role: "assistant", content: "x" }] }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("buildInputMessagesFromRequestBody (exported helper)", () => {
+  it("parses system + every turn into a role/content conversation", () => {
+    const body = JSON.stringify({
+      model: "claude-opus-4-8",
+      system: "You are a coding assistant.",
+      messages: [
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: [{ type: "text", text: "Hello" }] },
+      ],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "system", content: "You are a coding assistant." },
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello" },
+    ]);
+  });
+
+  it("flattens text + tool_result + tool_use blocks; drops thinking/images", () => {
+    const body = JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "look at this" },
+            {
+              type: "tool_result",
+              content: [{ type: "text", text: "result" }],
+            },
+            { type: "tool_use", name: "Read", input: { path: "x" } },
+            { type: "thinking", thinking: "<redacted>" },
+            { type: "image", source: {} },
+          ],
+        },
+      ],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "user", content: "look at this\n\nresult\n\n[tool_use: Read]" },
+    ]);
+  });
+
+  it("flattens a system array of content blocks", () => {
+    const body = JSON.stringify({
+      system: [
+        { type: "text", text: "line one" },
+        { type: "text", text: "line two" },
+      ],
+      messages: [{ role: "user", content: "go" }],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "system", content: "line one\n\nline two" },
+      { role: "user", content: "go" },
+    ]);
+  });
+
+  it("returns null for truncated / malformed / message-less bodies", () => {
+    expect(buildInputMessagesFromRequestBody(undefined)).toBeNull();
+    expect(buildInputMessagesFromRequestBody("")).toBeNull();
+    // claude truncates large request bodies inline -> invalid JSON tail.
+    expect(
+      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
+    expect(buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
+    // messages present but every turn flattens to empty -> null.
+    expect(
+      buildInputMessagesFromRequestBody(
+        JSON.stringify({ messages: [{ role: "user", content: [] }] }),
       ),
     ).toBeNull();
   });
