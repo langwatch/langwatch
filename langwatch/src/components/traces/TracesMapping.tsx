@@ -524,6 +524,11 @@ export const TracesMapping = ({
                   })
               : undefined;
 
+          // The spans/metadata key dropdown waits on the project-wide name list.
+          const isLoadingFieldNames =
+            projectFieldNamesLoading &&
+            (source === "spans" || source === "metadata");
+
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
             ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
@@ -683,7 +688,10 @@ export const TracesMapping = ({
                               borderRight={0}
                               marginLeft="12px"
                             />
-                            <NativeSelect.Root width="full">
+                            <NativeSelect.Root
+                              width="full"
+                              disabled={isLoadingFieldNames}
+                            >
                               <NativeSelect.Field
                                 onChange={(e) => {
                                   setTraceMappingState((prev) => ({
@@ -699,35 +707,46 @@ export const TracesMapping = ({
                                 }}
                                 value={key}
                               >
-                                {/* "* (any span)" option - matches all spans */}
-                                <option value="">
-                                  {source === "spans"
-                                    ? "* (any span)"
-                                    : source === "metadata"
-                                      ? "* (all metadata)"
-                                      : "* (any)"}
-                                </option>
-                                {mergeProjectKeyOptions(
-                                  source,
-                                  traceMappingDefinition.keys(traces_),
-                                ).map(({ key, label }: KeyOption) => (
-                                  <option key={key} value={key}>
-                                    {label}
+                                {/* While project-wide names load, show a single
+                                    placeholder so users don't pick from an
+                                    incomplete (trace-only) list. */}
+                                {isLoadingFieldNames ? (
+                                  <option value="">
+                                    {source === "spans"
+                                      ? "Loading span names…"
+                                      : "Loading metadata keys…"}
                                   </option>
-                                ))}
+                                ) : (
+                                  <>
+                                    {/* "* (any span)" option - matches all spans */}
+                                    <option value="">
+                                      {source === "spans"
+                                        ? "* (any span)"
+                                        : source === "metadata"
+                                          ? "* (all metadata)"
+                                          : "* (any)"}
+                                    </option>
+                                    {mergeProjectKeyOptions(
+                                      source,
+                                      traceMappingDefinition.keys(traces_),
+                                    ).map(({ key, label }: KeyOption) => (
+                                      <option key={key} value={key}>
+                                        {label}
+                                      </option>
+                                    ))}
+                                  </>
+                                )}
                               </NativeSelect.Field>
                               <NativeSelect.Indicator />
                             </NativeSelect.Root>
-                            {projectFieldNamesLoading &&
-                              (source === "spans" ||
-                                source === "metadata") && (
-                                <Spinner
-                                  size="sm"
-                                  flexShrink={0}
-                                  marginTop="8px"
-                                  color="fg.muted"
-                                />
-                              )}
+                            {isLoadingFieldNames && (
+                              <Spinner
+                                size="sm"
+                                flexShrink={0}
+                                marginTop="8px"
+                                color="fg.muted"
+                              />
+                            )}
                           </HStack>
                         )}
                       {subkeys && subkeys.length > 0 && (
