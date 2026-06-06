@@ -276,6 +276,11 @@ function legacyScopeFromDepartmentIds({
  *
  * External tools deliberately omitted - admins fill those in per-org
  * with internal links (no useful default exists across orgs).
+ *
+ * Cursor is intentionally omitted until `langwatch cursor` is validated
+ * end to end (https://github.com/langwatch/langwatch/issues/4647): the
+ * wrapper command exists but its telemetry/governance path is unverified,
+ * so we do not seed a tile we cannot stand behind.
  */
 export const STARTER_PACK_TILES: ReadonlyArray<{
   type: AiToolType;
@@ -292,18 +297,6 @@ export const STARTER_PACK_TILES: ReadonlyArray<{
     config: {
       assistantKind: "claude_code",
       setupCommand: "langwatch claude",
-      setupDocsUrl:
-        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
-    },
-  },
-  {
-    type: "coding_assistant",
-    slug: "cursor",
-    displayName: "Cursor",
-    iconAsset: "preset:cursor",
-    config: {
-      assistantKind: "cursor",
-      setupCommand: "langwatch cursor",
       setupDocsUrl:
         "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
     },

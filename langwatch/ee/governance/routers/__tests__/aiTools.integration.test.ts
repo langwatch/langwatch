@@ -452,7 +452,7 @@ describe("aiToolsRouter integration", () => {
         const result = await callerFor(adminUserId).aiTools.importStarterPack({
           organizationId: freshOrgId,
         });
-        expect(result.created).toBe(9); // 5 coding assistants + 4 model providers
+        expect(result.created).toBe(8); // 4 coding assistants + 4 model providers
         expect(result.updated).toBe(0);
         expect(result.skipped).toBe(0);
 
@@ -465,7 +465,6 @@ describe("aiToolsRouter integration", () => {
           "bedrock",
           "claude-code",
           "codex",
-          "cursor",
           "gemini",
           "google",
           "openai",
@@ -478,11 +477,11 @@ describe("aiToolsRouter integration", () => {
         });
         expect(second.created).toBe(0);
         expect(second.updated).toBe(0);
-        expect(second.skipped).toBe(9);
+        expect(second.skipped).toBe(8);
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(9);
+        expect(after).toHaveLength(8);
       } finally {
         await prisma.aiToolEntry
           .deleteMany({ where: { organizationId: freshOrgId } })
@@ -561,7 +560,7 @@ describe("aiToolsRouter integration", () => {
       try {
         // Pre-state mirrors what dogfood produced: admin manually
         // created "Claude Code" via UI → nanoid-suffixed slug, NULL
-        // iconAsset. And "Cursor" with iconAsset already set (the
+        // iconAsset. And "Codex" with iconAsset already set (the
         // admin uploaded a custom logo) - must NOT be overwritten.
         const adminClaudeRow = await prisma.aiToolEntry.create({
           data: {
@@ -580,21 +579,21 @@ describe("aiToolsRouter integration", () => {
             } as Prisma.InputJsonValue,
           },
         });
-        const customCursorIcon = "data:image/svg+xml;base64,PHN2Zy8+";
-        const adminCursorRow = await prisma.aiToolEntry.create({
+        const customCodexIcon = "data:image/svg+xml;base64,PHN2Zy8+";
+        const adminCodexRow = await prisma.aiToolEntry.create({
           data: {
             organizationId: freshOrgId,
             scope: "organization",
             scopeId: freshOrgId,
             type: "coding_assistant",
-            displayName: "Cursor",
-            slug: `cursor-${nanoid(6)}`,
-            iconAsset: customCursorIcon,
+            displayName: "Codex",
+            slug: `codex-${nanoid(6)}`,
+            iconAsset: customCodexIcon,
             order: 1,
             enabled: true,
             config: {
-              assistantKind: "cursor",
-              setupCommand: "langwatch cursor",
+              assistantKind: "codex",
+              setupCommand: "langwatch codex",
             } as Prisma.InputJsonValue,
           },
         });
@@ -603,13 +602,13 @@ describe("aiToolsRouter integration", () => {
           organizationId: freshOrgId,
         });
         expect(result.updated).toBe(1); // Claude Code merged in place
-        expect(result.skipped).toBe(1); // Cursor admin-curated icon preserved
-        expect(result.created).toBe(7); // remaining starter set inserted
+        expect(result.skipped).toBe(1); // Codex admin-curated icon preserved
+        expect(result.created).toBe(6); // remaining starter set inserted
 
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(9); // no duplicate row created
+        expect(after).toHaveLength(8); // no duplicate row created
 
         const claudeRows = after.filter(
           (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",
@@ -618,12 +617,12 @@ describe("aiToolsRouter integration", () => {
         expect(claudeRows[0]!.id).toBe(adminClaudeRow.id);
         expect(claudeRows[0]!.iconAsset).toBe("preset:claude_code");
 
-        const cursorRows = after.filter(
-          (e) => e.type === "coding_assistant" && e.displayName === "Cursor",
+        const codexRows = after.filter(
+          (e) => e.type === "coding_assistant" && e.displayName === "Codex",
         );
-        expect(cursorRows).toHaveLength(1);
-        expect(cursorRows[0]!.id).toBe(adminCursorRow.id);
-        expect(cursorRows[0]!.iconAsset).toBe(customCursorIcon);
+        expect(codexRows).toHaveLength(1);
+        expect(codexRows[0]!.id).toBe(adminCodexRow.id);
+        expect(codexRows[0]!.iconAsset).toBe(customCodexIcon);
       } finally {
         await prisma.aiToolEntry
           .deleteMany({ where: { organizationId: freshOrgId } })

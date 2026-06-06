@@ -32,7 +32,7 @@ describe("STARTER_PACK_TILES", () => {
       const codingTiles = STARTER_PACK_TILES.filter(
         (t) => t.type === "coding_assistant",
       ).map((t) => t.slug);
-      for (const slug of ["claude-code", "codex", "cursor", "gemini", "opencode"]) {
+      for (const slug of ["claude-code", "codex", "gemini", "opencode"]) {
         expect(codingTiles).toContain(slug);
       }
     });
