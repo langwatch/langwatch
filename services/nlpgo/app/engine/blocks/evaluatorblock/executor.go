@@ -159,7 +159,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	body := map[string]any{
-		"data": req.Data,
+		"data": coerceData(req.Data),
 	}
 	if req.Name != "" {
 		body["name"] = req.Name

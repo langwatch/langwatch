@@ -67,6 +67,7 @@ import {
 } from "~/server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "~/server/metrics";
 import { rAGChunkSchema } from "~/server/tracer/types.generated";
+import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
@@ -488,14 +489,19 @@ const batchEvaluationInputSchema = z.object({
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
+const coercedString = z.preprocess(
+  coerceEvaluatorScalar,
+  z.string().optional().nullable(),
+);
+
 const defaultEvaluatorInputSchema = z.object({
-  input: z.string().optional().nullable(),
-  output: z.string().optional().nullable(),
+  input: coercedString,
+  output: coercedString,
   contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
     .nullable(),
-  expected_output: z.string().optional().nullable(),
+  expected_output: coercedString,
   expected_contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
@@ -503,8 +509,8 @@ const defaultEvaluatorInputSchema = z.object({
   conversation: z
     .array(
       z.object({
-        input: z.string().optional().nullable(),
-        output: z.string().optional().nullable(),
+        input: coercedString,
+        output: coercedString,
       }),
     )
     .optional()
