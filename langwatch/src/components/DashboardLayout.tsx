@@ -14,7 +14,6 @@ import {
 import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
 import {
   Activity,
-  Building2,
   Check,
   ChevronDown,
   ChevronRight,
@@ -44,7 +43,12 @@ import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
-import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
+import {
+  buildProjectSwitchHref,
+  findCurrentRoute,
+  projectRoutes,
+  type Route,
+} from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
@@ -136,22 +140,22 @@ const ProjectScopeHeaderSwitcher = React.memo(function ProjectScopeHeaderSwitche
 });
 
 /**
- * Header chip rendered on org-scope routes (`/settings/*`, `/governance/*`).
+ * Header chip rendered on org-scope routes (`/settings/*`, `/governance`).
  * These routes carry no project/team slug, so the resolved organization comes
- * from the `selectedOrganizationId` localStorage key. For multi-org users this
- * renders the org name as a menu so they can switch the active organization in
- * place; single-org users keep the static chip (no menu, no chevron).
- *
- * `WorkspaceSwitcher` only models the personal/team/project hierarchy, so this
- * is a dedicated switcher rather than a new `WorkspaceSwitcher` kind. Switching
- * writes the chosen org to the same `selectedOrganizationId` key the resolver
- * reads (usehooks-ts broadcasts a `local-storage` event so every reader of the
- * key re-resolves in this tab), then navigates to `/settings` - the parent of
- * every org-scoped route, always valid for any org the user belongs to.
+ * from the `selectedOrganizationId` localStorage key. Renders the shared
+ * `<WorkspaceSwitcher>` with the org as the current chip so the user can jump
+ * straight back into any project or their personal workspace (the regression
+ * that prompted this: the old static chip had no way back to a project).
+ * Multi-org users additionally get an in-place org switch, which writes the
+ * chosen org to the same `selectedOrganizationId` key the resolver reads
+ * (usehooks-ts broadcasts a `local-storage` event so every reader re-resolves
+ * in this tab) and navigates to `/settings`, the parent of every org-scoped
+ * route, always valid for any org the user belongs to.
  */
 const OrganizationScopeHeaderSwitcher = React.memo(
   function OrganizationScopeHeaderSwitcher() {
     const router = useRouter();
+    const data = useWorkspaceData();
     const { organization, organizations } = useOrganizationTeamProject({
       redirectToOnboarding: false,
       redirectToProjectOnboarding: false,
@@ -160,114 +164,32 @@ const OrganizationScopeHeaderSwitcher = React.memo(
       "selectedOrganizationId",
       "",
     );
-    const [open, setOpen] = useState(false);
 
     if (!organization) return null;
 
-    const chip = (
-      <HStack
-        gap={1.5}
-        paddingX={2.5}
-        height="28px"
-        borderRadius="md"
-        bg="bg.emphasized"
-      >
-        <Building2 size={14} />
-        <Text fontSize="sm" fontWeight="medium">
-          {organization.name}
-        </Text>
-      </HStack>
-    );
+    const orgList = (organizations ?? []).map((org) => ({
+      orgId: org.id,
+      orgName: org.name,
+      orgSlug: org.slug,
+    }));
 
-    // Single-org (or not-yet-loaded) users see the original static chip with no
-    // affordance - nothing to switch to.
-    if (!organizations || organizations.length < 2) {
-      return chip;
-    }
-
-    const switchOrganization = (orgId: string) => {
-      setOpen(false);
+    const onSwitchOrganization = (orgId: string) => {
       if (orgId === organization.id) return;
       setSelectedOrganizationId(orgId);
       void router.push("/settings");
     };
 
     return (
-      <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
-        <Menu.Trigger asChild>
-          <Button
-            variant="ghost"
-            padding={0}
-            height="auto"
-            minWidth="fit-content"
-            fontWeight="normal"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-label={`Switch organization (current: ${organization.name})`}
-            _hover={{ "& > div": { bg: "bg.muted" } }}
-          >
-            <HStack
-              gap={1.5}
-              paddingX={2.5}
-              height="28px"
-              borderRadius="md"
-              bg="bg.emphasized"
-            >
-              <Building2 size={14} />
-              <Text fontSize="sm" fontWeight="medium">
-                {organization.name}
-              </Text>
-              <ChevronDown size={14} />
-            </HStack>
-          </Button>
-        </Menu.Trigger>
-        <Portal>
-          <Box zIndex="popover" padding={0}>
-            {open && (
-              <Menu.Content minWidth="240px" maxHeight="70vh" overflowY="auto">
-                <Menu.ItemGroup title="Organizations">
-                  {organizations.map((org) => {
-                    const active = org.id === organization.id;
-                    return (
-                      <Menu.Item
-                        key={org.id}
-                        value={org.id}
-                        fontSize="14px"
-                        paddingY="5px"
-                        onClick={() => switchOrganization(org.id)}
-                      >
-                        <HStack gap={3} width="full" alignItems="center">
-                          <Box
-                            width="20px"
-                            display="flex"
-                            justifyContent="center"
-                            flexShrink={0}
-                          >
-                            <Building2 size={14} />
-                          </Box>
-                          <Text
-                            fontWeight={active ? "semibold" : "normal"}
-                            truncate
-                            flex={1}
-                            minWidth={0}
-                          >
-                            {org.name}
-                          </Text>
-                          {active && (
-                            <Box color="fg.muted" flexShrink={0}>
-                              <Check size={14} />
-                            </Box>
-                          )}
-                        </HStack>
-                      </Menu.Item>
-                    );
-                  })}
-                </Menu.ItemGroup>
-              </Menu.Content>
-            )}
-          </Box>
-        </Portal>
-      </Menu.Root>
+      <WorkspaceSwitcher
+        {...data}
+        current={{
+          kind: "organization",
+          orgId: organization.id,
+          orgName: organization.name,
+        }}
+        organizations={orgList}
+        onSwitchOrganization={onSwitchOrganization}
+      />
     );
   },
 );
@@ -280,7 +202,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   project: Project;
 }) {
   const router = useRouter();
-  const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
   const [open, setOpen] = useState(false);
 
@@ -363,47 +284,13 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                         >
                           <Link
                             key={project_.id}
-                            href={(() => {
-                              const currentPath = window.location.pathname;
-                              const hasProjectInRoute =
-                                currentRoute?.path.includes("[project]");
-                              const hasProjectInPath = currentPath.includes(
-                                project.slug,
-                              );
-
-                              if (hasProjectInRoute) {
-                                // Check if route has other dynamic segments beyond [project]
-                                // If so, redirect to parent route to avoid 404
-                                const hasOtherDynamicSegments =
-                                  currentRoute?.path
-                                    .replace("[project]", "")
-                                    .includes("[");
-
-                                if (
-                                  hasOtherDynamicSegments &&
-                                  currentRoute?.parent
-                                ) {
-                                  const parentRoute =
-                                    projectRoutes[currentRoute.parent];
-                                  return parentRoute.path
-                                    .replace("[project]", project_.slug)
-                                    .replace(/\/\/+/g, "/");
-                                }
-
-                                return currentRoute?.path
-                                  .replace("[project]", project_.slug)
-                                  .replace(/\/\/+/g, "/");
-                              } else if (hasProjectInPath) {
-                                return currentPath.replace(
-                                  project.slug,
-                                  project_.slug,
-                                );
-                              } else {
-                                return `/${
-                                  project_.slug
-                                }?return_to=${encodeURIComponent(currentPath)}`;
-                              }
-                            })()}
+                            href={buildProjectSwitchHref({
+                              routePattern: router.pathname,
+                              resolvedPathname: window.location.pathname,
+                              currentProjectSlug: project.slug,
+                              targetSlug: project_.slug,
+                              homeFallback: "returnTo",
+                            })}
                             onClick={() => {
                               const currentPath = window.location.pathname;
                               const hasProjectInPath = currentPath.includes(
@@ -766,22 +653,8 @@ export const DashboardLayout = ({
               </HStack>
             </HStack>
           ) : isOrgScopeRoute && organization ? (
-            <HStack gap={3} alignItems="center" paddingLeft={2}>
+            <HStack gap={0} alignItems="center" paddingLeft={2}>
               <OrganizationScopeHeaderSwitcher />
-              <HStack
-                gap={1.5}
-                paddingX={2.5}
-                height="28px"
-                borderRadius="md"
-                bg="purple.500/8"
-                border="1px solid"
-                borderColor="purple.500/15"
-              >
-                <Info size={12} color="var(--chakra-colors-purple-400)" />
-                <Text fontSize="xs" color="purple.400">
-                  Organization-scoped, not tied to a project
-                </Text>
-              </HStack>
             </HStack>
           ) : isPersonalScopeRoute && organizations ? (
             <HStack gap={0} alignItems="center" paddingLeft={2}>
