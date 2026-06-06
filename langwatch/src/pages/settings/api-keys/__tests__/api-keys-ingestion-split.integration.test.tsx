@@ -66,11 +66,19 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   }),
 }));
 
-// Built once in the factory closure and returned by reference on every call —
-// a fresh literal per call busts the useMemo([organization]) inside
-// useAvailableScopes and hangs the worker. See the sibling scope-filter test.
+// Built once via vi.hoisted and returned by reference on every call — a fresh
+// literal per call busts the useMemo([organization]) inside useAvailableScopes
+// and hangs the worker. See the sibling scope-filter test. `project.apiKey` is
+// mutated per test (default null) to toggle the legacy project-key row.
+const otpMocks = vi.hoisted(() => ({
+  project: {
+    id: "proj-1",
+    name: "Project Alpha",
+    apiKey: null as string | null,
+  },
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
-  const project = { id: "proj-1", name: "Project Alpha", apiKey: null };
   const organization = {
     id: "org-1",
     name: "Acme Corp",
@@ -85,7 +93,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => {
   const team = { id: "team-1", name: "Team Red" };
   return {
     useOrganizationTeamProject: () => ({
-      project,
+      project: otpMocks.project,
       organization,
       team,
       hasPermission: () => true,
@@ -177,6 +185,7 @@ function renderSection() {
 describe("<ApiKeysSection /> ingestion-key split", () => {
   beforeEach(() => {
     for (const k of Object.keys(mockRouterQuery)) delete mockRouterQuery[k];
+    otpMocks.project.apiKey = null;
   });
   afterEach(() => cleanup());
 
@@ -259,6 +268,54 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
           screen.queryByRole("heading", { name: "API keys" }),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given both an ingestion key and a regular key", () => {
+    beforeEach(() => {
+      mockApiKeyList.mockReturnValue({
+        data: [
+          makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+          makeRegularKey("key-ci", "CI Pipeline"),
+        ],
+        isLoading: false,
+      });
+    });
+
+    /** @scenario API keys render above ingestion keys */
+    it("renders the API keys section above the Ingestion keys section", () => {
+      renderSection();
+      const apiHeading = screen.getByRole("heading", { name: "API keys" });
+      const ingestHeading = screen.getByRole("heading", {
+        name: "Ingestion keys",
+      });
+      // DOCUMENT_POSITION_FOLLOWING (4) means ingestHeading comes after the
+      // API keys heading in document order.
+      expect(
+        apiHeading.compareDocumentPosition(ingestHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario Ingestion keys render in their own labeled section */
+    it("shows the ingestion key secret with the ik-lw- prefix", () => {
+      renderSection();
+      expect(screen.getByText(/^ik-lw-/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the legacy per-project service key exists", () => {
+    beforeEach(() => {
+      otpMocks.project.apiKey = "sk-proj-legacy-secret-abcd";
+      mockApiKeyList.mockReturnValue({ data: [], isLoading: false });
+    });
+
+    /** @scenario Legacy project key row names its project */
+    it("renders the project name on the legacy project key row", () => {
+      renderSection();
+      expect(screen.getByText("Project API Key")).toBeInTheDocument();
+      // The scope cell names the project this fixed key belongs to.
+      expect(screen.getByText("Project Alpha")).toBeInTheDocument();
     });
   });
 });
