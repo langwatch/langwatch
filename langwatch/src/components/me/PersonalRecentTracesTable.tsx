@@ -80,7 +80,9 @@ export function PersonalRecentTracesTable({
       projectId,
       timeRange,
       sort: { columnId: "time", direction: "desc" },
-      page: 0,
+      // The list endpoint paginates 1-based (page.min(1)); page 0 fails
+      // input validation and the table silently renders empty.
+      page: 1,
       pageSize: RECENT_LIMIT,
     },
     { enabled: !!projectId, staleTime: 60_000, keepPreviousData: true },
