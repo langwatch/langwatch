@@ -83,7 +83,10 @@ const canonicalizeClaudeB = (): NormalizedAttributes => {
       spanId: `span_${i}`,
       timeUnixMs: 1_700_000_000_000 + i,
       eventName: r.eventName,
-      attrs: r.attrs as Record<string, string>,
+      // The JSON fixture infers a union of per-event-shape literals whose
+      // optional keys are typed `undefined`; route through `unknown` to land
+      // on the converter's string bag.
+      attrs: r.attrs as unknown as Record<string, string>,
       resource: null,
       instrumentationScope: null,
     }),

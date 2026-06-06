@@ -17,9 +17,10 @@ import { PersonalWorkspaceService } from "./personalWorkspace.service";
  *     opencode / claude_cowork) — stamped as `langwatch.source` provenance.
  *   - a single PROJECT-scoped CUSTOM role binding granting only `traces:create`
  *     (genuinely write-only — see ingest-api-key-lifecycle.feature).
- *   - `userId = null`: it is a project credential, not a user credential, so it
- *     behaves identically for personal and team projects. Authorization to mint
- *     is enforced by the caller (router).
+ *   - `userId` = the owning user for personal-project keys (so the API-key list
+ *     scopes them to their owner), or `null` for company-wide governance-project
+ *     keys (a genuine org service credential). Authorization to mint is enforced
+ *     by the caller (router); ownership only governs list visibility.
  *
  * Rotation is hard-cut: minting revokes any prior live ingest key for the same
  * (project, sourceType) before creating the new one, so a tool never
@@ -43,15 +44,21 @@ export class IngestionKeyService {
   /**
    * Issues (rotating in place) an ingestion key for a specific project.
    * Returns the plaintext token exactly once.
+   *
+   * `ownerUserId` decides API-key list visibility: pass the owning user for a
+   * personal-project key (so only that user and org admins see it), or `null`
+   * for a company-wide governance-project key (a genuine org service key).
    */
   async ensureForProject({
     callerUserId,
+    ownerUserId,
     organizationId,
     projectId,
     sourceType,
     ingestionTemplateId = null,
   }: {
     callerUserId: string;
+    ownerUserId: string | null;
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -76,8 +83,7 @@ export class IngestionKeyService {
 
     const { token, apiKey } = await this.apiKeys.create({
       name: `Ingestion key (${sourceType})`,
-      // Project credential, not user-owned — authz is enforced at the router.
-      userId: null,
+      userId: ownerUserId,
       createdByUserId: callerUserId,
       organizationId,
       permissionMode: "restricted",
@@ -123,6 +129,9 @@ export class IngestionKeyService {
 
     return this.ensureForProject({
       callerUserId: userId,
+      // Personal-project key: owned by the user so the API-key list scopes it
+      // to its owner (and org admins), never to other org members.
+      ownerUserId: userId,
       organizationId,
       projectId: workspace.project.id,
       sourceType,
@@ -156,6 +165,8 @@ export class IngestionKeyService {
     );
     return this.ensureForProject({
       callerUserId,
+      // Company-wide key: a genuine org service credential, not user-owned.
+      ownerUserId: null,
       organizationId,
       projectId: govProject.id,
       sourceType,

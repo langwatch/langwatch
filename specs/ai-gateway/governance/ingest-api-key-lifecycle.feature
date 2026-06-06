@@ -184,6 +184,19 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And the key cannot write into any other project
 
   # ---------------------------------------------------------------------------
+  # List visibility: personal ingest keys are private to their owner
+  # ---------------------------------------------------------------------------
+
+  @bdd @ingest-api-key @isolation @security
+  Scenario: Personal ingestion keys are not listed to other organization members
+    Given jane and ben each hold a personal ingestion key in "acme"
+    When ben opens Settings > API Keys as a non-admin member
+    Then ben sees his own ingestion key but not jane's
+    And ben does not see the org's company-wide ingestion keys
+    # Personal ingest keys are user-owned, so the API-key list scopes them to
+    # their owner; company-wide keys stay admin-only.
+
+  # ---------------------------------------------------------------------------
   # Activity tracking — lastUsedAt, not audit volume
   # ---------------------------------------------------------------------------
 

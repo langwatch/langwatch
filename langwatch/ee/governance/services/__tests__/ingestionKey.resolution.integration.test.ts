@@ -115,6 +115,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     it("mints through the org-tenancy guard and self-scopes on resolution with no projectId", async () => {
       const issued = await ingestKeys.ensureForProject({
         callerUserId: USER_ID,
+        ownerUserId: USER_ID,
         organizationId: ORG_ID,
         projectId: PROJECT_ID,
         sourceType: "claude_code",
@@ -189,12 +190,14 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     it("revokes the previous token so it stops resolving", async () => {
       const first = await ingestKeys.ensureForProject({
         callerUserId: USER_ID,
+        ownerUserId: USER_ID,
         organizationId: ORG_ID,
         projectId: OTHER_PROJECT_ID,
         sourceType: "codex",
       });
       const second = await ingestKeys.ensureForProject({
         callerUserId: USER_ID,
+        ownerUserId: USER_ID,
         organizationId: ORG_ID,
         projectId: OTHER_PROJECT_ID,
         sourceType: "codex",

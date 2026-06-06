@@ -163,12 +163,16 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<ApiKeyWithBindings[]> {
-    // Include both the user's own keys and service keys (userId = null)
+    // The caller's own keys (including their own personal ingestion key, which
+    // is user-owned) plus org service keys (userId = null). Company-wide
+    // ingestion keys are org-owned (userId = null) but must NOT leak their
+    // source/template/activity metadata to non-admins, so they are excluded
+    // here; admins reach them via the admin-gated company-wide list.
     return this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
-        OR: [{ userId }, { userId: null }],
+        OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
         roleBindings: {
