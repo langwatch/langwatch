@@ -271,8 +271,10 @@ export const propagateMappingsToNewDataset = (
 };
 
 /**
- * Fields that should primarily come from the target output.
- * "output" is the most common evaluator input that should connect to target.
+ * Identifiers whose only sensible source is the runner/target output. The
+ * heuristic never falls back to a same-named dataset column for these —
+ * letting an evaluator's `output` map back to a dataset column produces the
+ * very tautology the user did not want (grading the dataset against itself).
  */
 const TARGET_OUTPUT_FIELDS = new Set([
   "output",
@@ -280,6 +282,38 @@ const TARGET_OUTPUT_FIELDS = new Set([
   "answer",
   "result",
   "generated",
+]);
+
+/**
+ * Identifiers whose only sensible source is the dataset. The heuristic never
+ * falls back to a same-named runner output for these — the whole reason a
+ * dataset row carries an expected answer or an input is to grade against it,
+ * and reading those back from the runner would be a tautology too.
+ *
+ * Anything outside both sets (custom evaluator inputs like `score`,
+ * `threshold`, `label`) keeps the original dual-try behavior so the
+ * restriction stays narrow.
+ */
+const DATASET_INPUT_FIELDS = new Set([
+  // Input family (the prompt's input)
+  "input",
+  "question",
+  "user_input",
+  "user_query",
+  "query",
+  "prompt",
+  "message",
+  // Expected family (the golden answer)
+  "expected_output",
+  "expected_answer",
+  "ground_truth",
+  "expected",
+  "expected_result",
+  // Context family (retrieval / supporting facts)
+  "context",
+  "contexts",
+  "retrieved_contexts",
+  "relevant_context",
 ]);
 
 /**
@@ -314,11 +348,11 @@ export const inferEvaluatorMappings = (
     }
 
     const fieldLower = input.identifier.toLowerCase();
-    const shouldPrioritizeTarget = TARGET_OUTPUT_FIELDS.has(fieldLower);
+    const isTargetOnly = TARGET_OUTPUT_FIELDS.has(fieldLower);
+    const isDatasetOnly = DATASET_INPUT_FIELDS.has(fieldLower);
 
-    if (shouldPrioritizeTarget) {
-      // For "output" and similar: try target FIRST, then dataset
-      const targetOutputMatch = findMatchingColumn(
+    const targetMatch = (): string | undefined =>
+      findMatchingColumn(
         input.identifier,
         target.outputs.map((o) => ({
           id: o.identifier,
@@ -327,60 +361,54 @@ export const inferEvaluatorMappings = (
         })),
       );
 
-      if (targetOutputMatch) {
+    const datasetMatch = (): string | undefined =>
+      findMatchingColumn(input.identifier, dataset.columns);
+
+    if (isTargetOnly) {
+      const m = targetMatch();
+      if (m) {
         newMappings[input.identifier] = {
           type: "source",
           source: "target",
           sourceId: target.id,
-          sourceField: targetOutputMatch,
+          sourceField: m,
         };
-        continue;
       }
-
-      // Fallback to dataset if no target match
-      const datasetColumnMatch = findMatchingColumn(
-        input.identifier,
-        dataset.columns,
-      );
-      if (datasetColumnMatch) {
+      // No dataset fallback: empty beats a mapping that grades the dataset
+      // against itself.
+    } else if (isDatasetOnly) {
+      const m = datasetMatch();
+      if (m) {
         newMappings[input.identifier] = {
           type: "source",
           source: "dataset",
           sourceId: dataset.id,
-          sourceField: datasetColumnMatch,
+          sourceField: m,
         };
       }
+      // No target fallback: empty beats a mapping that reads an expected
+      // answer back from the runner.
     } else {
-      // For "input", "expected_output", etc: try dataset FIRST, then target
-      const datasetColumnMatch = findMatchingColumn(
-        input.identifier,
-        dataset.columns,
-      );
-      if (datasetColumnMatch) {
+      // Custom identifier (score, threshold, label, etc.): dataset first,
+      // then target. Preserves the original heuristic for everything
+      // outside the locked-side families above.
+      const fromDataset = datasetMatch();
+      if (fromDataset) {
         newMappings[input.identifier] = {
           type: "source",
           source: "dataset",
           sourceId: dataset.id,
-          sourceField: datasetColumnMatch,
+          sourceField: fromDataset,
         };
         continue;
       }
-
-      // Fallback to target if no dataset match
-      const targetOutputMatch = findMatchingColumn(
-        input.identifier,
-        target.outputs.map((o) => ({
-          id: o.identifier,
-          name: o.identifier,
-          type: "string" as const,
-        })),
-      );
-      if (targetOutputMatch) {
+      const fromTarget = targetMatch();
+      if (fromTarget) {
         newMappings[input.identifier] = {
           type: "source",
           source: "target",
           sourceId: target.id,
-          sourceField: targetOutputMatch,
+          sourceField: fromTarget,
         };
       }
     }
