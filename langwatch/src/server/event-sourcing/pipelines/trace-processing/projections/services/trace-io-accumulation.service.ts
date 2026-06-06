@@ -32,7 +32,7 @@ export const CLAUDE_CODE_SCOPE_NAMES = new Set([
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 /**
- * Priority: root > explicit > last-finishing.
+ * Priority: root (latest-finishing among roots) > explicit > last-finishing.
  * @internal Exported for unit testing
  */
 export function shouldOverrideOutput({
@@ -50,7 +50,14 @@ export function shouldOverrideOutput({
   endTime: number;
   currentEndTime: number;
 }): boolean {
-  if (isRoot) return true;
+  // A parentless span is "root". A claude_code Path B turn synthesizes MANY
+  // parentless spans under one trace (one per model call), so "root" is not
+  // unique here: among roots the latest-finishing reply wins, so the trace
+  // output is deterministic by end time instead of last-folded-wins (the real
+  // reply often sits on a middle call, with utility calls finishing after it).
+  // A root still beats a non-root child that set the output. For a conventional
+  // single-root trace this is a no-op — there is only ever one root.
+  if (isRoot) return !outputFromRoot || endTime >= currentEndTime;
   if (outputFromRoot) return false;
   if (isExplicit && !currentIsExplicit) return true;
   if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
