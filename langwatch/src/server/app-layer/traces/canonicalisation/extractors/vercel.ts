@@ -32,7 +32,7 @@ import {
   normaliseModelFromAiModelObject,
   recordValueType,
 } from "./_extraction";
-import { isNonEmptyString, isRecord } from "./_guards";
+import { asNumber, isNonEmptyString, isRecord } from "./_guards";
 import { extractSystemInstructionFromMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
@@ -123,6 +123,32 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       { object: ATTR_KEYS.AI_USAGE },
       `${this.id}:ai.usage->gen_ai.usage`,
     );
+
+    // Cache token details. The AI SDK reports cached input as flat-dotted
+    // attributes (ai.usage.inputTokenDetails.cache{Read,Write}Tokens, with
+    // ai.usage.cachedInputTokens as the older read alias) rather than the
+    // gen_ai.usage.cache_* convention, so map them here. Without this an
+    // opencode Path B cache-creation turn (12k+ tokens) goes uncounted.
+    const cacheRead =
+      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
+      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
+    const cacheWrite = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
+    if (cacheRead !== null && cacheRead > 0) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        cacheRead,
+      );
+      ctx.recordRule(`${this.id}:ai.usage.cacheRead->gen_ai.usage.cache_read`);
+    }
+    if (cacheWrite !== null && cacheWrite > 0) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        cacheWrite,
+      );
+      ctx.recordRule(
+        `${this.id}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`,
+      );
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Input Messages

@@ -76,6 +76,13 @@ export const ATTR_KEYS = {
   AI_RESPONSE_OBJECT: "ai.response.object",
   AI_MODEL: "ai.model",
   AI_USAGE: "ai.usage",
+  // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK
+  // embedders emit these instead of gen_ai.usage.cache_*). cacheReadTokens and
+  // cacheWriteTokens live under inputTokenDetails; cachedInputTokens is the
+  // older flat alias for the read count.
+  AI_USAGE_CACHED_INPUT_TOKENS: "ai.usage.cachedInputTokens",
+  AI_USAGE_CACHE_READ_TOKENS: "ai.usage.inputTokenDetails.cacheReadTokens",
+  AI_USAGE_CACHE_WRITE_TOKENS: "ai.usage.inputTokenDetails.cacheWriteTokens",
   AI_TOOL_CALL: "ai.toolCall",
   AI_TOOL_CALL_NAME: "ai.toolCall.name",
   AI_TOOL_CALL_ARGS: "ai.toolCall.args",

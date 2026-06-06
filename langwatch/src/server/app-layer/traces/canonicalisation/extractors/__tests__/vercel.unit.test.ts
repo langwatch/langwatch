@@ -185,4 +185,77 @@ describe("VercelExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
     });
   });
+
+  describe("when the AI SDK reports cache token details", () => {
+    it("maps inputTokenDetails.cacheWriteTokens to gen_ai cache_creation (opencode Path B)", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS]: 12629,
+          [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 0,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
+        12629,
+      );
+      // a zero read count is not surfaced as a redundant gen_ai attr
+      expect(
+        ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
+      ).toBeUndefined();
+    });
+
+    it("maps inputTokenDetails.cacheReadTokens to gen_ai cache_read on a cached turn", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 12629,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        12629,
+      );
+    });
+
+    it("falls back to the cachedInputTokens alias for the read count", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        8745,
+      );
+    });
+  });
 });
