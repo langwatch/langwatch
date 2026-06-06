@@ -830,10 +830,16 @@ export class ElasticsearchTraceService {
     startDate: number,
     endDate: number,
   ): Promise<DistinctFieldNamesResult> {
-    return esGetDistinctFieldNames({
+    const { spanNames, metadataKeys } = await esGetDistinctFieldNames({
       connConfig: { projectId },
       startDate,
       endDate,
     });
+    // Project-wide evaluator names are served from ClickHouse, the active
+    // backend (TraceService.getDistinctFieldNames always routes there). This
+    // Elasticsearch path predates that and is not reached for field-name
+    // mapping; the dropdowns still fall back to the trace-derived keys, so ES
+    // projects keep working without the project-wide expansion.
+    return { spanNames, metadataKeys, evaluationNames: [] };
   }
 }

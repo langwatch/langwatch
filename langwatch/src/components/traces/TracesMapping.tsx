@@ -74,6 +74,44 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
 
 type KeyOption = { key: string; label: string };
 
+/**
+ * Sources whose key dropdowns are expanded with the project's distinct field
+ * names from the last 30 days (not just the names on the loaded trace).
+ *
+ * Events are deliberately absent: their types live only inside the heavy
+ * stored_spans.SpanAttributes map, so a project-wide scan is not memory-safe
+ * (see DistinctFieldNamesResult). The events dropdown stays trace-derived.
+ */
+const PROJECT_FIELD_NAME_SOURCES: string[] = [
+  "spans",
+  "metadata",
+  "evaluations",
+];
+
+/** Result subfields an evaluation always exposes (see the evaluations mapping). */
+const DEFAULT_EVALUATION_SUBKEYS: KeyOption[] = [
+  "passed",
+  "score",
+  "label",
+  "details",
+  "status",
+  "error",
+].map((key) => ({ key, label: key }));
+
+/** Placeholder shown while a source's project-wide names are still loading. */
+const FIELD_NAME_LOADING_LABEL: Record<string, string> = {
+  spans: "Loading span names…",
+  metadata: "Loading metadata keys…",
+  evaluations: "Loading evaluations…",
+};
+
+/** Label for the "match everything" option at the top of a source's dropdown. */
+const FIELD_NAME_ANY_LABEL: Record<string, string> = {
+  spans: "* (any span)",
+  metadata: "* (all metadata)",
+  evaluations: "* (any evaluation)",
+};
+
 /** Dedupe {key,label} options by key, preserving first-seen order. */
 const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
   const seen = new Set<string>();
@@ -208,30 +246,32 @@ export const TracesMapping = ({
   );
   const mapping = traceMappingState.mapping;
 
-  // Only the spans and metadata sources draw from project-wide names. Fetch the
-  // 30-day distinct field-name list lazily — only when such a column is actually
-  // being mapped — so merely opening the drawer/wizard (or any other place that
-  // renders this component) doesn't trigger the heavier ClickHouse scan when no
-  // span/metadata column is in play.
+  // The spans, metadata, evaluations and events sources draw from project-wide
+  // names. Fetch the 30-day distinct field-name list lazily — only when such a
+  // column is actually being mapped — so merely opening the drawer/wizard (or
+  // any other place that renders this component) doesn't trigger the heavier
+  // ClickHouse scan when none of those sources is in play.
   const needsProjectFieldNames = useMemo(
     () =>
-      Object.values(mapping).some(
-        (m) => m.source === "spans" || m.source === "metadata",
+      Object.values(mapping).some((m) =>
+        PROJECT_FIELD_NAME_SOURCES.includes(m.source),
       ),
     [mapping],
   );
   const {
     spanNames: projectSpanNames,
     metadataKeys: projectMetadataKeys,
+    evaluationNames: projectEvaluationNames,
     isLoading: projectFieldNamesLoading,
   } = useProjectSpanNames({
     projectId: project?.id,
     enabled: needsProjectFieldNames,
   });
 
-  // Span / metadata dropdowns should offer every name the project produced in
-  // the last 30 days, not just the names on the loaded trace(s) — otherwise a
-  // span that exists elsewhere in the project cannot be selected for mapping.
+  // These dropdowns should offer every name the project produced in the last 30
+  // days, not just the names on the loaded trace(s) — otherwise a span (or
+  // evaluator) that exists elsewhere in the project cannot be selected for
+  // mapping.
   const mergeProjectKeyOptions = useCallback(
     (source: string, baseOptions: KeyOption[]): KeyOption[] => {
       const projectOptions =
@@ -239,7 +279,9 @@ export const TracesMapping = ({
           ? projectSpanNames
           : source === "metadata"
             ? projectMetadataKeys
-            : [];
+            : source === "evaluations"
+              ? projectEvaluationNames
+              : [];
       if (projectOptions.length === 0) {
         return baseOptions;
       }
@@ -247,7 +289,7 @@ export const TracesMapping = ({
         a.label.localeCompare(b.label),
       );
     },
-    [projectSpanNames, projectMetadataKeys],
+    [projectSpanNames, projectMetadataKeys, projectEvaluationNames],
   );
 
   // Check if any column uses a server-only source (e.g. formatted_trace)
@@ -505,6 +547,13 @@ export const TracesMapping = ({
             { key: "contexts", label: "contexts" },
           ];
 
+          const computeSubkeys = (k: string) =>
+            traceMappingDefinition && "subkeys" in traceMappingDefinition
+              ? traceMappingDefinition.subkeys(traces_, k, {
+                  annotationScoreOptions: getAnnotationScoreOptions.data,
+                })
+              : [];
+
           const subkeys =
             traceMappingDefinition &&
             "subkeys" in traceMappingDefinition &&
@@ -516,21 +565,25 @@ export const TracesMapping = ({
                   // loaded trace, where subkey discovery would otherwise be empty.
                   dedupeKeyOptions([
                     ...defaultSpanSubkeys,
-                    ...(key
-                      ? traceMappingDefinition.subkeys(traces_, key, {
-                          annotationScoreOptions: getAnnotationScoreOptions.data,
-                        })
-                      : []),
+                    ...(key ? computeSubkeys(key) : []),
                   ])
-                : traceMappingDefinition.subkeys(traces_, key!, {
-                    annotationScoreOptions: getAnnotationScoreOptions.data,
-                  })
+                : source === "evaluations" && key
+                  ? // Evaluations always expose the same result subfields. Offer
+                    // them for any selected evaluator — including project-wide
+                    // ones not on the loaded trace, where subkey discovery would
+                    // otherwise be empty.
+                    dedupeKeyOptions([
+                      ...DEFAULT_EVALUATION_SUBKEYS,
+                      ...computeSubkeys(key),
+                    ])
+                  : computeSubkeys(key!)
               : undefined;
 
-          // The spans/metadata key dropdown waits on the project-wide name list.
+          // The spans/metadata/evaluations key dropdown waits on the
+          // project-wide name list.
           const isLoadingFieldNames =
             projectFieldNamesLoading &&
-            (source === "spans" || source === "metadata");
+            PROJECT_FIELD_NAME_SOURCES.includes(source);
 
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
@@ -715,19 +768,14 @@ export const TracesMapping = ({
                                     incomplete (trace-only) list. */}
                                 {isLoadingFieldNames ? (
                                   <option value="">
-                                    {source === "spans"
-                                      ? "Loading span names…"
-                                      : "Loading metadata keys…"}
+                                    {FIELD_NAME_LOADING_LABEL[source] ??
+                                      "Loading…"}
                                   </option>
                                 ) : (
                                   <>
-                                    {/* "* (any span)" option - matches all spans */}
+                                    {/* "match everything" option for the source */}
                                     <option value="">
-                                      {source === "spans"
-                                        ? "* (any span)"
-                                        : source === "metadata"
-                                          ? "* (all metadata)"
-                                          : "* (any)"}
+                                      {FIELD_NAME_ANY_LABEL[source] ?? "* (any)"}
                                     </option>
                                     {mergeProjectKeyOptions(
                                       source,

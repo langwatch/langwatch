@@ -213,6 +213,48 @@ describe("useProjectSpanNames", () => {
     expect(keys).toContain("labels");
   });
 
+  it("passes through evaluation names from the endpoint response", () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        spanNames: [],
+        metadataKeys: [],
+        evaluationNames: [
+          { key: "evaluator-pii", label: "PII Check" },
+          { key: "evaluator-toxicity", label: "Toxicity" },
+        ],
+        eventTypes: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useProjectSpanNames({ projectId: "project-123" }),
+    );
+
+    expect(result.current.evaluationNames).toHaveLength(2);
+    expect(result.current.evaluationNames.map((e) => e.key)).toContain(
+      "evaluator-pii",
+    );
+    expect(result.current.evaluationNames.map((e) => e.label)).toContain(
+      "PII Check",
+    );
+  });
+
+  it("returns empty evaluationNames when absent from the response", () => {
+    mockUseQuery.mockReturnValue({
+      data: { spanNames: [], metadataKeys: [] },
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useProjectSpanNames({ projectId: "project-123" }),
+    );
+
+    expect(result.current.evaluationNames).toEqual([]);
+  });
+
   it("excludes 'custom' and 'all_keys' from metadata keys", () => {
     mockUseQuery.mockReturnValue({
       data: {
