@@ -96,25 +96,25 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
   Rule: an explicit override flag or env skips the prompt and is stripped from forwarded args
 
     @unit
-    Scenario: --lw-path=otlp forces ingestion and is not forwarded to the tool
+    Scenario: --tool-mode=otlp forces ingestion and is not forwarded to the tool
       Given tool_mode.claude is unset
-      When the user runs `langwatch claude --lw-path=otlp -p "hi"`
+      When the user runs `langwatch claude --tool-mode=otlp -p "hi"`
       Then the wrapper does NOT prompt
       And it proceeds in ingestion mode
       And the spawned `claude` receives argv `['-p', 'hi']` exactly
-      And no `--lw-path` flag leaks into the child's argv
+      And no `--tool-mode` flag leaks into the child's argv
 
     @unit
-    Scenario: --lw-path=gateway forces the gateway path
+    Scenario: --tool-mode=gateway forces the gateway path
       Given tool_mode.claude is unset
-      When the user runs `langwatch claude --lw-path=gateway`
+      When the user runs `langwatch claude --tool-mode=gateway`
       Then the wrapper does NOT prompt
       And it routes through the gateway
 
     @unit
-    Scenario: LANGWATCH_PATH=otlp forces ingestion without a flag
+    Scenario: LANGWATCH_TOOL_MODE=otlp forces ingestion without a flag
       Given tool_mode.claude is unset
-      And `LANGWATCH_PATH=otlp` is exported
+      And `LANGWATCH_TOOL_MODE=otlp` is exported
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
       And it proceeds in ingestion mode

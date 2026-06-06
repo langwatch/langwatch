@@ -3,7 +3,7 @@
  *
  * Covers the decision tree (override flag / env, remembered pref,
  * single-allowed-path, both-allowed prompt, non-TTY default) and the
- * `--lw-path` arg-strip that keeps the wrapper flag out of the child's
+ * `--tool-mode` arg-strip that keeps the wrapper flag out of the child's
  * argv. The prompt + config-save are injected seams, so no module mock
  * or filesystem touch is needed.
  */
@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
 import {
-  parseLwPath,
+  parseToolModeFlag,
   resolveWrapperPath,
   pathChoiceMessage,
   gatewayChoiceTitle,
@@ -39,11 +39,11 @@ const neverPrompt = vi.fn(async () => {
   throw new Error("prompt should not have been called");
 }) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
 
-describe("parseLwPath", () => {
+describe("parseToolModeFlag", () => {
   describe("given no wrapper flag is present", () => {
     it("forwards every arg verbatim in order with no override", () => {
       const input = ["--dangerously-skip-permissions", "-p", "say hi"];
-      const out = parseLwPath(input, {});
+      const out = parseToolModeFlag(input, {});
       expect(out.args).toEqual([
         "--dangerously-skip-permissions",
         "-p",
@@ -53,24 +53,24 @@ describe("parseLwPath", () => {
     });
   });
 
-  describe("given --lw-path=otlp in the args", () => {
-    /** @scenario "--lw-path=otlp forces ingestion and is not forwarded to the tool" */
+  describe("given --tool-mode=otlp in the args", () => {
+    /** @scenario "--tool-mode=otlp forces ingestion and is not forwarded to the tool" */
     it("strips the flag and resolves the ingestion override, order preserved", () => {
-      const input = ["--lw-path=otlp", "-p", "hi"];
-      const out = parseLwPath(input, {});
+      const input = ["--tool-mode=otlp", "-p", "hi"];
+      const out = parseToolModeFlag(input, {});
       expect(out.args).toEqual(["-p", "hi"]);
       expect(out.override).toBe("ingestion");
     });
 
-    /** @scenario "--lw-path=gateway forces the gateway path" */
+    /** @scenario "--tool-mode=gateway forces the gateway path" */
     it("strips the flag from the MIDDLE without disturbing surrounding args", () => {
       const input = [
         "--dangerously-skip-permissions",
-        "--lw-path=gateway",
+        "--tool-mode=gateway",
         "-p",
         "hi there",
       ];
-      const out = parseLwPath(input, {});
+      const out = parseToolModeFlag(input, {});
       expect(out.args).toEqual([
         "--dangerously-skip-permissions",
         "-p",
@@ -80,26 +80,26 @@ describe("parseLwPath", () => {
     });
   });
 
-  describe("given the space-separated --lw-path otlp form", () => {
+  describe("given the space-separated --tool-mode otlp form", () => {
     it("consumes both the flag and its value token", () => {
-      const input = ["--lw-path", "otlp", "--print", "x"];
-      const out = parseLwPath(input, {});
+      const input = ["--tool-mode", "otlp", "--print", "x"];
+      const out = parseToolModeFlag(input, {});
       expect(out.args).toEqual(["--print", "x"]);
       expect(out.override).toBe("ingestion");
     });
   });
 
-  describe("given LANGWATCH_PATH env and no flag", () => {
-    /** @scenario "LANGWATCH_PATH=otlp forces ingestion without a flag" */
+  describe("given LANGWATCH_TOOL_MODE env and no flag", () => {
+    /** @scenario "LANGWATCH_TOOL_MODE=otlp forces ingestion without a flag" */
     it("reads the override from the env", () => {
-      const out = parseLwPath(["-p", "hi"], { LANGWATCH_PATH: "otlp" });
+      const out = parseToolModeFlag(["-p", "hi"], { LANGWATCH_TOOL_MODE: "otlp" });
       expect(out.args).toEqual(["-p", "hi"]);
       expect(out.override).toBe("ingestion");
     });
 
     it("lets the flag win over the env", () => {
-      const out = parseLwPath(["--lw-path=otlp"], {
-        LANGWATCH_PATH: "gateway",
+      const out = parseToolModeFlag(["--tool-mode=otlp"], {
+        LANGWATCH_TOOL_MODE: "gateway",
       });
       expect(out.override).toBe("ingestion");
     });
@@ -214,7 +214,7 @@ describe("resolveWrapperPath", () => {
         expect(persisted.tool_mode?.claude).toBe("gateway");
         // tip mentions how to override + where it's stored.
         const tip = write.mock.calls.map((c) => c[0]).join("");
-        expect(tip).toContain("--lw-path=otlp");
+        expect(tip).toContain("--tool-mode=otlp");
         expect(tip).toContain("config.json");
       });
 

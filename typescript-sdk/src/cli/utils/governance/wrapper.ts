@@ -23,7 +23,7 @@ import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
-import { parseLwPath, resolveWrapperPath } from "./wrapper-path-choice";
+import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -365,10 +365,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.exit(2);
   }
 
-  // Strip the wrapper-only `--lw-path` flag from the args BEFORE anything
+  // Strip the wrapper-only `--tool-mode` flag from the args BEFORE anything
   // forwards them to the real tool, and resolve any explicit override.
   // Everything else stays verbatim + in order for the child invocation.
-  const { args: toolArgs, override: pathOverride } = parseLwPath(args);
+  const { args: toolArgs, override: pathOverride } = parseToolModeFlag(args);
 
   // Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
   // (and remembers the answer) only when the org policy allows BOTH paths,
@@ -498,7 +498,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   }
   const env = { ...parentEnv, ...modeResult.vars };
   // Forward the user's args verbatim and in order, minus the stripped
-  // wrapper flag (`--lw-path`). Any mode-specific prepends (e.g. codex
+  // wrapper flag (`--tool-mode`). Any mode-specific prepends (e.g. codex
   // `--profile langwatch-gateway`) lead.
   const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
 

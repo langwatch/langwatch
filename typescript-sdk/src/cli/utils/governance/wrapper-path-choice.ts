@@ -19,8 +19,8 @@
  * the rest of the wrapper reads it the same way it always has).
  *
  * Precedence (highest first):
- *   1. explicit override - `--lw-path=gateway|otlp` flag, then
- *      `LANGWATCH_PATH=gateway|otlp` env. Never prompts, never persists.
+ *   1. explicit override - `--tool-mode=gateway|otlp` flag, then
+ *      `LANGWATCH_TOOL_MODE=gateway|otlp` env. Never prompts, never persists.
  *   2. remembered answer - cfg.tool_mode[tool] pinned to gateway/ingestion.
  *   3. exactly one allowed path (policy gate) - used silently.
  *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
@@ -28,7 +28,7 @@
  *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - default gateway,
  *      no prompt, no persist.
  *
- * The `--lw-path` flag is a WRAPPER flag: it is stripped from the args
+ * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
  * before they are forwarded to the real tool. Every other arg is
  * forwarded verbatim and in order.
  */
@@ -41,7 +41,7 @@ import type { WrapperMode } from "./wrapper-mode";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 /** Wrapper-only flag name. */
-const LW_PATH_FLAG = "--lw-path";
+const TOOL_MODE_FLAG = "--tool-mode";
 
 /**
  * Map a user-facing path token (`gateway` / `otlp`) to the internal
@@ -55,44 +55,44 @@ function tokenToMode(token: string | undefined): WrapperMode | null {
   return null;
 }
 
-export interface ParsedLwPath {
-  /** Args with every `--lw-path` form removed, order otherwise preserved. */
+export interface ParsedToolMode {
+  /** Args with every `--tool-mode` form removed, order otherwise preserved. */
   args: string[];
-  /** The override mode if `--lw-path` (or LANGWATCH_PATH env) set one. */
+  /** The override mode if `--tool-mode` (or LANGWATCH_TOOL_MODE env) set one. */
   override?: WrapperMode;
 }
 
 /**
- * Strip the wrapper-only `--lw-path` flag from the forwarded args and
- * resolve any explicit override. Supports both `--lw-path=gateway` and
- * the space-separated `--lw-path gateway` form. Falls back to the
- * `LANGWATCH_PATH` env var when the flag is absent (the flag wins).
+ * Strip the wrapper-only `--tool-mode` flag from the forwarded args and
+ * resolve any explicit override. Supports both `--tool-mode=gateway` and
+ * the space-separated `--tool-mode gateway` form. Falls back to the
+ * `LANGWATCH_TOOL_MODE` env var when the flag is absent (the flag wins).
  *
- * CRITICAL: only `--lw-path` is consumed. Every other arg (including
+ * CRITICAL: only `--tool-mode` is consumed. Every other arg (including
  * flags like `--dangerously-skip-permissions` and quoted positional
  * values) is forwarded untouched and in order.
  */
-export function parseLwPath(
+export function parseToolModeFlag(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
-): ParsedLwPath {
+): ParsedToolMode {
   const out: string[] = [];
   let flagOverride: WrapperMode | undefined;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
-    if (arg === LW_PATH_FLAG) {
+    if (arg === TOOL_MODE_FLAG) {
       // Space-separated form: consume the next token as the value.
       const value = args[i + 1];
       const mode = tokenToMode(value);
       if (mode) flagOverride = mode;
       // Skip the value token too (whether or not it parsed) so a bare
-      // `--lw-path gateway` never leaks `gateway` to the child as a
+      // `--tool-mode gateway` never leaks `gateway` to the child as a
       // stray positional.
       if (value !== undefined) i++;
       continue;
     }
-    if (arg.startsWith(`${LW_PATH_FLAG}=`)) {
-      const value = arg.slice(LW_PATH_FLAG.length + 1);
+    if (arg.startsWith(`${TOOL_MODE_FLAG}=`)) {
+      const value = arg.slice(TOOL_MODE_FLAG.length + 1);
       const mode = tokenToMode(value);
       if (mode) flagOverride = mode;
       continue;
@@ -100,7 +100,7 @@ export function parseLwPath(
     out.push(arg);
   }
 
-  const override = flagOverride ?? tokenToMode(env.LANGWATCH_PATH) ?? undefined;
+  const override = flagOverride ?? tokenToMode(env.LANGWATCH_TOOL_MODE) ?? undefined;
   return { args: out, override };
 }
 
@@ -118,9 +118,9 @@ function isForcedAutoLogin(env: NodeJS.ProcessEnv): boolean {
 export interface ResolveWrapperPathOptions {
   cfg: GovernanceConfig;
   tool: string;
-  /** Args already passed through `parseLwPath` (flag stripped). */
+  /** Args already passed through `parseToolModeFlag` (flag stripped). */
   args: string[];
-  /** Explicit override from `parseLwPath`, if any. */
+  /** Explicit override from `parseToolModeFlag`, if any. */
   override?: WrapperMode;
   /** TTY detection seam for tests. Defaults to stdin AND stdout being a TTY. */
   isTTY?: boolean;
@@ -261,7 +261,7 @@ export async function resolveWrapperPath(
   const label = chosen === "gateway" ? "gateway" : "otlp";
   writeImpl(
     `langwatch: saved. \`${tool}\` will use the ${label} path. ` +
-      `Override with --lw-path=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
+      `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
       `or edit ~/.langwatch/config.json (tool_mode.${tool}).\n`,
   );
 
