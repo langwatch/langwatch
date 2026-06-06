@@ -137,6 +137,44 @@ describe("useProjectSpanNames", () => {
     );
   });
 
+  it("disables query when options.enabled is false, even with a projectId", () => {
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
+
+    renderHook(() =>
+      useProjectSpanNames("project-123", { enabled: false }),
+    );
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enabled: false,
+      })
+    );
+  });
+
+  it("enables query when options.enabled is true and projectId is set", () => {
+    mockUseQuery.mockReturnValue({
+      data: { spanNames: [], metadataKeys: [] },
+      isLoading: false,
+      error: null,
+    });
+
+    renderHook(() =>
+      useProjectSpanNames("project-123", { enabled: true }),
+    );
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enabled: true,
+      })
+    );
+  });
+
   it("handles API errors", () => {
     const mockError = new Error("API Error");
     mockUseQuery.mockReturnValue({

@@ -128,15 +128,6 @@ export const TracesMapping = ({
     task: state.workbenchState.task,
   }));
 
-  // Project-wide span names and metadata keys from the last 30 days, so the
-  // mapping dropdowns can offer names that exist in the project even when the
-  // currently loaded trace(s) don't contain them.
-  const {
-    spanNames: projectSpanNames,
-    metadataKeys: projectMetadataKeys,
-    isLoading: projectFieldNamesLoading,
-  } = useProjectSpanNames(project?.id);
-
   const annotationScores = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds: traces.map((trace) => trace.trace_id),
@@ -180,27 +171,6 @@ export const TracesMapping = ({
     [traces, annotationScores.data],
   );
 
-  // Span / metadata dropdowns should offer every name the project produced in
-  // the last 30 days, not just the names on the loaded trace(s) — otherwise a
-  // span that exists elsewhere in the project cannot be selected for mapping.
-  const mergeProjectKeyOptions = useCallback(
-    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
-      const projectOptions =
-        source === "spans"
-          ? projectSpanNames
-          : source === "metadata"
-            ? projectMetadataKeys
-            : [];
-      if (projectOptions.length === 0) {
-        return baseOptions;
-      }
-      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
-        a.label.localeCompare(b.label),
-      );
-    },
-    [projectSpanNames, projectMetadataKeys],
-  );
-
   const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
 
   type LocalTraceMappingState = Omit<MappingState, "expansions"> & {
@@ -237,6 +207,45 @@ export const TracesMapping = ({
     [traceMappingState, setTraceMapping],
   );
   const mapping = traceMappingState.mapping;
+
+  // Only the spans and metadata sources draw from project-wide names. Fetch the
+  // 30-day distinct field-name list lazily — only when such a column is actually
+  // being mapped — so merely opening the drawer/wizard (or any other place that
+  // renders this component) doesn't trigger the heavier ClickHouse scan when no
+  // span/metadata column is in play.
+  const needsProjectFieldNames = useMemo(
+    () =>
+      Object.values(mapping).some(
+        (m) => m.source === "spans" || m.source === "metadata",
+      ),
+    [mapping],
+  );
+  const {
+    spanNames: projectSpanNames,
+    metadataKeys: projectMetadataKeys,
+    isLoading: projectFieldNamesLoading,
+  } = useProjectSpanNames(project?.id, { enabled: needsProjectFieldNames });
+
+  // Span / metadata dropdowns should offer every name the project produced in
+  // the last 30 days, not just the names on the loaded trace(s) — otherwise a
+  // span that exists elsewhere in the project cannot be selected for mapping.
+  const mergeProjectKeyOptions = useCallback(
+    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
+      const projectOptions =
+        source === "spans"
+          ? projectSpanNames
+          : source === "metadata"
+            ? projectMetadataKeys
+            : [];
+      if (projectOptions.length === 0) {
+        return baseOptions;
+      }
+      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      );
+    },
+    [projectSpanNames, projectMetadataKeys],
+  );
 
   // Check if any column uses a server-only source (e.g. formatted_trace)
   const needsFormattedDigest = useMemo(
