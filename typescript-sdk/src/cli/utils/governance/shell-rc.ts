@@ -82,6 +82,20 @@ export function isShellAlreadyConfigured(): boolean {
 }
 
 /**
+ * Whether the shell rc file already contains the langwatch marker block.
+ * Lets the persist offer stay quiet when the user has already installed the
+ * exports but hasn't sourced the rc in this shell yet (so the OTEL env isn't
+ * live in process.env). Checks the file on disk, not just the environment.
+ */
+export function rcHasLangwatchBlock(shell: DetectedShell): boolean {
+  try {
+    return fs.readFileSync(rcPath(shell), "utf8").includes(BLOCK_BEGIN);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Build the export-block body (without the begin/end markers) for
  * the given shell. Iterates the 5 wrapped tools and dedups env keys
  * so a multi-provider tool (cursor / opencode) doesn't repeat
@@ -239,6 +253,9 @@ export async function maybeOfferIngestionShellRcPersist({
   if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
   const shell = detectShell();
   if (!shell) return;
+  // Already installed in the rc file, even if this shell hasn't sourced it
+  // yet (so the OTEL env isn't in process.env). Don't re-offer.
+  if (rcHasLangwatchBlock(shell)) return;
   if (Object.keys(vars).length === 0) return;
 
   const block = buildOtelExportBlock(vars, shell);

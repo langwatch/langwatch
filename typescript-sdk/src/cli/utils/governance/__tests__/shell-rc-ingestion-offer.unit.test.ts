@@ -139,6 +139,29 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
+  describe("when the rc file already has the langwatch block", () => {
+    it("stays quiet even if this shell hasn't sourced the rc yet", async () => {
+      // The user installed the block on a previous run but hasn't opened a new
+      // shell, so process.env has no OTEL endpoint (deleted in beforeEach). The
+      // offer must still detect the block on disk and not re-ask.
+      const rcFile = path.join(tmpHome, ".zshrc");
+      fs.writeFileSync(
+        rcFile,
+        "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://old\n# <<< langwatch end <<<\n",
+      );
+      const before = fs.readFileSync(rcFile, "utf8");
+      // No answer queued: a fired prompt would read "" → "yes" → rewrite.
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "claude",
+        vars: otelVars,
+      });
+      expect(saveConfigMock).not.toHaveBeenCalled();
+      expect(fs.readFileSync(rcFile, "utf8")).toBe(before);
+    });
+  });
+
   describe("when the config already carries shell_rc_preference='skip'", () => {
     it("does not prompt or write", async () => {
       // No answer queued: if the prompt fired it would read "" and proceed.
