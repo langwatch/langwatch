@@ -37,6 +37,7 @@ export class ApiKeyRepository {
     expiresAt,
     ingestSourceType,
     ingestionTemplateId,
+    createdByDeviceLabel,
   }: {
     name: string;
     description?: string | null;
@@ -49,6 +50,7 @@ export class ApiKeyRepository {
     expiresAt?: Date | null;
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
   }): Promise<ApiKey> {
     return this.prisma.apiKey.create({
       data: {
@@ -63,6 +65,7 @@ export class ApiKeyRepository {
         expiresAt: expiresAt ?? null,
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
+        createdByDeviceLabel: createdByDeviceLabel ?? null,
       },
     });
   }

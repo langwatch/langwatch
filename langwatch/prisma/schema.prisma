@@ -1726,6 +1726,14 @@ model ApiKey {
   /// per the app-layer-integrity convention); resolved by the ingest-key service.
   ingestionTemplateId String?
 
+  /// Human label of the CLI device session that minted this ingestion key
+  /// (e.g. "Rogerio's MacBook Pro"), snapshotted at mint time from the device
+  /// flow's `client_info`. Denormalized so the org-wide API-keys settings page
+  /// can show which device a key came from without resolving another user's
+  /// Redis-stored sessions. NULL for non-ingestion keys and for keys minted by
+  /// a CLI old enough to predate device metadata.
+  createdByDeviceLabel String?
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 

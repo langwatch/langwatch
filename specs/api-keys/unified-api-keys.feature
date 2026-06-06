@@ -60,6 +60,12 @@ Feature: Unified API Keys
     When I navigate to Settings > API Keys
     Then the legacy "Project API Key" row's scope names the project
 
+  Scenario: Ingestion key names the device session that minted it
+    Given the organization has an ingestion key minted from "Rogerio's MacBook Pro"
+    When I navigate to Settings > API Keys
+    Then the ingestion key row shows the device label "Rogerio's MacBook Pro"
+    And an ingestion key with no captured device falls back to "Unknown device"
+
   @unimplemented
   Scenario: Legacy project key row displays in table
     When I navigate to Settings > API Keys

@@ -55,6 +55,7 @@ export class IngestionKeyService {
     projectId,
     sourceType,
     ingestionTemplateId = null,
+    createdByDeviceLabel = null,
   }: {
     callerUserId: string;
     ownerUserId: string | null;
@@ -62,6 +63,9 @@ export class IngestionKeyService {
     projectId: string;
     sourceType: string;
     ingestionTemplateId?: string | null;
+    /** Human label of the CLI device session that minted the key (display
+     * provenance on the API-keys settings page). Null for non-CLI callers. */
+    createdByDeviceLabel?: string | null;
   }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
     // Hard-cut rotation: revoke any prior live ingest key for this
     // (project, sourceType) so the previous token dies immediately and we
@@ -90,6 +94,7 @@ export class IngestionKeyService {
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId }],
       ingestSourceType: sourceType,
       ingestionTemplateId,
+      createdByDeviceLabel,
     });
 
     return {
@@ -110,11 +115,13 @@ export class IngestionKeyService {
     organizationId,
     sourceType,
     ingestionTemplateId = null,
+    createdByDeviceLabel = null,
   }: {
     userId: string;
     organizationId: string;
     sourceType: string;
     ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
   }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
     const workspace = await this.personalWorkspace.findExisting({
       userId,
@@ -135,6 +142,7 @@ export class IngestionKeyService {
       projectId: workspace.project.id,
       sourceType,
       ingestionTemplateId,
+      createdByDeviceLabel,
     });
   }
 

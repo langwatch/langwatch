@@ -141,7 +141,12 @@ function makeRegularKey(id: string, name: string) {
   };
 }
 
-function makeIngestionKey(id: string, name: string, sourceType: string) {
+function makeIngestionKey(
+  id: string,
+  name: string,
+  sourceType: string,
+  createdByDeviceLabel: string | null = "Rogerio's MacBook Pro",
+) {
   return {
     id,
     name,
@@ -157,6 +162,7 @@ function makeIngestionKey(id: string, name: string, sourceType: string) {
     permissionMode: "restricted",
     ingestSourceType: sourceType,
     ingestionTemplateId: null,
+    createdByDeviceLabel,
     roleBindings: [
       {
         role: "CUSTOM",
@@ -301,6 +307,22 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
     it("shows the ingestion key secret with the ik-lw- prefix", () => {
       renderSection();
       expect(screen.getByText(/^ik-lw-/)).toBeInTheDocument();
+    });
+
+    /** @scenario Ingestion key names the device session that minted it */
+    it("shows the minting device label in the ingestion row", () => {
+      renderSection();
+      expect(screen.getByText("Rogerio's MacBook Pro")).toBeInTheDocument();
+    });
+
+    /** @scenario Ingestion key names the device session that minted it */
+    it("falls back to 'Unknown device' when no device label was captured", () => {
+      mockApiKeyList.mockReturnValue({
+        data: [makeIngestionKey("key-x", "no-device ingest", "codex", null)],
+        isLoading: false,
+      });
+      renderSection();
+      expect(screen.getByText("Unknown device")).toBeInTheDocument();
     });
   });
 

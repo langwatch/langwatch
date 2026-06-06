@@ -63,6 +63,7 @@ export function IngestionKeysSection({
                 <Table.ColumnHeader>Created</Table.ColumnHeader>
                 <Table.ColumnHeader>Last Used</Table.ColumnHeader>
                 <Table.ColumnHeader>Source</Table.ColumnHeader>
+                <Table.ColumnHeader>Created from</Table.ColumnHeader>
                 <Table.ColumnHeader width="100px"></Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
@@ -130,6 +131,15 @@ export function IngestionKeysSection({
                     <Badge size="sm" colorPalette="blue">
                       {apiKey.ingestSourceType}
                     </Badge>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {apiKey.createdByDeviceLabel ? (
+                      <Text fontSize="sm">{apiKey.createdByDeviceLabel}</Text>
+                    ) : (
+                      <Text fontSize="sm" color="fg.muted">
+                        Unknown device
+                      </Text>
+                    )}
                   </Table.Cell>
                   <Table.Cell>
                     {/* Ingestion keys carry no role bindings to edit; revoke

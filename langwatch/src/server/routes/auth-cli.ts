@@ -1332,6 +1332,13 @@ secured.access(CLI_POLICY).post(
         userId: tokenRecord.user_id,
         organizationId: tokenRecord.organization_id,
         sourceType: parsed.data.source_type,
+        // Snapshot which device minted the key so the API-keys settings page
+        // can attribute it. Falls back to the hostname when the CLI sent no
+        // explicit label; null for CLIs that predate device metadata.
+        createdByDeviceLabel:
+          tokenRecord.client_info?.device_label ??
+          tokenRecord.client_info?.hostname ??
+          null,
       });
       return c.json(
         {

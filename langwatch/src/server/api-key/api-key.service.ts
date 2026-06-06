@@ -95,6 +95,7 @@ export class ApiKeyService {
     bindings,
     ingestSourceType,
     ingestionTemplateId,
+    createdByDeviceLabel,
   }: {
     name: string;
     description?: string | null;
@@ -107,6 +108,7 @@ export class ApiKeyService {
     bindings: RoleBindingInput[];
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
   }): Promise<{ token: string; apiKey: ApiKey }> {
     const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
     const hasPermissions = !!permissions && permissions.length > 0;
@@ -191,6 +193,7 @@ export class ApiKeyService {
         expiresAt,
         ingestSourceType,
         ingestionTemplateId,
+        createdByDeviceLabel,
       });
 
       if (sortedPermissions) {

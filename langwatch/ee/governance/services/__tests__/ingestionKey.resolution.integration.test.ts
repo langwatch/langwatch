@@ -132,6 +132,22 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         expect(resolved.ingestionTemplateId).toBeNull();
       }
     });
+
+    it("persists the minting device label for the API-keys settings page", async () => {
+      const issued = await ingestKeys.ensureForProject({
+        callerUserId: USER_ID,
+        ownerUserId: USER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "codex",
+        createdByDeviceLabel: "Rogerio's MacBook Pro",
+      });
+      const row = await prisma.apiKey.findUniqueOrThrow({
+        where: { id: issued.apiKeyId },
+        select: { createdByDeviceLabel: true },
+      });
+      expect(row.createdByDeviceLabel).toBe("Rogerio's MacBook Pro");
+    });
   });
 
   describe("when an ordinary (non-ingest) API key is scoped to one project", () => {
