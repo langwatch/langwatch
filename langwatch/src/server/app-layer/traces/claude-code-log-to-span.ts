@@ -245,6 +245,51 @@ function baseAttrs(record: ClaudeCodeLogRecordInput): OtlpKeyValue[] {
 }
 
 /**
+ * claude_code api_request attributes already lifted onto canonical gen_ai.* /
+ * langwatch.* keys (or whose raw body payload is carried as input/output
+ * messages). Everything NOT listed here is copied verbatim under `claude_code.*`
+ * so no attribute claude emits is silently dropped.
+ */
+const CLAUDE_HANDLED_ATTRS = new Set<string>([
+  "model", // -> gen_ai.request/response.model
+  "input_tokens", // -> gen_ai.usage.input_tokens
+  "output_tokens", // -> gen_ai.usage.output_tokens
+  "cache_read_tokens", // -> gen_ai.usage.cache_read.input_tokens
+  "cache_creation_tokens", // -> gen_ai.usage.cache_creation.input_tokens
+  "cost_usd", // -> langwatch.span.cost
+  "request_id", // -> gen_ai.response.id
+  "effort", // -> gen_ai.request.reasoning_effort
+  "session.id", // -> gen_ai.conversation.id + langwatch.thread.id
+  "body", // lifted into gen_ai.input/output.messages, not copied raw
+  "body_length",
+  "body_truncated",
+  "service.name", // already gen_ai.system = claude_code
+]);
+
+/**
+ * Lift the provenance + reasoning knobs claude sends on a model-call event, then
+ * capture every remaining attribute under a `claude_code.*` namespace so the
+ * span keeps the full telemetry claude emits (speed, query_source, duration_ms,
+ * terminal.type, user.id, …) instead of only the canonical token/model subset.
+ */
+function appendProvenanceAttrs(
+  attrs: OtlpKeyValue[],
+  record: ClaudeCodeLogRecordInput,
+): void {
+  const requestId = asNonEmpty(record.attrs.request_id);
+  if (requestId) attrs.push(strAttr(ATTR_KEYS.GEN_AI_RESPONSE_ID, requestId));
+  const effort = asNonEmpty(record.attrs.effort);
+  if (effort) {
+    attrs.push(strAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, effort));
+  }
+  for (const [key, value] of Object.entries(record.attrs)) {
+    if (CLAUDE_HANDLED_ATTRS.has(key)) continue;
+    const clean = asNonEmpty(value);
+    if (clean) attrs.push(strAttr(`claude_code.${key}`, clean));
+  }
+}
+
+/**
  * Resolve the span's `gen_ai.input.messages` (a JSON array of `{ role, content }`)
  * from an api_request_body record. Prefers the full conversation parsed out of
  * the request body (system + every turn); when claude truncated the body inline
@@ -313,6 +358,9 @@ function buildCollapsedSpan(
   const cost = asNumber(anchor.attrs.cost_usd);
   if (cost !== null) attrs.push(dblAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, cost));
 
+  // request_id, reasoning effort, and every other attribute claude emits.
+  appendProvenanceAttrs(attrs, anchor);
+
   // INPUT as a structured `gen_ai.input.messages` conversation parsed from the
   // request body (system + every turn). When claude truncated the body inline,
   // resolveInputMessages falls back to the clean user_prompt text as the latest
@@ -370,6 +418,8 @@ function buildOrphanSpan(
     attrs.push(strAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model));
     attrs.push(strAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model));
   }
+
+  appendProvenanceAttrs(attrs, record);
 
   if (record.eventName === "api_request_body") {
     const inputMessages = resolveInputMessages(record, promptTextById);

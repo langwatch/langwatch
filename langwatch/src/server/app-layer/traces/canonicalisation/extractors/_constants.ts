@@ -25,6 +25,9 @@ export const ATTR_KEYS = {
   GEN_AI_REQUEST_SEED: "gen_ai.request.seed",
   GEN_AI_REQUEST_STOP_SEQUENCES: "gen_ai.request.stop_sequences",
   GEN_AI_REQUEST_CHOICE_COUNT: "gen_ai.request.choice.count",
+  // Reasoning effort knob (OpenAI low|medium|high; Anthropic emits it as
+  // `effort`, e.g. xhigh, on its claude_code api_request events).
+  GEN_AI_REQUEST_REASONING_EFFORT: "gen_ai.request.reasoning_effort",
   GEN_AI_INPUT_MESSAGES: "gen_ai.input.messages",
   GEN_AI_OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_OUTPUT_TYPE: "gen_ai.output.type",

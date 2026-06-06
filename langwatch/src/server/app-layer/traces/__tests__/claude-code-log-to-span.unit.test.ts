@@ -163,6 +163,64 @@ describe("convertClaudeCodeLogsToSpans", () => {
     });
   });
 
+  describe("provenance + spare attributes claude emits", () => {
+    const buildRich = () =>
+      convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request",
+          spanId: "dddddddddddddddd",
+          timeUnixMs: 1_700_000_002_113,
+          attrs: {
+            "event.name": "api_request",
+            "session.id": "sess_1",
+            model: "claude-opus-4-8",
+            input_tokens: "120",
+            output_tokens: "30",
+            cost_usd: "0.0875",
+            request_id: "req_rich",
+            effort: "xhigh",
+            speed: "normal",
+            "terminal.type": "tmux",
+            duration_ms: "1402",
+            query_source: "repl_main_thread",
+          },
+        }),
+      ]);
+
+    it("maps request_id -> gen_ai.response.id and effort -> reasoning_effort", () => {
+      const { span } = buildRich()[0]!;
+      expect(attr(span, "gen_ai.response.id")).toEqual({
+        stringValue: "req_rich",
+      });
+      expect(attr(span, "gen_ai.request.reasoning_effort")).toEqual({
+        stringValue: "xhigh",
+      });
+    });
+
+    it("captures every other emitted attribute under claude_code.*", () => {
+      const { span } = buildRich()[0]!;
+      expect(attr(span, "claude_code.speed")).toEqual({ stringValue: "normal" });
+      expect(attr(span, "claude_code.terminal.type")).toEqual({
+        stringValue: "tmux",
+      });
+      expect(attr(span, "claude_code.duration_ms")).toEqual({
+        stringValue: "1402",
+      });
+      expect(attr(span, "claude_code.query_source")).toEqual({
+        stringValue: "repl_main_thread",
+      });
+    });
+
+    it("does NOT double-copy attrs already lifted to canonical keys", () => {
+      const { span } = buildRich()[0]!;
+      expect(attr(span, "claude_code.model")).toBeUndefined();
+      expect(attr(span, "claude_code.cost_usd")).toBeUndefined();
+      expect(attr(span, "claude_code.request_id")).toBeUndefined();
+      expect(attr(span, "claude_code.effort")).toBeUndefined();
+      expect(attr(span, "claude_code.session.id")).toBeUndefined();
+    });
+  });
+
   describe("when the response is a non-conversational utility call", () => {
     it("keeps cost + tokens but withholds the completion text", () => {
       const spans = convertClaudeCodeLogsToSpans([
