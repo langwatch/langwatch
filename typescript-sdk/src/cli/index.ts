@@ -2,7 +2,8 @@
 
 // Load environment variables BEFORE any other imports
 import { config } from "dotenv";
-config();
+// quiet: silence dotenv's "injecting env" tip line on every CLI run.
+config({ quiet: true });
 
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";

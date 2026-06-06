@@ -190,6 +190,7 @@ export type PersistChoice = "yes" | "no" | "never" | "skip";
 
 export async function askPersistChoice(
   rcPathHint: string,
+  tool: string,
 ): Promise<PersistChoice> {
   if (!process.stdin.isTTY) return "skip";
 
@@ -199,7 +200,7 @@ export async function askPersistChoice(
   });
   const ans = await new Promise<string>((resolve) => {
     rl.question(
-      `Save the langwatch export block to ${rcPathHint}? [Y/n/never] `,
+      `Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
       (a) => resolve(a),
     );
   });
@@ -244,12 +245,7 @@ export async function maybeOfferIngestionShellRcPersist({
 
   const target = rcPath(shell);
   console.log();
-  console.log(
-    chalk.gray(
-      `  Install telemetry so a plain \`${tool}\` (without \`langwatch\`) captures automatically.`,
-    ),
-  );
-  const choice = await askPersistChoice(target);
+  const choice = await askPersistChoice(target, tool);
   if (choice === "skip" || choice === "no") return;
   if (choice === "never") {
     cfg.shell_rc_preference = "skip";
@@ -265,9 +261,6 @@ export async function maybeOfferIngestionShellRcPersist({
     const wrote = persistBlockToRc(shell, block);
     console.log(
       chalk.green(`  ✓ Installed langwatch telemetry exports to ${wrote}`),
-    );
-    console.log(
-      chalk.gray(`  Open a new shell or run \`source ${wrote}\` to load it.`),
     );
   } catch (err) {
     console.log(

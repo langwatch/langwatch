@@ -84,7 +84,21 @@ export async function runUnifiedLoginFlow(
 
   await openInBrowser(verifyURL, opts.browser);
 
-  const spinner = ora("Waiting for you to approve in the browser").start();
+  // discardStdin:false is load-bearing. ora's default (true) flips stdin to
+  // raw mode while the spinner runs, so Ctrl+C arrives as a raw 0x03 byte that
+  // ora swallows instead of a SIGINT — the wait becomes unkillable. Keeping
+  // stdin cooked lets the terminal deliver SIGINT; the handler stops the
+  // spinner and exits cleanly so the user can always abort the login wait.
+  const spinner = ora({
+    text: "Waiting for you to approve in the browser",
+    discardStdin: false,
+  }).start();
+  const onSigint = () => {
+    spinner.stop();
+    console.log(chalk.gray("\nLogin cancelled."));
+    process.exit(130);
+  };
+  process.once("SIGINT", onSigint);
   try {
     const result = await pollUntilDone({ baseUrl }, dc);
     if (result.kind === "device_session") {
@@ -177,6 +191,8 @@ export async function runUnifiedLoginFlow(
       }
     }
     throw err;
+  } finally {
+    process.removeListener("SIGINT", onSigint);
   }
 }
 
