@@ -1582,6 +1582,15 @@ gateway:
   ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
   chartManaged: true
 
+  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
+  publicUrl: ""
+
+  # The gateway needs its OWN externally-reachable endpoint, separate from
+  # the main app — point a second ingress / load balancer at gateway.ingress
+  # below (the LLM clients hit the gateway, the browser hits the app). The
+  # gateway subchart ships ingress.enabled=true with a SaaS placeholder host;
+  # override gateway.ingress.host with your domain.
+
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
   # umbrella-level overrides below; everything else inherits.

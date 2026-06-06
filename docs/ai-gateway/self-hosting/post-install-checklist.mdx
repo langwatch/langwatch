@@ -79,39 +79,40 @@ fix is almost always `gateway.controlPlane.baseUrl`, defaults to
 `http://langwatch-app:5560` on the assumption your release name is
 `langwatch`. Adjust on a different release name or split-domain.
 
-## 5. Distribute the unified `langwatch` CLI to your team
+## 5. Expose the gateway and set its public URL
 
-```bash
-# One-liner for the IT-bot Slack message:
-npx @langwatch/sdk@latest login --device --url https://<your-host>
+The gateway needs its **own** externally-reachable endpoint, separate
+from the app. Your LLM clients (Claude Code, Codex, Cursor) hit the
+gateway; the browser hits the app. So you provision two ingresses /
+load balancers: one for `app.your-corp.com` and one for
+`gateway.your-corp.com`.
+
+Then tell the control plane where the gateway lives, so it can hand
+that URL to CLI users at login. With the Helm chart, set the gateway's
+own host and the chart derives the rest:
+
+```yaml
+gateway:
+  ingress:
+    enabled: true
+    host: gateway.your-corp.com   # your domain, not the SaaS default
+  # publicUrl: https://gateway.your-corp.com   # or set explicitly
 ```
 
-Devs run that once. They get a short-lived `lw_at_*` access token
-plus a personal `vk-lw-*` virtual key, both bound to their SSO
-identity. Then any of the wrapped tools "just work":
+This populates `LW_GATEWAY_PUBLIC_URL` on the `langwatch-app`
+container. **Without it, the control plane returns
+`http://localhost:5563` to CLI users** and every `langwatch claude` /
+`langwatch codex` call from a developer laptop fails with
+`Cannot reach AI Gateway ... fetch failed`. Do NOT reuse
+`LW_GATEWAY_BASE_URL` for this — that variable is the internal
+control-plane URL the Go gateway dials back on, a different direction.
+
+Verify it landed:
 
 ```bash
-langwatch claude       # Claude Code with org-managed keys
-langwatch codex        # Codex CLI
-langwatch cursor       # Cursor with custom endpoint
-langwatch init-shell   # Eval-able shell snippet with ANTHROPIC_BASE_URL etc.
+kubectl -n langwatch get deploy langwatch-app -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
+# → https://gateway.your-corp.com
 ```
-
-The CLI calls `GET /api/auth/cli/budget/status` before exec'ing the
-underlying tool, a 402 short-circuits with a branded budget error
-so devs aren't surprised mid-session.
-
-## 6. Off-board cleanly when someone leaves
-
-Personal teams are deactivated through the same admin path as the
-user themselves:
-
-- **Settings → Organization → Members → ...**, choose Remove.
-- The user's personal team and projects stay in the audit log for
-  compliance retention but every personal VK is revoked
-  synchronously. New gateway calls return `401 vk_revoked`.
-- Their refresh + access tokens in Redis are invalidated so a
-  cached CLI session can't keep working past the off-boarding.
 
 ## What to read next
 
