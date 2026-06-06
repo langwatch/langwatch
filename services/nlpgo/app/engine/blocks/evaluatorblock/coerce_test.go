@@ -2,6 +2,7 @@ package evaluatorblock
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 )
 
@@ -67,6 +68,28 @@ func TestCoerceDataPreservesContextsAndConversation(t *testing.T) {
 	turn0, _ := conv[0].(map[string]any)
 	if turn0["input"] != "true" || turn0["output"] != "42" {
 		t.Errorf("turn 0 not coerced: %v", turn0)
+	}
+}
+
+func TestCoerceScalarNonFiniteFloats(t *testing.T) {
+	cases := []struct {
+		name string
+		in   any
+	}{
+		{"NaN float64", math.NaN()},
+		{"+Inf float64", math.Inf(1)},
+		{"-Inf float64", math.Inf(-1)},
+		{"NaN float32", float32(math.NaN())},
+		{"+Inf float32", float32(math.Inf(1))},
+		{"-Inf float32", float32(math.Inf(-1))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := coerceScalar(tc.in)
+			if got != nil {
+				t.Fatalf("coerceScalar(%v) = %v, want nil (parity with TS coerceEvaluatorScalar)", tc.in, got)
+			}
+		})
 	}
 }
 

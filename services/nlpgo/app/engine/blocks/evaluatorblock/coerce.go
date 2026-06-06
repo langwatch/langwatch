@@ -3,6 +3,7 @@ package evaluatorblock
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -30,11 +31,18 @@ func coerceScalar(v any) any {
 	case json.Number:
 		return x.String()
 	case float64:
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return nil
+		}
 		// strconv with -1 prec emits the shortest round-trip form
 		// (e.g. 42, 0.5) without trailing ".000000".
 		return strconv.FormatFloat(x, 'f', -1, 64)
 	case float32:
-		return strconv.FormatFloat(float64(x), 'f', -1, 32)
+		f := float64(x)
+		if math.IsNaN(f) || math.IsInf(f, 0) {
+			return nil
+		}
+		return strconv.FormatFloat(f, 'f', -1, 32)
 	case int:
 		return strconv.Itoa(x)
 	case int8:

@@ -187,7 +187,7 @@ def test_langeval_exact_match_transform_chain_still_applies_for_text():
     )
     evaluator = ExactMatchEvaluator(settings=settings)
     result = evaluator.evaluate(entry)
-    assert result.passed == True
+    assert result.passed
 
 
 # @scenario "The float-equality short-circuit still applies for numeric strings"
@@ -195,4 +195,4 @@ def test_langeval_exact_match_float_short_circuit_still_applies():
     entry = ExactMatchEntry(output="1.50", expected_output="1.5")
     evaluator = ExactMatchEvaluator(settings=ExactMatchSettings())
     result = evaluator.evaluate(entry)
-    assert result.passed == True
+    assert result.passed
