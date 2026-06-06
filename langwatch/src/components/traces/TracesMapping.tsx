@@ -5,6 +5,7 @@ import {
   GridItem,
   HStack,
   NativeSelect,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,6 +15,7 @@ import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
+import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -70,6 +72,20 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
   {} as Record<string, string[]>,
 );
 
+type KeyOption = { key: string; label: string };
+
+/** Dedupe {key,label} options by key, preserving first-seen order. */
+const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
+  const seen = new Set<string>();
+  const result: KeyOption[] = [];
+  for (const option of options) {
+    if (!option || seen.has(option.key)) continue;
+    seen.add(option.key);
+    result.push(option);
+  }
+  return result;
+};
+
 export const TracesMapping = ({
   titles,
   traces,
@@ -112,6 +128,15 @@ export const TracesMapping = ({
     task: state.workbenchState.task,
   }));
 
+  // Project-wide span names and metadata keys from the last 30 days, so the
+  // mapping dropdowns can offer names that exist in the project even when the
+  // currently loaded trace(s) don't contain them.
+  const {
+    spanNames: projectSpanNames,
+    metadataKeys: projectMetadataKeys,
+    isLoading: projectFieldNamesLoading,
+  } = useProjectSpanNames(project?.id);
+
   const annotationScores = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds: traces.map((trace) => trace.trace_id),
@@ -153,6 +178,27 @@ export const TracesMapping = ({
         ),
       })),
     [traces, annotationScores.data],
+  );
+
+  // Span / metadata dropdowns should offer every name the project produced in
+  // the last 30 days, not just the names on the loaded trace(s) — otherwise a
+  // span that exists elsewhere in the project cannot be selected for mapping.
+  const mergeProjectKeyOptions = useCallback(
+    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
+      const projectOptions =
+        source === "spans"
+          ? projectSpanNames
+          : source === "metadata"
+            ? projectMetadataKeys
+            : [];
+      if (projectOptions.length === 0) {
+        return baseOptions;
+      }
+      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      );
+    },
+    [projectSpanNames, projectMetadataKeys],
   );
 
   const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
@@ -452,8 +498,18 @@ export const TracesMapping = ({
             "subkeys" in traceMappingDefinition &&
             source !== "threads" &&
             source !== "threads_until_current"
-              ? key === "" && source === "spans"
-                ? defaultSpanSubkeys
+              ? source === "spans"
+                ? // Spans always expose the same subfields. Offer them for any
+                  // span name — including project-wide names that aren't on the
+                  // loaded trace, where subkey discovery would otherwise be empty.
+                  dedupeKeyOptions([
+                    ...defaultSpanSubkeys,
+                    ...(key
+                      ? traceMappingDefinition.subkeys(traces_, key, {
+                          annotationScoreOptions: getAnnotationScoreOptions.data,
+                        })
+                      : []),
+                  ])
                 : traceMappingDefinition.subkeys(traces_, key!, {
                     annotationScoreOptions: getAnnotationScoreOptions.data,
                   })
@@ -642,24 +698,27 @@ export const TracesMapping = ({
                                       ? "* (all metadata)"
                                       : "* (any)"}
                                 </option>
-                                {traceMappingDefinition
-                                  .keys(traces_)
-                                  .map(
-                                    ({
-                                      key,
-                                      label,
-                                    }: {
-                                      key: string;
-                                      label: string;
-                                    }) => (
-                                      <option key={key} value={key}>
-                                        {label}
-                                      </option>
-                                    ),
-                                  )}
+                                {mergeProjectKeyOptions(
+                                  source,
+                                  traceMappingDefinition.keys(traces_),
+                                ).map(({ key, label }: KeyOption) => (
+                                  <option key={key} value={key}>
+                                    {label}
+                                  </option>
+                                ))}
                               </NativeSelect.Field>
                               <NativeSelect.Indicator />
                             </NativeSelect.Root>
+                            {projectFieldNamesLoading &&
+                              (source === "spans" ||
+                                source === "metadata") && (
+                                <Spinner
+                                  size="sm"
+                                  flexShrink={0}
+                                  marginTop="8px"
+                                  color="fg.muted"
+                                />
+                              )}
                           </HStack>
                         )}
                       {subkeys && subkeys.length > 0 && (
