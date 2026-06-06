@@ -299,9 +299,14 @@ function parseOtlpScope(scope: unknown): OtlpInstrumentationScope | null {
  * the wire ids ARE present.
  *
  * Stability contract:
- *   - trace_id = sha256(session.id) truncated to 32 hex.
- *     Every turn of a single Claude Code session collapses into
- *     one trace row — matches the /me/traces UX user expects.
+ *   - trace_id = sha256(session.id || ':' || prompt.id) truncated to 32 hex.
+ *     One trace PER TURN: every event of a single user turn (the user_prompt,
+ *     the api_request / api_response model calls it drives, and the tool
+ *     events) carries the same prompt.id, so they share a trace; a new user
+ *     turn (new prompt.id) starts a new trace instead of growing one forever.
+ *     gen_ai.conversation.id = session.id still groups every turn of the
+ *     session into one conversation thread. Session-setup events that precede
+ *     the first prompt (no prompt.id) fall back to sha256(session.id).
  *   - span_id = sha256(session.id || ':' || prompt.id || ':' ||
  *     event.name || ':' || event.sequence) truncated to 16 hex.
  *     Each event (user_prompt + api_request + tool_decision + …)
@@ -333,9 +338,15 @@ function synthesizeClaudeCodeIdsIfMissing(args: {
   const promptId = attrs["prompt.id"] ?? "";
   const eventName = attrs["event.name"] ?? "";
   const eventSequence = attrs["event.sequence"] ?? "";
+  // Key the trace on the turn, not the session: every event of one user turn
+  // shares a prompt.id, so (session.id, prompt.id) yields one trace per turn
+  // while gen_ai.conversation.id = session.id keeps the turns grouped as one
+  // thread. Pre-prompt session-setup events (no prompt.id) fall back to the
+  // session-level id so they still correlate.
+  const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
   const traceId = wireTraceId
     ? wireTraceId
-    : createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+    : createHash("sha256").update(turnKey).digest("hex").slice(0, 32);
   const spanId = wireSpanId
     ? wireSpanId
     : createHash("sha256")

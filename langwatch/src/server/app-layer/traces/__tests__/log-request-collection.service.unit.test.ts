@@ -190,12 +190,13 @@ describe("LogRequestCollectionService", () => {
       const r2 = c2![0]!;
       expect(r1.traceId).toMatch(/^[0-9a-f]{32}$/);
       expect(r1.spanId).toMatch(/^[0-9a-f]{16}$/);
-      // Same session ⇒ same trace, different events ⇒ different spans.
+      // Same turn (session + prompt.id) ⇒ same trace, different events ⇒
+      // different spans.
       expect(r2.traceId).toBe(r1.traceId);
       expect(r2.spanId).not.toBe(r1.spanId);
     });
 
-    it("returns the SAME traceId across multiple turns of one session", async () => {
+    it("returns a DIFFERENT traceId per turn (prompt.id) within one session", async () => {
       const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
@@ -207,7 +208,11 @@ describe("LogRequestCollectionService", () => {
         piiRedactionLevel: "ESSENTIAL",
       });
       const traceIds = new Set(recordLog.mock.calls.map((c) => c[0]!.traceId));
-      expect(traceIds.size).toBe(1);
+      // One trace per turn: each prompt.id is its own trace. The turns stay
+      // grouped into a conversation downstream by gen_ai.conversation.id =
+      // session.id, not by sharing a trace id. Validated against a real
+      // 2-turn claude-code session (prompt.ids 47fcab35 / 5fc69a28).
+      expect(traceIds.size).toBe(2);
     });
 
     it("returns DIFFERENT traceIds across different sessions", async () => {
