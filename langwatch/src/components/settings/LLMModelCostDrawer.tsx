@@ -13,7 +13,7 @@ import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   ScopeChipPicker,
-  type ScopeChipPickerEntry,
+  type ScopeTriadEntry,
 } from "./ScopeChipPicker";
 
 export function LLMModelCostDrawer({
@@ -98,7 +98,7 @@ function LLMModelCostForm({
   // the row's scope; new/cloned rows default to the current project. The
   // org/team rows let an admin push one cost policy down the cascade
   // (PROJECT -> TEAM -> ORGANIZATION) instead of every project re-entering it.
-  const [scope, setScope] = useState<ScopeChipPickerEntry[]>(() => {
+  const [scope, setScope] = useState<ScopeTriadEntry[]>(() => {
     if (currentLLMModelCost?.scopeType && currentLLMModelCost?.scopeId) {
       return [
         {

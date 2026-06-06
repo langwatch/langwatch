@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * CliBootstrapService — shared logic for the Storyboard Screen 4
+ * CliBootstrapService - shared logic for the Storyboard Screen 4
  * login-completion ceremony. Returns inherited providers + monthly
  * budget. Consumed by both:
  *
@@ -13,7 +13,7 @@
  * b8b21bb79) renders identically regardless of which path the data
  * came through.
  *
- * Empty-state safe — returns providers=[] + budget={null, 0, MONTHLY}
+ * Empty-state safe - returns providers=[] + budget={null, 0, MONTHLY}
  * when the user has no personal workspace yet (fresh login flow,
  * no admin VK provisioning yet).
  *
@@ -35,12 +35,14 @@ import {
   getProviderModelOptions,
   modelProviders as modelProviderRegistry,
 } from "~/server/modelProviders/registry";
+import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 import {
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  PLATFORM_TOOL_SLUGS,
   type PlatformToolPolicyMap,
-  PlatformToolPolicyService,
 } from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
@@ -56,7 +58,7 @@ export interface CliBootstrapResult {
   };
   /**
    * Authoritative gateway base URL for the CLI to use as `cfg.gateway_url`.
-   * Resolution lives in {@link resolveGatewayBaseUrl} — shared with the
+   * Resolution lives in {@link resolveGatewayBaseUrl} - shared with the
    * personal-VK reveal card so /me and CLI surfaces report the same URL.
    * Note: in dev `scripts/start.sh` hijacks `LW_GATEWAY_BASE_URL` for the
    * Go control-plane URL, so on dev the SaaS branch is what keeps a
@@ -109,9 +111,9 @@ export class CliBootstrapService {
   }): Promise<CliBootstrapResult> {
     // Per-tool policy is org-level, independent of whether the user has a
     // personal workspace yet; a fresh login still needs the cached map.
-    const toolPolicies = await PlatformToolPolicyService.create(
-      this.prisma,
-    ).getForOrg({ organizationId: input.organizationId });
+    const toolPolicies = await this.resolveToolPolicies({
+      organizationId: input.organizationId,
+    });
 
     const workspaceService = new PersonalWorkspaceService(this.prisma);
     const workspace = await workspaceService.findExisting({
@@ -138,6 +140,31 @@ export class CliBootstrapService {
       adminEmail,
       toolPolicies,
     };
+  }
+
+  /**
+   * The login `toolPolicies` map. Derived from the org's coding_assistant
+   * tiles (per-tool slug) merged over the hardcoded
+   * {@link PLATFORM_TOOL_POLICY_DEFAULTS}: claude/codex/gemini/opencode =
+   * both paths, cursor = gateway only. A tool with no tile keeps its
+   * default, so the map is always complete for every known slug - the exact
+   * wire shape the CLI caches and gates on. Replaces the retired
+   * PlatformToolPolicy table.
+   */
+  private async resolveToolPolicies({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<PlatformToolPolicyMap> {
+    const overrides = await AiToolEntryService.create(
+      this.prisma,
+    ).resolveToolPolicyOverrides({ organizationId });
+
+    const map = {} as PlatformToolPolicyMap;
+    for (const slug of PLATFORM_TOOL_SLUGS) {
+      map[slug] = overrides[slug] ?? { ...PLATFORM_TOOL_POLICY_DEFAULTS[slug] };
+    }
+    return map;
   }
 
   private async resolveAdminEmail(

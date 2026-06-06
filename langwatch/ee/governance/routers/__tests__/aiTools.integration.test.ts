@@ -4,13 +4,13 @@
  * Integration coverage for the AI Tools Portal catalog router (Phase 7).
  *
  * Pins three things end-to-end via the live tRPC procedure layer:
- *   1. RBAC enforcement — MEMBER can list (aiTools:view) but cannot
+ *   1. RBAC enforcement - MEMBER can list (aiTools:view) but cannot
  *      create/update/archive/setEnabled/reorder. ADMIN can do all.
  *      EXTERNAL can also list (portal must work for everyone).
- *   2. Org/team scoping resolution — listForUser applies team-overrides-
- *      org by slug; entries scoped to a team the user is NOT a member of
- *      are filtered out.
- *   3. Per-type config validation — invalid config payloads (missing
+ *   2. Org/department scoping resolution - listForUser applies
+ *      department-overrides-org by slug; entries scoped to a department
+ *      the user does NOT belong to are filtered out.
+ *   3. Per-type config validation - invalid config payloads (missing
  *      required fields per the discriminated union) reject with
  *      BAD_REQUEST instead of corrupting the DB.
  *
@@ -40,6 +40,8 @@ describe("aiToolsRouter integration", () => {
   let organizationId: string;
   let teamPlatformId: string;
   let teamDataScienceId: string;
+  let deptPlatformId: string;
+  let deptDataScienceId: string;
   let adminUserId: string;
   let memberPlatformUserId: string;
   let memberOrphanUserId: string;
@@ -71,6 +73,19 @@ describe("aiToolsRouter integration", () => {
     });
     teamDataScienceId = teamDataScience.id;
 
+    // Departments are the new tile-visibility axis (the people lens):
+    // each member carries at most one OrganizationUser.departmentId and a
+    // department-scoped tile is visible only to members in that set.
+    const deptPlatform = await prisma.department.create({
+      data: { organizationId, name: `Platform Dept ${ns}` },
+    });
+    deptPlatformId = deptPlatform.id;
+
+    const deptDataScience = await prisma.department.create({
+      data: { organizationId, name: `Data Science Dept ${ns}` },
+    });
+    deptDataScienceId = deptDataScience.id;
+
     const admin = await prisma.user.create({
       data: { name: "Admin", email: `ait-admin-${ns}@example.com` },
     });
@@ -100,6 +115,9 @@ describe("aiToolsRouter integration", () => {
         userId: memberPlatform.id,
         organizationId,
         role: OrganizationUserRole.MEMBER,
+        // Member of the Platform department - sees department-scoped tiles
+        // bound to deptPlatform; memberOrphan (no department) does not.
+        departmentId: deptPlatform.id,
       },
     });
     await prisma.teamUser.create({
@@ -148,6 +166,7 @@ describe("aiToolsRouter integration", () => {
       .deleteMany({ where: { team: { slug: { startsWith: `--ait-` } } } })
       .catch(() => {});
     await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
+    await prisma.department.deleteMany({ where: { organizationId } }).catch(() => {});
     await prisma.team
       .deleteMany({ where: { slug: { startsWith: `--ait-` } } })
       .catch(() => {});
@@ -184,7 +203,7 @@ describe("aiToolsRouter integration", () => {
       await expect(
         memberCaller.aiTools.create({
           organizationId,
-          teamIds: [],
+          departmentIds: [],
           type: "external_tool",
           displayName: `Wiki ${nanoid(4)}`,
           config: {
@@ -199,7 +218,7 @@ describe("aiToolsRouter integration", () => {
       const adminCaller = callerFor(adminUserId);
       const created = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "coding_assistant",
         displayName: `Claude Code ${nanoid(4)}`,
         iconAsset: "preset:claude_code",
@@ -212,9 +231,9 @@ describe("aiToolsRouter integration", () => {
       expect(created.id).toBeDefined();
       // Server-owned slug: must auto-generate from displayName.
       expect(created.slug).toMatch(/^claude-code-/);
-      // teamIds[] mirrors back-compat scope/scopeId ('organization'
-      // when empty) — listForUser uses the new join-table path.
-      expect(created.teamIds).toEqual([]);
+      // departmentIds[] mirrors back-compat scope/scopeId ('organization'
+      // when empty) - listForUser uses the new join-table path.
+      expect(created.departmentIds).toEqual([]);
       expect(created.scope).toBe("organization");
       expect(created.iconAsset).toBe("preset:claude_code");
 
@@ -224,13 +243,13 @@ describe("aiToolsRouter integration", () => {
   });
 
   describe("Scoping", () => {
-    it("filters team-scoped entries to team members", async () => {
+    it("filters department-scoped entries to department members", async () => {
       const adminCaller = callerFor(adminUserId);
       const created = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [teamPlatformId],
+        departmentIds: [deptPlatformId],
         type: "model_provider",
-        displayName: `Bedrock — Platform team ${nanoid(4)}`,
+        displayName: `Bedrock - Platform dept ${nanoid(4)}`,
         iconAsset: "preset:bedrock",
         config: { providerKey: "bedrock" },
       });
@@ -240,8 +259,8 @@ describe("aiToolsRouter integration", () => {
       });
       expect(platformList.some((e) => e.id === created.id)).toBe(true);
       expect(
-        platformList.find((e) => e.id === created.id)?.teamIds,
-      ).toEqual([teamPlatformId]);
+        platformList.find((e) => e.id === created.id)?.departmentIds,
+      ).toEqual([deptPlatformId]);
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
@@ -249,14 +268,14 @@ describe("aiToolsRouter integration", () => {
       expect(orphanList.some((e) => e.id === created.id)).toBe(false);
     });
 
-    it("team entry shadows org default by slug", async () => {
+    it("department entry shadows org default by slug", async () => {
       // Slug is server-owned (auto-generated with a nanoid suffix),
       // so admins can't trigger shadowing via the public API by
       // re-using a slug. We exercise the listForUser shadowing path
-      // directly via prisma writes — the contract that *if* two
-      // entries share a slug the team-bound one wins for users in
-      // that team is still load-bearing for any future admin tool
-      // that imports catalogs by slug.
+      // directly via prisma writes - the contract that *if* two
+      // entries share a slug the department-bound one wins for members
+      // of that department is still load-bearing for any future admin
+      // tool that imports catalogs by slug.
       const sharedSlug = `openai-shadow-${nanoid(6).toLowerCase()}`;
       const orgEntry = await prisma.aiToolEntry.create({
         data: {
@@ -269,19 +288,19 @@ describe("aiToolsRouter integration", () => {
           config: { providerKey: "openai" },
         },
       });
-      const teamEntry = await prisma.aiToolEntry.create({
+      const deptEntry = await prisma.aiToolEntry.create({
         data: {
           organizationId,
-          scope: "team",
-          scopeId: teamPlatformId,
+          scope: "department",
+          scopeId: deptPlatformId,
           type: "model_provider",
-          displayName: "OpenAI — Platform override",
+          displayName: "OpenAI - Platform override",
           slug: sharedSlug,
           config: { providerKey: "openai" },
         },
       });
-      await prisma.aiToolEntryTeam.create({
-        data: { entryId: teamEntry.id, teamId: teamPlatformId },
+      await prisma.aiToolEntryDepartment.create({
+        data: { entryId: deptEntry.id, departmentId: deptPlatformId },
       });
 
       const platformList = await callerFor(memberPlatformUserId).aiTools.list({
@@ -289,7 +308,7 @@ describe("aiToolsRouter integration", () => {
       });
       const platformMatches = platformList.filter((e) => e.slug === sharedSlug);
       expect(platformMatches).toHaveLength(1);
-      expect(platformMatches[0]?.displayName).toBe("OpenAI — Platform override");
+      expect(platformMatches[0]?.displayName).toBe("OpenAI - Platform override");
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
@@ -300,7 +319,7 @@ describe("aiToolsRouter integration", () => {
 
       // Cleanup so other tests don't see the shadow rows.
       await prisma.aiToolEntry
-        .deleteMany({ where: { id: { in: [orgEntry.id, teamEntry.id] } } })
+        .deleteMany({ where: { id: { in: [orgEntry.id, deptEntry.id] } } })
         .catch(() => undefined);
     });
   });
@@ -310,7 +329,7 @@ describe("aiToolsRouter integration", () => {
       await expect(
         callerFor(adminUserId).aiTools.create({
           organizationId,
-          teamIds: [],
+          departmentIds: [],
           type: "coding_assistant",
           displayName: `Broken ${nanoid(4)}`,
           config: {
@@ -324,7 +343,7 @@ describe("aiToolsRouter integration", () => {
       await expect(
         callerFor(adminUserId).aiTools.create({
           organizationId,
-          teamIds: [],
+          departmentIds: [],
           type: "external_tool",
           displayName: `Bad link ${nanoid(4)}`,
           config: {
@@ -336,14 +355,14 @@ describe("aiToolsRouter integration", () => {
     });
 
     it("accepts namespaced iconAsset preset shapes (preset:<ns>:<kind>)", async () => {
-      // Drives B1.1 G2 — the internal-tool drawer's preset picker
+      // Drives B1.1 G2 - the internal-tool drawer's preset picker
       // writes `preset:tool:<kind>`. The original single-colon regex
       // rejected the nested-namespace shape, breaking every preset
       // pick except the wrench fallback. Both flat and namespaced
       // shapes must validate.
       const flat = await callerFor(adminUserId).aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "coding_assistant",
         displayName: `Flat preset ${nanoid(4)}`,
         iconAsset: "preset:claude_code",
@@ -356,7 +375,7 @@ describe("aiToolsRouter integration", () => {
 
       const namespaced = await callerFor(adminUserId).aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "external_tool",
         displayName: `Namespaced preset ${nanoid(4)}`,
         iconAsset: "preset:tool:globe",
@@ -372,7 +391,7 @@ describe("aiToolsRouter integration", () => {
       await expect(
         callerFor(adminUserId).aiTools.create({
           organizationId,
-          teamIds: [],
+          departmentIds: [],
           type: "external_tool",
           displayName: `Bad icon ${nanoid(4)}`,
           iconAsset: "not-a-preset",
@@ -389,7 +408,7 @@ describe("aiToolsRouter integration", () => {
     it("seeds the documented default tile set into a fresh org's catalog", async () => {
       // Use a brand-new org so the starter pack has a clean slate
       // (the suite-level org is reused across tests so it accumulates
-      // state — picking a fresh one here keeps assertions stable on
+      // state - picking a fresh one here keeps assertions stable on
       // exactly the starter set).
       const freshOrgId = `starter-org-${nanoid(8)}`;
       const freshTeamId = `starter-team-${nanoid(8)}`;
@@ -411,7 +430,7 @@ describe("aiToolsRouter integration", () => {
       // Re-grant adminUserId on the fresh org so the RBAC gate passes.
       // Mirrors the suite-level admin setup: OrganizationUser ADMIN +
       // RoleBinding at ORGANIZATION scope (the rbac middleware reads
-      // both — OrgUser alone isn't enough for `aiTools:manage`).
+      // both - OrgUser alone isn't enough for `aiTools:manage`).
       await prisma.organizationUser.create({
         data: {
           userId: adminUserId,
@@ -483,7 +502,7 @@ describe("aiToolsRouter integration", () => {
       }
     });
 
-    it("rejects MEMBER callers — manage-permission required", async () => {
+    it("rejects MEMBER callers - manage-permission required", async () => {
       await expect(
         callerFor(memberPlatformUserId).aiTools.importStarterPack({
           organizationId,
@@ -543,7 +562,7 @@ describe("aiToolsRouter integration", () => {
         // Pre-state mirrors what dogfood produced: admin manually
         // created "Claude Code" via UI → nanoid-suffixed slug, NULL
         // iconAsset. And "Cursor" with iconAsset already set (the
-        // admin uploaded a custom logo) — must NOT be overwritten.
+        // admin uploaded a custom logo) - must NOT be overwritten.
         const adminClaudeRow = await prisma.aiToolEntry.create({
           data: {
             organizationId: freshOrgId,
@@ -630,7 +649,7 @@ describe("aiToolsRouter integration", () => {
       const adminCaller = callerFor(adminUserId);
       const entry = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "external_tool",
         displayName: `Toggleable ${nanoid(4)}`,
         config: {
@@ -662,7 +681,7 @@ describe("aiToolsRouter integration", () => {
 
   describe("providerOptions", () => {
     it("returns every supported LLM provider with a configured flag", async () => {
-      // Drives B1.1 G1 — a fresh dev org with zero
+      // Drives B1.1 G1 - a fresh dev org with zero
       // GatewayProviderCredential rows must still see the full
       // platform catalog so the drawer's 'Configure provider →'
       // hint is reachable. Pre-fix, this returned [] and the
@@ -681,12 +700,12 @@ describe("aiToolsRouter integration", () => {
         expect(row.displayName.length).toBeGreaterThan(0);
         expect(typeof row.configured).toBe("boolean");
       }
-      // Test fixture has no GatewayProviderCredential rows seeded —
+      // Test fixture has no GatewayProviderCredential rows seeded -
       // every provider is unconfigured, exposing the warning path.
       expect(result.every((r) => r.configured === false)).toBe(true);
     });
 
-    it("rejects MEMBER callers — manage-permission required", async () => {
+    it("rejects MEMBER callers - manage-permission required", async () => {
       await expect(
         callerFor(memberPlatformUserId).aiTools.providerOptions({
           organizationId,
@@ -738,10 +757,10 @@ describe("aiToolsRouter integration", () => {
         ).aiTools.providerAvailability({ organizationId });
         expect(platform.configuredProviders).toContain("anthropic"); // org-wide
         expect(platform.configuredProviders).toContain("openai"); // own team
-        // azure is scoped to a team the caller can't reach — must not leak.
+        // azure is scoped to a team the caller can't reach - must not leak.
         expect(platform.configuredProviders).not.toContain("azure");
 
-        // memberOrphan belongs to no team — only org-wide providers count.
+        // memberOrphan belongs to no team - only org-wide providers count.
         const orphan = await callerFor(
           memberOrphanUserId,
         ).aiTools.providerAvailability({ organizationId });
@@ -760,21 +779,21 @@ describe("aiToolsRouter integration", () => {
 
   describe("update", () => {
     // Pins the new mutation shape (Stage B+C) end-to-end:
-    //   teamIds[] toggling round-trips through the AiToolEntryTeam
-    //   join + the legacy scope/scopeId mirror, iconAsset transitions
-    //   between preset / data URL / null, and cross-org team binds
-    //   are rejected by the org-membership guard.
-    it("teamIds toggles round-trip through join table + legacy mirror", async () => {
+    //   departmentIds[] toggling round-trips through the
+    //   AiToolEntryDepartment join + the legacy scope/scopeId mirror,
+    //   iconAsset transitions between preset / data URL / null, and
+    //   cross-org department binds are rejected by the org guard.
+    it("departmentIds toggles round-trip through join table + legacy mirror", async () => {
       const adminCaller = callerFor(adminUserId);
       const created = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "external_tool",
         displayName: `Update tile ${nanoid(4)}`,
         config: { descriptionMarkdown: "x", linkUrl: "https://example.com" },
       });
-      // Empty teams[] writes scope='organization' for back-compat.
-      expect(created.teamIds).toEqual([]);
+      // Empty departments[] writes scope='organization' for back-compat.
+      expect(created.departmentIds).toEqual([]);
       expect(created.scope).toBe("organization");
       expect(created.scopeId).toBe(organizationId);
 
@@ -782,45 +801,45 @@ describe("aiToolsRouter integration", () => {
       const single = await adminCaller.aiTools.update({
         organizationId,
         id: created.id,
-        teamIds: [teamPlatformId],
+        departmentIds: [deptPlatformId],
       });
-      expect(single.teamIds).toEqual([teamPlatformId]);
-      expect(single.scope).toBe("team");
-      expect(single.scopeId).toBe(teamPlatformId);
-      const singleRows = await prisma.aiToolEntryTeam.findMany({
+      expect(single.departmentIds).toEqual([deptPlatformId]);
+      expect(single.scope).toBe("department");
+      expect(single.scopeId).toBe(deptPlatformId);
+      const singleRows = await prisma.aiToolEntryDepartment.findMany({
         where: { entryId: created.id },
       });
-      expect(singleRows.map((r) => r.teamId)).toEqual([teamPlatformId]);
+      expect(singleRows.map((r) => r.departmentId)).toEqual([deptPlatformId]);
 
-      // [platform] → [platform, dataScience] (multi-team)
+      // [platform] → [platform, dataScience] (multi-department)
       const multi = await adminCaller.aiTools.update({
         organizationId,
         id: created.id,
-        teamIds: [teamPlatformId, teamDataScienceId],
+        departmentIds: [deptPlatformId, deptDataScienceId],
       });
-      expect(multi.teamIds.sort()).toEqual(
-        [teamPlatformId, teamDataScienceId].sort(),
+      expect(multi.departmentIds.sort()).toEqual(
+        [deptPlatformId, deptDataScienceId].sort(),
       );
-      // Legacy mirror still 'team' but only carries first id (best
-      // effort — multi-team can't be expressed in the legacy pair).
-      expect(multi.scope).toBe("team");
-      const multiRows = await prisma.aiToolEntryTeam.findMany({
+      // Legacy mirror still 'department' but only carries first id (best
+      // effort - multi-department can't be expressed in the legacy pair).
+      expect(multi.scope).toBe("department");
+      const multiRows = await prisma.aiToolEntryDepartment.findMany({
         where: { entryId: created.id },
       });
-      expect(multiRows.map((r) => r.teamId).sort()).toEqual(
-        [teamPlatformId, teamDataScienceId].sort(),
+      expect(multiRows.map((r) => r.departmentId).sort()).toEqual(
+        [deptPlatformId, deptDataScienceId].sort(),
       );
 
       // [platform, dataScience] → [] (back to org-wide)
       const cleared = await adminCaller.aiTools.update({
         organizationId,
         id: created.id,
-        teamIds: [],
+        departmentIds: [],
       });
-      expect(cleared.teamIds).toEqual([]);
+      expect(cleared.departmentIds).toEqual([]);
       expect(cleared.scope).toBe("organization");
       expect(cleared.scopeId).toBe(organizationId);
-      const clearedRows = await prisma.aiToolEntryTeam.findMany({
+      const clearedRows = await prisma.aiToolEntryDepartment.findMany({
         where: { entryId: created.id },
       });
       expect(clearedRows).toHaveLength(0);
@@ -832,7 +851,7 @@ describe("aiToolsRouter integration", () => {
       const adminCaller = callerFor(adminUserId);
       const created = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "coding_assistant",
         displayName: `Icon transitions ${nanoid(4)}`,
         iconAsset: "preset:claude_code",
@@ -862,21 +881,20 @@ describe("aiToolsRouter integration", () => {
       await prisma.aiToolEntry.delete({ where: { id: created.id } });
     });
 
-    it("rejects update binding a team from a foreign org", async () => {
+    it("rejects update binding a department from a foreign org", async () => {
       const adminCaller = callerFor(adminUserId);
       const foreignOrg = await prisma.organization.create({
         data: { name: `Foreign ${nanoid(4)}`, slug: `--ait-foreign-${nanoid(6)}` },
       });
-      const foreignTeam = await prisma.team.create({
+      const foreignDept = await prisma.department.create({
         data: {
-          name: `Foreign team ${nanoid(4)}`,
-          slug: `--ait-foreign-team-${nanoid(6)}`,
+          name: `Foreign dept ${nanoid(4)}`,
           organizationId: foreignOrg.id,
         },
       });
       const entry = await adminCaller.aiTools.create({
         organizationId,
-        teamIds: [],
+        departmentIds: [],
         type: "external_tool",
         displayName: `Cross-org guard ${nanoid(4)}`,
         config: { descriptionMarkdown: "x", linkUrl: "https://example.com" },
@@ -887,13 +905,13 @@ describe("aiToolsRouter integration", () => {
           adminCaller.aiTools.update({
             organizationId,
             id: entry.id,
-            teamIds: [foreignTeam.id],
+            departmentIds: [foreignDept.id],
           }),
-        ).rejects.toThrow(/teams do not belong to this organization/);
+        ).rejects.toThrow(/departments do not belong to this organization/);
 
         // Atomicity: the failed update must NOT have written any
         // join rows, and the legacy mirror must not have flipped.
-        const rows = await prisma.aiToolEntryTeam.findMany({
+        const rows = await prisma.aiToolEntryDepartment.findMany({
           where: { entryId: entry.id },
         });
         expect(rows).toHaveLength(0);
@@ -904,7 +922,7 @@ describe("aiToolsRouter integration", () => {
         expect(after.scope).toBe("organization");
       } finally {
         await prisma.aiToolEntry.delete({ where: { id: entry.id } });
-        await prisma.team.delete({ where: { id: foreignTeam.id } });
+        await prisma.department.delete({ where: { id: foreignDept.id } });
         await prisma.organization.delete({ where: { id: foreignOrg.id } });
       }
     });
@@ -939,7 +957,7 @@ describe("aiToolsRouter integration", () => {
       }
     });
 
-    it("rejects MEMBER callers — manage-permission required", async () => {
+    it("rejects MEMBER callers - manage-permission required", async () => {
       await expect(
         callerFor(memberPlatformUserId).aiTools.routingPolicyOptions({
           organizationId,

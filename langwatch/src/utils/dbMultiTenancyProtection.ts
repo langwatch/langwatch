@@ -163,6 +163,15 @@ const EXEMPT_MODELS = [
    */
   "AiToolEntryTeam",
   /**
+   * AiToolEntryDepartment (department-based "Visible to" model) is the
+   * join table binding AiToolEntry rows to departments. Same rationale
+   * as AiToolEntryTeam - org-scoped via the referenced entry, no
+   * projectId; service layer authorises by the parent entry's
+   * organizationId and validates each department belongs to that org
+   * before any mutation.
+   */
+  "AiToolEntryDepartment",
+  /**
    * IngestionTemplate is org-scoped: organizationId nullable
    * (NULL = platform-published default, NOT NULL = org-authored).
    * No projectId column - admin queries walk by organizationId or

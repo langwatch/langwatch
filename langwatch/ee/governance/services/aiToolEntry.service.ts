@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * AiToolEntryService — owns the AI Tools Portal catalog (Phase 7).
+ * AiToolEntryService - owns the AI Tools Portal catalog (Phase 7).
  *
- * The portal lives at /me as a card grid (3 sections — coding
+ * The portal lives at /me as a card grid (3 sections - coding
  * assistants, model providers, external tools) and is managed by org
  * admins at /settings/governance/tool-catalog.
  *
  * Scoping (read resolution):
  *   - org-scoped entries ("scope":"organization") are visible to ALL
  *     members of the org by default.
- *   - team-scoped entries ("scope":"team") are visible only to members
- *     of that team. A team-scoped entry with the same `slug` as an
- *     org-scoped entry OVERRIDES the org default for users in the team
- *     (admins use this to hide / re-skin a globally-listed tool per
- *     team).
+ *   - department-scoped entries ("scope":"department") are visible only
+ *     to members whose OrganizationUser.departmentId is in the entry's
+ *     department set (AiToolEntryDepartment join rows).
+ *
+ * The legacy team scope ("scope":"team" + AiToolEntryTeam) is retired:
+ * existing team-scoped rows degrade to org-wide at read time (departments
+ * are a new axis with no team->department mapping). New writes only ever
+ * produce "organization" or "department".
  *
  * Per-type config schema (validated at create / update via zod
- * discriminated union — DB-level shape is `Json @default("{}")`):
+ * discriminated union - DB-level shape is `Json @default("{}")`):
  *
  *   coding_assistant: { setupCommand, setupDocsUrl, helperText? }
  *   model_provider:   { providerKey, suggestedRoutingPolicyId?,
@@ -26,7 +29,7 @@
  *
  * Authorisation: callers MUST gate on `aiTools:view` (read paths) or
  * `aiTools:manage` (write paths) BEFORE invoking these methods. The
- * service itself never checks RBAC — that's the router / route layer.
+ * service itself never checks RBAC - that's the router / route layer.
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  */
@@ -43,8 +46,11 @@ export const SUPPORTED_TILE_TYPES = [
 ] as const;
 export type AiToolType = (typeof SUPPORTED_TILE_TYPES)[number];
 
-export const SUPPORTED_SCOPES = ["organization", "team"] as const;
-export type AiToolScope = (typeof SUPPORTED_SCOPES)[number];
+/// "organization" = org-wide. "department" = visible to members of the
+/// bound departments. "team" remains only as a legacy read value for
+/// pre-migration rows; the service never writes it.
+export const SUPPORTED_SCOPES = ["organization", "department"] as const;
+export type AiToolScope = (typeof SUPPORTED_SCOPES)[number] | "team";
 
 /**
  * Fixed list of well-known coding-assistant kinds the drawer surfaces
@@ -63,6 +69,23 @@ export const SUPPORTED_ASSISTANT_KINDS = [
 ] as const;
 export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
 
+/**
+ * Maps a coding-assistant tile's `assistantKind` to the CLI tool slug the
+ * `langwatch <tool>` wrapper uses (and the slug PlatformToolPolicy keyed on).
+ * Only the five wrapped tools map; kinds with no CLI wrapper (github_copilot,
+ * custom) are absent and contribute no toolPolicies entry. cliBootstrap reads
+ * this to derive the login `toolPolicies` map from tile config.
+ */
+export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
+  Record<AssistantKind, "claude" | "codex" | "gemini" | "opencode" | "cursor">
+> = {
+  claude_code: "claude",
+  codex: "codex",
+  gemini: "gemini",
+  opencode: "opencode",
+  cursor: "cursor",
+};
+
 const codingAssistantConfig = z.object({
   /// Discriminator inside config so the drawer can render the matching
   /// preset icon + setup hints. Required for new writes; existing rows
@@ -70,11 +93,18 @@ const codingAssistantConfig = z.object({
   assistantKind: z.enum(SUPPORTED_ASSISTANT_KINDS).optional(),
   setupCommand: z.string().min(1).max(256),
   // Drawer labels "Setup docs URL (optional)" and only includes the
-  // field in the wire payload when filled. Schema must match — when
+  // field in the wire payload when filled. Schema must match - when
   // required, every catalog publish 400'd with `Required` (Ariana QA
   // admin-hat #2). Type label says optional, behavior should too.
   setupDocsUrl: z.string().url().max(2048).optional(),
   helperText: z.string().max(2048).optional(),
+  /// CLI path policy folded into the tile (replaces PlatformToolPolicy).
+  /// Both default to true when absent - see cliBootstrap.service.ts, which
+  /// reads these to derive the login `toolPolicies` map. The "cursor"
+  /// assistant is forced to allowOtelDirect=false at the resolution layer
+  /// (GUI-only), so a stored true there is still treated as false.
+  allowVk: z.boolean().optional(),
+  allowOtelDirect: z.boolean().optional(),
 });
 
 const modelProviderConfig = z.object({
@@ -101,26 +131,26 @@ export type AiToolConfig = z.infer<typeof AiToolConfigSchema>["config"];
 export interface AiToolEntryDto {
   id: string;
   organizationId: string;
-  /// @deprecated Use `teamIds` instead. Populated for back-compat
-  /// with pre-multi-team rows; mirrors `teamIds` at write time
-  /// (`organization` when empty, `team` with first id when 1+).
+  /// @deprecated Use `departmentIds` instead. Populated for back-compat
+  /// reads; mirrors `departmentIds` at write time (`organization` when
+  /// empty, `department` when 1+).
   scope: AiToolScope;
-  /// @deprecated Use `teamIds` instead. Mirrors `teamIds` for
-  /// back-compat — see `scope` above.
+  /// @deprecated Use `departmentIds` instead. Mirrors the org/first-dept
+  /// id for back-compat - see `scope` above.
   scopeId: string;
-  /// Multi-team scope. Empty array = org-wide. Non-empty =
-  /// visible only to members of those teams.
-  teamIds: string[];
+  /// Department scope. Empty array = org-wide. Non-empty = visible only
+  /// to members whose departmentId is in this set.
+  departmentIds: string[];
   type: AiToolType;
   displayName: string;
   slug: string;
-  /// @deprecated Use `iconAsset` — kept for back-compat with
+  /// @deprecated Use `iconAsset` - kept for back-compat with
   /// pre-refactor rows.
   iconKey: string | null;
   /// Prefix-discriminated icon source:
-  ///   "preset:<kind>"        — built-in icon
-  ///   "data:image/...;base64,..." — admin-uploaded
-  ///   null                    — UI falls back to type default
+  ///   "preset:<kind>"        - built-in icon
+  ///   "data:image/...;base64,..." - admin-uploaded
+  ///   null                    - UI falls back to type default
   iconAsset: string | null;
   order: number;
   enabled: boolean;
@@ -150,18 +180,21 @@ interface AiToolEntryRow {
   updatedAt: Date;
   createdById: string | null;
   updatedById: string | null;
-  teams?: { teamId: string }[];
+  departments?: { departmentId: string }[];
 }
 
 function toDto(row: AiToolEntryRow): AiToolEntryDto {
-  const teamIds =
-    row.teams?.map((t) => t.teamId) ??
-    (row.scope === "team" && row.scopeId ? [row.scopeId] : []);
+  // New shape: AiToolEntryDepartment[] is the source of truth. Back-compat:
+  // a pre-migration row with scope='department' but no join rows mirrors its
+  // scopeId. Legacy team-scoped rows degrade to org-wide (empty set).
+  const departmentIds =
+    row.departments?.map((d) => d.departmentId) ??
+    (row.scope === "department" && row.scopeId ? [row.scopeId] : []);
   return {
     ...row,
     scope: row.scope as AiToolScope,
     type: row.type as AiToolType,
-    teamIds,
+    departmentIds,
     config: (row.config as Record<string, unknown>) ?? {},
   };
 }
@@ -182,20 +215,9 @@ function generateSlug(displayName: string): string {
 }
 
 /**
- * Mirror the new `teamIds[]` shape onto the legacy `scope`/`scopeId`
- * pair so any reader still hitting those columns sees a coherent row.
- *   []           → scope='organization', scopeId=organizationId
- *   [t]          → scope='team',         scopeId=t
- *   [t, ...]     → scope='team',         scopeId=teams[0]   (best
- *                  effort — multi-team can't be represented in the
- *                  legacy pair; readers should prefer teams[]).
- * Drops out of the service public API as soon as scope/scopeId are
- * removed in the follow-up migration.
- */
-/**
  * Pretty label for the admin drawer's provider dropdown. Falls back
  * to a Title-Cased rendering of the provider key when not explicitly
- * mapped — covers custom / future providers without a code change.
+ * mapped - covers custom / future providers without a code change.
  */
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   openai: "OpenAI",
@@ -221,28 +243,38 @@ function providerDisplayName(providerKey: string): string {
   );
 }
 
-function legacyScopeFromTeamIds({
+/**
+ * Mirror the `departmentIds[]` shape onto the legacy `scope`/`scopeId`
+ * pair so any reader still hitting those columns sees a coherent row.
+ *   []           → scope='organization', scopeId=organizationId
+ *   [d, ...]     → scope='department',   scopeId=departments[0]   (best
+ *                  effort - multi-department can't be represented in the
+ *                  legacy pair; readers should prefer departments[]).
+ * Drops out of the service public API once scope/scopeId are removed in a
+ * follow-up migration.
+ */
+function legacyScopeFromDepartmentIds({
   organizationId,
-  teamIds,
+  departmentIds,
 }: {
   organizationId: string;
-  teamIds: string[];
+  departmentIds: string[];
 }): { scope: AiToolScope; scopeId: string } {
-  if (teamIds.length === 0) {
+  if (departmentIds.length === 0) {
     return { scope: "organization", scopeId: organizationId };
   }
-  return { scope: "team", scopeId: teamIds[0]! };
+  return { scope: "department", scopeId: departmentIds[0]! };
 }
 
 /**
  * The starter pack documented in docs/ai-governance/personal-portal/
- * admin-catalog.mdx §"Starter pack" — a sensible default set that gives
+ * admin-catalog.mdx §"Starter pack" - a sensible default set that gives
  * a fresh org an immediately useful /me portal grid. Coding assistants
  * point at the `langwatch <tool>` device-flow command; model providers
  * carry a `providerKey` slug so the user-side click-to-expand can mint
  * a personal VK against the right backend without further admin input.
  *
- * External tools deliberately omitted — admins fill those in per-org
+ * External tools deliberately omitted - admins fill those in per-org
  * with internal links (no useful default exists across orgs).
  */
 export const STARTER_PACK_TILES: ReadonlyArray<{
@@ -319,7 +351,7 @@ export const STARTER_PACK_TILES: ReadonlyArray<{
     iconAsset: "preset:openai",
     config: {
       // Label must satisfy the personalVirtualKeys.issuePersonal regex
-      // (^[a-z0-9][a-z0-9_\-]*$) — Ariana caught the original
+      // (^[a-z0-9][a-z0-9_\-]*$) - Ariana caught the original
       // "OpenAI key" defaults pre-filling a value that immediately
       // failed validation. Keep the shape lowercase + dash so the user
       // can submit without editing.
@@ -386,11 +418,87 @@ export class AiToolEntryService {
   }
 
   /**
+   * Per-tool CLI path overrides derived from the org's coding_assistant
+   * tiles. For each tile whose `assistantKind` maps to a CLI slug
+   * ({@link ASSISTANT_KIND_TO_TOOL_SLUG}), reads `config.allowVk` /
+   * `config.allowOtelDirect` (absent → true). Cursor is forced to
+   * allowOtelDirect=false regardless of stored value (GUI-only).
+   *
+   * Returns ONLY slugs that have a tile (a partial map). cliBootstrap
+   * merges this over the hardcoded {@link PLATFORM_TOOL_POLICY_DEFAULTS}
+   * so a slug with no tile keeps its default - this is the replacement
+   * for the retired PlatformToolPolicy table. Disabled / archived tiles
+   * are ignored (an admin who hides a tile also stops governing its
+   * paths; the hardcoded default takes over).
+   *
+   * When two tiles map to the same slug, the lowest-`order` one wins
+   * (the same precedence the portal grid renders), keeping the result
+   * deterministic.
+   */
+  async resolveToolPolicyOverrides({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<
+    Partial<
+      Record<
+        "claude" | "codex" | "gemini" | "opencode" | "cursor",
+        { allowVk: boolean; allowOtelDirect: boolean }
+      >
+    >
+  > {
+    const tiles = await this.prisma.aiToolEntry.findMany({
+      where: {
+        organizationId,
+        type: "coding_assistant",
+        enabled: true,
+        archivedAt: null,
+      },
+      orderBy: [{ order: "asc" }, { displayName: "asc" }],
+      select: { config: true },
+    });
+
+    const overrides: Partial<
+      Record<
+        "claude" | "codex" | "gemini" | "opencode" | "cursor",
+        { allowVk: boolean; allowOtelDirect: boolean }
+      >
+    > = {};
+
+    for (const tile of tiles) {
+      const config = (tile.config as Record<string, unknown>) ?? {};
+      const kind = config.assistantKind;
+      if (typeof kind !== "string") continue;
+      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as AssistantKind];
+      if (!slug) continue;
+      // First (lowest-order) tile per slug wins.
+      if (overrides[slug]) continue;
+
+      const allowVk = config.allowVk === undefined ? true : !!config.allowVk;
+      const allowOtelDirect =
+        slug === "cursor"
+          ? false
+          : config.allowOtelDirect === undefined
+            ? true
+            : !!config.allowOtelDirect;
+      overrides[slug] = { allowVk, allowOtelDirect };
+    }
+
+    return overrides;
+  }
+
+  /**
    * User-facing list. Returns enabled, non-archived entries visible to
-   * the calling user. Org-scoped entries are visible to all members;
-   * team-scoped entries are filtered to the user's team memberships.
-   * Team-scoped entries with the same `slug` as an org-scoped entry
-   * SHADOW the org default (Vercel-style team-overrides-org pattern).
+   * the calling user. Org-wide entries are visible to all members;
+   * department-scoped entries are visible only when the member's
+   * departmentId is in the entry's department set. A department-bound
+   * entry with the same `slug` as an org-wide entry SHADOWS the org
+   * default for members of that department.
+   *
+   * Legacy team-scoped rows (scope='team' / AiToolEntryTeam) degrade to
+   * org-wide: departments are a new axis and no team->department mapping
+   * exists, so the safe default is to keep the tile visible to everyone
+   * rather than hide it.
    *
    * Sorted by (order ASC, displayName ASC).
    */
@@ -401,46 +509,48 @@ export class AiToolEntryService {
     organizationId: string;
     userId: string;
   }): Promise<AiToolEntryDto[]> {
-    // Resolve the user's team memberships in this org so we can filter
-    // team-scoped entries. The legacy TeamUser table is the source of
-    // truth (RoleBindings + groups land in a follow-up).
-    const teamMemberships = await this.prisma.teamUser.findMany({
-      where: { userId, team: { organizationId } },
-      select: { teamId: true },
+    // Resolve the member's department in this org so we can filter
+    // department-scoped entries. One nullable departmentId per
+    // OrganizationUser (the people lens).
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { departmentId: true },
     });
-    const userTeamIds = teamMemberships.map((m) => m.teamId);
+    const userDepartmentId = membership?.departmentId ?? null;
 
-    // Pull every active row in the org with its team bindings
-    // pre-joined; we filter visibility in JS so the team-overrides-org
-    // shadow is straightforward to express. Cardinality is per-org-
-    // catalog (~dozens), so the simpler shape outweighs a smarter
-    // SQL filter here.
+    // Pull every active row in the org with its department bindings
+    // pre-joined; we filter visibility in JS so the department-overrides-
+    // org shadow is straightforward to express. Cardinality is per-org-
+    // catalog (~dozens), so the simpler shape outweighs a smarter SQL
+    // filter here.
     const rows = await this.prisma.aiToolEntry.findMany({
       where: { organizationId, enabled: true, archivedAt: null },
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
-      include: { teams: { select: { teamId: true } } },
+      include: { departments: { select: { departmentId: true } } },
     });
 
-    const userTeamSet = new Set(userTeamIds);
     const visible = rows.filter((row) => {
-      // New shape: AiToolEntryTeam[] is the source of truth.
-      if (row.teams.length > 0) {
-        return row.teams.some((t) => userTeamSet.has(t.teamId));
+      // New shape: AiToolEntryDepartment[] is the source of truth. A
+      // member with no department never matches a department-bound tile.
+      if (row.departments.length > 0) {
+        return (
+          userDepartmentId !== null &&
+          row.departments.some((d) => d.departmentId === userDepartmentId)
+        );
       }
-      // Back-compat for rows still written with legacy scope/scopeId
-      // (Stage A migration only backfilled team-scoped rows into the
-      // join table; org-scoped rows have an empty teams[] AND a
-      // populated scope='organization'). Empty teams[] + scope='team'
-      // means a hand-edited row — fall through to the legacy check.
-      if (row.scope === "team") {
-        return userTeamSet.has(row.scopeId);
+      // Empty department set + scope='department' (a hand-edited /
+      // pre-migration row) → fall back to the legacy scopeId check.
+      if (row.scope === "department") {
+        return userDepartmentId !== null && row.scopeId === userDepartmentId;
       }
-      // scope='organization' (or missing) → org-wide.
+      // scope='organization', legacy 'team', or missing → org-wide.
+      // Legacy team rows intentionally degrade to org-wide here.
       return true;
     });
 
-    // Apply team-overrides-org by slug. A team-bound entry shadows
-    // an org-wide entry with the same slug for users in that team.
+    // Apply department-overrides-org by slug. A department-bound entry
+    // shadows an org-wide entry with the same slug for members of that
+    // department.
     const bySlug = new Map<string, (typeof visible)[number]>();
     for (const row of visible) {
       const existing = bySlug.get(row.slug);
@@ -448,10 +558,11 @@ export class AiToolEntryService {
         bySlug.set(row.slug, row);
         continue;
       }
-      const rowIsTeamBound = row.teams.length > 0 || row.scope === "team";
-      const existingIsTeamBound =
-        existing.teams.length > 0 || existing.scope === "team";
-      if (rowIsTeamBound && !existingIsTeamBound) {
+      const rowIsDeptBound =
+        row.departments.length > 0 || row.scope === "department";
+      const existingIsDeptBound =
+        existing.departments.length > 0 || existing.scope === "department";
+      if (rowIsDeptBound && !existingIsDeptBound) {
         bySlug.set(row.slug, row);
       }
     }
@@ -471,7 +582,7 @@ export class AiToolEntryService {
     const rows = await this.prisma.aiToolEntry.findMany({
       where: { organizationId },
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
-      include: { teams: { select: { teamId: true } } },
+      include: { departments: { select: { departmentId: true } } },
     });
     return rows.map(toDto);
   }
@@ -485,7 +596,7 @@ export class AiToolEntryService {
   }): Promise<AiToolEntryDto | null> {
     const row = await this.prisma.aiToolEntry.findUnique({
       where: { id },
-      include: { teams: { select: { teamId: true } } },
+      include: { departments: { select: { departmentId: true } } },
     });
     if (!row || row.organizationId !== organizationId) return null;
     return toDto(row);
@@ -494,11 +605,11 @@ export class AiToolEntryService {
   async create(input: {
     organizationId: string;
     /// Empty array = org-wide (visible to every member). Non-empty
-    /// = entry visible only to members of those teams.
-    teamIds: string[];
+    /// = entry visible only to members of those departments.
+    departmentIds: string[];
     type: AiToolType;
     displayName: string;
-    /// Optional iconAsset — "preset:<kind>" for built-in icons or
+    /// Optional iconAsset - "preset:<kind>" for built-in icons or
     /// a base64 data URL for admin-uploaded SVG/PNG. UI falls back
     /// to a type-default when null.
     iconAsset?: string | null;
@@ -508,26 +619,22 @@ export class AiToolEntryService {
   }): Promise<AiToolEntryDto> {
     AiToolConfigSchema.parse({ type: input.type, config: input.config });
 
-    // Validate referenced teams belong to the calling org. Without
-    // this an admin could bind a tile to a team in a foreign org and
+    // Validate referenced departments belong to the calling org. Without
+    // this an admin could bind a tile to a department in a foreign org and
     // cause cross-org visibility leaks.
-    if (input.teamIds.length > 0) {
-      const validTeams = await this.prisma.team.count({
-        where: {
-          id: { in: input.teamIds },
-          organizationId: input.organizationId,
-        },
+    if (input.departmentIds.length > 0) {
+      await this.assertDepartmentsInOrg({
+        organizationId: input.organizationId,
+        departmentIds: input.departmentIds,
       });
-      if (validTeams !== input.teamIds.length) {
-        throw new Error("One or more teams do not belong to this organization");
-      }
     }
 
     // Back-compat mirror to scope/scopeId so any reader still hitting
-    // the legacy columns sees a coherent row. Stage 2 will drop both.
-    const { scope, scopeId } = legacyScopeFromTeamIds({
+    // the legacy columns sees a coherent row. A follow-up migration
+    // drops both once every reader prefers the join table.
+    const { scope, scopeId } = legacyScopeFromDepartmentIds({
       organizationId: input.organizationId,
-      teamIds: input.teamIds,
+      departmentIds: input.departmentIds,
     });
 
     const slug = generateSlug(input.displayName);
@@ -549,17 +656,17 @@ export class AiToolEntryService {
           updatedById: input.actorUserId ?? null,
         },
       });
-      if (input.teamIds.length > 0) {
-        await tx.aiToolEntryTeam.createMany({
-          data: input.teamIds.map((teamId) => ({
+      if (input.departmentIds.length > 0) {
+        await tx.aiToolEntryDepartment.createMany({
+          data: input.departmentIds.map((departmentId) => ({
             entryId: created.id,
-            teamId,
+            departmentId,
           })),
         });
       }
       return await tx.aiToolEntry.findUniqueOrThrow({
         where: { id: created.id },
-        include: { teams: { select: { teamId: true } } },
+        include: { departments: { select: { departmentId: true } } },
       });
     });
     return toDto(row);
@@ -570,9 +677,9 @@ export class AiToolEntryService {
     organizationId: string;
     displayName?: string;
     iconAsset?: string | null;
-    /// Pass to overwrite the team binding set. Empty = org-wide.
+    /// Pass to overwrite the department binding set. Empty = org-wide.
     /// Omit to leave the existing binding untouched.
-    teamIds?: string[];
+    departmentIds?: string[];
     order?: number;
     enabled?: boolean;
     type?: AiToolType;
@@ -596,23 +703,18 @@ export class AiToolEntryService {
       });
     }
 
-    if (input.teamIds && input.teamIds.length > 0) {
-      const validTeams = await this.prisma.team.count({
-        where: {
-          id: { in: input.teamIds },
-          organizationId: input.organizationId,
-        },
+    if (input.departmentIds && input.departmentIds.length > 0) {
+      await this.assertDepartmentsInOrg({
+        organizationId: input.organizationId,
+        departmentIds: input.departmentIds,
       });
-      if (validTeams !== input.teamIds.length) {
-        throw new Error("One or more teams do not belong to this organization");
-      }
     }
 
     const legacyMirror =
-      input.teamIds !== undefined
-        ? legacyScopeFromTeamIds({
+      input.departmentIds !== undefined
+        ? legacyScopeFromDepartmentIds({
             organizationId: input.organizationId,
-            teamIds: input.teamIds,
+            departmentIds: input.departmentIds,
           })
         : null;
 
@@ -632,23 +734,51 @@ export class AiToolEntryService {
           updatedById: input.actorUserId ?? null,
         },
       });
-      if (input.teamIds !== undefined) {
-        await tx.aiToolEntryTeam.deleteMany({ where: { entryId: input.id } });
-        if (input.teamIds.length > 0) {
-          await tx.aiToolEntryTeam.createMany({
-            data: input.teamIds.map((teamId) => ({
+      if (input.departmentIds !== undefined) {
+        await tx.aiToolEntryDepartment.deleteMany({
+          where: { entryId: input.id },
+        });
+        if (input.departmentIds.length > 0) {
+          await tx.aiToolEntryDepartment.createMany({
+            data: input.departmentIds.map((departmentId) => ({
               entryId: input.id,
-              teamId,
+              departmentId,
             })),
           });
         }
       }
       return await tx.aiToolEntry.findUniqueOrThrow({
         where: { id: input.id },
-        include: { teams: { select: { teamId: true } } },
+        include: { departments: { select: { departmentId: true } } },
       });
     });
     return toDto(row);
+  }
+
+  /**
+   * Guard: every id must be an active department in the calling org.
+   * Archived or foreign-org departments throw - without this an admin
+   * could bind a tile to a department in another org and leak visibility.
+   */
+  private async assertDepartmentsInOrg({
+    organizationId,
+    departmentIds,
+  }: {
+    organizationId: string;
+    departmentIds: string[];
+  }): Promise<void> {
+    const valid = await this.prisma.department.count({
+      where: {
+        id: { in: departmentIds },
+        organizationId,
+        archivedAt: null,
+      },
+    });
+    if (valid !== new Set(departmentIds).size) {
+      throw new Error(
+        "One or more departments do not belong to this organization",
+      );
+    }
   }
 
   async archive({
@@ -667,6 +797,7 @@ export class AiToolEntryService {
     const row = await this.prisma.aiToolEntry.update({
       where: { id },
       data: { archivedAt: new Date(), enabled: false },
+      include: { departments: { select: { departmentId: true } } },
     });
     return toDto(row);
   }
@@ -678,8 +809,8 @@ export class AiToolEntryService {
    *
    *   - existing org-scoped row matches by (type, displayName) AND has
    *     `iconAsset = null` → UPDATE that row's iconAsset in place
-   *     (closes the bug where admin-created "Claude Code" — slug
-   *     `claude-code-x7k2y9` from generateSlug — coexisted with a
+   *     (closes the bug where admin-created "Claude Code" - slug
+   *     `claude-code-x7k2y9` from generateSlug - coexisted with a
    *     starter row at slug `claude-code` and the older NULL-icon
    *     row won the (order, displayName) sort)
    *   - existing match with `iconAsset` already populated → SKIP
@@ -767,7 +898,7 @@ export class AiToolEntryService {
             displayName: tile.displayName,
             slug: tile.slug,
             iconAsset: tile.iconAsset,
-            // Append after any tiles the admin already created — keeps
+            // Append after any tiles the admin already created - keeps
             // their hand-curated order on top.
             order: existing.length + index,
             enabled: true,
@@ -788,10 +919,10 @@ export class AiToolEntryService {
 
   /**
    * Returns the distinct set of `provider` strings the caller can
-   * reach a *bindable* credential for — an enabled `ModelProvider`
+   * reach a *bindable* credential for - an enabled `ModelProvider`
    * (`disabledAt: null`) scoped either org-wide or to a team/project
    * the caller belongs to. Drives the per-tile "Provider not
-   * configured" preflight on /me — without this, clicking an OpenAI
+   * configured" preflight on /me - without this, clicking an OpenAI
    * tile in an Anthropic-only org silently mints a VK that 502s on
    * first curl with `provider_error` (Sergey 3bbd7fbfc dogfood).
    *
@@ -803,7 +934,7 @@ export class AiToolEntryService {
    * Why this exact predicate: it mirrors the materialiser's
    * fail-closed binding contract (a5601f80a). If a credential
    * matching this shape is reachable by the caller, the personal-VK
-   * routing policy can route through it — guaranteeing the tile's
+   * routing policy can route through it - guaranteeing the tile's
    * green state matches what the gateway will actually accept at
    * request time. Using the bare ModelProvider table (without the
    * `disabledAt: null` join) would over-report for orgs that have
@@ -818,7 +949,7 @@ export class AiToolEntryService {
   }): Promise<string[]> {
     // Only teams the caller actually belongs to. A TEAM/PROJECT-scoped
     // provider on a team the caller can't reach must not green-light the
-    // tile — ORGANIZATION-scoped credentials still count for every member.
+    // tile - ORGANIZATION-scoped credentials still count for every member.
     const memberships = await this.prisma.teamUser.findMany({
       where: { userId, team: { organizationId } },
       select: { teamId: true, team: { select: { projects: { select: { id: true } } } } },
@@ -859,7 +990,7 @@ export class AiToolEntryService {
    * `configured` flag based on whether the org has a bindable live
    * GatewayProviderCredential for that provider. The drawer surfaces
    * `configured: false` rows as a "Configure provider →" hint pointing
-   * at /settings/model-providers — without that contract the warning
+   * at /settings/model-providers - without that contract the warning
    * path is unreachable on a fresh org (caught in B1.1 G1: dev
    * fixture only had Anthropic configured, list collapsed to one row,
    * unconfigured-warning UX could never fire).
@@ -928,7 +1059,7 @@ export class AiToolEntryService {
   /**
    * Admin-side dropdown source for the model_provider tile's
    * `suggestedRoutingPolicyId`. Returns the org-scoped routing
-   * policies (only — team-scoped policies are bound to a team's
+   * policies (only - team-scoped policies are bound to a team's
    * personal-VK flow and not surfaceable through a tile config).
    */
   async listRoutingPolicyOptionsForAdmin({
