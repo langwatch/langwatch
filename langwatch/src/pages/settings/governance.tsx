@@ -94,6 +94,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const catalogQuery = api.aiTools.adminList.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -133,10 +137,12 @@ function GovernanceOverviewPage() {
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
   const anomalyRules = anomalyRulesQuery.data ?? [];
+  const catalogTiles = catalogQuery.data ?? [];
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
   const hasAnomalyRules = anomalyRules.length > 0;
+  const hasCatalogTiles = catalogTiles.length > 0;
   const hasTraffic =
     !!summary &&
     (summary.spentThisWindowUsd > 0 ||
@@ -185,6 +191,17 @@ function GovernanceOverviewPage() {
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
+              <SetupItem
+                done={hasCatalogTiles}
+                title="Add tools to the catalog"
+                description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
+                href="/settings/governance/tool-catalog"
+                ctaLabel={
+                  hasCatalogTiles
+                    ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
+                    : "Add tools to the catalog"
+                }
+              />
               <SetupItem
                 done={hasPolicies}
                 title="Define a routing policy"
