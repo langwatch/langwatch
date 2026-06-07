@@ -46,6 +46,17 @@ Feature: Claude Code logs become gen_ai and tool spans by folding the whole turn
       Then each model call is its own span with its own input and output
       And neither call's input or output is attributed to the other
 
+  Rule: a turn is one root span, so the model calls and tool calls of a turn
+  hang under the user's prompt instead of appearing as a flat fan of separate
+  parentless spans.
+
+    @unit
+    Scenario: A turn's model and tool calls are children of one root span
+      Given a turn with a user prompt, a model call, and a Bash tool call
+      When the turn has been ingested
+      Then the turn is one root span carrying the user's prompt as its input
+      And the model call and the Bash tool call are children of that root
+
   Rule: Claude Code never reports a tool's stdout in telemetry, so a tool
   span's output is recovered from the conversation of the next model call,
   where the tool result is fed back to the model.

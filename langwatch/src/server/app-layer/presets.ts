@@ -510,7 +510,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const logCollection = traced(
     new LogRequestCollectionService({
       recordLog: commands.traces.recordLog,
-      recordSpan: commands.traces.recordSpan,
     }),
     "LogRequestCollectionService",
   );
@@ -706,7 +705,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         logCollection: traced(
           new LogRequestCollectionService({
             recordLog: noop,
-            recordSpan: noop,
           }),
           "LogRequestCollectionService",
         ),

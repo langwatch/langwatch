@@ -1,20 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  RecordLogCommandData,
-  RecordSpanCommandData,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  CLAUDE_CODE_KIND_ATTR,
+  CLAUDE_CODE_PII_ATTR,
+} from "../claude-code-log-to-span";
 import { LogRequestCollectionService } from "../log-request-collection.service";
 
 function makeService() {
   const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(
     () => Promise.resolve(),
   );
-  const recordSpan = vi.fn<(data: RecordSpanCommandData) => Promise<void>>(
-    () => Promise.resolve(),
-  );
-  const service = new LogRequestCollectionService({ recordLog, recordSpan });
-  return { service, recordLog, recordSpan };
+  const service = new LogRequestCollectionService({ recordLog });
+  return { service, recordLog };
 }
 
 describe("LogRequestCollectionService", () => {
@@ -338,14 +336,15 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
-  describe("when a claude_code model-call event is converted to a span", () => {
+  describe("when claude_code events the span fold consumes are ingested", () => {
     /**
-     * The model-call triplet (api_request / api_request_body /
-     * api_response_body) is trapped at ingest and converted into a single
-     * gen_ai span; those records are NOT written to stored_log_records.
-     * Every OTHER claude_code event stays on the log path. The detailed
-     * join / shape / cost / orphan behaviour lives in the converter's own
-     * unit test — these cases assert the service-level routing.
+     * The model-call events (api_request / api_request_body /
+     * api_response_body), the tool events (tool_decision / tool_result), and
+     * the user_prompt are SAVED as log records, marked with
+     * `langwatch.claude_code.kind` so the claudeCodeSpanSync reactor folds the
+     * whole turn's logs into spans. The receiver only appends — it no longer
+     * synthesizes spans inline. The detailed span shape lives in the
+     * converter's own unit test; these cases assert the service-level routing.
      */
     const scopeLogs = (records: Array<Record<string, any>>) => ({
       resourceLogs: [
@@ -374,19 +373,14 @@ describe("LogRequestCollectionService", () => {
         { key: "event.sequence", value: { stringValue: seq } },
         { key: "model", value: { stringValue: "claude-opus-4-7" } },
         { key: "input_tokens", value: { stringValue: "120" } },
-        { key: "output_tokens", value: { stringValue: "30" } },
         { key: "cost_usd", value: { stringValue: "0.0875" } },
-        { key: "duration_ms", value: { stringValue: "2113" } },
         { key: "request_id", value: { stringValue: requestId } },
         { key: "query_source", value: { stringValue: "repl_main_thread" } },
       ],
     });
 
-    const attrOf = (data: RecordSpanCommandData, key: string): unknown =>
-      data.span.attributes.find((a) => a.key === key)?.value;
-
-    it("drops the api_request from the log path and emits a gen_ai span instead", async () => {
-      const { service, recordLog, recordSpan } = makeService();
+    it("saves a model-call event marked kind=model, not as an inline span", async () => {
+      const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
@@ -394,29 +388,18 @@ describe("LogRequestCollectionService", () => {
         piiRedactionLevel: "ESSENTIAL",
       });
 
-      expect(recordLog).not.toHaveBeenCalled();
-      expect(recordSpan).toHaveBeenCalledTimes(1);
-      const data = recordSpan.mock.calls[0]![0]!;
-      expect(data.span.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(attrOf(data, "gen_ai.system")).toEqual({
-        stringValue: "claude_code",
-      });
-      expect(attrOf(data, "gen_ai.request.model")).toEqual({
-        stringValue: "claude-opus-4-7",
-      });
-      expect(attrOf(data, "gen_ai.usage.input_tokens")).toEqual({
-        intValue: 120,
-      });
-      expect(attrOf(data, "langwatch.span.cost")).toEqual({
-        doubleValue: 0.0875,
-      });
-      expect(attrOf(data, "langwatch.span.type")).toEqual({
-        stringValue: "llm",
-      });
+      expect(recordLog).toHaveBeenCalledTimes(1);
+      const data = recordLog.mock.calls[0]![0]!;
+      expect(data.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBe("model");
+      // The PII level is carried so the reactor redacts the derived span at
+      // the same level, and the payload + model survive for the fold.
+      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBe("ESSENTIAL");
+      expect(data.attributes.model).toBe("claude-opus-4-7");
     });
 
-    it("keeps lifecycle events as logs while converting model-call events", async () => {
-      const { service, recordLog, recordSpan } = makeService();
+    it("marks the user_prompt as kind=turn and a tool_result as kind=tool", async () => {
+      const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
@@ -430,61 +413,60 @@ describe("LogRequestCollectionService", () => {
               { key: "prompt", value: { stringValue: "hello" } },
             ],
           },
-          apiRequest("2", "req_b"),
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(1);
-      expect(recordLog.mock.calls[0]![0]!.attributes["event.name"]).toBe(
-        "user_prompt",
-      );
-      expect(recordSpan).toHaveBeenCalledTimes(1);
-    });
-
-    it("drops tool events from the log path and emits a tool span instead", async () => {
-      const { service, recordLog, recordSpan } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: scopeLogs([
           {
             timeUnixNano: "1700000002000000000",
             body: { stringValue: "claude_code.tool_result" },
             attributes: [
               { key: "event.name", value: { stringValue: "tool_result" } },
               { key: "session.id", value: { stringValue: "sess_conv" } },
-              { key: "prompt.id", value: { stringValue: "p_1" } },
-              { key: "event.sequence", value: { stringValue: "38" } },
               { key: "tool_name", value: { stringValue: "Bash" } },
               { key: "tool_use_id", value: { stringValue: "toolu_x" } },
-              { key: "success", value: { stringValue: "true" } },
-              { key: "duration_ms", value: { stringValue: "714" } },
-              {
-                key: "tool_input",
-                value: { stringValue: '{"command":"echo test"}' },
-              },
             ],
           },
         ]),
         piiRedactionLevel: "ESSENTIAL",
       });
 
-      expect(recordLog).not.toHaveBeenCalled();
-      expect(recordSpan).toHaveBeenCalledTimes(1);
-      const data = recordSpan.mock.calls[0]![0]!;
-      expect(attrOf(data, "langwatch.span.type")).toEqual({
-        stringValue: "tool",
-      });
-      expect(attrOf(data, "gen_ai.tool.name")).toEqual({ stringValue: "Bash" });
-      expect(attrOf(data, "gen_ai.tool.call.id")).toEqual({
-        stringValue: "toolu_x",
-      });
-      expect(data.span.name).toBe("Bash");
+      expect(recordLog).toHaveBeenCalledTimes(2);
+      const byEvent = Object.fromEntries(
+        recordLog.mock.calls.map((c) => [
+          c[0]!.attributes["event.name"],
+          c[0]!.attributes[CLAUDE_CODE_KIND_ATTR],
+        ]),
+      );
+      expect(byEvent.user_prompt).toBe("turn");
+      expect(byEvent.tool_result).toBe("tool");
     });
 
-    it("is idempotent: the same api_request yields the same span id on re-ingest", async () => {
-      const { service, recordSpan } = makeService();
+    it("leaves lifecycle events (hooks, plugins, mcp) as unmarked visible logs", async () => {
+      const { service, recordLog } = makeService();
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: scopeLogs([
+          {
+            timeUnixNano: "1700000000000000000",
+            body: { stringValue: "claude_code.hook_registered" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "hook_registered" } },
+              { key: "session.id", value: { stringValue: "sess_conv" } },
+            ],
+          },
+          apiRequest("2", "req_b"),
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(recordLog).toHaveBeenCalledTimes(2);
+      const hook = recordLog.mock.calls.find(
+        (c) => c[0]!.attributes["event.name"] === "hook_registered",
+      )![0]!;
+      // Not consumed by the fold -> no marker, stays a normal log row.
+      expect(hook.attributes[CLAUDE_CODE_KIND_ATTR]).toBeUndefined();
+    });
+
+    it("is idempotent: the same marked log yields the same ids on re-ingest", async () => {
+      const { service, recordLog } = makeService();
       const batch = scopeLogs([apiRequest("1", "req_c")]);
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
@@ -496,9 +478,9 @@ describe("LogRequestCollectionService", () => {
         logRequest: batch,
         piiRedactionLevel: "ESSENTIAL",
       });
-      const [c1, c2] = recordSpan.mock.calls;
-      expect(c1![0]!.span.spanId).toBe(c2![0]!.span.spanId);
-      expect(c1![0]!.span.traceId).toBe(c2![0]!.span.traceId);
+      const [c1, c2] = recordLog.mock.calls;
+      expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
+      expect(c1![0]!.traceId).toBe(c2![0]!.traceId);
     });
   });
 

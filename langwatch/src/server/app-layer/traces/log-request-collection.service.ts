@@ -8,25 +8,16 @@ import type { DeepPartial } from "~/utils/types";
 import {
   piiRedactionLevelSchema,
   type RecordLogCommandData,
-  type RecordSpanCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  instrumentationScopeSchema,
-  type OtlpAnyValue,
-  type OtlpInstrumentationScope,
-  type OtlpResource,
-  resourceSchema,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
-  type ClaudeCodeLogRecordInput,
-  convertClaudeCodeLogsToSpans,
-  convertClaudeCodeToolLogsToSpans,
-  isClaudeCodeConvertibleLog,
-  isClaudeCodeToolLog,
+  CLAUDE_CODE_KIND_ATTR,
+  CLAUDE_CODE_PII_ATTR,
+  claudeCodeLogKind,
 } from "./claude-code-log-to-span";
 
 /**
@@ -53,7 +44,6 @@ const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
-  recordSpan: (data: RecordSpanCommandData) => Promise<void>;
 }
 
 export class LogRequestCollectionService {
@@ -88,25 +78,9 @@ export class LogRequestCollectionService {
         let collectedCount = 0;
         let droppedCount = 0;
         let failedCount = 0;
+        let claudeMarkedCount = 0;
 
-        // claude_code model-call log records (api_request /
-        // api_request_body / api_response_body) are trapped here and
-        // converted into gen_ai spans after the loop — they are NOT
-        // written to stored_log_records (no double-write). See
-        // claude-code-log-to-span.ts.
-        const claudeConvertibles: ClaudeCodeLogRecordInput[] = [];
-
-        // claude_code tool log records (tool_decision / tool_result) are
-        // trapped here and converted into `tool` spans after the loop, so the
-        // Bash / Edit / Read calls a turn makes appear as waterfall nodes.
-        // Also kept off the log path (the span is the single source of truth).
-        const claudeToolConvertibles: ClaudeCodeLogRecordInput[] = [];
-
-        // Clean user-typed text per prompt.id, harvested from the co-batched
-        // claude_code `user_prompt` events (which stay on the log path). The
-        // converter prefers this over a truncated, unparseable api_request_body
-        // when stamping the synthesized span's input. See claude-code-log-to-span.ts.
-        const claudePromptTextById = new Map<string, string>();
+        const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
 
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
@@ -114,7 +88,6 @@ export class LogRequestCollectionService {
           const resourceAttrs = normalizeOtlpAttributeMap(
             resourceLog.resource?.attributes,
           );
-          const otlpResource = parseOtlpResource(resourceLog.resource);
 
           for (const scopeLog of resourceLog.scopeLogs) {
             if (!scopeLog?.logRecords) continue;
@@ -123,7 +96,6 @@ export class LogRequestCollectionService {
               (scopeLog.scope?.name as string | undefined) ?? "";
             const scopeVersion =
               (scopeLog.scope?.version as string | undefined) ?? null;
-            const otlpScope = parseOtlpScope(scopeLog.scope);
 
             for (const logRecord of scopeLog.logRecords) {
               if (!logRecord) {
@@ -183,51 +155,26 @@ export class LogRequestCollectionService {
                     )
                   : Date.now();
 
-                // Harvest the clean user-typed prompt text (keyed by prompt.id)
-                // so the converter can use it as the span input when the matching
-                // api_request_body is truncated. user_prompt stays on the log path.
-                if (
-                  scopeName === CLAUDE_CODE_EVENT_SCOPE &&
-                  logAttrs["event.name"] === "user_prompt"
-                ) {
-                  const promptId = logAttrs["prompt.id"];
-                  const promptText = logAttrs.prompt;
-                  if (promptId && promptText) {
-                    claudePromptTextById.set(promptId, promptText);
-                  }
-                }
-
-                // claude_code model-call events: trap + convert to a gen_ai
-                // span after the loop; do NOT write them as log records. The
-                // `body` content lives in the `body` attribute for these
-                // events, which is already in logAttrs.
-                if (isClaudeCodeConvertibleLog(scopeName, logAttrs["event.name"])) {
-                  claudeConvertibles.push({
-                    traceId,
-                    spanId,
-                    timeUnixMs,
-                    eventName: logAttrs["event.name"]!,
-                    attrs: logAttrs,
-                    resource: otlpResource,
-                    instrumentationScope: otlpScope,
-                  });
-                  continue;
-                }
-
-                // claude_code tool events: trap + convert to a `tool` span
-                // after the loop; do NOT write them as log records.
-                if (isClaudeCodeToolLog(scopeName, logAttrs["event.name"])) {
-                  claudeToolConvertibles.push({
-                    traceId,
-                    spanId,
-                    timeUnixMs,
-                    eventName: logAttrs["event.name"]!,
-                    attrs: logAttrs,
-                    resource: otlpResource,
-                    instrumentationScope: otlpScope,
-                  });
-                  continue;
-                }
+                // claude_code events the span fold consumes (model calls, tool
+                // calls, the user prompt) are SAVED here, marked so the
+                // claudeCodeSpanSync reactor can fold the WHOLE turn's logs into
+                // spans (the cross-batch join the per-batch receiver can't do)
+                // and the trace read path can hide the raw rows that became
+                // spans. The event payload rides the `body` attribute, already
+                // in logAttrs. Everything else (hooks, plugins, mcp) stays an
+                // unmarked, visible log.
+                const claudeKind = claudeCodeLogKind(
+                  scopeName,
+                  logAttrs["event.name"],
+                );
+                const attributes = claudeKind
+                  ? {
+                      ...logAttrs,
+                      [CLAUDE_CODE_KIND_ATTR]: claudeKind,
+                      [CLAUDE_CODE_PII_ATTR]: redaction,
+                    }
+                  : logAttrs;
+                if (claudeKind) claudeMarkedCount++;
 
                 await this.deps.recordLog({
                   tenantId,
@@ -237,12 +184,11 @@ export class LogRequestCollectionService {
                   severityNumber: (logRecord.severityNumber as number) ?? 0,
                   severityText: (logRecord.severityText as string) ?? "",
                   body,
-                  attributes: logAttrs,
+                  attributes,
                   resourceAttributes: resourceAttrs,
                   scopeName,
                   scopeVersion,
-                  piiRedactionLevel:
-                    piiRedactionLevelSchema.parse(piiRedactionLevel),
+                  piiRedactionLevel: redaction,
                   occurredAt: Date.now(),
                 });
 
@@ -261,61 +207,16 @@ export class LogRequestCollectionService {
           }
         }
 
-        // Convert the trapped claude_code model-call + tool logs into spans
-        // and feed them through the normal span pipeline. The existing span
-        // fold lifts model / tokens / cost / input / output; tool spans surface
-        // the agent's Bash / Edit / Read invocations in the waterfall.
-        let convertedSpanCount = 0;
-        const synthesizedSpans = [
-          ...convertClaudeCodeLogsToSpans(
-            claudeConvertibles,
-            claudePromptTextById,
-          ),
-          ...convertClaudeCodeToolLogsToSpans(claudeToolConvertibles),
-        ];
-        if (synthesizedSpans.length > 0) {
-          const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
-          for (const synthesized of synthesizedSpans) {
-            try {
-              await this.deps.recordSpan({
-                tenantId,
-                span: synthesized.span,
-                resource: synthesized.resource,
-                instrumentationScope: synthesized.instrumentationScope,
-                piiRedactionLevel: redaction,
-                occurredAt: Date.now(),
-              });
-              convertedSpanCount++;
-            } catch (error) {
-              failedCount++;
-              this.logger.error(
-                { error, tenantId, traceId: synthesized.span.traceId },
-                "Error recording converted claude_code span",
-              );
-            }
-          }
-        }
-
+        // The marked claude_code logs are folded into spans asynchronously by
+        // the claudeCodeSpanSync reactor (over the whole turn), not here — the
+        // receiver only appends, holding no cross-batch state.
         span.setAttribute("logs.ingestion.successes", collectedCount);
         span.setAttribute("logs.ingestion.drops", droppedCount);
         span.setAttribute("logs.ingestion.failures", failedCount);
-        span.setAttribute(
-          "logs.ingestion.claude_code_spans",
-          convertedSpanCount,
-        );
+        span.setAttribute("logs.ingestion.claude_code_marked", claudeMarkedCount);
       },
     );
   }
-}
-
-function parseOtlpResource(resource: unknown): OtlpResource | null {
-  const parsed = resourceSchema.safeParse(resource);
-  return parsed.success ? parsed.data : null;
-}
-
-function parseOtlpScope(scope: unknown): OtlpInstrumentationScope | null {
-  const parsed = instrumentationScopeSchema.safeParse(scope);
-  return parsed.success ? parsed.data : null;
 }
 
 /**

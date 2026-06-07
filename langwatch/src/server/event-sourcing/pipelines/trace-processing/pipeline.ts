@@ -33,6 +33,7 @@ export interface TraceProcessingPipelineDeps {
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
@@ -70,7 +71,8 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
     .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
+    .withReactor("logRecordStorage", "claudeCodeSpanSync", deps.claudeCodeSpanSyncReactor);
 
   if (deps.customerIoTraceSyncReactor) {
     builder = builder.withReactor(

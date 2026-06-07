@@ -1,9 +1,13 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { CLAUDE_CODE_KIND_ATTR } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
-import type { LogRecordStorageRepository } from "./log-record-storage.repository";
+import type {
+  LogRecordStorageRepository,
+  StoredLogRecordRow,
+} from "./log-record-storage.repository";
 
 const TABLE_NAME = "stored_log_records" as const;
 
@@ -61,5 +65,68 @@ export class LogRecordStorageClickHouseRepository
       );
       throw error;
     }
+  }
+
+  async getMarkedClaudeCodeLogsByTrace(
+    tenantId: string,
+    traceId: string,
+  ): Promise<StoredLogRecordRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace",
+    );
+
+    const client = await this.resolveClient(tenantId);
+    // Dedup to the latest version of each distinct stored log (the table is a
+    // ReplacingMergeTree(UpdatedAt) keyed on TenantId,TraceId,SpanId,ProjectionId);
+    // the IN-tuple over max(UpdatedAt) returns one row per record. TenantId is
+    // the first predicate (no other id is unique across tenants).
+    const result = await client.query({
+      query: `
+        SELECT
+          TraceId,
+          SpanId,
+          toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+          Attributes,
+          ResourceAttributes,
+          ScopeName,
+          ScopeVersion
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          AND Attributes[{kindKey:String}] != ''
+          AND (TenantId, TraceId, SpanId, ProjectionId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, ProjectionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              AND Attributes[{kindKey:String}] != ''
+            GROUP BY TenantId, TraceId, SpanId, ProjectionId
+          )
+        ORDER BY TimeUnixMs ASC
+      `,
+      query_params: { tenantId, traceId, kindKey: CLAUDE_CODE_KIND_ATTR },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as Array<{
+      TraceId: string;
+      SpanId: string;
+      TimeUnixMs: number;
+      Attributes: Record<string, string>;
+      ResourceAttributes: Record<string, string>;
+      ScopeName: string | null;
+      ScopeVersion: string | null;
+    }>;
+
+    return rows.map((row) => ({
+      traceId: row.TraceId,
+      spanId: row.SpanId,
+      timeUnixMs: row.TimeUnixMs,
+      attributes: row.Attributes ?? {},
+      resourceAttributes: row.ResourceAttributes ?? {},
+      scopeName: row.ScopeName ?? "",
+      scopeVersion: row.ScopeVersion ?? null,
+    }));
   }
 }

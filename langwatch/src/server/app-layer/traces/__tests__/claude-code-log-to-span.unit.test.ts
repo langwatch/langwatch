@@ -718,6 +718,101 @@ describe("convertClaudeCodeToolLogsToSpans", () => {
   });
 });
 
+describe("convertClaudeCodeTurnToSpans (turn hierarchy)", () => {
+  const TOOL_USE_ID = "toolu_hier_1";
+
+  const userPrompt = rec({
+    eventName: "user_prompt",
+    spanId: "abababababababab",
+    timeUnixMs: 500,
+    attrs: {
+      "event.name": "user_prompt",
+      "session.id": "sess_h",
+      "prompt.id": "p_h",
+      prompt: "Count the files in /tmp",
+      prompt_length: "24",
+    },
+  });
+  const reqBody = rec({
+    eventName: "api_request_body",
+    spanId: "b4b4b4b4b4b4b4b4",
+    timeUnixMs: 600,
+    attrs: {
+      "event.name": "api_request_body",
+      model: "claude-opus-4-8",
+      query_source: "repl_main_thread",
+      body: requestBody("Count the files in /tmp"),
+    },
+  });
+  const anchor = rec({
+    eventName: "api_request",
+    spanId: "a4a4a4a4a4a4a4a4",
+    timeUnixMs: 1_200,
+    attrs: {
+      "event.name": "api_request",
+      "session.id": "sess_h",
+      model: "claude-opus-4-8",
+      input_tokens: "100",
+      output_tokens: "20",
+      cost_usd: "0.05",
+      duration_ms: "600",
+      request_id: "req_h",
+      query_source: "repl_main_thread",
+    },
+  });
+  const toolResult = rec({
+    eventName: "tool_result",
+    spanId: "f4f4f4f4f4f4f4f4",
+    timeUnixMs: 1_500,
+    attrs: {
+      "event.name": "tool_result",
+      "session.id": "sess_h",
+      tool_name: "Bash",
+      tool_use_id: TOOL_USE_ID,
+      success: "true",
+      duration_ms: "100",
+      tool_input: '{"command":"ls /tmp | wc -l"}',
+    },
+  });
+
+  /** @scenario "A turn's model and tool calls are children of one root span" */
+  it("emits one root span with the model and tool calls as its children", () => {
+    const spans = convertClaudeCodeTurnToSpans([
+      userPrompt,
+      reqBody,
+      anchor,
+      toolResult,
+    ]);
+    const roots = spans.filter((s) => s.span.parentSpanId === null);
+    expect(roots).toHaveLength(1);
+    const root = roots[0]!.span;
+    // The root carries the user's prompt as input.
+    expect(strVal(root, "langwatch.span.type")).toBe("agent");
+    expect(strVal(root, "langwatch.input")).toBe("Count the files in /tmp");
+    expect(root.name).toBe("Count the files in /tmp");
+
+    // Every non-root span is a child of the root.
+    const children = spans.filter((s) => s.span.spanId !== root.spanId);
+    expect(children.length).toBe(2);
+    for (const child of children) {
+      expect(child.span.parentSpanId).toBe(root.spanId);
+    }
+    // The model call kept its tokens/cost; the tool call kept its input.
+    const model = children.find(
+      (s) => strVal(s.span, "langwatch.span.type") === "llm",
+    )!.span;
+    const tool = children.find(
+      (s) => strVal(s.span, "langwatch.span.type") === "tool",
+    )!.span;
+    expect(attr(model, "langwatch.span.cost")).toEqual({ doubleValue: 0.05 });
+    expect(attr(model, "gen_ai.usage.input_tokens")).toEqual({ intValue: 100 });
+    expect(strVal(tool, "langwatch.input")).toBe('{"command":"ls /tmp | wc -l"}');
+
+    // The root envelopes the children in time (starts at/before, ends at/after).
+    expect(startNano(root)).toBeLessThanOrEqual(startNano(model));
+  });
+});
+
 describe("convertClaudeCodeTurnToSpans (tool output recovery)", () => {
   const TOOL_USE_ID = "toolu_bash_42";
 

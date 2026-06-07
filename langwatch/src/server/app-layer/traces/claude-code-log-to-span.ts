@@ -121,6 +121,41 @@ export function isClaudeCodeToolLog(
   );
 }
 
+/**
+ * Attribute the receiver stamps on every claude_code log it saves that the
+ * span fold consumes, so (a) the span-sync reactor can find a turn's logs and
+ * (b) the trace read path can hide the raw rows that became spans. The value is
+ * the kind of span the log feeds, from {@link claudeCodeLogKind}.
+ */
+export const CLAUDE_CODE_KIND_ATTR = "langwatch.claude_code.kind";
+
+/**
+ * The PII redaction level the receiver used at ingest, stamped on each saved
+ * claude_code log so the span-sync reactor redacts the derived spans at the
+ * same level the trapped-span path used to (the reactor has no request context).
+ */
+export const CLAUDE_CODE_PII_ATTR = "langwatch.claude_code.pii";
+
+/**
+ * The span kind a claude_code log event feeds, or null when the event is not
+ * folded into a span (so it stays a plain, visible log). The receiver marks +
+ * saves every event with a non-null kind; the reactor folds them; the read path
+ * hides them. Only mark an event once the converter actually produces its span,
+ * or it would be hidden from the log view without a span to replace it.
+ */
+export function claudeCodeLogKind(
+  scopeName: string,
+  eventName: string | undefined,
+): string | null {
+  if (scopeName !== CLAUDE_CODE_EVENT_SCOPE || eventName === undefined) {
+    return null;
+  }
+  if (CLAUDE_CODE_CONVERTIBLE_EVENTS.has(eventName)) return "model";
+  if (CLAUDE_CODE_TOOL_EVENTS.has(eventName)) return "tool";
+  if (eventName === "user_prompt") return "turn";
+  return null;
+}
+
 /** A claude_code log record pulled out of the log path for conversion. */
 export interface ClaudeCodeLogRecordInput {
   traceId: string;
@@ -200,24 +235,61 @@ function groupByTrace(
 }
 
 /**
- * Convert a turn's claude_code logs into spans — both the model-call (gen_ai)
- * spans and the tool spans. Feed it the WHOLE turn's saved claude logs so the
+ * Convert a turn's claude_code logs into a hierarchy of spans: one ROOT span
+ * per turn (the user_prompt, carrying the turn input) with the model-call and
+ * tool spans as its children. Feed it the WHOLE turn's saved claude logs so the
  * cross-batch join is complete and tool outputs can be recovered from later
  * model calls' transcripts. Idempotent: re-running over the same (or a grown)
- * set converges on the same spans (see the file header).
+ * set converges on the same spans (see the file header). The root's SpanId is
+ * derived from the trace, so every re-fold parents the children under the same
+ * root.
  *
  * `promptTextById` maps a `prompt.id` to the clean user-typed text from the
- * co-located `user_prompt` event (which stays on the log path), used as the
- * input when claude truncated the api_request_body inline.
+ * co-located `user_prompt` event, used as the turn input when no user_prompt
+ * record is in the set or claude truncated the api_request_body inline.
  */
 export function convertClaudeCodeTurnToSpans(
   records: ClaudeCodeLogRecordInput[],
   promptTextById: ReadonlyMap<string, string> = new Map(),
 ): SynthesizedClaudeSpan[] {
-  return [
-    ...convertClaudeCodeLogsToSpans(records, promptTextById),
-    ...convertClaudeCodeToolLogsToSpans(records),
+  const out: SynthesizedClaudeSpan[] = [];
+  for (const traceRecords of groupByTrace(records).values()) {
+    out.push(...buildTurnSpans(traceRecords, promptTextById));
+  }
+  return out;
+}
+
+function buildTurnSpans(
+  records: ClaudeCodeLogRecordInput[],
+  promptTextById: ReadonlyMap<string, string>,
+): SynthesizedClaudeSpan[] {
+  const traceId = records[0]?.traceId;
+  if (!traceId) return [];
+
+  // Deterministic per-turn root id so every re-fold parents children identically.
+  const rootSpanId = createHash("sha256")
+    .update(`${traceId}:claude_root`)
+    .digest("hex")
+    .slice(0, 16);
+
+  const children = [
+    ...buildModelSpansForTrace(records, promptTextById),
+    ...buildToolSpansForTrace(records),
   ];
+  for (const child of children) {
+    child.span.parentSpanId = rootSpanId;
+  }
+
+  if (children.length === 0) return [];
+
+  const root = buildRootSpan({
+    records,
+    traceId,
+    rootSpanId,
+    children,
+    promptTextById,
+  });
+  return [root, ...children];
 }
 
 /**
@@ -492,6 +564,8 @@ function makeSpan({
   startMs,
   endMs,
   attributes,
+  events = [],
+  kind = SPAN_KIND_CLIENT,
 }: {
   traceId: string;
   spanId: string;
@@ -499,23 +573,142 @@ function makeSpan({
   startMs: number;
   endMs: number;
   attributes: OtlpKeyValue[];
+  events?: OtlpSpan["events"];
+  kind?: OtlpSpan["kind"];
 }): OtlpSpan {
   return {
     traceId,
     spanId,
     parentSpanId: null,
     name,
-    kind: SPAN_KIND_CLIENT,
+    kind,
     startTimeUnixNano: msToUnixNano(startMs),
     endTimeUnixNano: msToUnixNano(endMs),
     attributes,
-    events: [],
+    events,
     links: [],
     status: { message: null, code: null },
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
   };
+}
+
+/** nanosecond string -> integer milliseconds (exact via BigInt). */
+const nanoToMs = (nano: OtlpSpan["startTimeUnixNano"]): number =>
+  Number(BigInt(String(nano)) / 1_000_000n);
+
+/**
+ * Attributes already lifted onto the root turn span (or used to name it), so
+ * they are not re-copied under `claude_code.*`.
+ */
+const CLAUDE_ROOT_HANDLED_ATTRS = new Set<string>([
+  "prompt", // -> langwatch.input
+  "session.id", // -> gen_ai.conversation.id + langwatch.thread.id
+  "service.name",
+  "event.name",
+]);
+
+const SPAN_NAME_MAX = 80;
+
+/**
+ * The turn ROOT span: the user_prompt becomes one parentless span per turn that
+ * carries the turn input, with the model + tool spans hanging under it. A single
+ * root replaces the old flat fan of parentless model spans, so the trace has a
+ * real shape and the input/output gates in the fold work off one root. Its
+ * timing envelopes its children (and the user_prompt event). The SpanId is a
+ * stable hash of the trace, so every re-fold produces the same root.
+ */
+function buildRootSpan({
+  records,
+  traceId,
+  rootSpanId,
+  children,
+  promptTextById,
+}: {
+  records: ClaudeCodeLogRecordInput[];
+  traceId: string;
+  rootSpanId: string;
+  children: SynthesizedClaudeSpan[];
+  promptTextById: ReadonlyMap<string, string>;
+}): SynthesizedClaudeSpan {
+  const userPrompt =
+    records.find((r) => r.eventName === "user_prompt") ?? null;
+  const promptText =
+    asNonEmpty(userPrompt?.attrs.prompt) ??
+    asNonEmpty([...promptTextById.values()][0]);
+
+  const sessionId =
+    asNonEmpty(userPrompt?.attrs["session.id"]) ??
+    asNonEmpty(records.find((r) => r.attrs["session.id"])?.attrs["session.id"]);
+
+  const attrs: OtlpKeyValue[] = [strAttr(ATTR_KEYS.SPAN_TYPE, "agent")];
+  if (sessionId) {
+    attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId));
+    attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
+  }
+  if (promptText) {
+    attrs.push(
+      strAttr(
+        ATTR_KEYS.LANGWATCH_INPUT,
+        capPayloadString(promptText, undefined, "claude_input"),
+      ),
+    );
+  }
+  // user_prompt provenance (command_name, command_source, prompt_length, …).
+  if (userPrompt) {
+    for (const [key, value] of Object.entries(userPrompt.attrs)) {
+      if (CLAUDE_ROOT_HANDLED_ATTRS.has(key)) continue;
+      const clean = asNonEmpty(value);
+      if (clean) attrs.push(strAttr(`claude_code.${key}`, clean));
+    }
+  }
+
+  // Envelope the children (and the user_prompt event) in time.
+  let startMs = Number.POSITIVE_INFINITY;
+  let endMs = Number.NEGATIVE_INFINITY;
+  for (const child of children) {
+    startMs = Math.min(startMs, nanoToMs(child.span.startTimeUnixNano));
+    endMs = Math.max(endMs, nanoToMs(child.span.endTimeUnixNano));
+  }
+  if (userPrompt) {
+    startMs = Math.min(startMs, userPrompt.timeUnixMs);
+    endMs = Math.max(endMs, userPrompt.timeUnixMs);
+  }
+  if (!Number.isFinite(startMs)) startMs = userPrompt?.timeUnixMs ?? 0;
+  if (!Number.isFinite(endMs)) endMs = startMs;
+
+  const name = rootSpanName(promptText);
+  const resource =
+    userPrompt?.resource ?? children[0]?.resource ?? null;
+  const instrumentationScope =
+    userPrompt?.instrumentationScope ??
+    children[0]?.instrumentationScope ??
+    null;
+
+  return {
+    span: makeSpan({
+      traceId,
+      spanId: rootSpanId,
+      name,
+      startMs,
+      endMs,
+      attributes: attrs,
+      kind: "SPAN_KIND_SERVER",
+    }),
+    resource,
+    instrumentationScope,
+  };
+}
+
+/** A short, readable root name from the user's prompt (first line, capped). */
+function rootSpanName(promptText: string | null): string {
+  if (!promptText) return "Claude Code";
+  const firstLine = promptText.split("\n", 1)[0]?.trim() ?? "";
+  if (!firstLine) return "Claude Code";
+  return firstLine.length > SPAN_NAME_MAX
+    ? `${firstLine.slice(0, SPAN_NAME_MAX - 1)}…`
+    : firstLine;
 }
 
 /**
