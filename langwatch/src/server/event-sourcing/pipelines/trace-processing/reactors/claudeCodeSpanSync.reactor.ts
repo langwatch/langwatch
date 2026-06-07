@@ -79,7 +79,17 @@ export function createClaudeCodeSpanSyncReactor(
 
         const records = rows.map(rowToRecord);
         const piiRedactionLevel = resolvePiiLevel(rows);
-        const spans = convertClaudeCodeTurnToSpans(records);
+        // The user-typed prompt per prompt.id, so a model call whose request
+        // body claude truncated inline (~60KB) still shows the turn's input
+        // instead of nothing.
+        const promptTextById = new Map<string, string>();
+        for (const record of records) {
+          if (record.eventName !== "user_prompt") continue;
+          const promptId = record.attrs["prompt.id"];
+          const promptText = record.attrs.prompt;
+          if (promptId && promptText) promptTextById.set(promptId, promptText);
+        }
+        const spans = convertClaudeCodeTurnToSpans(records, promptTextById);
 
         for (const synthesized of spans) {
           await deps.recordSpan({
