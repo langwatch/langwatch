@@ -758,7 +758,7 @@ describe("buildSignatureNodeFromPrompt", () => {
     version: 6,
     versionId: "prompt_version_supportrouter_v6",
     versionCreatedAt: new Date("2026-01-15T10:00:00.000Z"),
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5-mini",
     prompt: "You are a support router.",
     projectId: "project-1",
     organizationId: "org-1",
@@ -838,7 +838,7 @@ describe("buildSignatureNodeFromLocalConfig", () => {
     version: 6,
     versionId: "prompt_version_supportrouter_v6",
     versionCreatedAt: new Date("2026-01-15T10:00:00.000Z"),
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5-mini",
     prompt: "You are a support router.",
     projectId: "project-1",
     organizationId: "org-1",
@@ -852,7 +852,7 @@ describe("buildSignatureNodeFromLocalConfig", () => {
   });
 
   const createLocalPromptConfig = (): LocalPromptConfig => ({
-    llm: { model: "openai/gpt-4o-mini", temperature: 0 },
+    llm: { model: "openai/gpt-5-mini", temperature: 0 },
     messages: [
       { role: "system", content: "You are terse." },
       { role: "user", content: "{{input}}" },
