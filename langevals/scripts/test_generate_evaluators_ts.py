@@ -9,7 +9,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from generate_evaluators_ts import field_to_zod, field_annotation_to_zod, settings_to_zod
+from generate_evaluators_ts import field_to_zod, settings_to_zod
 
 
 def zod_for(model: type, field_name: str) -> str:
@@ -41,6 +41,19 @@ def test_boolean_false_default_is_surfaced():
         zod_for(M, "case_sensitive")
         == 'z.boolean().describe("Case sensitive").default(false)'
     )
+
+
+def test_falsy_defaults_are_surfaced():
+    # Zero, empty string, empty list, empty dict are real defaults — they must
+    # keep their .default(...), not be dropped as "falsy".
+    class M(BaseModel):
+        count: int = 0
+        label: str = ""
+        items: List[str] = []
+
+    assert zod_for(M, "count") == "z.number().default(0)"
+    assert zod_for(M, "label") == 'z.string().default("")'
+    assert zod_for(M, "items") == "z.array(z.string()).default([])"
 
 
 def test_literal_union_with_default():

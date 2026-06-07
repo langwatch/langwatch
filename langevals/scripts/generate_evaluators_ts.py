@@ -74,10 +74,10 @@ def field_to_zod(field) -> str:
     base = field_annotation_to_zod(field.annotation)
     has_default = not isinstance(field.default, PydanticUndefinedType)
     default_value = dump_model_type(field.default) if has_default else None
-    # A falsy non-boolean default (None / empty) carries no explicit value to
-    # surface; booleans (including False) are always surfaced. This mirrors how
-    # the AVAILABLE_EVALUATORS catalog reports settings defaults.
-    emit_default = has_default and (bool(default_value) or isinstance(default_value, bool))
+    # Surface every explicit default except a bare None — an Optional field with
+    # a None default is represented as `.optional()` instead. Falsy values like
+    # 0, "", [] and {} are real defaults and must keep their `.default(...)`.
+    emit_default = has_default and default_value is not None
     is_optional = (
         get_origin(field.annotation) is Union
         and type(None) in get_args(field.annotation)

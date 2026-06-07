@@ -43,7 +43,7 @@ describe("given Zod schemas are the single source of truth", () => {
       span_id: "s1",
       trace_id: "t1",
       type: "llm" as const,
-      model: "gpt-5",
+      model: "gpt-5-mini",
       timestamps: { started_at: 1, finished_at: 2 },
       input: { type: "text" as const, value: "hi" },
     };
