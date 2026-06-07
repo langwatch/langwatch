@@ -458,11 +458,21 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       }
 
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
+        // need the same bundled-vs-billed resolution the trace path does —
+        // without it their cost never gets the non-billable marker and a
+        // bundled coding session reads as real spend. Cached per
+        // (org, sourceType).
+        const nonBillable = await resolveSourceNonBillable({
+          organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
         stampIngestKeyProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0], {
           apiKeyId: resolved.apiKeyId,
           sourceType: resolved.ingestSourceType,
           organizationId: resolved.organizationId,
           templateId: resolved.ingestionTemplateId,
+          nonBillable,
         });
       }
 
