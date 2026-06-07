@@ -734,14 +734,30 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		ns.Cost = res.Cost.Amount
 	}
 
-	// The evaluator node may declare a subset of outputs (e.g. a
-	// workflow that only cares about `passed`). Filter to declared
-	// names if present; otherwise hand back everything.
+	// The evaluator node may declare a subset of its VALUE outputs (e.g. a
+	// workflow that only wires `passed`). Restrict those to the declared
+	// set, but ALWAYS surface the EvaluationResultWithMetadata envelope
+	// (status / details / cost) regardless of what the node declares.
+	//
+	// The envelope is evaluation metadata, not workflow data: the Studio
+	// result panel, the experiments-v3 SSE consumer (resultMapper reads
+	// outputs.details for the reasoning) and the batch reporter
+	// (evaluation.go reads outputs.details) all expect it unconditionally.
+	// Python's end_component_event surfaced the full result dict and never
+	// filtered, so dropping `details` here was a silent NLP→Go migration
+	// regression that erased the evaluator reasoning everywhere the node
+	// declared only [passed, score, label].
 	declared := outputNames(node.Data.Outputs)
 	if len(declared) == 0 {
 		return out, nil
 	}
-	filtered := make(map[string]any, len(declared))
+	envelopeKeys := []string{"status", "details", "cost"}
+	filtered := make(map[string]any, len(declared)+len(envelopeKeys))
+	for _, name := range envelopeKeys {
+		if v, ok := out[name]; ok {
+			filtered[name] = v
+		}
+	}
 	for _, name := range declared {
 		if v, ok := out[name]; ok {
 			filtered[name] = v
