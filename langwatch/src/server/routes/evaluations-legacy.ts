@@ -40,12 +40,12 @@ import {
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import {
   type EvaluationRESTParams,
@@ -53,20 +53,18 @@ import {
   evaluationInputSchema,
 } from "~/server/evaluations/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationRESTParams,
-  ESBatchEvaluationTarget,
-  ESBatchEvaluationTargetType,
-} from "~/server/experiments/types";
-import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types.generated";
+  type ESBatchEvaluation,
+  type ESBatchEvaluationRESTParams,
+  type ESBatchEvaluationTarget,
+  type ESBatchEvaluationTargetType,
+} from "~/server/experiments/types";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import { rAGChunkSchema } from "~/server/tracer/types.generated";
+import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";

@@ -21,15 +21,6 @@ import {
   extractStrandsAgentsMetadata,
   isStrandsAgentsInstrumentation,
 } from "./span-event-processing/strands-agents";
-import type {
-  BaseSpan,
-  ChatMessage,
-  LLMSpan,
-  RAGChunk,
-  Span,
-  SpanTypes,
-  TypedValueChatMessages,
-} from "./types";
 import {
   chatMessageSchema,
   customMetadataSchema,
@@ -40,7 +31,14 @@ import {
   spanTimestampsSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
-} from "./types.generated";
+  type BaseSpan,
+  type ChatMessage,
+  type LLMSpan,
+  type RAGChunk,
+  type Span,
+  type SpanTypes,
+  type TypedValueChatMessages,
+} from "./types";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");

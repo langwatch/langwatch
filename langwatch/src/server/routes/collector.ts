@@ -9,12 +9,6 @@ import { evaluationNameAutoslug } from "../background/workers/collector/evaluati
 import { maybeAddIdsToContextList } from "../background/workers/collector/rag";
 import { fetchExistingMD5s } from "../background/workers/collectorWorker";
 import { prisma } from "../db";
-import type {
-  CollectorRESTParamsValidator,
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Span,
-} from "../tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
@@ -22,7 +16,11 @@ import {
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
-} from "../tracer/types.generated";
+  type CollectorRESTParamsValidator,
+  type CustomMetadata,
+  type ReservedTraceMetadata,
+  type Span,
+} from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../api-key/token-resolver";
