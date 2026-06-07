@@ -100,6 +100,35 @@ function Catalog() {
                     </HStack>
                   ))}
                 </VStack>
+                <Box
+                  marginTop={3}
+                  paddingTop={2}
+                  borderTopWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Text fontSize="xs" color="gray.500" marginBottom={1}>
+                    Trace fields (drive the mapping UI)
+                  </Text>
+                  <HStack fontSize="sm" gap={2} flexWrap="wrap">
+                    {def.requiredFields.length === 0 &&
+                    def.optionalFields.length === 0 ? (
+                      <Text color="gray.400">none</Text>
+                    ) : (
+                      <>
+                        {def.requiredFields.map((f) => (
+                          <Badge key={f} colorPalette="red">
+                            {f} · required
+                          </Badge>
+                        ))}
+                        {def.optionalFields.map((f) => (
+                          <Badge key={f} colorPalette="gray" variant="subtle">
+                            {f} · optional
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                  </HStack>
+                </Box>
               </Box>
             );
           })}
@@ -123,6 +152,14 @@ describe("given the Zod-first evaluator catalog", () => {
         screen.getAllByText(/default: "openai\/gpt-5"/).length,
       ).toBeGreaterThan(0);
       expect(screen.getByText("case_sensitive")).toBeVisible();
+
+      // exact_match's output/expected_output carry defaults in langevals, so the
+      // catalog (which drives the mapping UI) classifies them as optional — not
+      // required. expected_output is unique to exact_match in this showcase.
+      expect(screen.getByText("expected_output · optional")).toBeVisible();
+      expect(
+        screen.getAllByText("output · optional").length,
+      ).toBeGreaterThan(0);
 
       await page.screenshot({
         path: "/tmp/pr4651/evaluator-catalog-zod.png",
