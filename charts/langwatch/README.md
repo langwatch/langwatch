@@ -372,10 +372,10 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langwatch_nlp.service.type`                    | Service type.                                 | `ClusterIP`     |
 | `langwatch_nlp.service.port`                    | Service port.                                 | `5561`          |
 | `langwatch_nlp.resources`                       | Resource requests and limits.                 |                 |
-| `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                | `1000m`         |
-| `langwatch_nlp.resources.requests.memory`       | Requested memory.                             | `2Gi`           |
-| `langwatch_nlp.resources.limits.cpu`            | CPU limit.                                    | `2000m`         |
-| `langwatch_nlp.resources.limits.memory`         | Memory limit.                                 | `4Gi`           |
+| `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                | `250m`          |
+| `langwatch_nlp.resources.requests.memory`       | Requested memory.                             | `256Mi`         |
+| `langwatch_nlp.resources.limits.cpu`            | CPU limit.                                    | `1`             |
+| `langwatch_nlp.resources.limits.memory`         | Memory limit.                                 | `1Gi`           |
 | `langwatch_nlp.upstreams`                       | Upstream to app (callbacks, etc.).            |                 |
 | `langwatch_nlp.upstreams.langwatch.scheme`      | Scheme to app.                                | `http`          |
 | `langwatch_nlp.upstreams.langwatch.name`        | Service name for app.                         | `langwatch-app` |
