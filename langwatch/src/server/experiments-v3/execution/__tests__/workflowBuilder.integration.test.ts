@@ -19,7 +19,7 @@ import {
 describe("WorkflowBuilder", () => {
   const createBasicLocalPromptConfig = (): LocalPromptConfig => ({
     llm: {
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5-mini",
       temperature: 0,
       maxTokens: 1024,
     },
@@ -204,7 +204,7 @@ describe("WorkflowBuilder", () => {
         (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-5-mini",
         temperature: 0,
         max_tokens: 1024,
         litellm_params: undefined,
@@ -280,7 +280,7 @@ describe("WorkflowBuilder", () => {
       version: 1,
       versionId: "version-1",
       versionCreatedAt: new Date(),
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       temperature: 0.7,
       maxTokens: 2048,
       prompt: "You are a helpful assistant.",
@@ -328,7 +328,7 @@ describe("WorkflowBuilder", () => {
         (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         temperature: 0.7,
         max_tokens: 2048,
       });
