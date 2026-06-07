@@ -53,13 +53,22 @@ export interface PersonalUsageSummary {
 export interface PersonalUsageBucket {
   /** ISO date (YYYY-MM-DD) for the bucket. */
   day: string;
+  /** Theoretical (list-price) spend — the grand total regardless of plan. */
   spentUsd: number;
+  /**
+   * Portion actually billed per token. Excludes bundled / non-billable spend
+   * (e.g. a Claude Max session), so it reflects real money out the door.
+   */
+  billedUsd: number;
   requests: number;
 }
 
 export interface PersonalUsageBreakdown {
   label: string;
+  /** Theoretical (list-price) spend for this model/tool. */
   spentUsd: number;
+  /** Portion actually billed per token (excludes bundled spend). */
+  billedUsd: number;
   requests: number;
 }
 
@@ -191,12 +200,14 @@ export class PersonalUsageService {
         SELECT
           toDate(LatestOccurredAt) AS Day,
           sum(SpentUsd)            AS SpentUsd,
+          sum(if(NonBillable = 'true', 0, SpentUsd)) AS BilledUsd,
           count()                  AS Requests
         FROM (
           SELECT
             TraceId,
             argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(TotalCost, UpdatedAt)  AS SpentUsd
+            argMax(TotalCost, UpdatedAt)  AS SpentUsd,
+            argMax(Attributes['langwatch.cost.non_billable'], UpdatedAt) AS NonBillable
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
@@ -215,13 +226,26 @@ export class PersonalUsageService {
       format: "JSONEachRow",
     });
 
-    type RawBucket = { Day: string; SpentUsd: number; Requests: number };
+    type RawBucket = {
+      Day: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
     const rows = (await result.json()) as RawBucket[];
 
-    const byDay = new Map<string, { spentUsd: number; requests: number }>();
+    const byDay = new Map<
+      string,
+      { spentUsd: number; billedUsd: number; requests: number }
+    >();
     for (const r of rows) {
-      const existing = byDay.get(r.Day) ?? { spentUsd: 0, requests: 0 };
+      const existing = byDay.get(r.Day) ?? {
+        spentUsd: 0,
+        billedUsd: 0,
+        requests: 0,
+      };
       existing.spentUsd += Number(r.SpentUsd) || 0;
+      existing.billedUsd += Number(r.BilledUsd) || 0;
       existing.requests += Number(r.Requests) || 0;
       byDay.set(r.Day, existing);
     }
@@ -234,8 +258,13 @@ export class PersonalUsageService {
         window,
       });
       for (const r of ledgerBuckets) {
-        const existing = byDay.get(r.day) ?? { spentUsd: 0, requests: 0 };
+        const existing = byDay.get(r.day) ?? {
+          spentUsd: 0,
+          billedUsd: 0,
+          requests: 0,
+        };
         existing.spentUsd += r.spentUsd;
+        existing.billedUsd += r.billedUsd;
         existing.requests += r.requests;
         byDay.set(r.day, existing);
       }
@@ -274,11 +303,17 @@ export class PersonalUsageService {
       });
       type Raw = { Day: string; SpentUsd: number; Requests: number };
       const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        day: r.Day,
-        spentUsd: Number(r.SpentUsd) || 0,
-        requests: Number(r.Requests) || 0,
-      }));
+      return rows.map((r) => {
+        const spentUsd = Number(r.SpentUsd) || 0;
+        // The gateway ledger records real per-token spend (virtual-key
+        // traffic the customer pays for), so it is fully billed.
+        return {
+          day: r.Day,
+          spentUsd,
+          billedUsd: spentUsd,
+          requests: Number(r.Requests) || 0,
+        };
+      });
     } catch {
       return [];
     }
@@ -311,12 +346,14 @@ export class PersonalUsageService {
         SELECT
           Model,
           sum(SpentUsd) AS SpentUsd,
+          sum(if(NonBillable = 'true', 0, SpentUsd)) AS BilledUsd,
           count()       AS Requests
         FROM (
           SELECT
             TraceId,
             arrayJoin(argMax(Models, UpdatedAt)) AS Model,
-            argMax(TotalCost, UpdatedAt)         AS SpentUsd
+            argMax(TotalCost, UpdatedAt)         AS SpentUsd,
+            argMax(Attributes['langwatch.cost.non_billable'], UpdatedAt) AS NonBillable
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
@@ -338,7 +375,12 @@ export class PersonalUsageService {
       format: "JSONEachRow",
     });
 
-    type RawBreakdown = { Model: string; SpentUsd: number; Requests: number };
+    type RawBreakdown = {
+      Model: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
     const rows = (await result.json()) as RawBreakdown[];
 
     // Aggregate per-model since GROUP BY TraceId, Model returned per-trace rows.
@@ -347,9 +389,11 @@ export class PersonalUsageService {
       const existing = aggregated.get(r.Model) ?? {
         label: r.Model,
         spentUsd: 0,
+        billedUsd: 0,
         requests: 0,
       };
       existing.spentUsd += Number(r.SpentUsd) || 0;
+      existing.billedUsd += Number(r.BilledUsd) || 0;
       existing.requests += Number(r.Requests) || 0;
       aggregated.set(r.Model, existing);
     }
@@ -365,9 +409,11 @@ export class PersonalUsageService {
         const existing = aggregated.get(r.label) ?? {
           label: r.label,
           spentUsd: 0,
+          billedUsd: 0,
           requests: 0,
         };
         existing.spentUsd += r.spentUsd;
+        existing.billedUsd += r.billedUsd;
         existing.requests += r.requests;
         aggregated.set(r.label, existing);
       }
@@ -408,11 +454,16 @@ export class PersonalUsageService {
       });
       type Raw = { Label: string; SpentUsd: number; Requests: number };
       const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        label: r.Label,
-        spentUsd: Number(r.SpentUsd) || 0,
-        requests: Number(r.Requests) || 0,
-      }));
+      return rows.map((r) => {
+        const spentUsd = Number(r.SpentUsd) || 0;
+        // Gateway ledger spend is real per-token spend, so fully billed.
+        return {
+          label: r.Label,
+          spentUsd,
+          billedUsd: spentUsd,
+          requests: Number(r.Requests) || 0,
+        };
+      });
     } catch {
       return [];
     }
@@ -650,7 +701,7 @@ function defaultLast14DaysWindow(): PersonalUsageWindow {
 
 function fillEmptyBuckets(
   window: PersonalUsageWindow,
-  data?: Map<string, { spentUsd: number; requests: number }>,
+  data?: Map<string, { spentUsd: number; billedUsd: number; requests: number }>,
 ): PersonalUsageBucket[] {
   const buckets: PersonalUsageBucket[] = [];
   const cursor = new Date(window.start.getTime());
@@ -660,6 +711,7 @@ function fillEmptyBuckets(
     buckets.push({
       day,
       spentUsd: v?.spentUsd ?? 0,
+      billedUsd: v?.billedUsd ?? 0,
       requests: v?.requests ?? 0,
     });
     cursor.setUTCDate(cursor.getUTCDate() + 1);

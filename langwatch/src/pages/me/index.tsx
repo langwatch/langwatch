@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
+import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
@@ -42,8 +43,26 @@ function MyUsagePage() {
 
   const isOverBudget = budget.status === "exceeded";
 
-  const maxDay = Math.max(...spendByDay.map((d) => d.usd), 0.01);
-  const maxTool = Math.max(...spendByTool.map((t) => t.usd), 0.01);
+  // Two cost series across the spend charts: the theoretical list-price total
+  // (includes bundled / not-billed-per-token usage like Claude Max) and the
+  // amount actually billed. Each can be toggled off; hiding "theoretical"
+  // leaves only real spend. The axis rescales to whichever series is visible
+  // so a near-zero billed series still reads at full height on its own.
+  const [showTheoretical, setShowTheoretical] = useState(true);
+  const [showBilled, setShowBilled] = useState(true);
+
+  const maxDay = Math.max(
+    ...spendByDay.map((d) =>
+      Math.max(showTheoretical ? d.usd : 0, showBilled ? d.billedUsd : 0),
+    ),
+    0.01,
+  );
+  const maxTool = Math.max(
+    ...spendByTool.map((t) =>
+      Math.max(showTheoretical ? t.usd : 0, showBilled ? t.billedUsd : 0),
+    ),
+    0.01,
+  );
 
   return (
     <MyLayout>
@@ -132,24 +151,45 @@ function MyUsagePage() {
             />
           ) : (
             <VStack align="stretch" gap={2}>
-              <HStack
-                gap={1}
-                alignItems="end"
-                height="120px"
-                paddingTop={2}
-              >
+              <CostSeriesLegend
+                showTheoretical={showTheoretical}
+                showBilled={showBilled}
+                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                onToggleBilled={() => setShowBilled((v) => !v)}
+              />
+              <HStack gap={1} alignItems="end" height="120px" paddingTop={2}>
                 {spendByDay.map((d) => {
-                  const heightPct = (d.usd / maxDay) * 100;
+                  const theoreticalPct = (d.usd / maxDay) * 100;
+                  const billedPct = (d.billedUsd / maxDay) * 100;
                   return (
                     <Box
                       key={d.day}
                       flex={1}
-                      backgroundColor="blue.400"
-                      _hover={{ backgroundColor: "blue.500" }}
-                      borderRadius="sm"
-                      height={`${Math.max(2, heightPct)}%`}
-                      title={`${d.day} · ${fmtUsd(d.usd)}`}
-                    />
+                      position="relative"
+                      height="full"
+                      title={`${d.day} · theoretical ${fmtUsd(d.usd)} · billed ${fmtUsd(d.billedUsd)}`}
+                    >
+                      {showTheoretical && (
+                        <Box
+                          position="absolute"
+                          bottom={0}
+                          width="full"
+                          backgroundColor="purple.300"
+                          borderRadius="sm"
+                          height={`${Math.max(d.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+                        />
+                      )}
+                      {showBilled && (
+                        <Box
+                          position="absolute"
+                          bottom={0}
+                          width="full"
+                          backgroundColor="green.500"
+                          borderRadius="sm"
+                          height={`${Math.max(d.billedUsd > 0 ? 2 : 0, billedPct)}%`}
+                        />
+                      )}
+                    </Box>
                   );
                 })}
               </HStack>
@@ -165,9 +205,16 @@ function MyUsagePage() {
           {spendByTool.length === 0 ? (
             <EmptyState message="No tool data yet" />
           ) : (
-            <VStack align="stretch" gap={2}>
+            <VStack align="stretch" gap={3}>
+              <CostSeriesLegend
+                showTheoretical={showTheoretical}
+                showBilled={showBilled}
+                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                onToggleBilled={() => setShowBilled((v) => !v)}
+              />
               {spendByTool.map((tool) => {
-                const widthPct = (tool.usd / maxTool) * 100;
+                const theoreticalPct = (tool.usd / maxTool) * 100;
+                const billedPct = (tool.billedUsd / maxTool) * 100;
                 return (
                   <HStack key={tool.tool} gap={3}>
                     <Text fontSize="sm" minWidth="120px">
@@ -179,16 +226,45 @@ function MyUsagePage() {
                       backgroundColor="bg.muted"
                       borderRadius="sm"
                       overflow="hidden"
+                      position="relative"
+                      title={`theoretical ${fmtUsd(tool.usd)} · billed ${fmtUsd(tool.billedUsd)}`}
                     >
-                      <Box
-                        height="full"
-                        width={`${Math.max(2, widthPct)}%`}
-                        backgroundColor="purple.400"
-                      />
+                      {showTheoretical && (
+                        <Box
+                          position="absolute"
+                          left={0}
+                          top={0}
+                          height="full"
+                          width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+                          backgroundColor="purple.300"
+                        />
+                      )}
+                      {showBilled && (
+                        <Box
+                          position="absolute"
+                          left={0}
+                          top={0}
+                          height="full"
+                          width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
+                          backgroundColor="green.500"
+                        />
+                      )}
                     </Box>
-                    <Text fontSize="sm" color="fg.muted" minWidth="80px" textAlign="right">
-                      {fmtUsd(tool.usd)}
-                    </Text>
+                    <VStack
+                      gap={0}
+                      align="end"
+                      minWidth="90px"
+                      fontSize="sm"
+                    >
+                      {showTheoretical && (
+                        <Text color="fg.muted">{fmtUsd(tool.usd)}</Text>
+                      )}
+                      {showBilled && tool.billedUsd !== tool.usd && (
+                        <Text color="green.600" fontSize="xs">
+                          {fmtUsd(tool.billedUsd)} billed
+                        </Text>
+                      )}
+                    </VStack>
                   </HStack>
                 );
               })}
@@ -343,6 +419,69 @@ function EmptyState({ message, hint }: { message: string; hint?: string }) {
         </Text>
       )}
     </VStack>
+  );
+}
+
+// Clickable legend for the two cost series shared by the spend charts.
+// Purple = theoretical (list price, includes bundled), green = actually billed.
+function CostSeriesLegend({
+  showTheoretical,
+  showBilled,
+  onToggleTheoretical,
+  onToggleBilled,
+}: {
+  showTheoretical: boolean;
+  showBilled: boolean;
+  onToggleTheoretical: () => void;
+  onToggleBilled: () => void;
+}) {
+  return (
+    <HStack gap={4} fontSize="xs">
+      <LegendChip
+        label="Theoretical"
+        color="purple.300"
+        active={showTheoretical}
+        onClick={onToggleTheoretical}
+      />
+      <LegendChip
+        label="Billed"
+        color="green.500"
+        active={showBilled}
+        onClick={onToggleBilled}
+      />
+    </HStack>
+  );
+}
+
+function LegendChip({
+  label,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <HStack
+      as="button"
+      gap={1.5}
+      onClick={onClick}
+      opacity={active ? 1 : 0.45}
+      cursor="pointer"
+      _hover={{ opacity: active ? 0.8 : 0.65 }}
+      title={active ? `Hide ${label}` : `Show ${label}`}
+    >
+      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
+      <Text
+        color="fg.muted"
+        textDecoration={active ? undefined : "line-through"}
+      >
+        {label}
+      </Text>
+    </HStack>
   );
 }
 

@@ -60,8 +60,8 @@ export type PersonalContext = {
   switcher: WorkspaceSwitcherProps;
   summary: PersonalSummary;
   budget: PersonalBudgetState;
-  spendByDay: Array<{ day: string; usd: number }>;
-  spendByTool: Array<{ tool: string; usd: number }>;
+  spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
+  spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
@@ -188,6 +188,7 @@ export function usePersonalContext(): PersonalContext {
       personalUsageQuery.data?.dailyBuckets.map((bucket) => ({
         day: bucket.day,
         usd: bucket.spentUsd,
+        billedUsd: bucket.billedUsd,
       })) ?? [],
     // The CH service breaks down by model name today (see gateway.md spec —
     // tool-level breakdown needs User-Agent / `langwatch.client.name`
@@ -197,6 +198,7 @@ export function usePersonalContext(): PersonalContext {
       personalUsageQuery.data?.breakdownByModel.map((row) => ({
         tool: row.label,
         usd: row.spentUsd,
+        billedUsd: row.billedUsd,
       })) ?? [],
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
