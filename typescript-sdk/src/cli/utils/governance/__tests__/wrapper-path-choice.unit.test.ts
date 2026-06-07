@@ -327,13 +327,82 @@ describe("resolveWrapperPath", () => {
     });
   });
 
+  describe("when there is no remembered answer (run-time policy refresh)", () => {
+    it("re-checks the policy at run time and honors a freshly-disabled gateway", async () => {
+      // Login cached BOTH paths; the admin has since turned the gateway off.
+      // A stale read would prompt; the refresh must collapse to ingestion.
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: true } },
+      });
+      const save = vi.fn();
+      const refreshPolicies = vi.fn(async () => ({
+        claude: { allowVk: false, allowOtelDirect: true },
+      }));
+      const out = await resolveWrapperPath({
+        cfg,
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        refreshPolicies,
+        env: {},
+      });
+      expect(refreshPolicies).toHaveBeenCalledTimes(1);
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      // The fresh map is re-cached for next time.
+      const persisted = save.mock.calls[0]![0] as GovernanceConfig;
+      expect(persisted.tool_policies?.claude?.allowVk).toBe(false);
+    });
+
+    it("does not refresh when a path is already remembered", async () => {
+      const refreshPolicies = vi.fn(async () => null);
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { claude: "gateway" } }),
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        refreshPolicies,
+        env: {},
+      });
+      expect(refreshPolicies).not.toHaveBeenCalled();
+      expect(out.mode).toBe("gateway");
+    });
+
+    it("falls back to the cached policy when the refresh fails", async () => {
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: true } },
+      });
+      const refreshPolicies = vi.fn(async () => {
+        throw new Error("offline");
+      });
+      const out = await resolveWrapperPath({
+        cfg,
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: selectingPrompt("gateway"),
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        refreshPolicies,
+        env: {},
+      });
+      // Cached map still allows both, so it prompts (we picked gateway).
+      expect(refreshPolicies).toHaveBeenCalledTimes(1);
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(true);
+    });
+  });
+
   describe("prompt copy", () => {
     it("asks how the tool should run and names both paths", () => {
       expect(pathChoiceMessage("claude")).toBe(
         "How should `langwatch claude` run?",
       );
       expect(gatewayChoiceTitle()).toContain("Gateway (virtual key)");
-      expect(gatewayChoiceTitle()).toContain("billed to the gateway");
+      expect(gatewayChoiceTitle()).toContain("billed per token");
       expect(otlpChoiceTitle("claude")).toContain("Direct OTLP");
       expect(otlpChoiceTitle("claude")).toContain("your own claude plan");
     });

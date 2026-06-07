@@ -35,10 +35,14 @@
 
 import prompts from "prompts";
 
+import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
 import type { WrapperMode } from "./wrapper-mode";
-import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import {
+  resolvePlatformToolPolicy,
+  type PlatformToolPolicyMap,
+} from "./platform-tool-policy";
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
@@ -131,6 +135,15 @@ export interface ResolveWrapperPathOptions {
   /** Output seam for tests. Defaults to process.stderr.write. */
   writeImpl?: (s: string) => void;
   env?: NodeJS.ProcessEnv;
+  /**
+   * Re-fetch the org's per-tool path policy at run time. Invoked only when
+   * the decision rides on policy (no override, no remembered answer), so a
+   * path the admin disabled AFTER login is honored without a re-login. Returns
+   * null (or throws) when offline; the resolver then keeps the cached map.
+   */
+  refreshPolicies?: (
+    cfg: GovernanceConfig,
+  ) => Promise<PlatformToolPolicyMap | null>;
 }
 
 export interface ResolveWrapperPathResult {
@@ -154,7 +167,7 @@ export function pathChoiceMessage(tool: string): string {
 }
 
 export function gatewayChoiceTitle(): string {
-  return "Gateway (virtual key) - route LLM calls through LangWatch (usage billed to the gateway)";
+  return "Gateway (virtual key) - route LLM calls through LangWatch (usage billed per token)";
 }
 
 export function otlpChoiceTitle(tool: string): string {
@@ -193,7 +206,28 @@ export async function resolveWrapperPath(
     return { mode: pinned, prompted: false };
   }
 
-  // 3. Resolve which paths the org policy permits for this tool.
+  // 3. No override and no remembered answer: the decision rides on the org
+  // policy, which the admin may have flipped since login. Refresh it from the
+  // server (best-effort) so a freshly-disabled path is honored at run time,
+  // then re-cache it. A saved tool_mode short-circuits above, so this costs a
+  // request only on the runs before the user pins a path.
+  if (opts.refreshPolicies) {
+    try {
+      const fresh = await opts.refreshPolicies(cfg);
+      if (fresh) {
+        cfg.tool_policies = fresh;
+        try {
+          saveImpl({ ...cfg, tool_policies: fresh });
+        } catch {
+          // best-effort re-cache; a write failure must not block the run.
+        }
+      }
+    } catch {
+      // offline / server error: fall back to the cached policy map.
+    }
+  }
+
+  // Resolve which paths the org policy permits for this tool.
   const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
   const allowGateway = policy.allowVk;
   const allowOtlp = policy.allowOtelDirect;
@@ -260,7 +294,7 @@ export async function resolveWrapperPath(
 
   const label = chosen === "gateway" ? "gateway" : "otlp";
   writeImpl(
-    `langwatch: saved. \`${tool}\` will use the ${label} path. ` +
+    `${lwTag()} saved. \`${tool}\` will use the ${label} path. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
       `or edit ~/.langwatch/config.json (tool_mode.${tool}).\n`,
   );

@@ -13,6 +13,29 @@ import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
+/**
+ * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
+ * and must be resolved against the user's organization role, not any team-role
+ * bag. Covers `organization:` itself plus the AI Governance resource family
+ * (governance / ingestionSources / anomalyRules / complianceExport /
+ * activityMonitor / aiTools). Team admins do NOT inherit these automatically;
+ * delegation flows through the CustomRolePermissions JSON column at the team
+ * level (matching the rest of the RBAC catalog).
+ *
+ * @internal Exported for testing only
+ */
+export function isOrgScopedPermission(permission: Permission): boolean {
+  return (
+    permission.startsWith("organization:") ||
+    permission.startsWith("governance:") ||
+    permission.startsWith("ingestionSources:") ||
+    permission.startsWith("anomalyRules:") ||
+    permission.startsWith("complianceExport:") ||
+    permission.startsWith("activityMonitor:") ||
+    permission.startsWith("aiTools:")
+  );
+}
+
 /** @internal Exported for testing only */
 export function resolveProjectRedirectSubPath({
   pathname,
@@ -353,21 +376,9 @@ export const useOrganizationTeamProject = (
    * @example hasPermission("organization:manage")
    */
   const hasPermission = (permission: Permission) => {
-    // Org-scoped resources: organization itself + the AI Governance resource
-    // family (governance / ingestionSources / anomalyRules / complianceExport
-    // / activityMonitor — all live in ORGANIZATION_ROLE_PERMISSIONS, not in
-    // any team-role bag). Team admins do NOT get automatic governance perms;
-    // delegation flows through CustomRolePermissions JSON column at the team
-    // level if needed (matching the rest of the RBAC catalog).
-    const isOrgPermission =
-      permission.startsWith("organization:") ||
-      permission.startsWith("governance:") ||
-      permission.startsWith("ingestionSources:") ||
-      permission.startsWith("anomalyRules:") ||
-      permission.startsWith("complianceExport:") ||
-      permission.startsWith("activityMonitor:");
-
-    if (isOrgPermission) {
+    // Org-scoped resources resolve against the org role only (see
+    // isOrgScopedPermission); team admins do not inherit them automatically.
+    if (isOrgScopedPermission(permission)) {
       // Only check organization role - team admins do NOT get automatic organization permissions
       if (organizationRole) {
         const orgResult = organizationRoleHasPermission(

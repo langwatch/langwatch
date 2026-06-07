@@ -150,10 +150,11 @@ function CommandRow({ command }: { command: string }) {
           as="span"
           fontFamily="mono"
           fontSize="sm"
-          color="fg.muted"
+          color="fg.subtle"
           userSelect="none"
           flexShrink={0}
           aria-hidden="true"
+          marginTop="-4px"
         >
           $
         </Text>

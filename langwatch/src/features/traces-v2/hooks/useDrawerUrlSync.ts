@@ -53,10 +53,11 @@ function readUrlState(): DrawerUrlState {
  * persistence (hard reload, deep links) and browser navigation.
  *
  * Two listeners only:
- *  1. Store → URL: when URL-relevant state diverges from URL params, push
- *     the diff. The diff check makes the loop self-terminating — async
- *     router pushes can't clobber newer store values, because by the time
- *     a stale push lands, the store and URL re-converge before the next
+ *  1. Store → URL: when URL-relevant state diverges from URL params, REPLACE
+ *     the diff (no new history entry — these params are view-state inside an
+ *     already-open drawer). The diff check makes the loop self-terminating —
+ *     async router writes can't clobber newer store values, because by the
+ *     time a stale write lands, the store and URL re-converge before the next
  *     write fires.
  *  2. `popstate` → store: browser back/forward re-hydrates the store from
  *     the URL. Subsequent re-render sees store == URL → no echo push.
@@ -116,7 +117,13 @@ export function useDrawerUrlSync() {
       updates.pinnedSpans = storePinnedRaw || undefined;
     }
     if (Object.keys(updates).length === 0) return;
-    updateDrawerParams(updates);
+    // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
+    // already-open drawer, not separate destinations. Pushing a history entry
+    // per pane switch let Back land on the same drawer URL minus drawer.mode,
+    // which this effect then immediately re-synced (re-adding drawer.mode) -
+    // an infinite back-button trap. Replacing folds the open + its view-state
+    // into one entry, so Back closes the drawer instead of cycling panes.
+    updateDrawerParams(updates, { push: false });
   }, [
     drawerOpenInUrl,
     viewMode,

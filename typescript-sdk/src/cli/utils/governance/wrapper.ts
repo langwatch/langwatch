@@ -17,6 +17,7 @@
 import { spawn } from "node:child_process";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig, isLoggedIn } from "./config";
+import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap, GovernanceCliError } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
@@ -381,6 +382,11 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       tool,
       args: toolArgs,
       override: pathOverride,
+      // Re-check the org policy at run time so a path the admin disabled
+      // after login is respected without a re-login. Best-effort: on any
+      // failure resolveWrapperPath keeps the login-cached policy map.
+      refreshPolicies: (c) =>
+        getCliBootstrap(c).then((b) => b?.toolPolicies ?? null),
     });
   } catch (err) {
     process.stderr.write(`path selection failed: ${(err as Error).message}\n`);
@@ -411,7 +417,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
     if (pathChoice.mode === "ingestion" && policy.allowVk && !isToolDisabled) {
       process.stderr.write(
-        `langwatch: couldn't set up direct OTLP ingestion for ${tool} ` +
+        `${lwTag()} couldn't set up direct OTLP ingestion for ${tool} ` +
           `(${(err as Error).message}). Falling back to the gateway path.\n`,
       );
       try {
@@ -451,12 +457,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     }
     if (modeResult.codexConfigPath) {
       process.stderr.write(
-        `langwatch: wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
+        `${lwTag()} wired [model_providers.langwatch] in ${modeResult.codexConfigPath}.\n`,
       );
     }
     if (modeResult.codexProfilePath) {
       process.stderr.write(
-        `langwatch: wrote profile body to ${modeResult.codexProfilePath}.\n`,
+        `${lwTag()} wrote profile body to ${modeResult.codexProfilePath}.\n`,
       );
     }
   } else {
@@ -464,12 +470,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     // the wrapper just did on their behalf.
     if (modeResult.newKeyMinted) {
       process.stderr.write(
-        `langwatch: minted a personal ingestion key for ${tool}.\n`,
+        `${lwTag()} minted a personal ingestion key for ${tool}.\n`,
       );
     }
     if (modeResult.codexConfigPath) {
       process.stderr.write(
-        `langwatch: wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
+        `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
       );
     }
 

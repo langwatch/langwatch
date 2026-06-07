@@ -30,6 +30,7 @@ import {
 } from "@/cli/utils/codex-config-toml";
 import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
+import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
 import { GovernanceCliError, mintIngestionKey } from "./cli-api";
@@ -168,11 +169,11 @@ export async function resolveWrapperMode(
   // guaranteed true here, since the both-disabled case threw above).
   if (mode === "gateway" && !policy.allowVk) {
     mode = "ingestion";
-    notice = `langwatch: gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
+    notice = `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
   }
   if (mode === "ingestion" && !policy.allowOtelDirect) {
     mode = "gateway";
-    notice = `langwatch: direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
+    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
   }
 
   if (mode === "gateway") {
