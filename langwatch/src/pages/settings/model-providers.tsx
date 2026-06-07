@@ -365,8 +365,14 @@ export default function ModelsPage() {
                                 setProviderToDelete({
                                   id: provider.id ?? undefined,
                                   provider: provider.provider,
+                                  // Match the row label (the instance name,
+                                  // e.g. "OpenAI2") instead of the generic
+                                  // registry name so the dialog names the
+                                  // exact provider the user clicked.
                                   name:
-                                    providerSpec?.name ?? provider.provider,
+                                    (provider as { name?: string }).name ??
+                                    providerSpec?.name ??
+                                    provider.provider,
                                 });
                               }}
                             >
