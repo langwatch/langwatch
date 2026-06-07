@@ -417,6 +417,35 @@ function translatePerformanceMetric(
         params: {},
       };
 
+    // Cost actually billed per token: the whole list-price cost unless the
+    // trace is bundled (langwatch.cost.non_billable = 'true'), in which case
+    // it contributes nothing to real spend.
+    case "performance.cost_billed":
+      return {
+        selectExpression: translateSimpleAggregation(
+          `if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', 0, ${ts}.TotalCost)`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+        params: {},
+      };
+
+    // Bundled / theoretical cost not billed per token (the list-price value of
+    // bundled-subscription usage). The grand total is performance.total_cost.
+    case "performance.cost_non_billed":
+      return {
+        selectExpression: translateSimpleAggregation(
+          `if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0)`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+        params: {},
+      };
+
     case "performance.prompt_tokens":
       return {
         selectExpression: translateSimpleAggregation(

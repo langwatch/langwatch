@@ -119,6 +119,25 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("TotalCost");
       });
 
+      it("translates performance.cost_billed to zero out bundled traces", () => {
+        const result = translateMetric("performance.cost_billed", "sum", 0);
+        expect(result.selectExpression).toContain("sum(");
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.cost.non_billable'] = 'true', 0,"
+        );
+        expect(result.selectExpression).toContain("TotalCost");
+      });
+
+      it("translates performance.cost_non_billed to keep only bundled traces", () => {
+        const result = translateMetric("performance.cost_non_billed", "sum", 0);
+        expect(result.selectExpression).toContain("sum(");
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.cost.non_billable'] = 'true',"
+        );
+        // bundled branch keeps the cost, non-bundled contributes 0
+        expect(result.selectExpression).toMatch(/TotalCost,\s*0\)/);
+      });
+
       it("translates performance.first_token with p95", () => {
         const result = translateMetric("performance.first_token", "p95", 0);
         expect(result.selectExpression).toContain("quantileExact(0.95)");
