@@ -15,7 +15,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 }));
 
 vi.mock("../../env.mjs", () => ({
-  env: { TOPIC_CLUSTERING_SERVICE: "http://localhost:1234" },
+  env: { LANGEVALS_ENDPOINT: "http://localhost:1234" },
 }));
 
 vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
@@ -46,8 +46,8 @@ vi.mock("~/server/metrics", () => ({
   getPayloadSizeHistogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
 }));
 
-vi.mock("fetch-h2", () => ({
-  fetch: vi.fn().mockResolvedValue({
+vi.mock("../../langevals/stagedFetch", () => ({
+  stagedLangevalsFetch: vi.fn().mockResolvedValue({
     ok: true,
     json: () =>
       Promise.resolve({
@@ -62,7 +62,7 @@ vi.mock("fetch-h2", () => ({
 import { prisma } from "~/server/db";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { scheduleTopicClusteringNextPage } from "~/server/background/queues/topicClusteringQueue";
-import { fetch as mockFetchH2 } from "fetch-h2";
+import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import {
   clusterTopicsForProject,
   fetchTracesFromClickHouse,
@@ -186,8 +186,8 @@ describe("clusterTopicsForProject", () => {
 
       await clusterTopicsForProject("proj-1", undefined, false);
 
-      // clustering service was called (via mocked fetch-h2)
-      expect(mockFetchH2).toHaveBeenCalled();
+      // clustering service (langevals) was called
+      expect(stagedLangevalsFetch).toHaveBeenCalled();
     });
   });
 
@@ -290,8 +290,8 @@ describe("clusterTopicsForProject", () => {
       await clusterTopicsForProject("proj-1", undefined, false);
 
       // Traces with empty/null input should be filtered, leaving 10
-      const fetchCall = vi.mocked(mockFetchH2).mock.calls[0];
-      const body = fetchCall?.[1]?.json as { traces: Array<{ input: string }> } | undefined;
+      const fetchCall = vi.mocked(stagedLangevalsFetch).mock.calls[0];
+      const body = fetchCall?.[0]?.body as { traces: Array<{ input: string }> } | undefined;
       expect(body?.traces).toHaveLength(10);
       expect(body?.traces[0]?.input).toBe("User message 0");
     });

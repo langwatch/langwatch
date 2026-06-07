@@ -52,7 +52,7 @@ vi.mock("~/utils/logger/server", () => ({
 }));
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
-const PRODUCT_FLAG = "release_nlp_go_engine_enabled";
+const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 
 const emptyStore = {
   get: vi.fn().mockResolvedValue(null),
