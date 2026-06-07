@@ -19,7 +19,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # nlpgo service stand-up.
 
   Background:
-    Given the nlpgo service is running on port 5562 with NLPGO_BYPASS unset
+    Given the nlpgo service is running on its configured port
     And nlpgo imports the AI Gateway dispatcher in-process (no second HTTP hop)
     And a project "acme-api" exists with no VirtualKey configured
 

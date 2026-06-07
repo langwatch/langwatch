@@ -1,7 +1,7 @@
 // Package httpapi is the driving HTTP adapter for nlpgo. It mounts the
-// /go/* surface (the new Go engine and gateway proxy), exposes health
-// endpoints, and falls through to a reverse proxy targeting the
-// uvicorn child for everything else.
+// /go/* surface (the Go engine and gateway proxy) and exposes health
+// endpoints. Any other path returns a typed 502 (go-only mode); there
+// is no Python service to proxy to.
 package httpapi
 
 import (
@@ -26,10 +26,6 @@ type RouterDeps struct {
 	Logger  *zap.Logger
 	Health  *health.Registry
 	Version string
-	// ChildProxy reverse-proxies any unmatched (non-/go/*) request to
-	// the uvicorn child. Required when nlpgo is the entrypoint; nil-safe
-	// for tests where there is no child.
-	ChildProxy http.Handler
 	// MaxRequestBodyBytes caps per-request body size. 0 = no cap (used
 	// by tests). In production the operator sets this via env.
 	MaxRequestBodyBytes int64
@@ -80,43 +76,31 @@ func NewRouter(deps RouterDeps) http.Handler {
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 	})
 
-	// Fall-through: proxy everything else to uvicorn child if a child
-	// is configured. In Go-only mode (NLPGO_CHILD_BYPASS=true with no
-	// upstream URL — the npx-server topology) ChildProxy is nil; we
-	// short-circuit with a typed 502 + a self-explaining body so an
-	// operator who forgot to force the FF on for every project sees a
-	// clear message rather than chi's default 404 (which would suggest
-	// the URL is wrong) or a generic dial-failure log line.
-	if deps.ChildProxy != nil {
-		r.NotFound(deps.ChildProxy.ServeHTTP)
-		r.MethodNotAllowed(deps.ChildProxy.ServeHTTP)
-	} else {
-		r.NotFound(goOnlyModeFallback)
-		r.MethodNotAllowed(goOnlyModeFallback)
-	}
+	// Anything outside /go/* and the health routes gets a typed 502 with
+	// a self-explaining body. nlpgo is the only NLP engine and serves
+	// only /go/*; there is no Python service to proxy to.
+	r.NotFound(goOnlyModeFallback)
+	r.MethodNotAllowed(goOnlyModeFallback)
 
 	return r
 }
 
-// goOnlyModeFallback handles non-/go/* requests when nlpgo is running
-// in Go-only mode (no Python child, no upstream URL). Status code
-// matches the legacy proxypass 502 ("child upstream unavailable") so
-// existing client retry logic keeps working unchanged; the body
-// explains what to do, since a fresh operator hitting this path is
-// almost always missing the per-project feature flag override.
+// goOnlyModeFallback handles any request outside /go/* and the health
+// routes. nlpgo is the only NLP engine and serves just /go/*; there is
+// no Python service to proxy to. The 502 status is kept (it matches the
+// old proxypass "upstream unavailable" code) so any existing client
+// retry logic is unaffected; the body explains the caller hit a legacy
+// non-/go path.
 //
-// Pinned by TestRouter_GoOnlyModeFallbackReturns502 + integration
-// tests in router_go_only_mode_test.go.
+// Pinned by router_go_only_mode_test.go.
 func goOnlyModeFallback(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusBadGateway)
 	_, _ = w.Write([]byte(
-		"nlpgo is in Go-only mode (NLPGO_CHILD_BYPASS=true, no upstream " +
-			"configured).\nOnly /go/* paths are served by this binary. The " +
-			"main app must have release_nlp_go_engine_enabled forced on " +
-			"for every project — set FEATURE_FLAG_FORCE_ENABLE=" +
-			"release_nlp_go_engine_enabled in the langwatch app's env.\n" +
-			"Path attempted: " + r.URL.Path + "\n",
+		"nlpgo serves only /go/* paths (studio execution + the playground " +
+			"proxy) and the health endpoints. There is no Python service " +
+			"behind it, so a request to any other path means the caller used " +
+			"a legacy non-/go route.\nPath attempted: " + r.URL.Path + "\n",
 	))
 }
 

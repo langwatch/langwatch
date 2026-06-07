@@ -89,8 +89,16 @@ spec:
               containerPort: {{ .Values.langwatch_nlp.service.port }}
               protocol: TCP
 
-          # Environment variables for the NLP service
+          # Environment variables for the NLP service (Go binary).
           env:
+            # Bind address for the Go HTTP server. Kept in lockstep with the
+            # Service port so dialers (app -> langwatch-nlp:port) always reach
+            # the listener even when the port is overridden.
+            - name: SERVER_ADDR
+              value: ":{{ .Values.langwatch_nlp.service.port }}"
+            # Universal LangWatch app URL. nlpgo reads this for OTel export and
+            # as the evaluator / agent-workflow callback base URL (it falls back
+            # to LANGWATCH_ENDPOINT when NLPGO_ENGINE_LANGWATCH_BASE_URL is unset).
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
 
@@ -106,18 +114,27 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          # The Go service exposes /startupz, /readyz and /healthz. The static
+          # binary boots in milliseconds, so probes can start almost immediately.
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health
+              path: /healthz
               port: http
-            initialDelaySeconds: 60
+            initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 5
           volumeMounts:

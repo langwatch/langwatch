@@ -15,7 +15,6 @@ import { readEnvFile } from "./env-file.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
-import { startLangwatchNlp } from "./langwatch-nlp.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { runMigrations } from "./migrate.ts";
@@ -92,16 +91,11 @@ const runtimeImpl: RuntimeApi = {
     const childEnv = { ...envFromFile, ...ctx.userEnv };
 
     try {
-      // NLP backend selection: ctx.nlpMode picks startNlpgo (default,
-      // bundled monobinary) or startLangwatchNlp (legacy uvicorn under
-      // uv). Both bind to ctx.ports.nlp; the langwatch app's
-      // /studio/* routing is steered by FEATURE_FLAG_FORCE_ENABLE=
-      // release_nlp_go_engine_enabled in the .env (set by buildEnv only
-      // when nlpMode==='go'). aigateway uses the same monobinary either
-      // way — only the nlpgo subcommand is mode-gated.
-      const startNlp = ctx.nlpMode === "python" ? startLangwatchNlp : startNlpgo;
+      // nlpgo is the only NLP runtime — the Go service from the aigateway
+      // monobinary, dispatched as `nlpgo`. It binds to ctx.ports.nlp; the
+      // langwatch app's /studio/* routing always targets /go/*.
       const [nlp, langevals, gw, lw] = await Promise.all([
-        startNlp(ctx, bus, childEnv),
+        startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),

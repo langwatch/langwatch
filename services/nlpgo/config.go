@@ -1,7 +1,8 @@
-// Package nlpgo is the LangWatch Go NLP service. It runs alongside
-// (in front of) the legacy Python uvicorn process: nlpgo is the
-// container entrypoint, owns the new /go/* surface, and reverse-proxies
-// everything else to the Python child unchanged.
+// Package nlpgo is the LangWatch Go NLP service and the sole NLP engine.
+// It is the container entrypoint and owns the /go/* surface (studio
+// execution, the playground proxy) plus health. There is no Python
+// service; the only Python that runs is a transient code-block sandbox
+// subprocess (see app/engine/blocks/codeblock).
 package nlpgo
 
 import (
@@ -18,32 +19,8 @@ type Config struct {
 	Log         clog.Config   `env:"LOG"`
 	OTel        config.OTel   `env:"OTEL"`
 
-	// Child uvicorn process configuration.
-	Child UvicornChildConfig `env:"NLPGO_CHILD"`
-
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
-}
-
-// UvicornChildConfig controls the langwatch_nlp Python child process.
-type UvicornChildConfig struct {
-	// Bypass=1 prevents nlpgo from spawning uvicorn at all. Used for
-	// emergency rollback (operator points the Lambda Web Adapter at
-	// uvicorn directly and disables nlpgo via NLPGO_BYPASS — but in
-	// case the operator wants to keep nlpgo running for /go/* while
-	// uvicorn is managed externally, this disables the spawn).
-	Bypass bool `env:"BYPASS"`
-	// Command is the binary to exec. Default: uvicorn.
-	Command string `env:"COMMAND"`
-	// Args are passed verbatim. Default targets langwatch_nlp.main:app
-	// on 127.0.0.1:5561. Supplied as a single space-separated string
-	// (config.Hydrate doesn't support []string env unmarshal).
-	ArgsRaw string `env:"ARGS"`
-	// HealthURL is what nlpgo polls to gauge child readiness.
-	HealthURL string `env:"HEALTH_URL"`
-	// UpstreamURL is where the reverse proxy sends fall-through traffic.
-	// Default: http://127.0.0.1:5561.
-	UpstreamURL string `env:"UPSTREAM_URL"`
 }
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).
@@ -75,12 +52,6 @@ func defaultConfig() Config {
 			Addr:                ":5562",
 			GracefulSeconds:     10,
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
-		},
-		Child: UvicornChildConfig{
-			Command:     "uvicorn",
-			ArgsRaw:     "langwatch_nlp.main:app --host 127.0.0.1 --port 5561",
-			HealthURL:   "http://127.0.0.1:5561/health",
-			UpstreamURL: "http://127.0.0.1:5561",
 		},
 		Engine: EngineConfig{
 			StreamHeartbeatSeconds: 15,
@@ -119,29 +90,10 @@ func LoadConfig(ctx context.Context) (Config, error) {
 }
 
 func validateRequired(_ Config) error {
-	// Soft requirements — we let nlpgo boot even when the gateway is
+	// Soft requirements — nlpgo boots even when the gateway is
 	// unconfigured because the /go/proxy and LLM-block paths fail
-	// gracefully and operators may temporarily run nlpgo as a pure
-	// reverse proxy during rollout.
-	//
-	// `Child.Bypass=true` is now valid in two distinct topologies:
-	//
-	//  1. **External child** (legacy rollout / Lambda dual-process):
-	//     `Bypass=true` + `UpstreamURL=<url>` — no in-process child
-	//     spawned, but legacy `/non-go/*` requests reverse-proxy to the
-	//     URL where the Python sidecar is running externally.
-	//
-	//  2. **Go-only** (npx @langwatch/server / fully migrated stacks):
-	//     `Bypass=true` + `UpstreamURL=""` — there is no Python child
-	//     at all. `/go/*` runs in-process; legacy non-`/go/*` requests
-	//     get a self-explaining 502 from proxypass (see
-	//     proxypassHandler) so an operator who forgot to force the FF
-	//     on for every project sees a clear message rather than a
-	//     cryptic dial-failure log.
-	//
-	// We previously rejected (2) at config-load with
-	// 'NLPGO_CHILD_UPSTREAM_URL must be set when NLPGO_CHILD_BYPASS=true'
-	// — a stale assumption from when bypass meant 'child runs
-	// externally'. Removed; both shapes are first-class.
+	// gracefully, and operators may run nlpgo before every project's
+	// model providers are set up. Any non-/go/* request gets a
+	// self-explaining 502 from goOnlyModeFallback (see httpapi).
 	return nil
 }

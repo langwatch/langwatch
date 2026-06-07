@@ -98,8 +98,6 @@ func Root(ctx context.Context, _ []string) error {
 
 	application := app.New(
 		app.WithLogger(deps.Logger),
-		app.WithChildProxy(deps.ChildProxy),
-		app.WithChildManager(deps.Child),
 		app.WithWorkflowExecutor(executor),
 	)
 

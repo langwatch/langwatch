@@ -16,7 +16,6 @@ import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import {
   type StudioClientEvent,
   type StudioServerEvent,
@@ -181,20 +180,17 @@ secured.access(
         );
     }
 
-    // Optimization is DSPy-only; the Go engine intentionally drops it.
-    // Stop events still pass so a previously-started run can be cancelled.
+    // Optimization is DSPy-only; the Go engine dropped it. Stop events
+    // still pass so a previously-started run can be cancelled.
     if (message.type === "execute_optimization") {
-      const goEnabled = await isNlpGoEnabled({ projectId });
-      if (goEnabled) {
-        return c.json(
-          {
-            type: "optimize_disabled",
-            message:
-              "Optimization is no longer supported on the Go engine. The Optimize feature relied on DSPy, which has been removed.",
-          },
-          { status: 410 },
-        );
-      }
+      return c.json(
+        {
+          type: "optimize_disabled",
+          message:
+            "Optimization is no longer supported. The Optimize feature relied on DSPy, which has been removed.",
+        },
+        { status: 410 },
+      );
     }
 
     return streamSSE(c, async (stream) => {
