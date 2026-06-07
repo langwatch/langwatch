@@ -166,8 +166,15 @@ export const useUpdateDrawerParams = () => {
         comma: true,
         allowEmptyArrays: true,
       }) as Record<string, unknown>;
-      const drawer = ((parsed.drawer as Record<string, unknown>) ??
-        {}) as Record<string, unknown>;
+      // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
+      // query like `?drawer=foo` it's a string, not the object we mutate below.
+      // Guard the shape so the mutation loop can't throw at runtime.
+      const drawer =
+        parsed.drawer &&
+        typeof parsed.drawer === "object" &&
+        !Array.isArray(parsed.drawer)
+          ? (parsed.drawer as Record<string, unknown>)
+          : {};
       for (const [key, value] of Object.entries(updates)) {
         if (value === undefined) delete drawer[key];
         else drawer[key] = value;
