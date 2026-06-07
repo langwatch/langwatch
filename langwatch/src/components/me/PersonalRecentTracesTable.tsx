@@ -1,19 +1,17 @@
-import { HStack, Spinner, Table, Text } from "@chakra-ui/react";
-import { Fragment, useMemo } from "react";
-import { IOPreview } from "~/features/traces-v2/components/TraceTable/IOPreview";
-import { CostCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/CostCell";
-import { DurationCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/DurationCell";
-import { OriginCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/SimpleCells";
-import { TimeCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TimeCell";
-import { TokensCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TokensCell";
-import { TraceCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TraceCell";
-import type {
-  CellDef,
-  CellRenderContext,
-} from "~/features/traces-v2/components/TraceTable/registry/types";
+import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import {
+  type ColumnDef,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useMemo } from "react";
+import { buildTraceColumns } from "~/features/traces-v2/components/TraceTable/columns";
+import {
+  RegistryRow,
+  traceRegistry,
+} from "~/features/traces-v2/components/TraceTable/registry";
+import { TraceTableShell } from "~/features/traces-v2/components/TraceTable/TraceTableShell";
 import { TraceStatisticsProvider } from "~/features/traces-v2/components/TraceTable/traceStatisticsContext";
-import { useDensityTokens } from "~/features/traces-v2/hooks/useDensityTokens";
-import { useDensityStore } from "~/features/traces-v2/stores/densityStore";
 import type { TraceListItem } from "~/features/traces-v2/types/trace";
 import { mapTraceListPayload } from "~/features/traces-v2/utils/mapTraceListPayload";
 import { api } from "~/utils/api";
@@ -22,43 +20,35 @@ import { useRouter } from "~/utils/compat/next-router";
 const RECENT_WINDOW_DAYS = 30;
 const RECENT_LIMIT = 10;
 
-interface ReusedColumn {
-  cell: CellDef<TraceListItem>;
-  label: string;
-  align: "start" | "end";
-}
-
-// Reuse the exact /traces table cells so a personal trace reads the
-// same way it does in the trace explorer. The column set mirrors the
-// explorer's default lens (time / trace / origin / duration / cost /
-// tokens) and each row carries the same Input/Output summary preview
-// below it (see IOPreview), so Recent Activity matches /traces.
-const COLUMNS: ReusedColumn[] = [
-  { cell: TimeCell, label: "Time", align: "start" },
-  { cell: TraceCell, label: "Trace", align: "start" },
-  { cell: OriginCell, label: "Origin", align: "start" },
-  { cell: DurationCell, label: "Duration", align: "end" },
-  { cell: CostCell, label: "Cost", align: "end" },
-  { cell: TokensCell, label: "Tokens", align: "end" },
+// Mirror the explorer's default "All" lens: the same trace cells plus the
+// io-preview second-row addon (the Input/Output summary). Rendering through
+// the explorer's own TraceTableShell + RegistryRow keeps the header
+// typography, row borders, density, and the summary row pixel-identical to
+// /traces instead of re-styling a parallel table.
+const RECENT_COLUMN_IDS = [
+  "time",
+  "trace",
+  "origin",
+  "duration",
+  "cost",
+  "tokens",
 ];
+const RECENT_ADDONS = ["io-preview"];
 
-function renderCell(
-  cell: CellDef<TraceListItem>,
-  ctx: CellRenderContext<TraceListItem>,
-) {
-  return cell.renderComfortable
-    ? cell.renderComfortable(ctx)
-    : cell.render(ctx);
+const FALLBACK_COL_MIN_PX = 100;
+
+function isFlexColumn(def: ColumnDef<TraceListItem, any>): boolean {
+  return Boolean((def.meta as { flex?: boolean } | undefined)?.flex);
 }
 
 /**
  * The "Recent activity" card on /me, rendered with the /traces v2 table
- * cells against the user's personal project. Clicking a row deep-links
+ * itself, scoped to the user's personal project. Clicking a row deep-links
  * into the full trace explorer with the detail drawer open, so the user
- * lands on the same trace they clicked — no second lookup. Reading the
- * personal project tenant directly (rather than the gateway ledger the
- * old card used) means Path B OTLP traces (Claude Code et al.) show up
- * here too, not just gateway-routed requests.
+ * lands on the same trace they clicked. Reading the personal project tenant
+ * directly (rather than the gateway ledger the old card used) means Path B
+ * OTLP traces (Claude Code et al.) show up here too, not just gateway-routed
+ * requests.
  */
 export function PersonalRecentTracesTable({
   projectId,
@@ -68,8 +58,6 @@ export function PersonalRecentTracesTable({
   projectSlug: string;
 }) {
   const router = useRouter();
-  const density = useDensityTokens();
-  const densityMode = useDensityStore((s) => s.density);
 
   const timeRange = useMemo(() => {
     const to = Date.now();
@@ -94,6 +82,44 @@ export function PersonalRecentTracesTable({
   );
 
   const rows = useMemo(() => mapTraceListPayload(query.data), [query.data]);
+
+  // The explorer pins the trace column at a fixed 560px so the wide lens can
+  // scroll; in this compact card we widen it back to flex so the trace name
+  // absorbs the card's slack instead of forcing horizontal scroll. The
+  // shared column defs are spread (never mutated) so the explorer's own
+  // columns are untouched.
+  const columns = useMemo(
+    () =>
+      buildTraceColumns(RECENT_COLUMN_IDS).map((col) =>
+        col.id === "trace"
+          ? { ...col, size: 9999, meta: { ...col.meta, flex: true } }
+          : col,
+      ),
+    [],
+  );
+
+  const minWidth = useMemo(() => {
+    const px = columns.reduce((sum, col) => {
+      const width = isFlexColumn(col)
+        ? (col.minSize ?? FALLBACK_COL_MIN_PX)
+        : (col.size ?? col.minSize ?? FALLBACK_COL_MIN_PX);
+      return sum + width;
+    }, 0);
+    return `${px}px`;
+  }, [columns]);
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.traceId,
+    // A 10-row preview card: sorting + resizing belong to the full explorer,
+    // not here. Disabling them keeps the headers as plain, non-interactive
+    // labels (no chevrons, no resize grips) while preserving the exact
+    // header styling from TraceTableShell.
+    enableSorting: false,
+    enableColumnResizing: false,
+  });
 
   const openTrace = (row: TraceListItem) => {
     const params = new URLSearchParams({
@@ -122,88 +148,22 @@ export function PersonalRecentTracesTable({
 
   return (
     <TraceStatisticsProvider traces={rows}>
-      <Table.Root size="sm" variant="line" width="full">
-        <Table.Header>
-          <Table.Row backgroundColor="transparent">
-            {COLUMNS.map(({ cell, label, align }) => (
-              <Table.ColumnHeader
-                key={cell.id}
-                paddingX={2}
-                color="fg.muted"
-                fontWeight="medium"
-                textAlign={align}
-              >
-                {label}
-              </Table.ColumnHeader>
-            ))}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rows.map((row) => {
-            const ctx: CellRenderContext<TraceListItem> = {
-              row,
-              density,
-              densityMode,
-              isExpanded: false,
-              isSelected: false,
-              isFocused: false,
-              actions: {},
-              enabledAddonIds: [],
-            };
-            return (
-              <Fragment key={row.traceId}>
-                <Table.Row
-                  cursor="pointer"
-                  _hover={{ backgroundColor: "bg.muted" }}
-                  onClick={() => openTrace(row)}
-                  // Match the trace explorer's hover affordance: the trace id
-                  // fades in on row hover (TraceCell keeps it at opacity 0 by
-                  // default), kept dense until you reach for it.
-                  css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
-                >
-                  {COLUMNS.map(({ cell, align }) => (
-                    <Table.Cell
-                      key={cell.id}
-                      paddingX={2}
-                      textAlign={align}
-                      verticalAlign="middle"
-                      // The trace column absorbs the slack and truncates long
-                      // names; the metric columns size to their content. The
-                      // `max-width: 0` + `width: 100%` pair is the table-cell
-                      // truncation idiom that bounds the cell so the inner
-                      // `truncate` actually clips.
-                      width={cell.id === "trace" ? "100%" : undefined}
-                      maxWidth={cell.id === "trace" ? "0" : undefined}
-                    >
-                      {renderCell(cell, ctx)}
-                    </Table.Cell>
-                  ))}
-                </Table.Row>
-                {/* Mirror the io-preview addon: LLM traces with both input AND
-                    output get the same Input/Output summary row beneath them
-                    that the /traces explorer renders. */}
-                {row.input !== null && row.output !== null && (
-                  <Table.Row
-                    cursor="pointer"
-                    _hover={{ backgroundColor: "bg.muted" }}
-                    onClick={() => openTrace(row)}
-                  >
-                    <Table.Cell
-                      colSpan={COLUMNS.length}
-                      paddingX={2}
-                      paddingTop={0}
-                      paddingBottom={3}
-                      borderTopWidth={0}
-                    >
-                      <IOPreview input={row.input} output={row.output} />
-                    </Table.Cell>
-                  </Table.Row>
-                )}
-              </Fragment>
-            );
-          })}
-        </Table.Body>
-      </Table.Root>
+      <Box overflowX="auto" width="full">
+        <TraceTableShell table={table} minWidth={minWidth}>
+          {table.getRowModel().rows.map((row) => (
+            <RegistryRow
+              key={row.id}
+              tanstackRow={row}
+              registry={traceRegistry}
+              addons={RECENT_ADDONS}
+              status={row.original.status}
+              hoverScope="unified"
+              rowDomId={row.original.traceId}
+              onSelect={() => openTrace(row.original)}
+            />
+          ))}
+        </TraceTableShell>
+      </Box>
     </TraceStatisticsProvider>
   );
 }
