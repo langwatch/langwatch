@@ -17,7 +17,7 @@
  * the customer pays per token) and is always billed.
  *
  * Per-(org, sourceType) results are cached in-process for 30s, mirroring
- * GovernanceContentStripService — the ingest path is bursty, so a brief window
+ * GovernanceContentStripService. The ingest path is bursty, so a brief window
  * sharply cuts Prisma load while keeping an admin's flip visible within ~30s.
  */
 import type { PrismaClient } from "@prisma/client";

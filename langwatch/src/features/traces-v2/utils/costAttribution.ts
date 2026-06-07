@@ -4,7 +4,7 @@
  * LangWatch bills per captured event, never per token. But a customer's own
  * LLM spend depends on how they pay the provider: gateway / virtual-key usage
  * is billed per token, while a coding assistant on a bundled subscription
- * (e.g. Claude Max) is NOT billed per token — its list-price token cost is
+ * (e.g. Claude Max) is NOT billed per token, so its list-price token cost is
  * theoretical. The receiver tags bundled ingest traces with
  * `langwatch.cost.non_billable = "true"` (resolved from the tool's
  * `bundledPlan` admin flag), so we can split a trace's list-price cost into

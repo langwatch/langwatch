@@ -14,7 +14,7 @@ function billedCostOf(row: TraceListItem): number {
 
 function bundledTitle(row: TraceListItem): string | undefined {
   if ((row.nonBilledCost ?? 0) <= 0) return undefined;
-  return `Bundled plan — not billed per token. Billed ${formatCost(
+  return `Bundled plan, not billed per token. Billed ${formatCost(
     billedCostOf(row),
   )}, theoretical ${formatCost(row.totalCost)}.`;
 }

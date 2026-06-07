@@ -1123,7 +1123,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                       value={formatCost(grandCost, trace.tokensEstimated)}
                     />
                     <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                      Bundled plan — not billed per token
+                      Bundled plan, not billed per token
                     </Text>
                   </>
                 ) : (
