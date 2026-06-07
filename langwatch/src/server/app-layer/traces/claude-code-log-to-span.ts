@@ -2,57 +2,58 @@
  * Claude Code log-record → gen_ai span converter (write-path).
  *
  * Claude Code 2.x emits its model calls as OTLP LOG records, not spans
- * (scope `com.anthropic.claude_code.events`). Three of those log events
- * describe one model call and are "trapped" at ingest and CONVERTED into a
- * single standard OTel gen_ai.* span:
+ * (scope `com.anthropic.claude_code.events`). It logs one model call as three
+ * events, split in time:
  *
- *   - api_request        anchor: model, input/output/cache tokens, cost_usd,
- *                        duration_ms, request_id, query_source, session.id
- *   - api_request_body   the request payload (messages[]) -> gen_ai.prompt
- *   - api_response_body   the response payload (content[].text) -> gen_ai.completion
+ *   - api_request        anchor (call END): model, input/output/cache tokens,
+ *                        cost_usd, duration_ms, request_id, query_source,
+ *                        session.id
+ *   - api_request_body   the request payload at call START -> gen_ai.input.messages
+ *   - api_response_body  the response payload at call END  -> gen_ai.completion
  *
- * The three collapse into ONE `llm` span keyed by the api_request log's own
- * (synthesized) SpanId, so the existing span pipeline + canonicalisation +
- * fold lift model / tokens / cost / input / output for free — no read-path
- * code, no new fold-state fields. The converted log records are NOT written
- * to stored_log_records (no double-write, no double-count): the span is the
- * single source of truth.
+ * and one tool call as two events: `tool_decision` (claude chose to run a tool)
+ * and `tool_result` (terminal: tool name, input, duration, success).
  *
- * The claude_code tool events (tool_decision / tool_result) are trapped too
- * and converted into `tool` spans (one per tool_use_id) by
- * convertClaudeCodeToolLogsToSpans, so the agent's Bash / Edit / Read calls
- * show up as waterfall nodes. Every OTHER claude_code event (user_prompt,
- * hook_*, mcp_server_connection, plugin_loaded, any unknown event.name) stays
- * on the normal log path, untouched — see CLAUDE_CODE_CONVERTIBLE_EVENTS /
- * CLAUDE_CODE_TOOL_EVENTS.
+ * Because the OTLP exporter flushes on an interval, any model call longer than
+ * that interval — which is every tool-using turn — has its request body (START)
+ * delivered in an earlier export batch than its anchor + response (END). A
+ * per-batch converter can never rejoin those halves. So this converter is run
+ * over the WHOLE TURN's saved logs (the receiver records the claude logs to
+ * stored_log_records and a reactor re-folds them); the trace is keyed per turn
+ * (`traceId = sha256(session.id:prompt.id)`), so a turn's log set is small and
+ * bounded and every batch is already visible when it is folded.
  *
- * Join determinism (verified against real OTLP):
- *   - OUTPUT: api_request <-> api_response_body by exact request_id (both carry
- *             it). Both are logged at call END, so they co-batch and join.
- *   - INPUT:  api_request <-> api_request_body by (model, query_source)
- *             consume-once in time order — api_request_body has NO request_id on
- *             the wire, and query_source is part of the key so a
- *             generate_session_title body never cross-pairs with a
- *             repl_main_thread request.
+ * Idempotency (load-bearing). The fold re-runs over the turn's growing log set,
+ * so a given call is converted many times as more of its parts arrive. Spans
+ * land in `stored_spans`, a `ReplacingMergeTree(StartTime)` ORDER BY (TenantId,
+ * TraceId, SpanId) whose read path dedups on `max(StartTime)` per SpanId. Two
+ * rules keep that convergent:
+ *   1. Stable identity: a call's SpanId is the anchor's own synthesized SpanId;
+ *      a tool span's SpanId is `sha256(trace:tool:toolUseId)`. Re-deriving the
+ *      same call yields the same SpanId, so the store dedups it.
+ *   2. Completeness wins: a span's emitted StartTime is its real start minus a
+ *      tiny per-missing-part nudge (<= 2ms), so a later, MORE complete version
+ *      of the same span (e.g. a tool span that gains its output once the next
+ *      model call's transcript arrives) has a strictly greater StartTime and
+ *      wins both the read's `max(StartTime)` and the RMT merge. Without this a
+ *      grown-in-place span would tie its earlier, partial self at a fixed
+ *      StartTime and the merge would keep an arbitrary one (lost output).
+ * A model span is only emitted once its anchor is present (the anchor carries
+ * the stable id + timing); a request/response body with no anchor in the set
+ * contributes to the eventual span but is never emitted on its own, which kills
+ * the orphan-body duplicate by construction.
  *
- * Cost: handled entirely by the existing span pipeline. Anthropic models are on
- * our static price table, so computeSpanCost prices the span from tokens
- * (priority 2). We additionally set `langwatch.span.cost = cost_usd`, the
- * existing reserved fallback key (priority 3), so a future claude model not yet
- * on the table is still costed from Anthropic's own figure. No pipeline change.
+ * Tool output. Claude's telemetry never carries a tool's stdout (no field, no
+ * env var — see project_claude_tool_output_no_env_var). The only place a tool's
+ * result appears is the NEXT model call's request body, as a `tool_result`
+ * block keyed by `tool_use_id`. Folding over the full turn lets us recover it
+ * from there and attach it to the tool span's output. The deciding model call's
+ * own OUTPUT is its `tool_use` block, read straight from its response body.
  *
- * Cross-batch split: api_request_body is logged at call START, the api_request
- * anchor + api_response_body at call END. For any call longer than the OTLP
- * export interval (every tool-using turn) the body lands in a different export
- * batch than its anchor, and with no request_id it can't be re-paired across
- * batches. An orphan body is therefore DROPPED rather than emitted as a
- * duplicate, input-less span: the turn's input is already on the trace via the
- * co-batched user_prompt event, and the tool spans show what the call did.
- * Anchor + response co-batch (both at call END), so the output stays joined; a
- * rare orphan response still becomes its own marked span (claude_code.orphan)
- * rather than lose the reply. Restoring per-span input on cross-batch-split
- * calls would need a stateful join buffer — a tracked follow-up, deliberately
- * not new receiver-side Redis state.
+ * Cost is handled by the existing span pipeline. Anthropic models are on the
+ * static price table (computeSpanCost priority 2); we also set
+ * `langwatch.span.cost = cost_usd` (reserved fallback, priority 3) so an
+ * off-table claude model is still costed from Anthropic's own figure.
  */
 
 import { createHash } from "node:crypto";
@@ -67,16 +68,17 @@ import type {
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   buildInputMessagesFromRequestBody,
-  extractAssistantTextFromResponseBody,
+  collectToolResultsFromRequestBody,
+  extractAssistantOutputFromResponseBody,
   isConversationalQuerySource,
 } from "./canonicalisation/extractors/claudeCode";
 
 export const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 
 /**
- * The three claude_code log events that describe one model call and are
- * trapped+converted into a single gen_ai span (and dropped from the log
- * path). Everything else under the claude_code scope stays a log.
+ * The three claude_code log events that describe one model call and are folded
+ * into a single gen_ai span. Everything else under the claude_code scope stays
+ * a log.
  */
 export const CLAUDE_CODE_CONVERTIBLE_EVENTS: ReadonlySet<string> = new Set([
   "api_request",
@@ -86,17 +88,11 @@ export const CLAUDE_CODE_CONVERTIBLE_EVENTS: ReadonlySet<string> = new Set([
 
 /**
  * The two claude_code log events that describe one tool invocation and are
- * trapped+converted into a single `tool` span: `tool_decision` (the moment
- * claude chose to run a tool — permission decision + source) and
- * `tool_result` (the terminal event carrying tool name, input, duration, and
- * success). Without this the Bash/Edit/Read calls a coding turn makes never
- * appear as waterfall nodes — the trace shows the model spans but not what
- * the agent actually DID, which is most of the value of an agent trace.
- *
- * Paired by `tool_use_id` (both carry it). The tool_result alone is enough to
- * build a complete span; tool_decision only enriches it with the
- * permission-decision provenance, so a cross-batch split that separates the
- * two still yields a usable tool span.
+ * folded into a single `tool` span: `tool_decision` (the permission decision +
+ * source) and `tool_result` (the terminal event carrying tool name, input,
+ * duration, success). Without these the Bash / Edit / Read calls a coding turn
+ * makes never appear as waterfall nodes — the trace would show the model spans
+ * but not what the agent actually DID. Paired by `tool_use_id` (both carry it).
  */
 export const CLAUDE_CODE_TOOL_EVENTS: ReadonlySet<string> = new Set([
   "tool_decision",
@@ -125,7 +121,7 @@ export function isClaudeCodeToolLog(
   );
 }
 
-/** A buffered claude_code log record pulled out of the log path for conversion. */
+/** A claude_code log record pulled out of the log path for conversion. */
 export interface ClaudeCodeLogRecordInput {
   traceId: string;
   spanId: string;
@@ -145,6 +141,15 @@ export interface SynthesizedClaudeSpan {
 
 const SPAN_KIND_CLIENT = "SPAN_KIND_CLIENT" as const;
 
+/**
+ * Per-missing-part StartTime penalty (ms). A span emitted while still missing
+ * some of its parts starts this many ms earlier per missing part, so a later,
+ * more complete version of the SAME span has a strictly greater StartTime and
+ * wins the `max(StartTime)` read dedup + RMT merge. Bounded to <= 2ms total, so
+ * it never reorders the waterfall. See the idempotency note in the file header.
+ */
+const COMPLETENESS_NUDGE_MS = 1;
+
 const strAttr = (key: string, value: string): OtlpKeyValue => ({
   key,
   value: { stringValue: value },
@@ -156,10 +161,6 @@ const intAttr = (key: string, value: number): OtlpKeyValue => ({
 const dblAttr = (key: string, value: number): OtlpKeyValue => ({
   key,
   value: { doubleValue: value },
-});
-const boolAttr = (key: string, value: boolean): OtlpKeyValue => ({
-  key,
-  value: { boolValue: value },
 });
 
 const asNumber = (raw: string | undefined): number | null => {
@@ -176,36 +177,6 @@ const asNonEmpty = (raw: string | undefined): string | null =>
 const msToUnixNano = (ms: number): string =>
   (BigInt(Math.round(ms)) * 1_000_000n).toString();
 
-/**
- * Convert a batch of trapped claude_code log records into gen_ai spans.
- * Records are grouped by traceId, the triplet is joined per the determinism
- * rules above, and any orphan part still becomes its own (marked) span.
- *
- * `promptTextById` maps a `prompt.id` to the clean user-typed text from the
- * co-batched `user_prompt` event (which stays on the log path, so it is passed
- * in rather than found among `records`). claude-code truncates large
- * `api_request_body` payloads inline (`body_truncated=true`, ~64KB), which makes
- * the body unparseable — without this the span input would fall back to the raw
- * truncated JSON blob. The clean user_prompt text is the genuine turn input.
- */
-export function convertClaudeCodeLogsToSpans(
-  records: ClaudeCodeLogRecordInput[],
-  promptTextById: ReadonlyMap<string, string> = new Map(),
-): SynthesizedClaudeSpan[] {
-  const byTrace = new Map<string, ClaudeCodeLogRecordInput[]>();
-  for (const record of records) {
-    const list = byTrace.get(record.traceId);
-    if (list) list.push(record);
-    else byTrace.set(record.traceId, [record]);
-  }
-
-  const out: SynthesizedClaudeSpan[] = [];
-  for (const traceRecords of byTrace.values()) {
-    out.push(...convertOneTrace(traceRecords, promptTextById));
-  }
-  return out;
-}
-
 const bySequence = (
   a: ClaudeCodeLogRecordInput,
   b: ClaudeCodeLogRecordInput,
@@ -216,7 +187,56 @@ const bySequence = (
   return sa - sb;
 };
 
-function convertOneTrace(
+function groupByTrace(
+  records: ClaudeCodeLogRecordInput[],
+): Map<string, ClaudeCodeLogRecordInput[]> {
+  const byTrace = new Map<string, ClaudeCodeLogRecordInput[]>();
+  for (const record of records) {
+    const list = byTrace.get(record.traceId);
+    if (list) list.push(record);
+    else byTrace.set(record.traceId, [record]);
+  }
+  return byTrace;
+}
+
+/**
+ * Convert a turn's claude_code logs into spans — both the model-call (gen_ai)
+ * spans and the tool spans. Feed it the WHOLE turn's saved claude logs so the
+ * cross-batch join is complete and tool outputs can be recovered from later
+ * model calls' transcripts. Idempotent: re-running over the same (or a grown)
+ * set converges on the same spans (see the file header).
+ *
+ * `promptTextById` maps a `prompt.id` to the clean user-typed text from the
+ * co-located `user_prompt` event (which stays on the log path), used as the
+ * input when claude truncated the api_request_body inline.
+ */
+export function convertClaudeCodeTurnToSpans(
+  records: ClaudeCodeLogRecordInput[],
+  promptTextById: ReadonlyMap<string, string> = new Map(),
+): SynthesizedClaudeSpan[] {
+  return [
+    ...convertClaudeCodeLogsToSpans(records, promptTextById),
+    ...convertClaudeCodeToolLogsToSpans(records),
+  ];
+}
+
+/**
+ * Build the model-call (gen_ai) spans from a turn's claude_code logs. Filters
+ * the convertible events (api_request / api_request_body / api_response_body)
+ * out of `records` itself, so it is safe to pass the whole turn's record set.
+ */
+export function convertClaudeCodeLogsToSpans(
+  records: ClaudeCodeLogRecordInput[],
+  promptTextById: ReadonlyMap<string, string> = new Map(),
+): SynthesizedClaudeSpan[] {
+  const out: SynthesizedClaudeSpan[] = [];
+  for (const traceRecords of groupByTrace(records).values()) {
+    out.push(...buildModelSpansForTrace(traceRecords, promptTextById));
+  }
+  return out;
+}
+
+function buildModelSpansForTrace(
   records: ClaudeCodeLogRecordInput[],
   promptTextById: ReadonlyMap<string, string>,
 ): SynthesizedClaudeSpan[] {
@@ -235,7 +255,8 @@ function convertOneTrace(
   const spans: SynthesizedClaudeSpan[] = [];
 
   for (const anchor of anchors) {
-    // OUTPUT join: exact request_id match (consume-once).
+    // OUTPUT join: exact request_id match (consume-once). The response and the
+    // anchor are both logged at call END, so over the full turn they pair.
     const requestId = asNonEmpty(anchor.attrs.request_id);
     let response: ClaudeCodeLogRecordInput | null = null;
     if (requestId) {
@@ -248,7 +269,10 @@ function convertOneTrace(
       }
     }
 
-    // INPUT join: (model, query_source) consume-once in time order.
+    // INPUT join: (model, query_source) consume-once in time order — the body
+    // carries no request_id, and query_source keys the pairing so a
+    // generate_session_title body never cross-pairs with a repl_main_thread
+    // request.
     const model = anchor.attrs.model ?? "";
     const querySource = anchor.attrs.query_source ?? "";
     const bodyIdx = bodies.findIndex(
@@ -260,28 +284,12 @@ function convertOneTrace(
     const body = bodyIdx >= 0 ? bodies[bodyIdx]! : null;
     if (bodyIdx >= 0) usedBodies.add(bodyIdx);
 
-    spans.push(buildCollapsedSpan(anchor, body, response, promptTextById));
+    spans.push(buildModelSpan(anchor, body, response, promptTextById));
   }
 
-  // Orphan api_request_body (cross-batch split): claude logs the request body
-  // at call START and the api_request anchor at call END, so for any call
-  // longer than the OTLP export interval (every tool-using turn) the body and
-  // anchor land in different batches and the body can't pair — it carries no
-  // request_id to converge on. Emitting it as its own span produced a
-  // confusing DUPLICATE of the model call (input but no tokens/cost/output)
-  // that also sorted before the anchor in the waterfall ("output earlier than
-  // input"). Drop it: the turn's input is already on the trace via the
-  // co-batched `user_prompt` event, and the tool spans show what the call did.
-  // (Restoring per-span input on cross-batch-split calls needs a stateful join
-  // buffer — a tracked follow-up, deliberately not new receiver-side state.)
-
-  // Orphan api_response_body: the response is logged at call END alongside the
-  // anchor, so it rarely splits; when it does it still carries the assistant's
-  // reply, so emit it as its own marked span rather than lose the output.
-  responses.forEach((response, i) => {
-    if (!usedResponses.has(i)) spans.push(buildOrphanResponseSpan(response));
-  });
-
+  // A request/response body with no anchor in the set is NOT emitted on its own
+  // — it pairs with its anchor once that anchor is in the folded turn. This is
+  // what removes the cross-batch orphan-body duplicate by construction.
   return spans;
 }
 
@@ -348,11 +356,9 @@ function appendProvenanceAttrs(
  * from an api_request_body record. Prefers the full conversation parsed out of
  * the request body (system + every turn); when claude truncated the body inline
  * (`body_truncated=true`, ~60KB cap) it is unparseable JSON, so fall back to the
- * clean co-batched `user_prompt` text as the single latest turn. The raw
- * truncated JSON blob is NEVER used as input — wrapping it as one user message
- * is what made the trace detail render `{"model":...,"messages":[...]}` instead
- * of a conversation. Each message's content is capped individually so the array
- * stays valid JSON. Returns null when nothing usable is available.
+ * clean co-located `user_prompt` text as the single latest turn. The raw
+ * truncated JSON blob is NEVER used as input. Each message's content is capped
+ * individually so the array stays valid JSON. Returns null when nothing usable.
  */
 function resolveInputMessages(
   body: ClaudeCodeLogRecordInput,
@@ -378,10 +384,8 @@ function resolveInputMessages(
  * The span's waterfall name. Conversational turns are named by model (matching
  * the gateway / Path A convention). Non-conversational utility calls
  * (generate_session_title, prompt_suggestion, …) are named by their
- * query_source instead: a turn fans out into the main reply PLUS a couple of
- * these housekeeping calls, and naming all of them "claude-opus-4-8" left the
- * waterfall with mysterious-looking model spans that carry no conversation. The
- * query_source name says what the call was FOR.
+ * query_source instead, so the waterfall reads as what the call was FOR rather
+ * than a row of mystery model spans that carry no conversation.
  */
 function claudeSpanName(
   model: string | null,
@@ -393,7 +397,7 @@ function claudeSpanName(
   return model ?? "llm";
 }
 
-function buildCollapsedSpan(
+function buildModelSpan(
   anchor: ClaudeCodeLogRecordInput,
   body: ClaudeCodeLogRecordInput | null,
   response: ClaudeCodeLogRecordInput | null,
@@ -434,10 +438,8 @@ function buildCollapsedSpan(
   // request_id, reasoning effort, and every other attribute claude emits.
   appendProvenanceAttrs(attrs, anchor);
 
-  // INPUT as a structured `gen_ai.input.messages` conversation parsed from the
-  // request body (system + every turn). When claude truncated the body inline,
-  // resolveInputMessages falls back to the clean user_prompt text as the latest
-  // turn — never the raw JSON blob.
+  // INPUT: structured conversation parsed from the request body (system + every
+  // turn); falls back to the clean user_prompt text when the body was truncated.
   if (body) {
     const inputMessages = resolveInputMessages(body, promptTextById);
     if (inputMessages) {
@@ -445,22 +447,29 @@ function buildCollapsedSpan(
     }
   }
 
-  // OUTPUT text from the response body — attached to EVERY model call,
-  // conversational or utility (generate_session_title / prompt_suggestion), so
-  // drilling into a utility span shows what the model actually returned. The
-  // trace-level headline output stays gated to conversation turns in
-  // trace-io-accumulation.service.ts (claude utility spans are skipped there,
-  // like tool spans), so a utility reply never becomes the trace's output.
+  // OUTPUT: the assistant's reply, INCLUDING tool_use blocks so a model call
+  // whose reply is a tool invocation shows the tool it chose to call rather
+  // than an empty output. Attached to every model call (conversational or
+  // utility); the trace headline stays conversational-only via the fold's
+  // accumulation gate (trace-io-accumulation.service.ts).
   if (response) {
-    const outputText = extractAssistantTextFromResponseBody(response.attrs.body);
+    const outputText = extractAssistantOutputFromResponseBody(
+      response.attrs.body,
+    );
     if (outputText) {
       attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
     }
   }
 
+  // Completeness nudge so a later, more complete version of this same call wins
+  // the read's max(StartTime). Missing parts among {body, response} -> earlier.
+  const missingParts = (body ? 0 : 1) + (response ? 0 : 1);
   const durationMs = asNumber(anchor.attrs.duration_ms) ?? 0;
   const endMs = anchor.timeUnixMs;
-  const startMs = Math.max(0, endMs - durationMs);
+  const startMs = Math.max(
+    0,
+    endMs - durationMs - missingParts * COMPLETENESS_NUDGE_MS,
+  );
 
   return {
     span: makeSpan({
@@ -473,52 +482,6 @@ function buildCollapsedSpan(
     }),
     resource: anchor.resource,
     instrumentationScope: anchor.instrumentationScope,
-  };
-}
-
-/**
- * Build a marked span for an orphan api_response_body — a response whose
- * api_request anchor landed in a different export batch. Rare, because the
- * response and anchor are both logged at call END and so co-batch; when it
- * does split, the response still carries the assistant's reply, so it becomes
- * its own span rather than losing the output. The `claude_code.orphan` marker
- * distinguishes it from a fully-joined call.
- */
-function buildOrphanResponseSpan(
-  record: ClaudeCodeLogRecordInput,
-): SynthesizedClaudeSpan {
-  const attrs = baseAttrs(record);
-  attrs.push(boolAttr("claude_code.orphan", true));
-  attrs.push(strAttr("claude_code.orphan_kind", record.eventName));
-
-  const model = asNonEmpty(record.attrs.model);
-  if (model) {
-    attrs.push(strAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model));
-    attrs.push(strAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model));
-  }
-
-  appendProvenanceAttrs(attrs, record);
-
-  const querySource = asNonEmpty(record.attrs.query_source);
-  // Output on every model call (see buildCollapsedSpan); the trace headline
-  // stays conversational-only via the fold's accumulation gate.
-  const outputText = extractAssistantTextFromResponseBody(record.attrs.body);
-  if (outputText) {
-    attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
-  }
-
-  // No api_request to anchor timing on: zero-duration at the record's own time.
-  return {
-    span: makeSpan({
-      traceId: record.traceId,
-      spanId: record.spanId,
-      name: claudeSpanName(model, querySource),
-      startMs: record.timeUnixMs,
-      endMs: record.timeUnixMs,
-      attributes: attrs,
-    }),
-    resource: record.resource,
-    instrumentationScope: record.instrumentationScope,
   };
 }
 
@@ -572,76 +535,98 @@ const CLAUDE_TOOL_HANDLED_ATTRS = new Set<string>([
 ]);
 
 /**
- * Convert claude_code tool events (tool_decision + tool_result) into `tool`
- * spans — one per tool invocation, keyed by `tool_use_id`. Without these the
- * waterfall shows the model calls but never the Bash / Edit / Read invocations
- * the agent actually ran, which is most of the value of an agent trace. See
- * CLAUDE_CODE_TOOL_EVENTS.
+ * Build the `tool` spans from a turn's claude_code logs — one per tool
+ * invocation, keyed by `tool_use_id`. Filters the tool events out of `records`
+ * itself, so it is safe to pass the whole turn's record set; when the set also
+ * contains the model api_request_body records, each tool's OUTPUT is recovered
+ * from the next model call's transcript (the `tool_result` block keyed by
+ * `tool_use_id`), which is the only place claude reports it.
  *
- * The command lands on `langwatch.input` so the span detail reads like an
- * instrumented function call (args in). This is safe because the trace-IO fold
- * skips `span_type=tool` (see trace-io-accumulation.service.ts): a synthesized
- * claude span is parentless (a "root" to the fold), so without that skip its
- * input would hijack the trace's headline input. Only `gen_ai.tool.name` and
- * `gen_ai.tool.call.id` (real OTel gen_ai attributes) are mapped from the raw
- * claude keys; everything else is copied verbatim under `claude_code.*`. There
- * is no output to mirror - claude reports only the result SIZE
- * (`tool_result_size_bytes`), never the tool's stdout.
+ * The command rides on `langwatch.input` and the recovered result on
+ * `langwatch.output`, so the span detail reads like an instrumented call. This
+ * is safe because the trace-IO fold skips `span_type=tool`, so a synthesized
+ * (parentless) tool span never hijacks the trace's headline I/O.
  */
 export function convertClaudeCodeToolLogsToSpans(
   records: ClaudeCodeLogRecordInput[],
 ): SynthesizedClaudeSpan[] {
-  const byTrace = new Map<string, ClaudeCodeLogRecordInput[]>();
-  for (const record of records) {
-    const list = byTrace.get(record.traceId);
-    if (list) list.push(record);
-    else byTrace.set(record.traceId, [record]);
-  }
-
   const out: SynthesizedClaudeSpan[] = [];
-  for (const traceRecords of byTrace.values()) {
-    // Pair decision + result by tool_use_id. Either may be absent on a
-    // cross-batch split; tool_result alone is enough for a complete span.
-    const byToolUseId = new Map<
-      string,
-      {
-        decision: ClaudeCodeLogRecordInput | null;
-        result: ClaudeCodeLogRecordInput | null;
-      }
-    >();
-    for (const record of [...traceRecords].sort(bySequence)) {
-      const toolUseId = asNonEmpty(record.attrs.tool_use_id);
-      if (!toolUseId) continue;
-      const entry = byToolUseId.get(toolUseId) ?? {
-        decision: null,
-        result: null,
-      };
-      if (record.eventName === "tool_result") entry.result = record;
-      else if (record.eventName === "tool_decision") entry.decision = record;
-      byToolUseId.set(toolUseId, entry);
-    }
-
-    for (const [toolUseId, { decision, result }] of byToolUseId) {
-      const span = buildToolSpan(toolUseId, decision, result);
-      if (span) out.push(span);
-    }
+  for (const traceRecords of groupByTrace(records).values()) {
+    out.push(...buildToolSpansForTrace(traceRecords));
   }
   return out;
+}
+
+function buildToolSpansForTrace(
+  records: ClaudeCodeLogRecordInput[],
+): SynthesizedClaudeSpan[] {
+  // Recover tool outputs from every model request body in the turn: a later
+  // call feeds each tool's result back as a tool_result block keyed by
+  // tool_use_id. Merge across bodies (first occurrence wins).
+  const toolOutputsByUseId = new Map<string, string>();
+  for (const record of records) {
+    if (record.eventName !== "api_request_body") continue;
+    for (const [useId, text] of collectToolResultsFromRequestBody(
+      record.attrs.body,
+    )) {
+      if (!toolOutputsByUseId.has(useId)) toolOutputsByUseId.set(useId, text);
+    }
+  }
+
+  // Pair decision + result by tool_use_id. The result is the terminal event and
+  // is required to emit a span (it carries name + input + duration); decision
+  // only enriches it with the permission-decision provenance.
+  const byToolUseId = new Map<
+    string,
+    {
+      decision: ClaudeCodeLogRecordInput | null;
+      result: ClaudeCodeLogRecordInput | null;
+    }
+  >();
+  for (const record of [...records].sort(bySequence)) {
+    if (
+      record.eventName !== "tool_decision" &&
+      record.eventName !== "tool_result"
+    ) {
+      continue;
+    }
+    const toolUseId = asNonEmpty(record.attrs.tool_use_id);
+    if (!toolUseId) continue;
+    const entry = byToolUseId.get(toolUseId) ?? {
+      decision: null,
+      result: null,
+    };
+    if (record.eventName === "tool_result") entry.result = record;
+    else entry.decision = record;
+    byToolUseId.set(toolUseId, entry);
+  }
+
+  const spans: SynthesizedClaudeSpan[] = [];
+  for (const [toolUseId, { decision, result }] of byToolUseId) {
+    const span = buildToolSpan(
+      toolUseId,
+      decision,
+      result,
+      toolOutputsByUseId.get(toolUseId) ?? null,
+    );
+    if (span) spans.push(span);
+  }
+  return spans;
 }
 
 function buildToolSpan(
   toolUseId: string,
   decision: ClaudeCodeLogRecordInput | null,
   result: ClaudeCodeLogRecordInput | null,
+  output: string | null,
 ): SynthesizedClaudeSpan | null {
-  // tool_result is the terminal event and carries name + input + duration +
-  // success, so it's the primary; tool_decision only enriches with the
-  // permission-decision provenance.
-  const primary = result ?? decision;
-  if (!primary) return null;
+  // The result is the terminal event (name + input + duration + success); a
+  // decision with no result yet is a tool still running / never run, skipped
+  // until the result lands so the span only ever materializes once, complete.
+  if (!result) return null;
 
   const toolName =
-    asNonEmpty(result?.attrs.tool_name) ??
+    asNonEmpty(result.attrs.tool_name) ??
     asNonEmpty(decision?.attrs.tool_name) ??
     "tool";
 
@@ -653,26 +638,18 @@ function buildToolSpan(
   ];
 
   const sessionId =
-    asNonEmpty(result?.attrs["session.id"]) ??
+    asNonEmpty(result.attrs["session.id"]) ??
     asNonEmpty(decision?.attrs["session.id"]);
   if (sessionId) {
     attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId));
     attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
   }
 
-  // The tool call arguments (Bash command, Edit patch, ...). tool_input on
-  // tool_result is the clean call; tool_parameters is the fallback. Surface it
-  // as the span's `langwatch.input` so the detail panel reads like an
-  // instrumented function call (args in) instead of an empty I/O, rather than
-  // `gen_ai.tool.call.arguments` (not a real OTel attribute). The trace-IO
-  // fold skips `tool` spans, so this no longer hijacks the trace's headline
-  // input. There is no matching output: claude only reports the result SIZE
-  // (tool_result_size_bytes), never the tool's stdout, so we leave output
-  // empty rather than invent one.
+  // The tool call arguments (Bash command, Edit patch, …) on langwatch.input.
   const callArguments =
-    asNonEmpty(result?.attrs.tool_input) ??
+    asNonEmpty(result.attrs.tool_input) ??
     asNonEmpty(decision?.attrs.tool_parameters) ??
-    asNonEmpty(result?.attrs.tool_parameters);
+    asNonEmpty(result.attrs.tool_parameters);
   if (callArguments) {
     attrs.push(
       strAttr(
@@ -682,12 +659,24 @@ function buildToolSpan(
     );
   }
 
+  // The tool's result recovered from the next model call's transcript. Absent
+  // when the tool was the last action in the turn (no later call fed its result
+  // back) — left empty rather than fabricated.
+  if (output) {
+    attrs.push(
+      strAttr(
+        ATTR_KEYS.LANGWATCH_OUTPUT,
+        capPayloadString(output, undefined, "claude_tool_output"),
+      ),
+    );
+  }
+
   // Every remaining tool attribute (success, duration_ms, decision,
   // *_size_bytes, …) under claude_code.*. Merge decision-then-result so the
   // result's value wins on overlap and no key is emitted twice.
   const merged: Record<string, string> = {
     ...(decision?.attrs ?? {}),
-    ...(result?.attrs ?? {}),
+    ...result.attrs,
   };
   for (const [key, value] of Object.entries(merged)) {
     if (CLAUDE_TOOL_HANDLED_ATTRS.has(key)) continue;
@@ -695,31 +684,34 @@ function buildToolSpan(
     if (clean) attrs.push(strAttr(`claude_code.${key}`, clean));
   }
 
-  // Timing: tool_result.duration_ms anchored at the result time; without a
-  // result, the decision time (zero-duration).
-  const endMs = primary.timeUnixMs;
-  const durationMs = asNumber(result?.attrs.duration_ms) ?? 0;
-  const startMs = result
-    ? Math.max(0, endMs - durationMs)
-    : (decision?.timeUnixMs ?? endMs);
+  // Timing anchored on the result; completeness nudge so the version WITH the
+  // recovered output (which arrives in a later batch than the result) wins the
+  // read's max(StartTime) over the earlier output-less version of this span.
+  const endMs = result.timeUnixMs;
+  const durationMs = asNumber(result.attrs.duration_ms) ?? 0;
+  const missingParts = output ? 0 : 1;
+  const startMs = Math.max(
+    0,
+    endMs - durationMs - missingParts * COMPLETENESS_NUDGE_MS,
+  );
 
-  // Deterministic id from tool_use_id so decision + result converge on one
-  // span (idempotent under re-ingest through the stored_spans RMT).
+  // Deterministic id from tool_use_id so decision + result + later output
+  // converge on one span (idempotent under re-fold through the stored_spans RMT).
   const spanId = createHash("sha256")
-    .update(`${primary.traceId}:tool:${toolUseId}`)
+    .update(`${result.traceId}:tool:${toolUseId}`)
     .digest("hex")
     .slice(0, 16);
 
   return {
     span: makeSpan({
-      traceId: primary.traceId,
+      traceId: result.traceId,
       spanId,
       name: toolName,
       startMs,
       endMs,
       attributes: attrs,
     }),
-    resource: primary.resource,
-    instrumentationScope: primary.instrumentationScope,
+    resource: result.resource,
+    instrumentationScope: result.instrumentationScope,
   };
 }

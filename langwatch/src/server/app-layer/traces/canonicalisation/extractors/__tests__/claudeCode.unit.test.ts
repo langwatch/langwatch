@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildInputMessagesFromRequestBody,
   ClaudeCodeExtractor,
+  collectToolResultsFromRequestBody,
+  extractAssistantOutputFromResponseBody,
   extractAssistantTextFromResponseBody,
   extractUserTextFromRequestBody,
   isConversationalQuerySource,
@@ -299,5 +301,115 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
         JSON.stringify({ messages: [{ role: "user", content: [] }] }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("extractAssistantOutputFromResponseBody", () => {
+  it("renders a tool_use reply as the output so a tool-deciding call is not empty", () => {
+    const body = JSON.stringify({
+      content: [
+        { type: "text", text: "Let me check." },
+        { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "ls /tmp" } },
+      ],
+    });
+    const out = extractAssistantOutputFromResponseBody(body) ?? "";
+    expect(out).toContain("Let me check.");
+    expect(out).toContain("[tool_use: Bash]");
+    expect(out).toContain("ls /tmp");
+  });
+
+  it("matches the text-only extractor for a plain text reply", () => {
+    const body = JSON.stringify({ content: [{ type: "text", text: "PONG-Z" }] });
+    expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
+    expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
+  });
+
+  it("returns null for an empty or unparseable body", () => {
+    expect(extractAssistantOutputFromResponseBody("")).toBeNull();
+    expect(extractAssistantOutputFromResponseBody("{not json")).toBeNull();
+    expect(extractAssistantOutputFromResponseBody(null)).toBeNull();
+  });
+});
+
+describe("collectToolResultsFromRequestBody", () => {
+  // Real wire shape (from raw dumps): the tool_result block keys are
+  // `tool_use_id`, `type`, `content` (a plain string for Bash), `is_error`.
+  const bashResult = (toolUseId: string, content: string) => ({
+    tool_use_id: toolUseId,
+    type: "tool_result",
+    content,
+    is_error: false,
+  });
+
+  it("maps each tool_use_id to its result text from a whole, parseable body", () => {
+    const body = JSON.stringify({
+      model: "claude-opus-4-7",
+      messages: [
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "toolu_a", name: "Bash", input: {} }],
+        },
+        { role: "user", content: [bashResult("toolu_a", "       0")] },
+      ],
+    });
+    const map = collectToolResultsFromRequestBody(body);
+    expect(map.get("toolu_a")).toBe("       0");
+  });
+
+  it("handles array-form content (Read-style) as well as string content", () => {
+    const body = JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              tool_use_id: "toolu_read",
+              type: "tool_result",
+              content: [{ type: "text", text: "file contents here" }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(collectToolResultsFromRequestBody(body).get("toolu_read")).toBe(
+      "file contents here",
+    );
+  });
+
+  it("recovers complete tool_results from a 60KB-truncated body and skips the cut-off tail", () => {
+    // Claude truncates the request body inline (~60KB, body_truncated=true), so
+    // the whole body does NOT JSON.parse. Everything before the cut is still
+    // recoverable; the final, half-written tool_result is not.
+    const full = JSON.stringify({
+      model: "claude-opus-4-7",
+      messages: [
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "toolu_first", name: "Bash", input: {} }],
+        },
+        { role: "user", content: [bashResult("toolu_first", "first-result")] },
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "toolu_last", name: "Bash", input: {} }],
+        },
+        { role: "user", content: [bashResult("toolu_last", "SECOND_RESULT_CUT_HERE")] },
+      ],
+    });
+    const truncated = full.slice(0, full.indexOf("SECOND_RESULT_CUT_HERE") + 6);
+    // Sanity: the truncated body is genuinely not valid JSON.
+    expect(() => JSON.parse(truncated)).toThrow();
+
+    const map = collectToolResultsFromRequestBody(truncated);
+    expect(map.get("toolu_first")).toBe("first-result");
+    expect(map.has("toolu_last")).toBe(false);
+  });
+
+  it("returns an empty map for a body with no tool_results", () => {
+    const body = JSON.stringify({
+      messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+    });
+    expect(collectToolResultsFromRequestBody(body).size).toBe(0);
+    expect(collectToolResultsFromRequestBody("").size).toBe(0);
+    expect(collectToolResultsFromRequestBody(null).size).toBe(0);
   });
 });
