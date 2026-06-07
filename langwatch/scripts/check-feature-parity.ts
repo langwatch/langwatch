@@ -73,16 +73,14 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
 
 /**
  * Roots scanned for Python `test_*.py` files. Python-side scenarios
- * (langevals scorers, langwatch_nlp Studio executor) use the same
- * `@scenario` token as TS/Go; binding is satisfied when the next
- * non-blank, non-comment line is a `def test_...` function. Without
- * this scan path, scenarios pinned to langevals scorers or the legacy
- * python NLP service would have no way to satisfy parity short of a
+ * (langevals scorers) use the same `@scenario` token as TS/Go; binding
+ * is satisfied when the next non-blank, non-comment line is a
+ * `def test_...` function. Without this scan path, scenarios pinned to
+ * langevals scorers would have no way to satisfy parity short of a
  * misleading TS stub.
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "langevals",
-  "langwatch_nlp",
   "langwatch_server",
 ];
 

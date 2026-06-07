@@ -34,7 +34,6 @@
     "packages/server/dist/",
     "packages/server/templates/",
     "langwatch/",
-    "langwatch_nlp/",
     "langevals/",
     "python-sdk/",
     "mcp-server/",
