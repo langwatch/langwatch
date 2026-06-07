@@ -122,7 +122,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
       | attribute            | value (source)                              |
       | langwatch.source     | "claude_code" (from ingestSourceType)       |
       | langwatch.api_key.id | the ingest key id                           |
-      | langwatch.origin     | "ingest_key"                                |
+      | langwatch.origin     | "coding_agent" (derived from ingestSourceType) |
       | langwatch.project.id | "personal-jane" (the bound project)         |
     And `langwatch.template.id` is stamped ONLY when ingestionTemplateId is set
 

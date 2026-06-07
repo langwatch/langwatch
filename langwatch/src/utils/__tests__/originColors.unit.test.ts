@@ -51,6 +51,22 @@ describe("originColors", () => {
       });
     });
 
+    it("returns orange for coding_agent origin", () => {
+      const result = getOriginColor("coding_agent");
+      expect(result).toEqual({
+        background: "orange.subtle",
+        color: "orange.emphasized",
+      });
+    });
+
+    it("returns yellow for ai_tool origin", () => {
+      const result = getOriginColor("ai_tool");
+      expect(result).toEqual({
+        background: "yellow.subtle",
+        color: "yellow.emphasized",
+      });
+    });
+
     it("returns hash-based color for unknown origin", () => {
       const result = getOriginColor("custom-origin");
       expect(result).toHaveProperty("background");
@@ -86,6 +102,11 @@ describe("originColors", () => {
 
     it("capitalizes custom origin values", () => {
       expect(getOriginLabel("my-custom-origin")).toBe("My-custom-origin");
+    });
+
+    it("renders multi-word ingest origins from the known-label map", () => {
+      expect(getOriginLabel("coding_agent")).toBe("Coding Agent");
+      expect(getOriginLabel("ai_tool")).toBe("AI Tool");
     });
   });
 });

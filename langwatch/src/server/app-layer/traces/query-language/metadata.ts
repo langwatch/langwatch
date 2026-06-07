@@ -436,7 +436,17 @@ const HAS_NONE_VALUES: string[] = [
 /** Known values for autocomplete suggestions. */
 export const FIELD_VALUES: Record<string, string[]> = {
   status: ["error", "warning", "ok"],
-  origin: ["application", "simulation", "evaluation", "sample"],
+  origin: [
+    "application",
+    "simulation",
+    "evaluation",
+    "sample",
+    "gateway",
+    "playground",
+    "workflow",
+    "coding_agent",
+    "ai_tool",
+  ],
   has: HAS_NONE_VALUES,
   none: HAS_NONE_VALUES,
   scenarioVerdict: ["success", "failure", "inconclusive"],

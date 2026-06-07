@@ -10,9 +10,11 @@
  *
  *   - langwatch.source         (ingestSourceType — drives the /me/traces filter)
  *   - langwatch.api_key.id      (the ingestion key id)
- *   - langwatch.origin          ("ingest_key") — discriminator that the
- *                               governance content-strip / no-spy policy is
- *                               applicable (must be in GOVERNED_ORIGINS).
+ *   - langwatch.origin          ("coding_agent" for a CLI coding assistant,
+ *                               "ai_tool" for any other ingest source) —
+ *                               discriminator the governance content-strip /
+ *                               no-spy policy keys on (must be in
+ *                               GOVERNED_ORIGINS).
  *   - langwatch.organization_id (feeds the no-spy policy org lookup)
  *   - langwatch.template.id     (only when the key carries an ingestionTemplateId,
  *                               e.g. claude_cowork)
@@ -36,11 +38,40 @@ export const PROVENANCE_ATTR_ORGANIZATION_ID =
 export const PROVENANCE_ATTR_TEMPLATE_ID = "langwatch.template.id" as const;
 
 /**
- * Origin value stamped on ingest-key traces. Must be present in the
- * GOVERNED_ORIGINS set in GovernanceContentStripService, otherwise ingest-key
- * traces silently bypass the org's no-spy / strip-IO policy.
+ * Trace origin stamped on ingest-key traces, derived from the key's
+ * `ingestSourceType`. A CLI coding assistant (claude code / codex / gemini /
+ * opencode / cursor) becomes `coding_agent`; every other ingest source
+ * (claude_cowork, otel_generic, compliance pulls, admin templates, …) becomes
+ * the generic `ai_tool`. Both values MUST be present in the GOVERNED_ORIGINS
+ * set in GovernanceContentStripService, otherwise ingest-key traces silently
+ * bypass the org's no-spy / strip-IO policy.
  */
-export const INGEST_KEY_ORIGIN_VALUE = "ingest_key" as const;
+export const CODING_AGENT_ORIGIN_VALUE = "coding_agent" as const;
+export const AI_TOOL_ORIGIN_VALUE = "ai_tool" as const;
+
+/**
+ * Source-type slugs that represent a CLI coding assistant wrapped by
+ * `langwatch <tool>`. Mirrors ASSISTANT_KIND_TO_TOOL_SLUG in
+ * aiToolEntry.service.ts. Anything not in this set is treated as a generic
+ * AI tool.
+ */
+const CODING_AGENT_SOURCE_TYPES: ReadonlySet<string> = new Set([
+  "claude_code",
+  "codex",
+  "gemini",
+  "opencode",
+  "cursor",
+]);
+
+/**
+ * Maps an ingestion-key `ingestSourceType` to the trace origin surfaced in the
+ * UI. Coding CLIs get `coding_agent`; any other ingest source gets `ai_tool`.
+ */
+export function originForIngestSourceType(sourceType: string): string {
+  return CODING_AGENT_SOURCE_TYPES.has(sourceType)
+    ? CODING_AGENT_ORIGIN_VALUE
+    : AI_TOOL_ORIGIN_VALUE;
+}
 
 const PROVENANCE_KEYS: readonly string[] = [
   PROVENANCE_ATTR_SOURCE,
@@ -116,7 +147,10 @@ function buildProvenanceAttributes(
   const attrs: OtlpAttribute[] = [
     { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.sourceType } },
     { key: PROVENANCE_ATTR_API_KEY_ID, value: { stringValue: provenance.apiKeyId } },
-    { key: PROVENANCE_ATTR_ORIGIN, value: { stringValue: INGEST_KEY_ORIGIN_VALUE } },
+    {
+      key: PROVENANCE_ATTR_ORIGIN,
+      value: { stringValue: originForIngestSourceType(provenance.sourceType) },
+    },
     { key: PROVENANCE_ATTR_ORGANIZATION_ID, value: { stringValue: provenance.organizationId } },
   ];
   if (provenance.templateId) {

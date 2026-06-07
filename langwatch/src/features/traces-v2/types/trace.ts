@@ -66,7 +66,19 @@ export interface TraceListItem {
   errorSpanName?: string;
   conversationId?: string;
   userId?: string;
-  origin: "application" | "simulation" | "evaluation";
+  origin:
+    | "application"
+    | "simulation"
+    | "evaluation"
+    | "workflow"
+    | "playground"
+    | "gateway"
+    | "sample"
+    | "coding_agent"
+    | "ai_tool"
+    // CH `langwatch.origin` is a free string; keep the known set for
+    // autocomplete/exhaustiveness while still accepting future values.
+    | (string & {});
   tokensEstimated?: boolean;
   ttft?: number;
   traceName?: string;
