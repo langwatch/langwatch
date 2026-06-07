@@ -33,6 +33,7 @@ import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { AiToolEntryService } from "../../services/aiToolEntry.service";
 
 describe("aiToolsRouter integration", () => {
   const ns = `aitools-${nanoid(8)}`;
@@ -321,6 +322,146 @@ describe("aiToolsRouter integration", () => {
       await prisma.aiToolEntry
         .deleteMany({ where: { id: { in: [orgEntry.id, deptEntry.id] } } })
         .catch(() => undefined);
+    });
+  });
+
+  describe("CLI tool path policy visibility", () => {
+    // Hermetic fresh org: the suite-level org accumulates org-wide
+    // claude_code tiles from sibling tests, which would pollute the
+    // lowest-order-wins dedup. A clean org isolates the per-user
+    // visibility behavior resolveToolPolicyOverrides must honour.
+    const pol = `aitp-${nanoid(8)}`;
+    let polOrgId: string;
+    let polDeptId: string;
+    let polMemberInDeptId: string;
+    let polMemberOrphanId: string;
+
+    beforeAll(async () => {
+      const org = await prisma.organization.create({
+        data: { name: `Policy Org ${pol}`, slug: `--aitp-${pol}` },
+      });
+      polOrgId = org.id;
+      const dept = await prisma.department.create({
+        data: { organizationId: polOrgId, name: `Platform ${pol}` },
+      });
+      polDeptId = dept.id;
+
+      const inDept = await prisma.user.create({
+        data: { name: "In Dept", email: `aitp-in-${pol}@example.com` },
+      });
+      polMemberInDeptId = inDept.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: inDept.id,
+          organizationId: polOrgId,
+          role: OrganizationUserRole.MEMBER,
+          departmentId: dept.id,
+        },
+      });
+
+      const orphan = await prisma.user.create({
+        data: { name: "Orphan", email: `aitp-orphan-${pol}@example.com` },
+      });
+      polMemberOrphanId = orphan.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: orphan.id,
+          organizationId: polOrgId,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.aiToolEntry
+        .deleteMany({ where: { organizationId: polOrgId } })
+        .catch(() => {});
+      await prisma.organizationUser
+        .deleteMany({ where: { organizationId: polOrgId } })
+        .catch(() => {});
+      await prisma.department
+        .deleteMany({ where: { organizationId: polOrgId } })
+        .catch(() => {});
+      await prisma.organization
+        .deleteMany({ where: { id: polOrgId } })
+        .catch(() => {});
+      await prisma.user
+        .deleteMany({
+          where: {
+            email: {
+              in: [
+                `aitp-in-${pol}@example.com`,
+                `aitp-orphan-${pol}@example.com`,
+              ],
+            },
+          },
+        })
+        .catch(() => {});
+    });
+
+    it("scopes a department tile's CLI path policy to members who can see it", async () => {
+      // Org-wide Claude tile leaves direct OTLP ON; a Platform-dept tile
+      // (same slug, higher order) turns it OFF and shadows the org one.
+      const slug = `claude-policy-${nanoid(6).toLowerCase()}`;
+      await prisma.aiToolEntry.create({
+        data: {
+          organizationId: polOrgId,
+          scope: "organization",
+          scopeId: polOrgId,
+          type: "coding_assistant",
+          displayName: "Claude (org default)",
+          slug,
+          order: 0,
+          config: {
+            assistantKind: "claude_code",
+            allowVk: true,
+            allowOtelDirect: true,
+          },
+        },
+      });
+      const deptTile = await prisma.aiToolEntry.create({
+        data: {
+          organizationId: polOrgId,
+          scope: "department",
+          scopeId: polDeptId,
+          type: "coding_assistant",
+          displayName: "Claude - Platform (no direct OTLP)",
+          slug,
+          order: 10,
+          config: {
+            assistantKind: "claude_code",
+            allowVk: true,
+            allowOtelDirect: false,
+          },
+        },
+      });
+      await prisma.aiToolEntryDepartment.create({
+        data: { entryId: deptTile.id, departmentId: polDeptId },
+      });
+
+      const service = AiToolEntryService.create(prisma);
+
+      // The dept member sees the dept tile, which shadows the org one
+      // despite its higher order: direct OTLP is governed OFF.
+      const inDeptPolicy = await service.resolveToolPolicyOverrides({
+        organizationId: polOrgId,
+        userId: polMemberInDeptId,
+      });
+      expect(inDeptPolicy.claude).toEqual({
+        allowVk: true,
+        allowOtelDirect: false,
+      });
+
+      // The orphan member can't see the dept tile, so the restrictive
+      // policy does NOT leak: they keep the org-wide tile's policy.
+      const orphanPolicy = await service.resolveToolPolicyOverrides({
+        organizationId: polOrgId,
+        userId: polMemberOrphanId,
+      });
+      expect(orphanPolicy.claude).toEqual({
+        allowVk: true,
+        allowOtelDirect: true,
+      });
     });
   });
 

@@ -82,14 +82,33 @@ export function isShellAlreadyConfigured(): boolean {
 }
 
 /**
- * Whether the shell rc file already contains the langwatch marker block.
- * Lets the persist offer stay quiet when the user has already installed the
- * exports but hasn't sourced the rc in this shell yet (so the OTEL env isn't
- * live in process.env). Checks the file on disk, not just the environment.
+ * Whether the shell rc file already has a langwatch marker block carrying
+ * THIS export set. Lets the persist offer stay quiet when the user has
+ * already installed the current exports but hasn't sourced the rc in this
+ * shell yet (so the env isn't live in process.env). Checks the file on
+ * disk, not just the environment.
+ *
+ * `requiredKeys` makes the match export-set aware: a bare marker block, or
+ * a block for a DIFFERENT export set (e.g. a stale block missing the OTLP
+ * vars this run needs), does NOT count as installed, so the offer still
+ * fires and persists the current vars. Omit `requiredKeys` to test only
+ * for the presence of a well-formed block.
  */
-export function rcHasLangwatchBlock(shell: DetectedShell): boolean {
+export function rcHasLangwatchBlock({
+  shell,
+  requiredKeys,
+}: {
+  shell: DetectedShell;
+  requiredKeys?: string[];
+}): boolean {
   try {
-    return fs.readFileSync(rcPath(shell), "utf8").includes(BLOCK_BEGIN);
+    const content = fs.readFileSync(rcPath(shell), "utf8");
+    const begin = content.indexOf(BLOCK_BEGIN);
+    const end = content.indexOf(BLOCK_END);
+    if (begin === -1 || end === -1 || end < begin) return false;
+    if (!requiredKeys || requiredKeys.length === 0) return true;
+    const block = content.slice(begin, end);
+    return requiredKeys.every((k) => block.includes(k));
   } catch {
     return false;
   }
@@ -253,10 +272,11 @@ export async function maybeOfferIngestionShellRcPersist({
   if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
   const shell = detectShell();
   if (!shell) return;
-  // Already installed in the rc file, even if this shell hasn't sourced it
-  // yet (so the OTEL env isn't in process.env). Don't re-offer.
-  if (rcHasLangwatchBlock(shell)) return;
   if (Object.keys(vars).length === 0) return;
+  // Already installed in the rc file, even if this shell hasn't sourced it
+  // yet (so the OTEL env isn't in process.env). Keyed on the current vars so
+  // a stale / different export block doesn't suppress installing this one.
+  if (rcHasLangwatchBlock({ shell, requiredKeys: Object.keys(vars) })) return;
 
   const block = buildOtelExportBlock(vars, shell);
 

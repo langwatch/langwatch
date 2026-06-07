@@ -111,8 +111,11 @@ export class CliBootstrapService {
   }): Promise<CliBootstrapResult> {
     // Per-tool policy is org-level, independent of whether the user has a
     // personal workspace yet; a fresh login still needs the cached map.
+    // Scoped to the user so a department-bound tile only governs the paths
+    // of members who can actually see it.
     const toolPolicies = await this.resolveToolPolicies({
       organizationId: input.organizationId,
+      userId: input.userId,
     });
 
     const workspaceService = new PersonalWorkspaceService(this.prisma);
@@ -143,22 +146,24 @@ export class CliBootstrapService {
   }
 
   /**
-   * The login `toolPolicies` map. Derived from the org's coding_assistant
-   * tiles (per-tool slug) merged over the hardcoded
+   * The login `toolPolicies` map. Derived from the coding_assistant tiles
+   * the user can see (per-tool slug) merged over the hardcoded
    * {@link PLATFORM_TOOL_POLICY_DEFAULTS}: claude/codex/gemini/opencode =
-   * both paths, cursor = gateway only. A tool with no tile keeps its
-   * default, so the map is always complete for every known slug - the exact
-   * wire shape the CLI caches and gates on. Replaces the retired
+   * both paths, cursor = gateway only. A tool with no visible tile keeps
+   * its default, so the map is always complete for every known slug - the
+   * exact wire shape the CLI caches and gates on. Replaces the retired
    * PlatformToolPolicy table.
    */
   private async resolveToolPolicies({
     organizationId,
+    userId,
   }: {
     organizationId: string;
+    userId: string;
   }): Promise<PlatformToolPolicyMap> {
     const overrides = await AiToolEntryService.create(
       this.prisma,
-    ).resolveToolPolicyOverrides({ organizationId });
+    ).resolveToolPolicyOverrides({ organizationId, userId });
 
     const map = {} as PlatformToolPolicyMap;
     for (const slug of PLATFORM_TOOL_SLUGS) {

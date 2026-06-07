@@ -139,17 +139,17 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
-  describe("when the rc file already has the langwatch block", () => {
+  describe("when the rc already has a block for THIS export set", () => {
     it("stays quiet even if this shell hasn't sourced the rc yet", async () => {
-      // The user installed the block on a previous run but hasn't opened a new
-      // shell, so process.env has no OTEL endpoint (deleted in beforeEach). The
-      // offer must still detect the block on disk and not re-ask.
+      // The user installed the current exports on a previous run but hasn't
+      // opened a new shell, so process.env has no OTEL endpoint (deleted in
+      // beforeEach). Every required key is already present, so the offer must
+      // detect the block on disk and not re-ask.
       const rcFile = path.join(tmpHome, ".zshrc");
-      fs.writeFileSync(
-        rcFile,
-        "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://old\n# <<< langwatch end <<<\n",
-      );
-      const before = fs.readFileSync(rcFile, "utf8");
+      const installed = `# >>> langwatch begin >>>\n${Object.entries(otelVars)
+        .map(([k, v]) => `export ${k}=${v}`)
+        .join("\n")}\n# <<< langwatch end <<<\n`;
+      fs.writeFileSync(rcFile, installed);
       // No answer queued: a fired prompt would read "" → "yes" → rewrite.
       const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
@@ -158,7 +158,37 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         vars: otelVars,
       });
       expect(saveConfigMock).not.toHaveBeenCalled();
-      expect(fs.readFileSync(rcFile, "utf8")).toBe(before);
+      expect(fs.readFileSync(rcFile, "utf8")).toBe(installed);
+    });
+  });
+
+  describe("when the rc has a block for a DIFFERENT export set", () => {
+    it("still offers and installs the current vars", async () => {
+      // A stale block (only an old endpoint, missing the OTLP exporter +
+      // headers this run needs) must not suppress the offer - otherwise the
+      // user stays unconfigured for plain `<tool>` runs.
+      const rcFile = path.join(tmpHome, ".zshrc");
+      fs.writeFileSync(
+        rcFile,
+        "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://old\n# <<< langwatch end <<<\n",
+      );
+      answers.push("y");
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "claude",
+        vars: otelVars,
+      });
+      const rc = fs.readFileSync(rcFile, "utf8");
+      // The block is rewritten in place with the full current export set.
+      expect(rc).toContain("export OTEL_TRACES_EXPORTER=otlp");
+      expect(rc).toContain(
+        "export OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+      );
+      expect(rc).toContain("OTEL_EXPORTER_OTLP_HEADERS");
+      expect(rc).toContain("sk-lw-token");
+      // The stale endpoint is replaced, not left behind.
+      expect(rc).not.toContain("http://old");
     });
   });
 

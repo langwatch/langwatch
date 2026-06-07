@@ -420,7 +420,7 @@ export function ScopeChipPicker<
       icon: React.ReactElement;
       scope: ScopeChipPickerEntry;
     }> = [];
-    if (currentOrganizationId) {
+    if (currentOrganizationId && allowed.has("ORGANIZATION")) {
       out.push({
         key: "ORGANIZATION",
         label: "Organization",
@@ -428,7 +428,7 @@ export function ScopeChipPicker<
         scope: { scopeType: "ORGANIZATION", scopeId: currentOrganizationId },
       });
     }
-    if (currentTeamId) {
+    if (currentTeamId && allowed.has("TEAM")) {
       out.push({
         key: "TEAM",
         label: "This team",
@@ -436,7 +436,7 @@ export function ScopeChipPicker<
         scope: { scopeType: "TEAM", scopeId: currentTeamId },
       });
     }
-    if (currentProjectId) {
+    if (currentProjectId && allowed.has("PROJECT")) {
       out.push({
         key: "PROJECT",
         label: "This project",
@@ -445,7 +445,7 @@ export function ScopeChipPicker<
       });
     }
     return out;
-  }, [currentOrganizationId, currentTeamId, currentProjectId]);
+  }, [allowed, currentOrganizationId, currentTeamId, currentProjectId]);
 
   const matchingQuickPick = useMemo(() => {
     if (scopes.length !== 1) return null;

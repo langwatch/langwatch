@@ -411,27 +411,37 @@ export class AiToolEntryService {
   }
 
   /**
-   * Per-tool CLI path overrides derived from the org's coding_assistant
-   * tiles. For each tile whose `assistantKind` maps to a CLI slug
-   * ({@link ASSISTANT_KIND_TO_TOOL_SLUG}), reads `config.allowVk` /
-   * `config.allowOtelDirect` (absent → true). Cursor is forced to
-   * allowOtelDirect=false regardless of stored value (GUI-only).
+   * Per-tool CLI path overrides derived from the coding_assistant tiles
+   * the calling user can actually see. For each visible tile whose
+   * `assistantKind` maps to a CLI slug ({@link ASSISTANT_KIND_TO_TOOL_SLUG}),
+   * reads `config.allowVk` / `config.allowOtelDirect` (absent → true).
+   * Cursor is forced to allowOtelDirect=false regardless of stored value
+   * (GUI-only).
    *
-   * Returns ONLY slugs that have a tile (a partial map). cliBootstrap
-   * merges this over the hardcoded {@link PLATFORM_TOOL_POLICY_DEFAULTS}
-   * so a slug with no tile keeps its default - this is the replacement
-   * for the retired PlatformToolPolicy table. Disabled / archived tiles
-   * are ignored (an admin who hides a tile also stops governing its
-   * paths; the hardcoded default takes over).
+   * Visibility + precedence go through {@link resolveVisibleTilesForUser},
+   * so a department-scoped tile only governs the CLI paths of members who
+   * can see it (and shadows the org-wide tile for them), keeping the cached
+   * bootstrap map in lockstep with the tile the user gets in the portal. A
+   * member outside that department falls through to the org-wide tile or
+   * the hardcoded default.
    *
-   * When two tiles map to the same slug, the lowest-`order` one wins
-   * (the same precedence the portal grid renders), keeping the result
-   * deterministic.
+   * Returns ONLY slugs that have a visible tile (a partial map).
+   * cliBootstrap merges this over the hardcoded
+   * {@link PLATFORM_TOOL_POLICY_DEFAULTS} so a slug with no tile keeps its
+   * default - this is the replacement for the retired PlatformToolPolicy
+   * table. Disabled / archived tiles are ignored (an admin who hides a
+   * tile also stops governing its paths; the hardcoded default takes over).
+   *
+   * When two visible tiles map to the same CLI slug, the lowest-`order`
+   * one wins (the same precedence the portal grid renders), keeping the
+   * result deterministic.
    */
   async resolveToolPolicyOverrides({
     organizationId,
+    userId,
   }: {
     organizationId: string;
+    userId: string;
   }): Promise<
     Partial<
       Record<
@@ -440,16 +450,17 @@ export class AiToolEntryService {
       >
     >
   > {
-    const tiles = await this.prisma.aiToolEntry.findMany({
-      where: {
-        organizationId,
-        type: "coding_assistant",
-        enabled: true,
-        archivedAt: null,
-      },
-      orderBy: [{ order: "asc" }, { displayName: "asc" }],
-      select: { config: true },
+    const tiles = await this.resolveVisibleTilesForUser({
+      organizationId,
+      userId,
+      type: "coding_assistant",
     });
+    // The shadow already resolved department-vs-org per tile `slug`;
+    // re-sort so two distinct tile slugs that map to the same CLI slug
+    // still resolve deterministically by (order, displayName).
+    const sorted = [...tiles].sort(
+      (a, b) => a.order - b.order || a.displayName.localeCompare(b.displayName),
+    );
 
     const overrides: Partial<
       Record<
@@ -458,7 +469,7 @@ export class AiToolEntryService {
       >
     > = {};
 
-    for (const tile of tiles) {
+    for (const tile of sorted) {
       const config = (tile.config as Record<string, unknown>) ?? {};
       const kind = config.assistantKind;
       if (typeof kind !== "string") continue;
@@ -481,27 +492,39 @@ export class AiToolEntryService {
   }
 
   /**
-   * User-facing list. Returns enabled, non-archived entries visible to
-   * the calling user. Org-wide entries are visible to all members;
-   * department-scoped entries are visible only when the member's
-   * departmentId is in the entry's department set. A department-bound
-   * entry with the same `slug` as an org-wide entry SHADOWS the org
-   * default for members of that department.
+   * Resolve the catalog tiles visible to one member, with the
+   * department-overrides-org shadow already applied. Shared by the
+   * user-facing list ({@link listForUser}) and the CLI path-policy
+   * resolver ({@link resolveToolPolicyOverrides}) so both surfaces honour
+   * the exact same visibility + precedence: a member only ever sees (and
+   * is governed by) the tile the portal would render for them.
    *
-   * Legacy team-scoped rows (scope='team' / AiToolEntryTeam) degrade to
-   * org-wide: departments are a new axis and no team->department mapping
-   * exists, so the safe default is to keep the tile visible to everyone
-   * rather than hide it.
+   *   - Org-wide entries (scope='organization', legacy 'team', or an empty
+   *     department set) are visible to all members.
+   *   - Department-scoped entries are visible only when the member's
+   *     OrganizationUser.departmentId is in the entry's department set
+   *     (AiToolEntryDepartment is the source of truth; an empty set with
+   *     scope='department' falls back to the legacy scopeId).
+   *   - A department-bound entry SHADOWS an org-wide entry with the same
+   *     `slug` for members of that department.
    *
-   * Sorted by (order ASC, displayName ASC).
+   * Optionally narrowed to one tile `type`. Rows are pulled sorted by
+   * (order ASC, displayName ASC); the shadow keeps each slug's first
+   * (lowest-order) appearance unless a department-bound row supersedes it.
    */
-  async listForUser({
+  private async resolveVisibleTilesForUser({
     organizationId,
     userId,
+    type,
   }: {
     organizationId: string;
     userId: string;
-  }): Promise<AiToolEntryDto[]> {
+    type?: AiToolType;
+  }): Promise<
+    Prisma.AiToolEntryGetPayload<{
+      include: { departments: { select: { departmentId: true } } };
+    }>[]
+  > {
     // Resolve the member's department in this org so we can filter
     // department-scoped entries. One nullable departmentId per
     // OrganizationUser (the people lens).
@@ -517,7 +540,12 @@ export class AiToolEntryService {
     // catalog (~dozens), so the simpler shape outweighs a smarter SQL
     // filter here.
     const rows = await this.prisma.aiToolEntry.findMany({
-      where: { organizationId, enabled: true, archivedAt: null },
+      where: {
+        organizationId,
+        enabled: true,
+        archivedAt: null,
+        ...(type ? { type } : {}),
+      },
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
       include: { departments: { select: { departmentId: true } } },
     });
@@ -560,7 +588,27 @@ export class AiToolEntryService {
       }
     }
 
-    return Array.from(bySlug.values()).map(toDto);
+    return Array.from(bySlug.values());
+  }
+
+  /**
+   * User-facing list. Returns enabled, non-archived entries visible to
+   * the calling user with the department-overrides-org shadow applied
+   * (see {@link resolveVisibleTilesForUser}). Sorted by (order ASC,
+   * displayName ASC).
+   */
+  async listForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<AiToolEntryDto[]> {
+    const tiles = await this.resolveVisibleTilesForUser({
+      organizationId,
+      userId,
+    });
+    return tiles.map(toDto);
   }
 
   /**
