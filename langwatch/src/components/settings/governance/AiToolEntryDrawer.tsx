@@ -76,6 +76,9 @@ interface CodingAssistantForm {
   /// Default true. Cursor forces allowOtelDirect=false (GUI-only).
   allowVk: boolean;
   allowOtelDirect: boolean;
+  /// Direct-OTLP usage is part of a bundled subscription (not billed per
+  /// token). Default true. Gateway usage ignores this and is always billed.
+  bundledPlan: boolean;
 }
 
 interface ModelProviderForm {
@@ -108,6 +111,7 @@ function blankForm(type: AiToolTileType): FormState {
       setupDocsUrl: "",
       allowVk: true,
       allowOtelDirect: true,
+      bundledPlan: true,
     };
   }
   if (type === "model_provider") {
@@ -151,6 +155,7 @@ function formFromEntry(entry: AiToolEntry): FormState {
       // Cursor is GUI-only - direct OTLP never applies, regardless of a
       // stored value. Force it off so the toggle reads honestly.
       allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      bundledPlan: boolOr("bundledPlan", true),
     };
   }
   if (entry.type === "model_provider") {
@@ -186,6 +191,7 @@ function configFromForm(form: FormState): Record<string, unknown> {
       allowVk: form.allowVk,
       allowOtelDirect:
         form.assistantKind === "cursor" ? false : form.allowOtelDirect,
+      bundledPlan: form.bundledPlan,
     };
   }
   if (form.type === "model_provider") {
@@ -789,7 +795,47 @@ function CodingAssistantFields({
         />
       </FormSection>
       <CliPathsSection form={form} setForm={setForm} />
+      <CostAttributionSection form={form} setForm={setForm} />
     </>
+  );
+}
+
+/**
+ * Cost attribution for traces this tool sends through the direct OTLP
+ * ingestion path. Most coding assistants run on a bundled subscription
+ * (e.g. Claude Max), so their list-price token cost is theoretical rather
+ * than real spend. When this is on, the receiver tags those traces
+ * non-billable, and the trace summary / analytics split billed vs non-billed
+ * cost. Gateway / virtual-key usage is always billed and ignores this flag.
+ */
+function CostAttributionSection({
+  form,
+  setForm,
+}: {
+  form: CodingAssistantForm;
+  setForm: (f: FormState) => void;
+}) {
+  return (
+    <FormSection
+      label="Cost attribution"
+      hint="How usage from this tool counts toward spend. Only the direct OTLP path is affected; gateway usage is always billed per token."
+    >
+      <HStack justify="space-between">
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm">Bundled subscription (not billed per token)</Text>
+          <Text fontSize="xs" color="fg.muted">
+            Direct-OTLP usage is included in a flat plan, so its cost is shown
+            as theoretical rather than counted as real spend.
+          </Text>
+        </VStack>
+        <Switch
+          checked={form.bundledPlan}
+          onCheckedChange={({ checked }) =>
+            setForm({ ...form, bundledPlan: checked })
+          }
+        />
+      </HStack>
+    </FormSection>
   );
 }
 

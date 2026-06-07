@@ -535,6 +535,16 @@ export const DrawerHeader = memo(function DrawerHeader({
     trace.outputTokens != null &&
     (trace.inputTokens > 0 || trace.outputTokens > 0);
 
+  // Billed vs non-billed cost. `totalCost` is the grand list-price cost;
+  // `nonBilledCost` is the bundled (theoretical) portion a coding assistant on
+  // a flat plan never actually pays per token. The pill shows the billed
+  // amount (real spend) so a bundled session doesn't read as huge spend; the
+  // popover breaks down the split.
+  const grandCost = trace.totalCost ?? 0;
+  const nonBilledCost = trace.nonBilledCost ?? 0;
+  const billedCost = Math.max(0, grandCost - nonBilledCost);
+  const isBundledCost = nonBilledCost > 0;
+
   const resources = useTraceResources(trace.traceId);
   const conversationContext = useConversationContext(
     trace.conversationId ?? null,
@@ -1096,31 +1106,45 @@ export const DrawerHeader = memo(function DrawerHeader({
             </Box>
           </Tooltip>
         )}
-        {(trace.totalCost ?? 0) > 0 && (
+        {grandCost > 0 && (
           <Tooltip
             content={
-              <VStack align="stretch" gap={0.5} minWidth="140px">
-                <TooltipRow
-                  label="Total"
-                  value={formatCost(
-                    trace.totalCost ?? 0,
-                    trace.tokensEstimated,
-                  )}
-                />
-                {trace.tokensEstimated && !hasAuthoritativeTokens && (
-                  <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                    Cost is estimated from token counts
-                  </Text>
+              <VStack align="stretch" gap={0.5} minWidth="160px">
+                {isBundledCost ? (
+                  <>
+                    <TooltipRow label="Billed" value={formatCost(billedCost)} />
+                    <TooltipRow
+                      label="Non-billed"
+                      value={formatCost(nonBilledCost)}
+                    />
+                    <Box height="1px" bg="border" marginY={1} />
+                    <TooltipRow
+                      label="Theoretical total"
+                      value={formatCost(grandCost, trace.tokensEstimated)}
+                    />
+                    <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
+                      Bundled plan — not billed per token
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <TooltipRow
+                      label="Total"
+                      value={formatCost(grandCost, trace.tokensEstimated)}
+                    />
+                    {trace.tokensEstimated && !hasAuthoritativeTokens && (
+                      <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
+                        Cost is estimated from token counts
+                      </Text>
+                    )}
+                  </>
                 )}
               </VStack>
             }
             positioning={{ placement: "top" }}
           >
             <Box>
-              <MetricPill
-                label="Cost"
-                value={formatCost(trace.totalCost ?? 0)}
-              />
+              <MetricPill label="Cost" value={formatCost(billedCost)} />
             </Box>
           </Tooltip>
         )}

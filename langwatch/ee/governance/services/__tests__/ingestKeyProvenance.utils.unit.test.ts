@@ -101,6 +101,39 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
     });
   });
 
+  describe("given a bundled (non-billable) ingest source", () => {
+    it("stamps langwatch.cost.non_billable = 'true' when nonBillable is true", () => {
+      const request = { resourceMetrics: [{ resource: { attributes: [] } }] };
+      stampIngestKeyProvenanceOnMetricRequest(request, {
+        ...PROVENANCE,
+        nonBillable: true,
+      });
+      const map = attrMap(request.resourceMetrics[0]!.resource.attributes);
+      expect(map["langwatch.cost.non_billable"]).toBe("true");
+    });
+
+    it("stamps 'false' when nonBillable is false and omits when undefined", () => {
+      const billed = { resourceMetrics: [{ resource: { attributes: [] } }] };
+      stampIngestKeyProvenanceOnMetricRequest(billed, {
+        ...PROVENANCE,
+        nonBillable: false,
+      });
+      expect(
+        attrMap(billed.resourceMetrics[0]!.resource.attributes)[
+          "langwatch.cost.non_billable"
+        ],
+      ).toBe("false");
+
+      const unset = { resourceMetrics: [{ resource: { attributes: [] } }] };
+      stampIngestKeyProvenanceOnMetricRequest(unset, PROVENANCE);
+      expect(
+        attrMap(unset.resourceMetrics[0]!.resource.attributes)[
+          "langwatch.cost.non_billable"
+        ],
+      ).toBeUndefined();
+    });
+  });
+
   describe("given a template-derived ingest key", () => {
     it("stamps the template id only when present", () => {
       const withTemplate = { resourceMetrics: [{ resource: { attributes: [] } }] };

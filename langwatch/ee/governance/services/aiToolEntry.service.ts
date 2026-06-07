@@ -105,6 +105,16 @@ const codingAssistantConfig = z.object({
   /// (GUI-only), so a stored true there is still treated as false.
   allowVk: z.boolean().optional(),
   allowOtelDirect: z.boolean().optional(),
+  /// Whether usage that lands via the direct OTLP ingestion path is part of
+  /// a bundled subscription plan (e.g. Claude Max) rather than billed per
+  /// token. Defaults to true when absent: coding assistants are usually on a
+  /// flat plan, so their list-price token cost is "theoretical" (non-billed)
+  /// rather than real spend. Gateway / virtual-key usage is ALWAYS billed and
+  /// ignores this flag (we route it through a key the user pays per token).
+  /// The receiver stamps the resolved value onto ingest traces
+  /// (`langwatch.cost.non_billable`) so the trace summary can split billed vs
+  /// non-billed cost.
+  bundledPlan: z.boolean().optional(),
 });
 
 const modelProviderConfig = z.object({

@@ -53,7 +53,10 @@ export interface TraceListItem {
   name: string;
   serviceName: string;
   durationMs: number;
+  /** Grand list-price cost. `nonBilledCost` is the bundled (theoretical)
+   *  portion of it; billed = totalCost - nonBilledCost. */
   totalCost: number;
+  nonBilledCost: number;
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;

@@ -24,6 +24,7 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrConversationId: string;
   AttrUserId: string;
   AttrOrigin: string;
+  AttrNonBillable: string;
   LastEventOccurredAt: number;
 }
 
@@ -140,6 +141,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrConversationId,
           AttrUserId,
           AttrOrigin,
+          AttrNonBillable,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
@@ -185,6 +187,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['gen_ai.conversation.id'] AS AttrConversationId,
             Attributes['langwatch.user_id'] AS AttrUserId,
             Attributes['langwatch.origin'] AS AttrOrigin,
+            Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
             OccurredAt,
             CreatedAt,
             UpdatedAt,
@@ -885,7 +888,7 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
 // list mapper expects keys absent (so its `?? null` / `?? ""` fallbacks
 // fire) rather than present-but-empty.
 //
-// The five keys below match the explicit Attributes[...] projections in
+// The six keys below match the explicit Attributes[...] projections in
 // `findAll`'s SELECT. To surface another attribute in the list, add it
 // in both places. If user-pinned attribute columns ever ship, prefer
 // extending the query input with an `extraAttributeKeys: string[]` list
@@ -903,5 +906,8 @@ function buildListAttributes(
   }
   if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
   if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
+  if (row.AttrNonBillable) {
+    attributes["langwatch.cost.non_billable"] = row.AttrNonBillable;
+  }
   return attributes;
 }

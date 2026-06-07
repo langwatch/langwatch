@@ -28,6 +28,14 @@ export interface IngestKeyProvenance {
   organizationId: string;
   /** Only set for template-derived ingest keys (e.g. claude_cowork). */
   templateId?: string | null;
+  /**
+   * Whether this tool's direct-OTLP usage is part of a bundled subscription
+   * (not billed per token). Resolved from the org's coding-assistant tile
+   * (`config.bundledPlan`, default true for the ingest path). Stamped so the
+   * trace summary can split billed vs non-billed cost. Omitted → not stamped
+   * (the trace is treated as billed).
+   */
+  nonBillable?: boolean;
 }
 
 export const PROVENANCE_ATTR_SOURCE = "langwatch.source" as const;
@@ -36,6 +44,11 @@ export const PROVENANCE_ATTR_ORIGIN = "langwatch.origin" as const;
 export const PROVENANCE_ATTR_ORGANIZATION_ID =
   "langwatch.organization_id" as const;
 export const PROVENANCE_ATTR_TEMPLATE_ID = "langwatch.template.id" as const;
+/**
+ * Receiver-stamped marker: "true" when the trace's LLM usage is bundled into a
+ * subscription (not billed per token). Read by the trace summary / cost split.
+ */
+export const PROVENANCE_ATTR_NON_BILLABLE = "langwatch.cost.non_billable" as const;
 
 /**
  * Trace origin stamped on ingest-key traces, derived from the key's
@@ -79,6 +92,7 @@ const PROVENANCE_KEYS: readonly string[] = [
   PROVENANCE_ATTR_ORIGIN,
   PROVENANCE_ATTR_ORGANIZATION_ID,
   PROVENANCE_ATTR_TEMPLATE_ID,
+  PROVENANCE_ATTR_NON_BILLABLE,
 ];
 
 type OtlpAttribute = {
@@ -157,6 +171,12 @@ function buildProvenanceAttributes(
     attrs.push({
       key: PROVENANCE_ATTR_TEMPLATE_ID,
       value: { stringValue: provenance.templateId },
+    });
+  }
+  if (provenance.nonBillable !== undefined) {
+    attrs.push({
+      key: PROVENANCE_ATTR_NON_BILLABLE,
+      value: { stringValue: provenance.nonBillable ? "true" : "false" },
     });
   }
   return attrs;
