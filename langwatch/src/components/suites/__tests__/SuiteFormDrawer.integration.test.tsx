@@ -124,7 +124,7 @@ vi.mock("~/utils/api", () => ({
         })),
       },
       getResolvedDefault: {
-        useQuery: vi.fn(() => ({ data: { model: "openai/gpt-5.5" } })),
+        useQuery: vi.fn(() => ({ data: { model: "openai/gpt-5-mini" } })),
       },
     },
     useContext: vi.fn(() => ({

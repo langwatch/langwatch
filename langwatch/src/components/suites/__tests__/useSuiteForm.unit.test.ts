@@ -367,6 +367,8 @@ describe("useSuiteForm()", () => {
           selectedTargets: [{ type: "http", referenceId: "agent_1" }],
           repeatCount: 1,
           labels: [],
+          simulatorModel: null,
+          judgeModel: null,
         });
       });
     });

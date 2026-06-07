@@ -74,17 +74,17 @@ describe.skipIf(isTestcontainersOnly)(
           expect(created.judgeModel).toBeNull();
 
           const updated = await service.update(created.id, projectId, {
-            simulatorModel: "anthropic/claude-sonnet-4",
-            judgeModel: "openai/gpt-5.5",
+            simulatorModel: "openai/gpt-5-mini",
+            judgeModel: "openai/gpt-5-nano",
           });
-          expect(updated.simulatorModel).toBe("anthropic/claude-sonnet-4");
-          expect(updated.judgeModel).toBe("openai/gpt-5.5");
+          expect(updated.simulatorModel).toBe("openai/gpt-5-mini");
+          expect(updated.judgeModel).toBe("openai/gpt-5-nano");
 
           const reread = await prisma.scenario.findFirst({
             where: { id: created.id, projectId },
           });
-          expect(reread?.simulatorModel).toBe("anthropic/claude-sonnet-4");
-          expect(reread?.judgeModel).toBe("openai/gpt-5.5");
+          expect(reread?.simulatorModel).toBe("openai/gpt-5-mini");
+          expect(reread?.judgeModel).toBe("openai/gpt-5-nano");
         });
       });
     });
@@ -102,17 +102,17 @@ describe.skipIf(isTestcontainersOnly)(
             targets: [],
             repeatCount: 1,
             labels: [],
-            simulatorModel: "anthropic/claude-sonnet-4",
-            judgeModel: "openai/gpt-5.5",
+            simulatorModel: "openai/gpt-5-mini",
+            judgeModel: "openai/gpt-5-nano",
           });
-          expect(created.simulatorModel).toBe("anthropic/claude-sonnet-4");
-          expect(created.judgeModel).toBe("openai/gpt-5.5");
+          expect(created.simulatorModel).toBe("openai/gpt-5-mini");
+          expect(created.judgeModel).toBe("openai/gpt-5-nano");
 
           const reread = await prisma.simulationSuite.findFirst({
             where: { id: created.id, projectId },
           });
-          expect(reread?.simulatorModel).toBe("anthropic/claude-sonnet-4");
-          expect(reread?.judgeModel).toBe("openai/gpt-5.5");
+          expect(reread?.simulatorModel).toBe("openai/gpt-5-mini");
+          expect(reread?.judgeModel).toBe("openai/gpt-5-nano");
         });
       });
     });
