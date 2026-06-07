@@ -517,6 +517,15 @@ export const DrawerHeader = memo(function DrawerHeader({
     "gen_ai.usage.reasoning_tokens",
   );
 
+  // Total tokens the model actually processed = input + output PLUS cache
+  // read + cache write. Anthropic reports `input_tokens` as the NON-cached
+  // portion, so the cache counts are additive, not a subset (which is why a
+  // raw input+output "Total" can sit below the cache rows and read as wrong).
+  // Reasoning is a subset of output, so it is not added again. Falls back to
+  // the server input+output total when no cache was reported.
+  const totalTokensWithCache =
+    trace.totalTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0);
+
   // If we have concrete input AND output token numbers to display, trust them
   // and suppress the "estimated" caveat — historical trace summaries can carry
   // a stale `tokensEstimated=true` from before the per-span fix landed, so
@@ -1153,7 +1162,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                 <Box height="1px" bg="border" marginY={1} />
                 <TooltipRow
                   label="Total"
-                  value={trace.totalTokens.toLocaleString()}
+                  value={totalTokensWithCache.toLocaleString()}
                 />
                 {trace.tokensEstimated && !hasAuthoritativeTokens && (
                   <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
@@ -1175,6 +1184,9 @@ export const DrawerHeader = memo(function DrawerHeader({
               />
             </Box>
           </Tooltip>
+        )}
+        {reasoningTokens != null && reasoningTokens > 0 && (
+          <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
         )}
         {trace.models.length > 0 && (
           <HStack gap={1}>

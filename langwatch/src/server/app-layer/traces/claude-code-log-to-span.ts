@@ -566,8 +566,8 @@ function makeSpan({
 const CLAUDE_TOOL_HANDLED_ATTRS = new Set<string>([
   "tool_name", // -> gen_ai.tool.name + span name
   "tool_use_id", // -> gen_ai.tool.call.id
-  "tool_input", // -> gen_ai.tool.call.arguments
-  "tool_parameters", // -> gen_ai.tool.call.arguments (fallback)
+  "tool_input", // -> langwatch.input
+  "tool_parameters", // -> langwatch.input (fallback)
   "session.id", // -> gen_ai.conversation.id + langwatch.thread.id
   "service.name", // already implied (claude_code)
   "event.name",
@@ -580,13 +580,15 @@ const CLAUDE_TOOL_HANDLED_ATTRS = new Set<string>([
  * the agent actually ran, which is most of the value of an agent trace. See
  * CLAUDE_CODE_TOOL_EVENTS.
  *
- * The command lands on `gen_ai.tool.call.arguments`, NOT `langwatch.input`: a
- * synthesized claude span is parentless (a "root" to the trace-IO fold), and
- * that fold reads langwatch.input / gen_ai.input.messages — putting the shell
- * command there would hijack the trace's headline input (the exact
- * subagent-pollution failure the user_prompt gate already guards against). The
- * gen_ai.tool.* keys keep the command on the span for the drawer without
- * touching the trace summary.
+ * The command lands on `langwatch.input` so the span detail reads like an
+ * instrumented function call (args in). This is safe because the trace-IO fold
+ * skips `span_type=tool` (see trace-io-accumulation.service.ts): a synthesized
+ * claude span is parentless (a "root" to the fold), so without that skip its
+ * input would hijack the trace's headline input. Only `gen_ai.tool.name` and
+ * `gen_ai.tool.call.id` (real OTel gen_ai attributes) are mapped from the raw
+ * claude keys; everything else is copied verbatim under `claude_code.*`. There
+ * is no output to mirror - claude reports only the result SIZE
+ * (`tool_result_size_bytes`), never the tool's stdout.
  */
 export function convertClaudeCodeToolLogsToSpans(
   records: ClaudeCodeLogRecordInput[],
@@ -660,8 +662,15 @@ function buildToolSpan(
     attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
   }
 
-  // The actual command / params. tool_input (on tool_result) is the clean tool
-  // call; tool_parameters is the fallback.
+  // The tool call arguments (Bash command, Edit patch, ...). tool_input on
+  // tool_result is the clean call; tool_parameters is the fallback. Surface it
+  // as the span's `langwatch.input` so the detail panel reads like an
+  // instrumented function call (args in) instead of an empty I/O, rather than
+  // `gen_ai.tool.call.arguments` (not a real OTel attribute). The trace-IO
+  // fold skips `tool` spans, so this no longer hijacks the trace's headline
+  // input. There is no matching output: claude only reports the result SIZE
+  // (tool_result_size_bytes), never the tool's stdout, so we leave output
+  // empty rather than invent one.
   const callArguments =
     asNonEmpty(result?.attrs.tool_input) ??
     asNonEmpty(decision?.attrs.tool_parameters) ??
@@ -669,7 +678,7 @@ function buildToolSpan(
   if (callArguments) {
     attrs.push(
       strAttr(
-        ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS,
+        ATTR_KEYS.LANGWATCH_INPUT,
         capPayloadString(callArguments, undefined, "claude_tool_arguments"),
       ),
     );

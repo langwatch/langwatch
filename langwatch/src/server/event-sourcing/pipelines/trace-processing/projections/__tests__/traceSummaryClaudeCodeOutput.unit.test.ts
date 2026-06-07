@@ -131,4 +131,26 @@ describe("claude_code span-fold output latching", () => {
       expect(foldAll([later, earlier]).computedOutput).toBe(DONE);
     });
   });
+
+  describe("when a tool span carries its own langwatch.input", () => {
+    it("does not let the tool command leak into the trace input", () => {
+      const toolSpan = claudeSpan({
+        spanId: "toolBash",
+        startTimeUnixMs: 2300,
+        endTimeUnixMs: 2400,
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "gen_ai.tool.name": "Bash",
+          // The instrumented call rides on langwatch.input now; the fold must
+          // skip tool spans so this never becomes the trace's headline input.
+          "langwatch.input": '{"command":"echo \\"test otlp\\""}',
+        },
+      });
+      const state = foldAll([callDecidesTool, toolSpan, callAfterTool]);
+      // Input comes from the conversational span, NOT the Bash command JSON.
+      expect(state.computedInput).toContain("can you do");
+      expect(state.computedInput).not.toContain("command");
+      expect(state.computedOutput).toBe(DONE);
+    });
+  });
 });

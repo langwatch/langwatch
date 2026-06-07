@@ -1,7 +1,9 @@
 import { HStack, Spinner, Table, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
+import { IOPreview } from "~/features/traces-v2/components/TraceTable/IOPreview";
 import { CostCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/CostCell";
 import { DurationCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/DurationCell";
+import { OriginCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/SimpleCells";
 import { TimeCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TimeCell";
 import { TokensCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TokensCell";
 import { TraceCell } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/TraceCell";
@@ -27,11 +29,14 @@ interface ReusedColumn {
 }
 
 // Reuse the exact /traces table cells so a personal trace reads the
-// same way it does in the trace explorer. Only the five columns the
-// /me card cares about, in list order.
+// same way it does in the trace explorer. The column set mirrors the
+// explorer's default lens (time / trace / origin / duration / cost /
+// tokens) and each row carries the same Input/Output summary preview
+// below it (see IOPreview), so Recent Activity matches /traces.
 const COLUMNS: ReusedColumn[] = [
   { cell: TimeCell, label: "Time", align: "start" },
   { cell: TraceCell, label: "Trace", align: "start" },
+  { cell: OriginCell, label: "Origin", align: "start" },
   { cell: DurationCell, label: "Duration", align: "end" },
   { cell: CostCell, label: "Cost", align: "end" },
   { cell: TokensCell, label: "Tokens", align: "end" },
@@ -146,34 +151,55 @@ export function PersonalRecentTracesTable({
               enabledAddonIds: [],
             };
             return (
-              <Table.Row
-                key={row.traceId}
-                cursor="pointer"
-                _hover={{ backgroundColor: "bg.muted" }}
-                onClick={() => openTrace(row)}
-                // Match the trace explorer's hover affordance: the trace
-                // id fades in on row hover (TraceCell keeps it at opacity 0
-                // by default), kept dense until you reach for it.
-                css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
-              >
-                {COLUMNS.map(({ cell, align }) => (
-                  <Table.Cell
-                    key={cell.id}
-                    paddingX={2}
-                    textAlign={align}
-                    verticalAlign="middle"
-                    // The trace column absorbs the slack and truncates long
-                    // names; the metric columns size to their content. The
-                    // `max-width: 0` + `width: 100%` pair is the table-cell
-                    // truncation idiom — it bounds the cell so the inner
-                    // `truncate` actually clips.
-                    width={cell.id === "trace" ? "100%" : undefined}
-                    maxWidth={cell.id === "trace" ? "0" : undefined}
+              <Fragment key={row.traceId}>
+                <Table.Row
+                  cursor="pointer"
+                  _hover={{ backgroundColor: "bg.muted" }}
+                  onClick={() => openTrace(row)}
+                  // Match the trace explorer's hover affordance: the trace id
+                  // fades in on row hover (TraceCell keeps it at opacity 0 by
+                  // default), kept dense until you reach for it.
+                  css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
+                >
+                  {COLUMNS.map(({ cell, align }) => (
+                    <Table.Cell
+                      key={cell.id}
+                      paddingX={2}
+                      textAlign={align}
+                      verticalAlign="middle"
+                      // The trace column absorbs the slack and truncates long
+                      // names; the metric columns size to their content. The
+                      // `max-width: 0` + `width: 100%` pair is the table-cell
+                      // truncation idiom that bounds the cell so the inner
+                      // `truncate` actually clips.
+                      width={cell.id === "trace" ? "100%" : undefined}
+                      maxWidth={cell.id === "trace" ? "0" : undefined}
+                    >
+                      {renderCell(cell, ctx)}
+                    </Table.Cell>
+                  ))}
+                </Table.Row>
+                {/* Mirror the io-preview addon: LLM traces with both input AND
+                    output get the same Input/Output summary row beneath them
+                    that the /traces explorer renders. */}
+                {row.input !== null && row.output !== null && (
+                  <Table.Row
+                    cursor="pointer"
+                    _hover={{ backgroundColor: "bg.muted" }}
+                    onClick={() => openTrace(row)}
                   >
-                    {renderCell(cell, ctx)}
-                  </Table.Cell>
-                ))}
-              </Table.Row>
+                    <Table.Cell
+                      colSpan={COLUMNS.length}
+                      paddingX={2}
+                      paddingTop={0}
+                      paddingBottom={3}
+                      borderTopWidth={0}
+                    >
+                      <IOPreview input={row.input} output={row.output} />
+                    </Table.Cell>
+                  </Table.Row>
+                )}
+              </Fragment>
             );
           })}
         </Table.Body>

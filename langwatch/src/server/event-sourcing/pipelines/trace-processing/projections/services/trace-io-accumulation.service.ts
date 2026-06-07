@@ -205,7 +205,17 @@ export class TraceIOAccumulationService {
       }
     }
 
-    if (spanType === "evaluation" || spanType === "guardrail") {
+    // Tool spans never define the trace's headline I/O: they are
+    // sub-operations (a Bash run, an Edit), not the conversation. This is
+    // load-bearing for synthesized claude_code tool spans, which are
+    // parentless (= root) so their langwatch.input would otherwise hijack the
+    // trace input. Skipping them lets a tool span carry its own input/output
+    // for the span detail without polluting the trace summary.
+    if (
+      spanType === "evaluation" ||
+      spanType === "guardrail" ||
+      spanType === "tool"
+    ) {
       return {
         computedInput,
         computedOutput,

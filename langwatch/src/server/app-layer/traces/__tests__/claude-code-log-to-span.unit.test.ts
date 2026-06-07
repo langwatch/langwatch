@@ -760,17 +760,17 @@ describe("convertClaudeCodeToolLogsToSpans", () => {
       expect(span.name).toBe("Bash");
     });
 
-    it("puts the command on gen_ai.tool.call.arguments, never on the trace-IO keys", () => {
+    it("puts the command on langwatch.input as the instrumented call", () => {
       const { span } = build()[0]!;
       // tool_input (the clean tool call) wins over tool_parameters.
-      expect(attr(span, "gen_ai.tool.call.arguments")).toEqual({
+      expect(attr(span, "langwatch.input")).toEqual({
         stringValue: '{"command":"echo \\"test otlp\\""}',
       });
-      // A tool span is parentless (root) to the trace-IO fold; putting the
-      // shell command on langwatch.input / gen_ai.input.messages would hijack
-      // the trace's headline input.
-      expect(attr(span, "langwatch.input")).toBeUndefined();
-      expect(attr(span, "gen_ai.input.messages")).toBeUndefined();
+      // The non-standard gen_ai.tool.call.arguments is gone; the call rides on
+      // langwatch.input now. Safe because the trace-IO fold skips tool spans
+      // (see trace-io-accumulation.service.ts), so it never hijacks the trace
+      // headline input. No output: claude reports only the result size.
+      expect(attr(span, "gen_ai.tool.call.arguments")).toBeUndefined();
       expect(attr(span, "langwatch.output")).toBeUndefined();
       expect(attr(span, "gen_ai.output.messages")).toBeUndefined();
     });
@@ -811,7 +811,7 @@ describe("convertClaudeCodeToolLogsToSpans", () => {
       expect(spans).toHaveLength(1);
       const { span } = spans[0]!;
       expect(attr(span, "gen_ai.tool.name")).toEqual({ stringValue: "Bash" });
-      expect(attr(span, "gen_ai.tool.call.arguments")).toEqual({
+      expect(attr(span, "langwatch.input")).toEqual({
         stringValue: '{"command":"echo \\"test otlp\\""}',
       });
     });
