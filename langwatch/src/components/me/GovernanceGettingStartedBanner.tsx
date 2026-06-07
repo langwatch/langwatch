@@ -46,6 +46,11 @@ export function GovernanceGettingStartedBanner() {
       color="white"
       boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
       minHeight={{ base: "180px", md: "190px" }}
+      // Center the content within the min-height so the hero keeps its
+      // presence without pooling dead space below the button when the
+      // copy is short.
+      display="flex"
+      alignItems="center"
     >
       <Box position="absolute" inset={0} pointerEvents="none">
         <MeshGradient

@@ -39,6 +39,7 @@ import { useMemo, useState } from "react";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import type { AiToolEntry } from "~/components/me/tiles/types";
 import { Checkbox } from "~/components/ui/checkbox";
+import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
@@ -68,6 +69,11 @@ export function ToolCatalogEditor({
 }: Props) {
   const utils = api.useUtils();
 
+  // Delete is permanent, so it routes through a confirm dialog. `null`
+  // means no pending deletion; a non-null entry is the tile awaiting
+  // confirmation.
+  const [pendingDelete, setPendingDelete] = useState<AiToolEntry | null>(null);
+
   const adminListQuery = api.aiTools.adminList.useQuery(
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
@@ -96,11 +102,12 @@ export function ToolCatalogEditor({
     },
   });
 
-  const archiveMutation = api.aiTools.archive.useMutation({
+  const removeMutation = api.aiTools.remove.useMutation({
     onSuccess: () => {
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
       toaster.create({ title: "Tile deleted", type: "success" });
+      setPendingDelete(null);
     },
     onError: (err) => {
       toaster.create({
@@ -346,9 +353,7 @@ export function ToolCatalogEditor({
                     enabled: !entry.enabled,
                   })
                 }
-                onDelete={(entry) =>
-                  archiveMutation.mutate({ organizationId, id: entry.id })
-                }
+                onDelete={(entry) => setPendingDelete(entry)}
                 togglePendingId={
                   setEnabledMutation.isPending
                     ? setEnabledMutation.variables?.id
@@ -359,6 +364,47 @@ export function ToolCatalogEditor({
           </VStack>
         );
       })}
+
+      <Dialog.Root
+        open={pendingDelete !== null}
+        onOpenChange={({ open }) => {
+          if (!open) setPendingDelete(null);
+        }}
+        placement="center"
+      >
+        {pendingDelete && (
+          <Dialog.Content bg="bg">
+            <Dialog.CloseTrigger />
+            <Dialog.Header>
+              <Dialog.Title>Delete {pendingDelete.displayName}?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Text fontSize="sm" color="fg.muted">
+                This permanently removes the tile from the catalog and from
+                every member&apos;s /me portal. It cannot be undone. To hide it
+                without losing its configuration, use Disable instead.
+              </Text>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button variant="outline" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="red"
+                loading={removeMutation.isPending}
+                onClick={() =>
+                  removeMutation.mutate({
+                    organizationId,
+                    id: pendingDelete.id,
+                  })
+                }
+              >
+                Delete tile
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        )}
+      </Dialog.Root>
     </VStack>
   );
 }

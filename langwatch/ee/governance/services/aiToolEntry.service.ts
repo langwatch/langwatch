@@ -622,8 +622,9 @@ export class AiToolEntryService {
   }
 
   /**
-   * Admin list. Returns ALL entries (incl. disabled + archived) for
-   * the catalog editor surface.
+   * Admin list. Returns every live entry (incl. disabled) for the catalog
+   * editor surface. Deleted tiles are removed for good, so there is no
+   * archived tail to surface here.
    */
   async listForAdmin({
     organizationId,
@@ -631,7 +632,7 @@ export class AiToolEntryService {
     organizationId: string;
   }): Promise<AiToolEntryDto[]> {
     const rows = await this.prisma.aiToolEntry.findMany({
-      where: { organizationId },
+      where: { organizationId, archivedAt: null },
       orderBy: [{ order: "asc" }, { displayName: "asc" }],
       include: { departments: { select: { departmentId: true } } },
     });
@@ -832,7 +833,18 @@ export class AiToolEntryService {
     }
   }
 
-  async archive({
+  /**
+   * Permanently remove a tile from the catalog. Deleting (as opposed to
+   * disabling) drops the row outright, so it vanishes from both the admin
+   * editor and every member's /me portal. The department / team scope
+   * bindings are removed via `onDelete: Cascade`; nothing else
+   * foreign-keys the tile (virtual keys and ingest keys carry their own
+   * resolved values, not a tile reference), so there are no orphans.
+   *
+   * Reversible hiding is a separate action — `setEnabled(false)` keeps the
+   * row and its config so an admin can re-enable it later.
+   */
+  async remove({
     id,
     organizationId,
   }: {
@@ -845,9 +857,8 @@ export class AiToolEntryService {
         `AiToolEntry ${id} not found in organization ${organizationId}`,
       );
     }
-    const row = await this.prisma.aiToolEntry.update({
+    const row = await this.prisma.aiToolEntry.delete({
       where: { id },
-      data: { archivedAt: new Date(), enabled: false },
       include: { departments: { select: { departmentId: true } } },
     });
     return toDto(row);

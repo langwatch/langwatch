@@ -5,7 +5,7 @@
  *
  * Pins three things end-to-end via the live tRPC procedure layer:
  *   1. RBAC enforcement - MEMBER can list (aiTools:view) but cannot
- *      create/update/archive/setEnabled/reorder. ADMIN can do all.
+ *      create/update/remove/setEnabled/reorder. ADMIN can do all.
  *      EXTERNAL can also list (portal must work for everyone).
  *   2. Org/department scoping resolution - listForUser applies
  *      department-overrides-org by slug; entries scoped to a department
@@ -784,7 +784,7 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
-  describe("setEnabled + archive", () => {
+  describe("setEnabled + remove", () => {
     it("setEnabled toggles visibility on the user-facing list", async () => {
       const adminCaller = callerFor(adminUserId);
       const entry = await adminCaller.aiTools.create({
@@ -816,6 +816,41 @@ describe("aiToolsRouter integration", () => {
 
       const adminAfter = await adminCaller.aiTools.adminList({ organizationId });
       expect(adminAfter.some((e) => e.id === entry.id && e.enabled === false)).toBe(true);
+    });
+
+    /** @scenario "Deleted entries are removed from both lists" */
+    it("remove permanently drops the tile from the admin and user lists", async () => {
+      const adminCaller = callerFor(adminUserId);
+      const entry = await adminCaller.aiTools.create({
+        organizationId,
+        departmentIds: [],
+        type: "external_tool",
+        displayName: `Deletable ${nanoid(4)}`,
+        config: {
+          descriptionMarkdown: "x",
+          linkUrl: "https://example.com",
+        },
+      });
+
+      const adminBefore = await adminCaller.aiTools.adminList({ organizationId });
+      expect(adminBefore.some((e) => e.id === entry.id)).toBe(true);
+
+      await adminCaller.aiTools.remove({ organizationId, id: entry.id });
+
+      // Gone from the admin editor - delete is permanent, not a soft hide.
+      const adminAfter = await adminCaller.aiTools.adminList({ organizationId });
+      expect(adminAfter.some((e) => e.id === entry.id)).toBe(false);
+
+      // ...and gone from every member's portal.
+      const userAfter = await callerFor(memberPlatformUserId).aiTools.list({
+        organizationId,
+      });
+      expect(userAfter.some((e) => e.id === entry.id)).toBe(false);
+
+      // The row itself is removed, so a re-fetch by id is NOT_FOUND.
+      await expect(
+        adminCaller.aiTools.get({ organizationId, id: entry.id }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
 

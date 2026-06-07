@@ -130,8 +130,8 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
-   * Admin list - includes disabled + archived. Powers the catalog
-   * editor at /settings/governance/tool-catalog.
+   * Admin list - includes disabled (but not deleted) tiles. Powers the
+   * catalog editor at /settings/governance/tool-catalog.
    */
   adminList: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -242,12 +242,17 @@ export const aiToolsRouter = createTRPCRouter({
       }
     }),
 
-  archive: protectedProcedure
+  /**
+   * Permanently delete a tile. Distinct from `setEnabled(false)`, which
+   * only hides it: this drops the row so it disappears from the admin
+   * editor and every member's portal.
+   */
+  remove: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
-      return await service.archive({
+      return await service.remove({
         id: input.id,
         organizationId: input.organizationId,
       });
