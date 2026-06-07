@@ -1144,7 +1144,11 @@ export const DrawerHeader = memo(function DrawerHeader({
             positioning={{ placement: "top" }}
           >
             <Box>
-              <MetricPill label="Cost" value={formatCost(billedCost)} />
+              {isBundledCost ? (
+                <MetricPill label="Cost" value="Bundled" tone="purple" />
+              ) : (
+                <MetricPill label="Cost" value={formatCost(billedCost)} />
+              )}
             </Box>
           </Tooltip>
         )}

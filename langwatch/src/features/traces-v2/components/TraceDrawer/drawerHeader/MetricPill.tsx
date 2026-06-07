@@ -8,7 +8,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
-import { Chip } from "../Chip";
+import { Chip, type ChipTone } from "../Chip";
 import { TooltipRow } from "./TooltipRow";
 
 /**
@@ -19,8 +19,16 @@ import { TooltipRow } from "./TooltipRow";
  * pills next to the source/origin Chip strip). Routing through Chip
  * collapses them into one design language; callers keep the same API.
  */
-export function MetricPill({ label, value }: { label: string; value: string }) {
-  return <Chip label={label} value={value} tone="neutral" />;
+export function MetricPill({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: ChipTone;
+}) {
+  return <Chip label={label} value={value} tone={tone} />;
 }
 
 /**

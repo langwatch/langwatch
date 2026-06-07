@@ -12,8 +12,12 @@ function billedCostOf(row: TraceListItem): number {
   return Math.max(0, row.totalCost - (row.nonBilledCost ?? 0));
 }
 
+function isBundled(row: TraceListItem): boolean {
+  return (row.nonBilledCost ?? 0) > 0;
+}
+
 function bundledTitle(row: TraceListItem): string | undefined {
-  if ((row.nonBilledCost ?? 0) <= 0) return undefined;
+  if (!isBundled(row)) return undefined;
   return `Bundled plan, not billed per token. Billed ${formatCost(
     billedCostOf(row),
   )}, theoretical ${formatCost(row.totalCost)}.`;
@@ -22,19 +26,37 @@ function bundledTitle(row: TraceListItem): string | undefined {
 export const CostCell = {
   id: "cost",
   label: "Cost",
-  render: ({ row }) => (
-    <MonoCell title={bundledTitle(row)}>
-      {formatCost(billedCostOf(row), row.tokensEstimated)}
-    </MonoCell>
-  ),
-  renderComfortable: ({ row }) => (
-    <Text
-      title={bundledTitle(row)}
-      textStyle="sm"
-      color="fg.muted"
-      textAlign="right"
-    >
-      {formatCost(billedCostOf(row), row.tokensEstimated)}
-    </Text>
-  ),
+  render: ({ row }) =>
+    isBundled(row) ? (
+      <MonoCell title={bundledTitle(row)}>
+        <Text as="span" color="purple.fg" fontWeight="medium">
+          Bundled
+        </Text>
+      </MonoCell>
+    ) : (
+      <MonoCell title={bundledTitle(row)}>
+        {formatCost(billedCostOf(row), row.tokensEstimated)}
+      </MonoCell>
+    ),
+  renderComfortable: ({ row }) =>
+    isBundled(row) ? (
+      <Text
+        title={bundledTitle(row)}
+        textStyle="sm"
+        color="purple.fg"
+        fontWeight="medium"
+        textAlign="right"
+      >
+        Bundled
+      </Text>
+    ) : (
+      <Text
+        title={bundledTitle(row)}
+        textStyle="sm"
+        color="fg.muted"
+        textAlign="right"
+      >
+        {formatCost(billedCostOf(row), row.tokensEstimated)}
+      </Text>
+    ),
 } as const satisfies CellDef<TraceListItem>;
