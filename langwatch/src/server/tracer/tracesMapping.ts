@@ -540,7 +540,7 @@ export const TRACE_EXPANSIONS = {
     },
   },
   "spans.all.span_id": {
-    label: "all spans",
+    label: "span",
     expansion: (trace: TraceWithAnnotations) => {
       const spans = trace.spans ?? [];
       return spans.map((span) => ({

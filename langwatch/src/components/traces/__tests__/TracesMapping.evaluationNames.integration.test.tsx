@@ -103,7 +103,10 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
   describe("when a project evaluator is absent from the loaded trace", () => {
     /** @scenario Evaluator names from the project are offered even when absent from the open trace */
     it("offers the project evaluator name for mapping", async () => {
+      const user = userEvent.setup();
       renderEvaluationsMapping();
+      // Open the searchable key dropdown (shows "* (any evaluation)" until opened).
+      await user.click(await screen.findByText("* (any evaluation)"));
 
       expect(
         await screen.findByRole("option", { name: "PII Check" }),
@@ -116,12 +119,11 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
     it("offers the passed, score, label, details, status and error subfields", async () => {
       const user = userEvent.setup();
       renderEvaluationsMapping();
+      await user.click(await screen.findByText("* (any evaluation)"));
 
-      const piiOption = await screen.findByRole("option", { name: "PII Check" });
-      const keySelect = piiOption.closest("select");
-      expect(keySelect).not.toBeNull();
-
-      await user.selectOptions(keySelect!, piiOption as HTMLOptionElement);
+      await user.click(
+        await screen.findByRole("option", { name: "PII Check" }),
+      );
 
       // Scope the subfield assertions to the subkey <select> (identified by its
       // "* (full object)" option) so they don't collide with other dropdowns.
