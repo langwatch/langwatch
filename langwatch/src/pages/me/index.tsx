@@ -196,7 +196,7 @@ function MyUsagePage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Recent activity">
+        <SectionCard title="Recent activity" flushContent>
           {personalProjectId && personalProjectSlug ? (
             <PersonalRecentTracesTable
               projectId={personalProjectId}
@@ -251,10 +251,39 @@ function SummaryCard({
 function SectionCard({
   title,
   children,
+  flushContent = false,
 }: {
   title: string;
   children: React.ReactNode;
+  // When set, the content area spans the full card width (no side padding)
+  // and is divided from the title by a top border. Used for an embedded
+  // table that should read edge-to-edge while the title stays inset.
+  flushContent?: boolean;
 }) {
+  if (flushContent) {
+    return (
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
+        <Text
+          fontSize="sm"
+          fontWeight="semibold"
+          paddingX={4}
+          paddingTop={4}
+          paddingBottom={3}
+        >
+          {title}
+        </Text>
+        <Box borderTopWidth="1px" borderTopColor="border.muted">
+          {children}
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box
       borderWidth="1px"

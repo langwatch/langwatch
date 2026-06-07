@@ -83,16 +83,24 @@ export function PersonalRecentTracesTable({
 
   const rows = useMemo(() => mapTraceListPayload(query.data), [query.data]);
 
-  // The explorer pins the trace column at a fixed 560px so the wide lens can
-  // scroll; in this compact card we widen it back to flex so the trace name
-  // absorbs the card's slack instead of forcing horizontal scroll. The
-  // shared column defs are spread (never mutated) so the explorer's own
-  // columns are untouched.
+  // The explorer pins the trace column at a fixed 560px (capped at 820) so
+  // the wide lens can scroll; in this compact card we flex it instead so the
+  // trace name absorbs the card's slack and the table never overflows. The
+  // flex sentinel (`size: 9999`) only takes effect when it isn't clamped, so
+  // we also lift `maxSize` — otherwise getSize() clamps to 820, the resize
+  // heuristic reads it as a manual resize, and the column pins to a fixed
+  // 820px (the horizontal-scroll bug). The shared column defs are spread
+  // (never mutated) so the explorer's own columns are untouched.
   const columns = useMemo(
     () =>
       buildTraceColumns(RECENT_COLUMN_IDS).map((col) =>
         col.id === "trace"
-          ? { ...col, size: 9999, meta: { ...col.meta, flex: true } }
+          ? {
+              ...col,
+              size: 9999,
+              maxSize: 9999,
+              meta: { ...col.meta, flex: true },
+            }
           : col,
       ),
     [],
