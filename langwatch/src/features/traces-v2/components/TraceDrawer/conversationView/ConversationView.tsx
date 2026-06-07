@@ -23,7 +23,12 @@ import { extractReadableText, extractReasoningText } from "../transcript";
 import { AnnotationsView } from "./AnnotationsView";
 import { ChatTurnRow } from "./ChatTurnRow";
 import { SystemPromptBanner } from "./SystemPromptBanner";
-import { EMPTY_TURNS, type Mode, type ParsedTurn } from "./types";
+import {
+  EMPTY_TURNS,
+  type Mode,
+  type ParsedTurn,
+  type TurnLayout,
+} from "./types";
 import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
@@ -64,7 +69,7 @@ export const ConversationView = memo(function ConversationView({
   currentTraceId,
 }: ConversationViewProps) {
   const { navigateToTrace } = useTraceDrawerNavigation();
-  const [mode, setMode] = useState<Mode>("bubbles");
+  const [mode, setMode] = useState<Mode>("thread");
   const query = useConversationTurns(conversationId);
 
   const turns =
@@ -176,8 +181,9 @@ export const ConversationView = memo(function ConversationView({
         mode={mode}
         onModeChange={setMode}
       />
-      {mode === "bubbles" ? (
-        <BubblesView
+      {mode === "thread" || mode === "bubbles" ? (
+        <TurnsView
+          layout={mode}
           parsedTurns={parsedTurns}
           systemPromptInput={turns[0]?.input}
           currentTraceId={currentTraceId}
@@ -342,18 +348,27 @@ const ConversationHeader: React.FC<{
     <SegmentedToggle
       value={mode}
       onChange={(v) => onModeChange(v as Mode)}
-      options={["bubbles", "markdown", "annotations"]}
+      options={["thread", "bubbles", "markdown", "annotations"]}
     />
   </HStack>
 );
 
-const BubblesView: React.FC<{
+/**
+ * ChatGPT-style thread layout constrains the column to a comfortable reading
+ * width and centers it; bubbles span the pane so the left/right sides have
+ * room to breathe.
+ */
+const THREAD_MAX_WIDTH = "800px";
+
+const TurnsView: React.FC<{
+  layout: TurnLayout;
   parsedTurns: ParsedTurn[];
   systemPromptInput: string | null | undefined;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
 }> = ({
+  layout,
   parsedTurns,
   systemPromptInput,
   currentTraceId,
@@ -367,7 +382,8 @@ const BubblesView: React.FC<{
 
   if (parsedTurns.length >= VIRTUALIZE_AT) {
     return (
-      <VirtualizedBubblesView
+      <VirtualizedTurnsView
+        layout={layout}
         parsedTurns={parsedTurns}
         systemPrompt={systemPrompt}
         currentTraceId={currentTraceId}
@@ -377,27 +393,38 @@ const BubblesView: React.FC<{
     );
   }
 
+  const maxWidth = layout === "thread" ? THREAD_MAX_WIDTH : undefined;
+
   return (
-    <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="auto">
-      {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
-      {parsedTurns.map((p, i) => (
-        <ChatTurnRow
-          key={p.turn.traceId}
-          turn={p.turn}
-          userText={p.userText}
-          assistantText={p.assistantText}
-          assistantReasoning={p.assistantReasoning}
-          gapSecs={p.gapSecs}
-          showGap={p.showGap}
-          index={i + 1}
-          isCurrent={p.turn.traceId === currentTraceId}
-          onSelect={onSelectTurn}
-          annotationItems={
-            annotationsByTrace.get(p.turn.traceId) ?? EMPTY_ANNOTATION_ITEMS
-          }
-        />
-      ))}
-    </VStack>
+    <Box flex={1} overflow="auto" paddingX={5} paddingY={4}>
+      <VStack
+        align="stretch"
+        gap={layout === "thread" ? 2 : 5}
+        width="full"
+        maxWidth={maxWidth}
+        marginX="auto"
+      >
+        {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
+        {parsedTurns.map((p, i) => (
+          <ChatTurnRow
+            key={p.turn.traceId}
+            layout={layout}
+            turn={p.turn}
+            userText={p.userText}
+            assistantText={p.assistantText}
+            assistantReasoning={p.assistantReasoning}
+            gapSecs={p.gapSecs}
+            showGap={p.showGap}
+            index={i + 1}
+            isCurrent={p.turn.traceId === currentTraceId}
+            onSelect={onSelectTurn}
+            annotationItems={
+              annotationsByTrace.get(p.turn.traceId) ?? EMPTY_ANNOTATION_ITEMS
+            }
+          />
+        ))}
+      </VStack>
+    </Box>
   );
 };
 
@@ -407,13 +434,15 @@ const BubblesView: React.FC<{
  * codebase. The system-prompt banner stays sticky at the top, outside the
  * virtual range, so it doesn't get measured + remeasured every scroll.
  */
-const VirtualizedBubblesView: React.FC<{
+const VirtualizedTurnsView: React.FC<{
+  layout: TurnLayout;
   parsedTurns: ParsedTurn[];
   systemPrompt: string | null;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
 }> = ({
+  layout,
   parsedTurns,
   systemPrompt,
   currentTraceId,
@@ -430,50 +459,55 @@ const VirtualizedBubblesView: React.FC<{
     getItemKey: (index) => parsedTurns[index]!.turn.traceId,
   });
 
+  const maxWidth = layout === "thread" ? THREAD_MAX_WIDTH : undefined;
+
   return (
     <Box ref={parentRef} flex={1} overflow="auto" paddingX={5} paddingY={4}>
-      {systemPrompt && (
-        <Box marginBottom={5}>
-          <SystemPromptBanner text={systemPrompt} />
+      <Box width="full" maxWidth={maxWidth} marginX="auto">
+        {systemPrompt && (
+          <Box marginBottom={5}>
+            <SystemPromptBanner text={systemPrompt} />
+          </Box>
+        )}
+        <Box
+          height={`${virtualizer.getTotalSize()}px`}
+          width="full"
+          position="relative"
+        >
+          {virtualizer.getVirtualItems().map((row) => {
+            const p = parsedTurns[row.index]!;
+            return (
+              <Box
+                key={row.key}
+                ref={virtualizer.measureElement}
+                data-index={row.index}
+                position="absolute"
+                top={0}
+                left={0}
+                width="full"
+                transform={`translateY(${row.start}px)`}
+                paddingBottom={layout === "thread" ? 2 : 5}
+              >
+                <ChatTurnRow
+                  layout={layout}
+                  turn={p.turn}
+                  userText={p.userText}
+                  assistantText={p.assistantText}
+                  assistantReasoning={p.assistantReasoning}
+                  gapSecs={p.gapSecs}
+                  showGap={p.showGap}
+                  index={row.index + 1}
+                  isCurrent={p.turn.traceId === currentTraceId}
+                  onSelect={onSelectTurn}
+                  annotationItems={
+                    annotationsByTrace.get(p.turn.traceId) ??
+                    EMPTY_ANNOTATION_ITEMS
+                  }
+                />
+              </Box>
+            );
+          })}
         </Box>
-      )}
-      <Box
-        height={`${virtualizer.getTotalSize()}px`}
-        width="full"
-        position="relative"
-      >
-        {virtualizer.getVirtualItems().map((row) => {
-          const p = parsedTurns[row.index]!;
-          return (
-            <Box
-              key={row.key}
-              ref={virtualizer.measureElement}
-              data-index={row.index}
-              position="absolute"
-              top={0}
-              left={0}
-              width="full"
-              transform={`translateY(${row.start}px)`}
-              paddingBottom={5}
-            >
-              <ChatTurnRow
-                turn={p.turn}
-                userText={p.userText}
-                assistantText={p.assistantText}
-                assistantReasoning={p.assistantReasoning}
-                gapSecs={p.gapSecs}
-                showGap={p.showGap}
-                index={row.index + 1}
-                isCurrent={p.turn.traceId === currentTraceId}
-                onSelect={onSelectTurn}
-                annotationItems={
-                  annotationsByTrace.get(p.turn.traceId) ??
-                  EMPTY_ANNOTATION_ITEMS
-                }
-              />
-            </Box>
-          );
-        })}
       </Box>
     </Box>
   );

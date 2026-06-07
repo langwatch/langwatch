@@ -1,6 +1,15 @@
-import { Box, Flex, HStack, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle } from "lucide-react";
+import {
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
+import { Markdown } from "~/components/Markdown";
 import type { RouterOutputs } from "~/utils/api";
 import type { TraceListItem } from "../../../types/trace";
 import {
@@ -10,9 +19,16 @@ import {
   formatRelativeTime,
   formatTokens,
 } from "../../../utils/formatters";
-import { Bubble } from "../../TraceTable/registry/addons/conversation/Bubble";
+import {
+  Bubble,
+  type BubbleSide,
+  type BubbleTone,
+  truncateMarkdown,
+} from "../../TraceTable/registry/addons/conversation/Bubble";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
+import { getRolePalette, ReasoningBlock } from "../transcript";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
+import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -28,6 +44,8 @@ interface ChatTurnRowProps {
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
+  /** ChatGPT-style full-width thread vs left/right side bubbles. */
+  layout?: TurnLayout;
   /**
    * Annotations for this turn, prefetched at the conversation level so each
    * row doesn't fire its own `getByTraceId`. Drives the bubble's annotation
@@ -46,6 +64,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   index,
   isCurrent,
   onSelect,
+  layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
 }) {
   const handleSelect = useCallback(
@@ -82,7 +101,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     : assistantVisuals.bubbleLabel;
 
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
       {showGap && (
         <Flex align="center" gap={2}>
           <Box height="1px" flex={1} bg="border.muted" />
@@ -98,12 +117,15 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         turn={turn}
         isCurrent={isCurrent}
         onSelect={handleSelect}
-        assistantSide={assistantSide}
+        // Thread layout stacks both roles full-width on the left, so there's
+        // no "opposite side" to anchor the inline actions to — pin them right.
+        assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
       />
 
       {userText && (
-        <Bubble
+        <TurnMessage
+          layout={layout}
           side={userSide}
           tone={userVisuals.displayRole}
           label={userVisuals.bubbleLabel}
@@ -111,13 +133,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           text={userText}
           isSelected={isCurrent}
           onClick={handleSelect}
-          size="compact"
-          maxChars={500}
         />
       )}
 
       {assistantText ? (
-        <Bubble
+        <TurnMessage
+          layout={layout}
           side={assistantSide}
           tone={assistantVisuals.displayRole}
           label={assistantLabel}
@@ -126,12 +147,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           reasoning={assistantReasoning}
           isSelected={isCurrent}
           onClick={handleSelect}
-          size="compact"
-          maxChars={500}
           annotation={annotationSummary}
         />
       ) : turn.error ? (
-        <Bubble
+        <TurnMessage
+          layout={layout}
           side={assistantSide}
           tone="error"
           label="Error"
@@ -140,12 +160,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           reasoning={assistantReasoning}
           isSelected={isCurrent}
           onClick={handleSelect}
-          size="compact"
-          maxChars={500}
           annotation={annotationSummary}
         />
       ) : assistantReasoning ? (
-        <Bubble
+        <TurnMessage
+          layout={layout}
           side={assistantSide}
           tone={assistantVisuals.displayRole}
           label={assistantLabel}
@@ -154,14 +173,158 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           reasoning={assistantReasoning}
           isSelected={isCurrent}
           onClick={handleSelect}
-          size="compact"
-          maxChars={500}
           annotation={annotationSummary}
         />
       ) : null}
     </VStack>
   );
 });
+
+interface TurnMessageProps {
+  layout: TurnLayout;
+  side: BubbleSide;
+  tone: BubbleTone;
+  label: string;
+  icon: React.ReactNode;
+  text: string;
+  reasoning?: string;
+  isSelected?: boolean;
+  onClick?: () => void;
+  annotation?: { count: number; hasCorrection: boolean };
+}
+
+/**
+ * One message bubble in a turn, rendered either as a side bubble (bubbles
+ * layout) or a full-width ChatGPT-style row (thread layout). Both share the
+ * same tone / label / annotation inputs so toggling the layout never changes
+ * what's shown, only how it's arranged.
+ */
+function TurnMessage({ layout, side, ...rest }: TurnMessageProps) {
+  if (layout === "thread") {
+    return <ThreadMessage {...rest} />;
+  }
+  return <Bubble side={side} size="compact" maxChars={500} {...rest} />;
+}
+
+/** Maps a bubble tone onto the canonical role palette used by thread layout. */
+const TONE_ROLE: Record<BubbleTone, string> = {
+  user: "user",
+  assistant: "assistant",
+  system: "system",
+  error: "assistant",
+};
+
+const THREAD_MAX_CHARS = 800;
+
+function ThreadMessage({
+  tone,
+  label,
+  icon,
+  text,
+  reasoning,
+  isSelected = false,
+  onClick,
+  annotation,
+}: Omit<TurnMessageProps, "layout" | "side">) {
+  const palette = getRolePalette(TONE_ROLE[tone]);
+  const isError = tone === "error";
+  const display = truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS });
+  const hasAnnotation = !!annotation && annotation.count > 0;
+
+  return (
+    <Flex
+      gap={2.5}
+      align="flex-start"
+      width="full"
+      paddingX={3}
+      paddingY={2.5}
+      borderRadius="lg"
+      bg={isSelected ? "bg.muted" : "transparent"}
+      cursor={onClick ? "pointer" : "default"}
+      transition="background 0.15s ease"
+      _hover={
+        onClick ? { bg: isSelected ? "bg.muted" : "bg.subtle" } : undefined
+      }
+      onClick={(e: React.MouseEvent) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <Circle
+        size="24px"
+        bg={isError ? "red.muted" : palette.muted}
+        color={isError ? "red.fg" : palette.fg}
+        flexShrink={0}
+        marginTop="1px"
+      >
+        <Icon boxSize="13px">{icon}</Icon>
+      </Circle>
+
+      <Box flex={1} minWidth={0}>
+        <HStack gap={1.5} marginBottom={1} align="center">
+          <Text
+            textStyle="2xs"
+            fontWeight="600"
+            color={isError ? "red.fg" : palette.fg}
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            {label}
+          </Text>
+          {hasAnnotation && (
+            <HStack
+              gap={0.5}
+              paddingX={1.5}
+              paddingY={0.5}
+              borderRadius="sm"
+              bg="amber.subtle"
+              color="amber.fg"
+              aria-label={`${annotation!.count} annotation${
+                annotation!.count === 1 ? "" : "s"
+              }${annotation!.hasCorrection ? ", includes correction" : ""}`}
+            >
+              <Icon as={MessageSquare} boxSize="10px" />
+              <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+                {annotation!.count}
+              </Text>
+              {annotation!.hasCorrection && (
+                <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />
+              )}
+            </HStack>
+          )}
+        </HStack>
+
+        {reasoning && (
+          <Box
+            mb={text ? "2.5" : "0"}
+            bg="bg.muted/60"
+            px="3"
+            py="2"
+            borderRadius="md"
+          >
+            <ReasoningBlock text={reasoning} />
+          </Box>
+        )}
+
+        {display && (
+          <Box
+            color={isError ? "red.fg" : "fg"}
+            css={{
+              "& > div": { fontSize: "13.5px", lineHeight: "1.6" },
+              "& h1": { fontSize: "1.15em !important" },
+              "& h2": { fontSize: "1.1em !important" },
+              "& h3": { fontSize: "1.05em !important" },
+              "& h4, & h5, & h6": { fontSize: "1em !important" },
+            }}
+          >
+            <Markdown>{display}</Markdown>
+          </Box>
+        )}
+      </Box>
+    </Flex>
+  );
+}
 
 const TurnSeparator: React.FC<{
   index: number;
@@ -189,6 +352,7 @@ const TurnSeparator: React.FC<{
   const annotationsOnLeft = assistantSide === "left";
   return (
     <Flex
+      position="relative"
       align="center"
       gap={2}
       cursor="pointer"
@@ -196,16 +360,6 @@ const TurnSeparator: React.FC<{
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
-      {annotationsOnLeft && (
-        <>
-          <TurnAnnotationBadges
-            traceId={turn.traceId}
-            output={turn.output}
-            prefetchedItems={annotationItems}
-          />
-          <TurnActionRow traceId={turn.traceId} output={turn.output} />
-        </>
-      )}
       <Box
         className="turn-line"
         height="1px"
@@ -288,16 +442,26 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      {!annotationsOnLeft && (
-        <>
-          <TurnAnnotationBadges
-            traceId={turn.traceId}
-            output={turn.output}
-            prefetchedItems={annotationItems}
-          />
-          <TurnActionRow traceId={turn.traceId} output={turn.output} />
-        </>
-      )}
+      {/* Inline actions float over one end of the separator instead of
+          sitting in flow — the hidden hover chrome used to reserve ~180px of
+          width, stopping the divider line short of the edge. Absolutely
+          positioned, the lines now span the full width and the badge/actions
+          overlay the end (badges only when present, actions on hover). */}
+      <HStack
+        position="absolute"
+        top="50%"
+        transform="translateY(-50%)"
+        gap={1}
+        {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <TurnAnnotationBadges
+          traceId={turn.traceId}
+          output={turn.output}
+          prefetchedItems={annotationItems}
+        />
+        <TurnActionRow traceId={turn.traceId} output={turn.output} />
+      </HStack>
     </Flex>
   );
 };
