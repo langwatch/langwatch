@@ -5,7 +5,6 @@ import {
   GridItem,
   HStack,
   NativeSelect,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -614,6 +613,25 @@ export const TracesMapping = ({
               PROJECT_FIELD_NAME_SOURCES.includes(source)) ||
             (projectEventTypesLoading && source === "events");
 
+          // Options for the (searchable) key dropdown: the "match everything"
+          // entry plus every project-wide / trace name for this source. These
+          // lists can be large (hundreds of span names), which is why the key
+          // dropdown is a searchable select rather than a plain <select>.
+          const hasKeys =
+            !!traceMappingDefinition && "keys" in traceMappingDefinition;
+          const keyOptions: KeyOption[] =
+            isLoadingFieldNames || !hasKeys
+              ? []
+              : [
+                  { key: "", label: FIELD_NAME_ANY_LABEL[source] ?? "* (any)" },
+                  ...mergeProjectKeyOptions(
+                    source,
+                    traceMappingDefinition.keys(traces_),
+                  ),
+                ];
+          const selectedKeyOption =
+            keyOptions.find((option) => option.key === (key ?? "")) ?? null;
+
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
             ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
@@ -773,60 +791,55 @@ export const TracesMapping = ({
                               borderRight={0}
                               marginLeft="12px"
                             />
-                            <NativeSelect.Root
-                              width="full"
-                              disabled={isLoadingFieldNames}
-                            >
-                              <NativeSelect.Field
-                                onChange={(e) => {
-                                  setTraceMappingState((prev) => ({
-                                    ...prev,
-                                    mapping: {
-                                      ...prev.mapping,
-                                      [targetField]: {
-                                        ...(prev.mapping[targetField] as any),
-                                        key: e.target.value,
-                                      },
+                            {/* Searchable key dropdown: these lists can hold
+                                hundreds of names, so a plain <select> is hard to
+                                scan. While project-wide names load it shows a
+                                loading placeholder with a spinner. */}
+                            <MultiSelect
+                              isDisabled={isLoadingFieldNames}
+                              isLoading={isLoadingFieldNames}
+                              options={keyOptions.map((option) => ({
+                                value: option.key,
+                                label: option.label,
+                              }))}
+                              value={
+                                selectedKeyOption
+                                  ? {
+                                      value: selectedKeyOption.key,
+                                      label: selectedKeyOption.label,
+                                    }
+                                  : null
+                              }
+                              onChange={(newValue) => {
+                                const selected = newValue as {
+                                  value: string;
+                                } | null;
+                                setTraceMappingState((prev) => ({
+                                  ...prev,
+                                  mapping: {
+                                    ...prev.mapping,
+                                    [targetField]: {
+                                      ...(prev.mapping[targetField] as any),
+                                      key: selected?.value ?? "",
                                     },
-                                  }));
-                                }}
-                                value={key}
-                              >
-                                {/* While project-wide names load, show a single
-                                    placeholder so users don't pick from an
-                                    incomplete (trace-only) list. */}
-                                {isLoadingFieldNames ? (
-                                  <option value="">
-                                    {FIELD_NAME_LOADING_LABEL[source] ??
-                                      "Loading…"}
-                                  </option>
-                                ) : (
-                                  <>
-                                    {/* "match everything" option for the source */}
-                                    <option value="">
-                                      {FIELD_NAME_ANY_LABEL[source] ?? "* (any)"}
-                                    </option>
-                                    {mergeProjectKeyOptions(
-                                      source,
-                                      traceMappingDefinition.keys(traces_),
-                                    ).map(({ key, label }: KeyOption) => (
-                                      <option key={key} value={key}>
-                                        {label}
-                                      </option>
-                                    ))}
-                                  </>
-                                )}
-                              </NativeSelect.Field>
-                              <NativeSelect.Indicator />
-                            </NativeSelect.Root>
-                            {isLoadingFieldNames && (
-                              <Spinner
-                                size="sm"
-                                flexShrink={0}
-                                marginTop="8px"
-                                color="fg.muted"
-                              />
-                            )}
+                                  },
+                                }));
+                              }}
+                              placeholder={
+                                isLoadingFieldNames
+                                  ? FIELD_NAME_LOADING_LABEL[source] ??
+                                    "Loading…"
+                                  : FIELD_NAME_ANY_LABEL[source] ?? "* (any)"
+                              }
+                              chakraStyles={{
+                                container: (base) => ({
+                                  ...base,
+                                  width: "100%",
+                                  minWidth: "260px",
+                                }),
+                                menu: (base) => ({ ...base, zIndex: 2 }),
+                              }}
+                            />
                           </HStack>
                         )}
                       {subkeys && subkeys.length > 0 && (

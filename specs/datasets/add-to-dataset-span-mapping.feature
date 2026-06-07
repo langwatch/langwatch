@@ -44,6 +44,12 @@ Feature: Span field mapping when adding traces to a dataset
     When I select "spans" as the source and choose "Research.aexecute_stream"
     Then I can map its input, output, params and contexts subfields
 
+  Scenario: The span name dropdown is searchable for large projects
+    Given my project has so many span names that scanning the list is slow
+    When I select "spans" as the source for a column
+    And I type part of a span name into the dropdown
+    Then the dropdown filters down to the matching span names
+
   # ============================================================================
   # Server never silently truncates the available names or spans
   # ============================================================================
@@ -88,3 +94,21 @@ Feature: Span field mapping when adding traces to a dataset
     And the trace I opened the "Add to Dataset" drawer on has no such event
     When I select "events" as the source for a column
     Then "thumbs_up" is offered as an event type to map
+
+  # ============================================================================
+  # Span expansion behaviour (the "One row per span" toggle). Locked because
+  # saved automations persist these expansion keys; the toggle enabled means
+  # "normalize / expand", producing one row per span, not one row for all spans.
+  # ============================================================================
+
+  Scenario: Expanding spans produces one dataset row per span
+    Given a trace with three spans mapped with the spans source
+    And the "One row per span" expansion is enabled
+    When the trace is converted to dataset rows
+    Then it produces three rows, one per span
+
+  Scenario: Without the span expansion the trace stays a single row
+    Given a trace with three spans mapped with the spans source
+    And no expansion is enabled
+    When the trace is converted to dataset rows
+    Then it produces a single row whose spans field is the array of all spans
