@@ -157,9 +157,9 @@ setup() {
 setup_env_fixture() {
   TMP="$(mktemp -d)"
   pushd "$TMP" > /dev/null
-  mkdir -p langwatch langwatch_nlp node_modules/foo .next dist build vendor coverage
+  mkdir -p langwatch langevals node_modules/foo .next dist build vendor coverage
   : > langwatch/.env
-  : > langwatch_nlp/.env
+  : > langevals/.env
   : > .env
   # Excluded by suffix
   : > langwatch/.env.example
@@ -185,7 +185,7 @@ teardown_env_fixture() {
   result=$(boxd_env_files | sort)
   [[ "$result" == *"./.env"* ]]
   [[ "$result" == *"./langwatch/.env"* ]]
-  [[ "$result" == *"./langwatch_nlp/.env"* ]]
+  [[ "$result" == *"./langevals/.env"* ]]
   teardown_env_fixture
 }
 

@@ -116,13 +116,13 @@ MOCKEOF
 
   # Fixture: a fake repo root with a couple of .env files.
   WORK_DIR="$TEST_DIR/repo"
-  mkdir -p "$WORK_DIR/langwatch" "$WORK_DIR/langwatch_nlp"
+  mkdir -p "$WORK_DIR/langwatch" "$WORK_DIR/langevals"
   cat > "$WORK_DIR/langwatch/.env" <<EOF
 NEXTAUTH_URL=http://localhost:5560
 BASE_HOST=http://localhost:5560
 SOMETHING_ELSE=keep-me
 EOF
-  : > "$WORK_DIR/langwatch_nlp/.env"
+  : > "$WORK_DIR/langevals/.env"
   cd "$WORK_DIR"
 
   source "$SCRIPT_DIR/boxd-fork.sh"
