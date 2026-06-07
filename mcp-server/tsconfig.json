@@ -13,6 +13,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
+    // The evaluator catalog we import (langevals/ts-integration/evaluators.generated.ts)
+    // is Zod-first and imports `zod`, but lives outside this package's
+    // node_modules tree, so plain resolution cannot find it. Point `zod` at this
+    // package's own copy (a declared dependency) so tsc can type-check it.
+    "baseUrl": ".",
+    "paths": { "zod": ["./node_modules/zod"] },
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
