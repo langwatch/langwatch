@@ -39,6 +39,10 @@ export const suiteFormSchema = z.object({
       MAX_REPEAT_COUNT,
       `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`,
     ),
+  // null = follow the project default (scenarios.user_simulator /
+  // scenarios.judge); a string pins the model for the whole run plan.
+  simulatorModel: z.string().nullable(),
+  judgeModel: z.string().nullable(),
 });
 
 export type SuiteFormData = z.infer<typeof suiteFormSchema>;
@@ -88,6 +92,8 @@ const defaultValues: SuiteFormData = {
   selectedScenarioIds: [],
   selectedTargets: [],
   repeatCount: 1,
+  simulatorModel: null,
+  judgeModel: null,
 };
 
 export function useSuiteForm({
@@ -116,6 +122,8 @@ export function useSuiteForm({
   const selectedScenarioIds = form.watch("selectedScenarioIds");
   const selectedTargets = form.watch("selectedTargets");
   const labels = form.watch("labels");
+  const simulatorModel = form.watch("simulatorModel");
+  const judgeModel = form.watch("judgeModel");
 
   // -- Derived: available targets from agents + prompts --
   const availableTargets = useMemo(() => {
@@ -216,6 +224,8 @@ export function useSuiteForm({
         selectedScenarioIds: suite.scenarioIds,
         selectedTargets: parseSuiteTargets(suite.targets),
         repeatCount: suite.repeatCount,
+        simulatorModel: suite.simulatorModel,
+        judgeModel: suite.judgeModel,
       });
     } else if (isOpen) {
       form.reset(defaultValues);
@@ -330,6 +340,12 @@ export function useSuiteForm({
     labels,
     selectedScenarioIds,
     selectedTargets,
+    simulatorModel,
+    judgeModel,
+    setSimulatorModel: (value: string | null) =>
+      form.setValue("simulatorModel", value, { shouldDirty: true }),
+    setJudgeModel: (value: string | null) =>
+      form.setValue("judgeModel", value, { shouldDirty: true }),
 
     // UI state
     executionOptionsOpen,

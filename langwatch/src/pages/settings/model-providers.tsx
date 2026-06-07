@@ -71,7 +71,7 @@ export default function ModelsPage() {
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const updateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
-  const [providerToDisable, setProviderToDisable] = useState<{
+  const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
     provider: string;
     name: string;
@@ -248,7 +248,7 @@ export default function ModelsPage() {
           </EmptyState.Root>
         ) : (
           <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0}>
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
           <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
@@ -358,11 +358,11 @@ export default function ModelsPage() {
                               </Box>
                             </Menu.Item>
                             <Menu.Item
-                              value="disable"
+                              value="delete"
                               color="red"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setProviderToDisable({
+                                setProviderToDelete({
                                   id: provider.id ?? undefined,
                                   provider: provider.provider,
                                   name:
@@ -372,7 +372,7 @@ export default function ModelsPage() {
                             >
                               <Box display="flex" alignItems="center" gap={2}>
                                 <Trash2 size={14} />
-                                Disable Provider
+                                Delete Provider
                               </Box>
                             </Menu.Item>
                           </Menu.Content>
@@ -405,28 +405,27 @@ export default function ModelsPage() {
         />
 
         <Dialog.Root
-          open={!!providerToDisable}
+          open={!!providerToDelete}
           onOpenChange={(details) => {
             if (!details.open) {
-              setProviderToDisable(null);
+              setProviderToDelete(null);
             }
           }}
         >
           <Dialog.Content bg="bg">
             <Dialog.Header>
-              <Dialog.Title>Disable {providerToDisable?.name}?</Dialog.Title>
+              <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <VStack gap={3} align="start">
-                <Text>This provider will no longer be available for use.</Text>
+                <Text>
+                  This permanently deletes the provider and its stored API
+                  keys. This cannot be undone.
+                </Text>
                 <Text fontSize="sm" color="fg.muted">
                   Default model configs that reference this provider will
                   surface as &ldquo;Update needed&rdquo; in the table below.
                 </Text>
-                {/* Binding-count warning was tied to GatewayProviderCredential,
-                    folded into ModelProvider in iter 110. The disable action
-                    sets ModelProvider.enabled=false which is itself the
-                    source of truth — no separate binding to count. */}
               </VStack>
             </Dialog.Body>
             <Dialog.Footer>
@@ -437,14 +436,14 @@ export default function ModelsPage() {
                 colorPalette="red"
                 loading={deleteMutation.isPending}
                 onClick={async () => {
-                  if (!providerToDisable) return;
+                  if (!providerToDelete) return;
                   if (!project?.id) return;
                   await deleteMutation.mutateAsync({
-                    id: providerToDisable.id,
+                    id: providerToDelete.id,
                     projectId: project.id,
-                    provider: providerToDisable.provider,
+                    provider: providerToDelete.provider,
                   });
-                  setProviderToDisable(null);
+                  setProviderToDelete(null);
                   await refetch();
                   // Invalidate every cross-page query that gates UI on
                   // "are there enabled providers?" so the prompts page
@@ -460,7 +459,7 @@ export default function ModelsPage() {
                   ]);
                 }}
               >
-                Disable
+                Delete
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger />
@@ -528,7 +527,7 @@ function AddModelProviderMenu({
 function ProvidersTableSkeleton() {
   return (
     <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0}>
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>

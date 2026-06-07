@@ -289,7 +289,18 @@ export const ChildProcessJobDataSchema = z.object({
   /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
   scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
+  /** Model params for the target adapter (prompt / workflow under test). */
   modelParams: LiteLLMParamsSchema,
+  /**
+   * Model params for the user-simulator agent. Resolved from the run-plan /
+   * scenario override or the scenarios.user_simulator default. Optional so a
+   * job queued by an older worker (which only carried modelParams) still
+   * parses; the child falls back to modelParams when absent.
+   */
+  simulatorModelParams: LiteLLMParamsSchema.optional(),
+  /** Model params for the judge agent — same resolution + fallback as the
+   *  simulator, from the scenarios.judge default. */
+  judgeModelParams: LiteLLMParamsSchema.optional(),
   nlpServiceUrl: z.string(),
   target: TargetConfigSchema,
 });

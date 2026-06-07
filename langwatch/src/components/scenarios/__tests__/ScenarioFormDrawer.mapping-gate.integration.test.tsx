@@ -57,6 +57,25 @@ vi.mock("../SaveAndRunMenu", () => ({
     </div>
   ),
 }));
+// Auto-confirm the run-model dialog so the gate flow reaches the run; the
+// dialog UI is covered in ScenarioRunModelDialog.integration.test.tsx.
+vi.mock("../ScenarioRunModelDialog", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+  return {
+    ScenarioRunModelDialog: ({
+      open,
+      onConfirm,
+    }: {
+      open?: boolean;
+      onConfirm?: () => void;
+    }) => {
+      React.useEffect(() => {
+        if (open) onConfirm?.();
+      }, [open]);
+      return null;
+    },
+  };
+});
 
 import { ScenarioFormDrawer } from "../ScenarioFormDrawer";
 
