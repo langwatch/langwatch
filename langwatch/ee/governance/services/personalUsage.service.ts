@@ -199,14 +199,14 @@ export class PersonalUsageService {
       query: `
         SELECT
           toDate(LatestOccurredAt) AS Day,
-          sum(SpentUsd)            AS SpentUsd,
-          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledUsd,
+          sum(TraceSpentUsd)       AS SpentUsd,
+          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
           count()                  AS Requests
         FROM (
           SELECT
             TraceId,
             argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(TotalCost, UpdatedAt)  AS SpentUsd,
+            argMax(TotalCost, UpdatedAt)  AS TraceSpentUsd,
             argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
@@ -345,14 +345,14 @@ export class PersonalUsageService {
       query: `
         SELECT
           Model,
-          sum(SpentUsd) AS SpentUsd,
-          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledUsd,
+          sum(TraceSpentUsd) AS SpentUsd,
+          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
           count()       AS Requests
         FROM (
           SELECT
             TraceId,
             arrayJoin(argMax(Models, UpdatedAt)) AS Model,
-            argMax(TotalCost, UpdatedAt)         AS SpentUsd,
+            argMax(TotalCost, UpdatedAt)         AS TraceSpentUsd,
             argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
