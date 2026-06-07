@@ -224,7 +224,7 @@ describe("convertClaudeCodeLogsToSpans", () => {
   });
 
   describe("when the response is a non-conversational utility call", () => {
-    it("keeps cost + tokens but withholds the completion text", () => {
+    it("keeps cost + tokens AND carries the completion text on the span", () => {
       const spans = convertClaudeCodeLogsToSpans([
         rec({
           eventName: "api_request",
@@ -259,8 +259,12 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({
         intValue: 457,
       });
-      // ...but the utility text is NOT surfaced as the assistant's reply
-      expect(attr(span, "gen_ai.completion")).toBeUndefined();
+      // ...and the utility reply is now attached to the span so drilling in
+      // shows what the model returned. It's kept off the trace headline by the
+      // fold's accumulation gate (trace-io-accumulation.service.ts), not here.
+      expect(attr(span, "gen_ai.completion")).toEqual({
+        stringValue: '{"title": "List temporary directory"}',
+      });
     });
   });
 

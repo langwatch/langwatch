@@ -205,6 +205,17 @@ export class TraceIOAccumulationService {
       }
     }
 
+    // Claude Code utility model calls (prompt_suggestion autosuggest,
+    // generate_session_title) are not the conversation — their reply is now
+    // attached to the span (so the span detail shows it) but must NOT become
+    // the trace's headline I/O. Like tool spans, they're parentless (= root),
+    // so without this skip a utility reply could win the headline by end-time.
+    // Mirrors the log-path gate in extractIOFromLogRecord so both agree.
+    const claudeQuerySource = span.spanAttributes["claude_code.query_source"];
+    const isClaudeUtilitySpan =
+      typeof claudeQuerySource === "string" &&
+      !isConversationalQuerySource(claudeQuerySource);
+
     // Tool spans never define the trace's headline I/O: they are
     // sub-operations (a Bash run, an Edit), not the conversation. This is
     // load-bearing for synthesized claude_code tool spans, which are
@@ -214,7 +225,8 @@ export class TraceIOAccumulationService {
     if (
       spanType === "evaluation" ||
       spanType === "guardrail" ||
-      spanType === "tool"
+      spanType === "tool" ||
+      isClaudeUtilitySpan
     ) {
       return {
         computedInput,

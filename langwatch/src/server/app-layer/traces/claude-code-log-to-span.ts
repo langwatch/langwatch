@@ -445,18 +445,16 @@ function buildCollapsedSpan(
     }
   }
 
-  // OUTPUT text from the response body, gated on a genuine conversation turn so
-  // utility calls (generate_session_title / prompt_suggestion) never surface as
-  // the assistant's reply. The token/cost usage still folds for those calls.
+  // OUTPUT text from the response body — attached to EVERY model call,
+  // conversational or utility (generate_session_title / prompt_suggestion), so
+  // drilling into a utility span shows what the model actually returned. The
+  // trace-level headline output stays gated to conversation turns in
+  // trace-io-accumulation.service.ts (claude utility spans are skipped there,
+  // like tool spans), so a utility reply never becomes the trace's output.
   if (response) {
-    const querySource = asNonEmpty(response.attrs.query_source);
-    if (isConversationalQuerySource(querySource)) {
-      const outputText = extractAssistantTextFromResponseBody(
-        response.attrs.body,
-      );
-      if (outputText) {
-        attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
-      }
+    const outputText = extractAssistantTextFromResponseBody(response.attrs.body);
+    if (outputText) {
+      attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
     }
   }
 
@@ -502,11 +500,11 @@ function buildOrphanResponseSpan(
   appendProvenanceAttrs(attrs, record);
 
   const querySource = asNonEmpty(record.attrs.query_source);
-  if (isConversationalQuerySource(querySource)) {
-    const outputText = extractAssistantTextFromResponseBody(record.attrs.body);
-    if (outputText) {
-      attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
-    }
+  // Output on every model call (see buildCollapsedSpan); the trace headline
+  // stays conversational-only via the fold's accumulation gate.
+  const outputText = extractAssistantTextFromResponseBody(record.attrs.body);
+  if (outputText) {
+    attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
   }
 
   // No api_request to anchor timing on: zero-duration at the record's own time.
