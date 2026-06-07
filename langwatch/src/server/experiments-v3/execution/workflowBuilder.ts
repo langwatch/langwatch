@@ -211,26 +211,26 @@ const buildTargetNode = (
         loadedData.prompt?.name ??
         targetConfig.id;
       return {
-        targetNode: buildSignatureNodeFromLocalConfig(
-          targetNodeId,
+        targetNode: buildSignatureNodeFromLocalConfig({
+          nodeId: targetNodeId,
           name,
-          targetConfig.localPromptConfig,
+          localConfig: targetConfig.localPromptConfig,
           targetConfig,
           cell,
           // The base prompt this draft started from (may be undefined for a
           // brand-new local prompt with no saved base).
-          loadedData.prompt,
-        ),
+          basePrompt: loadedData.prompt,
+        }),
         targetNodeId,
       };
     } else if (loadedData.prompt) {
       return {
-        targetNode: buildSignatureNodeFromPrompt(
-          targetNodeId,
-          loadedData.prompt,
+        targetNode: buildSignatureNodeFromPrompt({
+          nodeId: targetNodeId,
+          prompt: loadedData.prompt,
           targetConfig,
           cell,
-        ),
+        }),
         targetNodeId,
       };
     } else {
@@ -363,12 +363,17 @@ export const buildEvaluatorTargetNode = (
 /**
  * Builds a signature node from a VersionedPrompt (database prompt).
  */
-export const buildSignatureNodeFromPrompt = (
-  nodeId: string,
-  prompt: VersionedPrompt,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): Node<Signature> => {
+export const buildSignatureNodeFromPrompt = ({
+  nodeId,
+  prompt,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  prompt: VersionedPrompt;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): Node<Signature> => {
   const inputs = (prompt.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],
@@ -500,15 +505,22 @@ const buildPromptIdentity = (identity: {
 /**
  * Builds a signature node from LocalPromptConfig (unsaved local changes).
  */
-export const buildSignatureNodeFromLocalConfig = (
-  nodeId: string,
-  name: string,
-  localConfig: LocalPromptConfig,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
+export const buildSignatureNodeFromLocalConfig = ({
+  nodeId,
+  name,
+  localConfig,
+  targetConfig,
+  cell,
+  basePrompt,
+}: {
+  nodeId: string;
+  name: string;
+  localConfig: LocalPromptConfig;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
   /** The saved prompt this draft started from, if any. */
-  basePrompt?: VersionedPrompt,
-): Node<Signature> => {
+  basePrompt?: VersionedPrompt;
+}): Node<Signature> => {
   const inputs = localConfig.inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],

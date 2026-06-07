@@ -798,34 +798,34 @@ describe("buildSignatureNodeFromPrompt", () => {
     datasetEntry: { _datasetId: "dataset-1", question: "I want a refund" },
   });
 
-  it("forwards configId, handle and versionMetadata from the saved prompt", () => {
-    const node = buildSignatureNodeFromPrompt(
-      "target-1",
-      createVersionedPrompt(),
-      createPromptTargetConfig(),
-      createCell(),
-    );
-    const data = node.data as LlmPromptConfigComponent;
+  describe("given a target backed by a saved prompt", () => {
+    describe("when building the signature node", () => {
+      const buildNode = () =>
+        buildSignatureNodeFromPrompt({
+          nodeId: "target-1",
+          prompt: createVersionedPrompt(),
+          targetConfig: createPromptTargetConfig(),
+          cell: createCell(),
+        });
 
-    expect(data.configId).toBe("prompt_supportrouter_xyz");
-    expect(data.handle).toBe("support-router");
-    expect(data.versionMetadata).toEqual({
-      versionId: "prompt_version_supportrouter_v6",
-      versionNumber: 6,
-      versionCreatedAt: "2026-01-15T10:00:00.000Z",
+      it("forwards configId, handle and versionMetadata from the saved prompt", () => {
+        const data = buildNode().data as LlmPromptConfigComponent;
+
+        expect(data.configId).toBe("prompt_supportrouter_xyz");
+        expect(data.handle).toBe("support-router");
+        expect(data.versionMetadata).toEqual({
+          versionId: "prompt_version_supportrouter_v6",
+          versionNumber: 6,
+          versionCreatedAt: "2026-01-15T10:00:00.000Z",
+        });
+      });
+
+      it("does not flag a saved prompt as a draft", () => {
+        const data = buildNode().data as LlmPromptConfigComponent;
+
+        expect(data.promptDraft).toBeUndefined();
+      });
     });
-  });
-
-  it("does not flag a saved prompt as a draft", () => {
-    const node = buildSignatureNodeFromPrompt(
-      "target-1",
-      createVersionedPrompt(),
-      createPromptTargetConfig(),
-      createCell(),
-    );
-    const data = node.data as LlmPromptConfigComponent;
-
-    expect(data.promptDraft).toBeUndefined();
   });
 });
 
@@ -880,35 +880,43 @@ describe("buildSignatureNodeFromLocalConfig", () => {
     datasetEntry: { _datasetId: "dataset-1", question: "I want a refund" },
   });
 
-  it("keeps the base prompt identity and flags promptDraft when edited from a saved base", () => {
-    const node = buildSignatureNodeFromLocalConfig(
-      "target-1",
-      "support-router",
-      createLocalPromptConfig(),
-      createTargetConfig(),
-      createCell(),
-      createBasePrompt(),
-    );
-    const data = node.data as LlmPromptConfigComponent;
+  describe("given a local prompt edited from a saved base", () => {
+    describe("when building the signature node", () => {
+      it("keeps the base prompt identity and flags promptDraft", () => {
+        const node = buildSignatureNodeFromLocalConfig({
+          nodeId: "target-1",
+          name: "support-router",
+          localConfig: createLocalPromptConfig(),
+          targetConfig: createTargetConfig(),
+          cell: createCell(),
+          basePrompt: createBasePrompt(),
+        });
+        const data = node.data as LlmPromptConfigComponent;
 
-    expect(data.configId).toBe("prompt_supportrouter_xyz");
-    expect(data.handle).toBe("support-router");
-    expect(data.versionMetadata?.versionNumber).toBe(6);
-    expect(data.promptDraft).toBe(true);
+        expect(data.configId).toBe("prompt_supportrouter_xyz");
+        expect(data.handle).toBe("support-router");
+        expect(data.versionMetadata?.versionNumber).toBe(6);
+        expect(data.promptDraft).toBe(true);
+      });
+    });
   });
 
-  it("forwards no prompt identity for a brand-new local prompt with no saved base", () => {
-    const node = buildSignatureNodeFromLocalConfig(
-      "target-1",
-      "draft",
-      createLocalPromptConfig(),
-      createTargetConfig(),
-      createCell(),
-      undefined,
-    );
-    const data = node.data as LlmPromptConfigComponent;
+  describe("given a brand-new local prompt with no saved base", () => {
+    describe("when building the signature node", () => {
+      it("forwards no prompt identity", () => {
+        const node = buildSignatureNodeFromLocalConfig({
+          nodeId: "target-1",
+          name: "draft",
+          localConfig: createLocalPromptConfig(),
+          targetConfig: createTargetConfig(),
+          cell: createCell(),
+          basePrompt: undefined,
+        });
+        const data = node.data as LlmPromptConfigComponent;
 
-    expect(data.configId).toBeUndefined();
-    expect(data.promptDraft).toBeUndefined();
+        expect(data.configId).toBeUndefined();
+        expect(data.promptDraft).toBeUndefined();
+      });
+    });
   });
 });

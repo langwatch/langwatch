@@ -174,13 +174,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
@@ -192,13 +192,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
@@ -216,13 +216,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const instructionsParam = (
         node.data as LlmPromptConfigComponent
@@ -235,13 +235,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const messagesParam = (
         node.data as LlmPromptConfigComponent
@@ -256,13 +256,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.data.inputs).toHaveLength(1);
       expect(node.data.inputs?.[0]?.identifier).toBe("input");
@@ -300,12 +300,12 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromPrompt(
-        "test-node",
+      const node = buildSignatureNodeFromPrompt({
+        nodeId: "test-node",
         prompt,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
@@ -317,12 +317,12 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromPrompt(
-        "test-node",
+      const node = buildSignatureNodeFromPrompt({
+        nodeId: "test-node",
         prompt,
         targetConfig,
         cell,
-      );
+      });
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
