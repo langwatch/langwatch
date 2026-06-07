@@ -119,23 +119,28 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("TotalCost");
       });
 
-      it("translates performance.cost_billed to zero out bundled traces", () => {
+      it("translates performance.cost_billed to TotalCost minus the bundled portion", () => {
         const result = translateMetric("performance.cost_billed", "sum", 0);
         expect(result.selectExpression).toContain("sum(");
+        // billed = grand total minus the folded non-billed amount.
+        expect(result.selectExpression).toContain("coalesce(ts.TotalCost, 0) -");
+        // the non-billed amount prefers the folded column ...
+        expect(result.selectExpression).toContain("ts.NonBilledCost");
+        // ... falling back to the legacy boolean for pre-column rows.
         expect(result.selectExpression).toContain(
-          "Attributes['langwatch.cost.non_billable'] = 'true', 0,"
+          "Attributes['langwatch.cost.non_billable'] = 'true'"
         );
-        expect(result.selectExpression).toContain("TotalCost");
       });
 
-      it("translates performance.cost_non_billed to keep only bundled traces", () => {
+      it("translates performance.cost_non_billed to the folded bundled amount with legacy fallback", () => {
         const result = translateMetric("performance.cost_non_billed", "sum", 0);
         expect(result.selectExpression).toContain("sum(");
+        // prefers the fold-time column ...
+        expect(result.selectExpression).toContain("coalesce(ts.NonBilledCost,");
+        // ... then the legacy all-or-nothing boolean, then 0.
         expect(result.selectExpression).toContain(
-          "Attributes['langwatch.cost.non_billable'] = 'true',"
+          "Attributes['langwatch.cost.non_billable'] = 'true', ts.TotalCost, 0"
         );
-        // bundled branch keeps the cost, non-bundled contributes 0
-        expect(result.selectExpression).toMatch(/TotalCost,\s*0\)/);
       });
 
       it("translates performance.first_token with p95", () => {

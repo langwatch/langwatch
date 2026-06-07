@@ -64,6 +64,7 @@ function buildFoldState(
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: overrides.totalCost ?? 0.0125,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 300,
     totalCompletionTokenCount: 150,

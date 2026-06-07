@@ -40,6 +40,7 @@ import {
   SpanTimingService,
   SpanStatusService,
   SpanCostService,
+  NON_BILLABLE_ATTR,
   TraceOriginService,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
@@ -283,6 +284,7 @@ export class TraceSummaryFoldProjection
       errorMessage: null,
       models: [],
       totalCost: null,
+      nonBilledCost: null,
       tokensEstimated: false,
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
@@ -455,6 +457,7 @@ export class TraceSummaryFoldProjection
     // for cost so we don't double-count across replays.
     let models = state.models;
     let totalCost = state.totalCost;
+    let nonBilledCost = state.nonBilledCost;
     let totalPromptTokenCount = state.totalPromptTokenCount;
     let totalCompletionTokenCount = state.totalCompletionTokenCount;
     const liftedModel = liftedAttrs["langwatch.model"];
@@ -464,6 +467,13 @@ export class TraceSummaryFoldProjection
     const liftedCost = Number(liftedAttrs["langwatch.cost.usd"]);
     if (Number.isFinite(liftedCost) && liftedCost > 0) {
       totalCost = (totalCost ?? 0) + liftedCost;
+      // A log-only emitter has no per-span markers; the receiver stamps the
+      // bundled flag on the log record's resource, so classify the whole
+      // increment by that.
+      const resAttr = event.data.resourceAttributes?.[NON_BILLABLE_ATTR];
+      if (resAttr === "true") {
+        nonBilledCost = (nonBilledCost ?? 0) + liftedCost;
+      }
     }
     const liftedIn = Number(liftedAttrs["langwatch.input_tokens"]);
     if (Number.isFinite(liftedIn) && liftedIn > 0) {
@@ -483,6 +493,7 @@ export class TraceSummaryFoldProjection
       attributes: mergedAttributes,
       models,
       totalCost,
+      nonBilledCost,
       totalPromptTokenCount,
       totalCompletionTokenCount,
     };

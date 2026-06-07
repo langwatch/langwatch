@@ -5,10 +5,11 @@
  * LLM spend depends on how they pay the provider: gateway / virtual-key usage
  * is billed per token, while a coding assistant on a bundled subscription
  * (e.g. Claude Max) is NOT billed per token, so its list-price token cost is
- * theoretical. The receiver tags bundled ingest traces with
- * `langwatch.cost.non_billable = "true"` (resolved from the tool's
- * `bundledPlan` admin flag), so we can split a trace's list-price cost into
- * the amount actually billed per token vs the bundled (theoretical) portion.
+ * theoretical. The bundled portion is summed per span at fold time into the
+ * trace's `nonBilledCost`, so a trace that mixes billed and bundled spans
+ * splits correctly. Rows folded before that column existed fall back to the
+ * legacy all-or-nothing `langwatch.cost.non_billable = "true"` marker (resolved
+ * by the receiver from the tool's `bundledPlan` admin flag).
  */
 
 /** Resource attribute the receiver stamps on bundled ingest traces. */
@@ -43,4 +44,29 @@ export function splitTraceCost({
   return nonBillable
     ? { billedCost: 0, nonBilledCost: grand }
     : { billedCost: grand, nonBilledCost: 0 };
+}
+
+/**
+ * Resolve a trace's bundled (non-billed) cost. Prefers the fold-time per-span
+ * `nonBilledCost` amount; for rows folded before that column existed (null),
+ * falls back to the legacy all-or-nothing boolean. Clamped to [0, totalCost].
+ */
+export function resolveNonBilledCost({
+  foldedNonBilledCost,
+  totalCost,
+  attributes,
+}: {
+  foldedNonBilledCost: number | null | undefined;
+  totalCost: number | null | undefined;
+  attributes: Record<string, string> | null | undefined;
+}): number {
+  const grand = totalCost ?? 0;
+  const folded =
+    foldedNonBilledCost != null
+      ? foldedNonBilledCost
+      : splitTraceCost({
+          totalCost,
+          nonBillable: isNonBillableTrace(attributes),
+        }).nonBilledCost;
+  return Math.min(Math.max(0, folded), grand);
 }

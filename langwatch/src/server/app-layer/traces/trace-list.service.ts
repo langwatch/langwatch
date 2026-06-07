@@ -2,10 +2,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
-import {
-  isNonBillableTrace,
-  splitTraceCost,
-} from "~/features/traces-v2/utils/costAttribution";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createLogger } from "~/utils/logger/server";
 import type {
   ExpressionCategoricalDef,
@@ -1085,10 +1082,11 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,
     totalCost: row.totalCost ?? 0,
-    nonBilledCost: splitTraceCost({
+    nonBilledCost: resolveNonBilledCost({
+      foldedNonBilledCost: row.nonBilledCost,
       totalCost: row.totalCost,
-      nonBillable: isNonBillableTrace(row.attributes),
-    }).nonBilledCost,
+      attributes: row.attributes,
+    }),
     totalTokens,
     inputTokens: row.totalPromptTokenCount,
     outputTokens: row.totalCompletionTokenCount,

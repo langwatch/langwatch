@@ -59,6 +59,12 @@ export const traceSummaryDataSchema = z.object({
   errorMessage: z.string().nullable(),
   models: z.array(z.string()),
   totalCost: z.number().nullable(),
+  // Bundled portion of totalCost, summed per span at fold time (a span whose
+  // langwatch.cost.non_billable marker is set is covered by a flat plan, not
+  // billed per token). Billed = totalCost - nonBilledCost. Null for rows
+  // folded before the column existed; the read layer falls back to the legacy
+  // trace-level boolean for those.
+  nonBilledCost: z.number().nullable(),
   tokensEstimated: z.boolean(),
   totalPromptTokenCount: z.number().nullable(),
   totalCompletionTokenCount: z.number().nullable(),

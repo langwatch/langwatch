@@ -27,6 +27,7 @@ export interface TraceSummaryFieldsBase {
   ErrorMessage: string | null;
   Models: string[];
   TotalCost: number | null;
+  NonBilledCost: number | null;
   TokensEstimated: boolean;
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;

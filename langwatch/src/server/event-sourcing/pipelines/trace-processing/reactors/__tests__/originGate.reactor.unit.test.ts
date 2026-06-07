@@ -29,6 +29,7 @@ function createFoldState(
     errorMessage: null,
     models: [],
     totalCost: null,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,

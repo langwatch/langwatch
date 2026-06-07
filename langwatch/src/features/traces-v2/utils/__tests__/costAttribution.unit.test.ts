@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isNonBillableTrace,
   NON_BILLABLE_ATTR,
+  resolveNonBilledCost,
   splitTraceCost,
 } from "../costAttribution";
 
@@ -50,6 +51,58 @@ describe("splitTraceCost", () => {
       expect(
         splitTraceCost({ totalCost: undefined, nonBillable: false }),
       ).toEqual({ billedCost: 0, nonBilledCost: 0 });
+    });
+  });
+});
+
+describe("resolveNonBilledCost", () => {
+  describe("when the fold-time amount is present", () => {
+    it("uses the folded amount and ignores the legacy boolean", () => {
+      // A mixed trace: folded bundled portion is 0.30 of a 1.00 total, even
+      // though the legacy boolean marks the whole trace bundled.
+      expect(
+        resolveNonBilledCost({
+          foldedNonBilledCost: 0.3,
+          totalCost: 1,
+          attributes: { [NON_BILLABLE_ATTR]: "true" },
+        }),
+      ).toBe(0.3);
+    });
+
+    it("clamps the folded amount to [0, totalCost]", () => {
+      expect(
+        resolveNonBilledCost({
+          foldedNonBilledCost: 5,
+          totalCost: 1,
+          attributes: null,
+        }),
+      ).toBe(1);
+      expect(
+        resolveNonBilledCost({
+          foldedNonBilledCost: -2,
+          totalCost: 1,
+          attributes: null,
+        }),
+      ).toBe(0);
+    });
+  });
+
+  describe("when the fold-time amount is null (row folded before the column existed)", () => {
+    it("falls back to the all-or-nothing legacy boolean", () => {
+      expect(
+        resolveNonBilledCost({
+          foldedNonBilledCost: null,
+          totalCost: 0.42,
+          attributes: { [NON_BILLABLE_ATTR]: "true" },
+        }),
+      ).toBe(0.42);
+      expect(
+        resolveNonBilledCost({
+          foldedNonBilledCost: null,
+          totalCost: 0.42,
+          attributes: {},
+        }),
+      ).toBe(0);
     });
   });
 });

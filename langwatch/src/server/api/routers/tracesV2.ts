@@ -1,9 +1,6 @@
 import { on } from "node:events";
 import { z } from "zod";
-import {
-  isNonBillableTrace,
-  splitTraceCost,
-} from "~/features/traces-v2/utils/costAttribution";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
@@ -96,9 +93,10 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
 
   const status = deriveTraceStatus(summary);
 
-  const { nonBilledCost } = splitTraceCost({
+  const nonBilledCost = resolveNonBilledCost({
+    foldedNonBilledCost: summary.nonBilledCost,
     totalCost: summary.totalCost,
-    nonBillable: isNonBillableTrace(summary.attributes),
+    attributes: summary.attributes,
   });
 
   return {
