@@ -44,6 +44,20 @@ Feature: Zod schemas are the single source of truth for shared types
     Then every evaluator name, category, required fields and default settings are present
     And the catalog content matches what was shipped before the source-of-truth change
 
+  @unit
+  Scenario: Evaluator entry fields with a default are classified optional
+    Given an evaluator declares an entry field that carries a default value
+    When the catalog classifies that field as required or optional
+    Then the field is listed as optional rather than required
+    And the classification matches the evaluation service's own optional contract
+
+  @unit
+  Scenario: A chat message text part keeps the pi-ai content field
+    Given a producer sends a text content part using the pi-ai "content" key
+    When the shared chat content schema parses it
+    Then the content value is preserved rather than stripped by the union order
+    And a part carrying both text and content keeps both values
+
   Scenario: The SDK ships the same shared schemas without a generation step
     Given the TypeScript SDK consumes the shared trace and evaluator shapes
     When the SDK is built

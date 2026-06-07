@@ -53,10 +53,7 @@ export const chatRichContentSchema = z.union([
   z.object({
     type: z.literal("text"),
     text: z.string().optional(),
-  }),
-  z.object({
     /** pi-ai uses `content` instead of `text` inside text blocks */
-    type: z.literal("text"),
     content: z.string().optional(),
   }),
   z.object({

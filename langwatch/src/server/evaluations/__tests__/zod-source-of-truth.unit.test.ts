@@ -7,6 +7,7 @@ import {
   evaluatorsSchema,
 } from "~/server/evaluations/evaluators.generated";
 import {
+  chatRichContentSchema,
   collectorRESTParamsSchema,
   spanInputOutputSchema,
   spanSchema,
@@ -82,6 +83,21 @@ describe("given Zod schemas are the single source of truth", () => {
     });
   });
 
+  describe("when a chat text part uses the pi-ai `content` key", () => {
+    /** @scenario A chat message text part keeps the pi-ai content field */
+    it("preserves `content` instead of dropping it via the union order", () => {
+      // A text part carrying only `content` must not be silently stripped to
+      // `{ type: "text" }` by an earlier union branch that only knows `text`.
+      expect(
+        chatRichContentSchema.parse({ type: "text", content: "hi" }),
+      ).toEqual({ type: "text", content: "hi" });
+      // A part carrying both keeps both.
+      expect(
+        chatRichContentSchema.parse({ type: "text", text: "a", content: "b" }),
+      ).toEqual({ type: "text", text: "a", content: "b" });
+    });
+  });
+
   describe("when an evaluator is configured with partial settings", () => {
     /** @scenario Evaluator settings are validated against schemas built from the evaluator catalog */
     it("fills missing settings from their defaults and rejects invalid values", () => {
@@ -120,6 +136,34 @@ describe("given Zod schemas are the single source of truth", () => {
         expect(definition.name).toBeTruthy();
         expect(Array.isArray(definition.requiredFields)).toBe(true);
       }
+    });
+  });
+
+  describe("when an evaluator entry field declares a default value", () => {
+    /** @scenario Evaluator entry fields with a default are classified optional */
+    it("lists defaulted entry fields as optional, not required", () => {
+      // exact_match's `output`/`expected_output` carry defaults in the
+      // evaluation service, so they are omittable — the catalog must reflect
+      // that contract instead of forcing them to be mapped.
+      const exactMatch = AVAILABLE_EVALUATORS["langevals/exact_match"];
+      expect(exactMatch.requiredFields).toEqual([]);
+      expect(exactMatch.optionalFields).toEqual(["output", "expected_output"]);
+
+      const answerMatch = AVAILABLE_EVALUATORS["langevals/llm_answer_match"];
+      expect(answerMatch.requiredFields).toEqual([]);
+      expect(answerMatch.optionalFields).toEqual([
+        "input",
+        "output",
+        "expected_output",
+      ]);
+
+      // The fix only relaxes fields the service marks optional — it does not
+      // blanket-empty every catalog entry; evaluators with genuinely required
+      // entry fields still list them.
+      const someStillRequired = Object.values(AVAILABLE_EVALUATORS).some(
+        (definition) => definition.requiredFields.length > 0,
+      );
+      expect(someStillRequired).toBe(true);
     });
   });
 });

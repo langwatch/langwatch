@@ -154,7 +154,7 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
         evaluator_info["result"]["label"] = {"description": label_field.description}
 
     def is_field_optional(field):
-        if not field.is_required:
+        if not field.is_required():
             return True
         if get_origin(field.annotation) is Union and type(None) in get_args(
             field.annotation
