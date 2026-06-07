@@ -4,6 +4,7 @@ import {
   AI_TOOL_ORIGIN_VALUE,
   CODING_AGENT_ORIGIN_VALUE,
   originForIngestSourceType,
+  stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
 } from "../ingestKeyProvenance.utils";
 
@@ -143,6 +144,48 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
       const noTemplate = { resourceMetrics: [{ resource: { attributes: [] } }] };
       stampIngestKeyProvenanceOnMetricRequest(noTemplate, PROVENANCE);
       expect(attrMap(noTemplate.resourceMetrics[0]!.resource.attributes)["langwatch.template.id"]).toBeUndefined();
+    });
+  });
+});
+
+// Claude Code (and other coding assistants) export OTLP *logs*, not spans, so
+// the bundled-cost marker has to ride on the log request too — the trace path
+// alone would never stamp it for them.
+describe("stampIngestKeyProvenanceOnLogRequest", () => {
+  describe("given a bundled (non-billable) coding-assistant log request", () => {
+    it("stamps origin, source and langwatch.cost.non_billable on every resource", () => {
+      const request = {
+        resourceLogs: [
+          { resource: { attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }] } },
+          { resource: { attributes: [] } },
+        ],
+      };
+      const stamped = stampIngestKeyProvenanceOnLogRequest(request, {
+        ...PROVENANCE,
+        nonBillable: true,
+      });
+      expect(stamped).toBe(2);
+      for (const rl of request.resourceLogs) {
+        const map = attrMap(rl.resource.attributes);
+        expect(map["langwatch.source"]).toBe("claude_code");
+        expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
+        expect(map["langwatch.cost.non_billable"]).toBe("true");
+      }
+    });
+  });
+
+  describe("given a billed log request", () => {
+    it("stamps 'false' when nonBillable is false", () => {
+      const request = { resourceLogs: [{ resource: { attributes: [] } }] };
+      stampIngestKeyProvenanceOnLogRequest(request, {
+        ...PROVENANCE,
+        nonBillable: false,
+      });
+      expect(
+        attrMap(request.resourceLogs[0]!.resource.attributes)[
+          "langwatch.cost.non_billable"
+        ],
+      ).toBe("false");
     });
   });
 });
