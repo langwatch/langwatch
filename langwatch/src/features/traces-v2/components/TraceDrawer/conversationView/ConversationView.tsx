@@ -135,7 +135,10 @@ export const ConversationView = memo(function ConversationView({
         fromTraceId: currentTraceIdRef.current,
         fromViewMode: "conversation",
         toTraceId: traceId,
-        toViewMode: "trace",
+        // Open the turn's Summary, not the raw Trace tab — and transiently, so
+        // peeking at a turn doesn't repoint the user's remembered tab.
+        toViewMode: "summary",
+        persistViewMode: false,
       });
     },
     [navigateToTrace],

@@ -222,7 +222,6 @@ function ThreadMessage({
   icon,
   text,
   reasoning,
-  isSelected = false,
   onClick,
   annotation,
 }: Omit<TurnMessageProps, "layout" | "side">) {
@@ -231,6 +230,9 @@ function ThreadMessage({
   const display = truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS });
   const hasAnnotation = !!annotation && annotation.count > 0;
 
+  // No persistent "selected" background — the active turn reads flat like the
+  // rest of the thread (ChatGPT-style); only a transient hover cue signals the
+  // row is clickable.
   return (
     <Flex
       gap={2.5}
@@ -239,12 +241,9 @@ function ThreadMessage({
       paddingX={3}
       paddingY={2.5}
       borderRadius="lg"
-      bg={isSelected ? "bg.muted" : "transparent"}
       cursor={onClick ? "pointer" : "default"}
       transition="background 0.15s ease"
-      _hover={
-        onClick ? { bg: isSelected ? "bg.muted" : "bg.subtle" } : undefined
-      }
+      _hover={onClick ? { bg: "bg.subtle" } : undefined}
       onClick={(e: React.MouseEvent) => {
         if (!onClick) return;
         e.stopPropagation();
