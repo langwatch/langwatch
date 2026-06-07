@@ -12,6 +12,7 @@ import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
@@ -162,34 +163,56 @@ function MyUsagePage() {
                   const theoreticalPct = (d.usd / maxDay) * 100;
                   const billedPct = (d.billedUsd / maxDay) * 100;
                   return (
-                    <Box
+                    <Tooltip
                       key={d.day}
-                      flex={1}
-                      position="relative"
-                      height="full"
-                      title={`${d.day} · theoretical ${fmtUsd(d.usd)} · billed ${fmtUsd(d.billedUsd)}`}
+                      openDelay={100}
+                      positioning={{ placement: "top" }}
+                      content={
+                        <VStack gap={0.5} align="start">
+                          <Text fontWeight="semibold">{d.day}</Text>
+                          <Text>Theoretical: {fmtUsd(d.usd)}</Text>
+                          <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
+                        </VStack>
+                      }
                     >
-                      {showTheoretical && (
+                      <Box
+                        flex={1}
+                        position="relative"
+                        height="full"
+                        cursor="default"
+                      >
+                        {/* Always-present baseline so empty days still read as a
+                            point on the timeline instead of a blank gap. */}
                         <Box
                           position="absolute"
                           bottom={0}
                           width="full"
-                          backgroundColor="purple.300"
-                          borderRadius="sm"
-                          height={`${Math.max(d.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+                          height="2px"
+                          borderRadius="full"
+                          backgroundColor="blue.200"
                         />
-                      )}
-                      {showBilled && (
-                        <Box
-                          position="absolute"
-                          bottom={0}
-                          width="full"
-                          backgroundColor="green.500"
-                          borderRadius="sm"
-                          height={`${Math.max(d.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                        />
-                      )}
-                    </Box>
+                        {showTheoretical && d.usd > 0 && (
+                          <Box
+                            position="absolute"
+                            bottom={0}
+                            width="full"
+                            backgroundColor="blue.200"
+                            borderRadius="sm"
+                            height={`${Math.max(2, theoreticalPct)}%`}
+                          />
+                        )}
+                        {showBilled && d.billedUsd > 0 && (
+                          <Box
+                            position="absolute"
+                            bottom={0}
+                            width="full"
+                            backgroundColor="blue.400"
+                            borderRadius="sm"
+                            height={`${Math.max(2, billedPct)}%`}
+                          />
+                        )}
+                      </Box>
+                    </Tooltip>
                   );
                 })}
               </HStack>
@@ -220,36 +243,48 @@ function MyUsagePage() {
                     <Text fontSize="sm" minWidth="120px">
                       {tool.tool}
                     </Text>
-                    <Box
-                      flex={1}
-                      height="14px"
-                      backgroundColor="bg.muted"
-                      borderRadius="sm"
-                      overflow="hidden"
-                      position="relative"
-                      title={`theoretical ${fmtUsd(tool.usd)} · billed ${fmtUsd(tool.billedUsd)}`}
+                    <Tooltip
+                      openDelay={100}
+                      positioning={{ placement: "top" }}
+                      content={
+                        <VStack gap={0.5} align="start">
+                          <Text fontWeight="semibold">{tool.tool}</Text>
+                          <Text>Theoretical: {fmtUsd(tool.usd)}</Text>
+                          <Text>Billed: {fmtUsd(tool.billedUsd)}</Text>
+                        </VStack>
+                      }
                     >
-                      {showTheoretical && (
-                        <Box
-                          position="absolute"
-                          left={0}
-                          top={0}
-                          height="full"
-                          width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
-                          backgroundColor="purple.300"
-                        />
-                      )}
-                      {showBilled && (
-                        <Box
-                          position="absolute"
-                          left={0}
-                          top={0}
-                          height="full"
-                          width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                          backgroundColor="green.500"
-                        />
-                      )}
-                    </Box>
+                      <Box
+                        flex={1}
+                        height="14px"
+                        backgroundColor="bg.muted"
+                        borderRadius="sm"
+                        overflow="hidden"
+                        position="relative"
+                        cursor="default"
+                      >
+                        {showTheoretical && (
+                          <Box
+                            position="absolute"
+                            left={0}
+                            top={0}
+                            height="full"
+                            width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+                            backgroundColor="blue.200"
+                          />
+                        )}
+                        {showBilled && (
+                          <Box
+                            position="absolute"
+                            left={0}
+                            top={0}
+                            height="full"
+                            width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
+                            backgroundColor="blue.400"
+                          />
+                        )}
+                      </Box>
+                    </Tooltip>
                     <VStack
                       gap={0}
                       align="end"
@@ -260,7 +295,7 @@ function MyUsagePage() {
                         <Text color="fg.muted">{fmtUsd(tool.usd)}</Text>
                       )}
                       {showBilled && tool.billedUsd !== tool.usd && (
-                        <Text color="green.600" fontSize="xs">
+                        <Text color="blue.600" fontSize="xs">
                           {fmtUsd(tool.billedUsd)} billed
                         </Text>
                       )}
@@ -423,7 +458,7 @@ function EmptyState({ message, hint }: { message: string; hint?: string }) {
 }
 
 // Clickable legend for the two cost series shared by the spend charts.
-// Purple = theoretical (list price, includes bundled), green = actually billed.
+// Light blue = theoretical (list price, includes bundled), blue = actually billed.
 function CostSeriesLegend({
   showTheoretical,
   showBilled,
@@ -439,13 +474,13 @@ function CostSeriesLegend({
     <HStack gap={4} fontSize="xs">
       <LegendChip
         label="Theoretical"
-        color="purple.300"
+        color="blue.200"
         active={showTheoretical}
         onClick={onToggleTheoretical}
       />
       <LegendChip
         label="Billed"
-        color="green.500"
+        color="blue.400"
         active={showBilled}
         onClick={onToggleBilled}
       />
