@@ -731,10 +731,9 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
 
-  # Resource requirements for the NLP service.
-  # The service is a lean static Go binary (nlpgo); it only spawns a transient
-  # Python interpreter to sandbox user code blocks, so it needs far less than the
-  # old Python (litellm + dspy + uvicorn) service did.
+  # Resource requirements for the NLP service. The service is a lean static Go
+  # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
+  # user code blocks, so it has a small footprint.
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langwatch_nlp.resources Resource requests and limits.
   ## @param langwatch_nlp.resources.requests.cpu [string, default: 250m] Requested CPU.
