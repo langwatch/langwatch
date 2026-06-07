@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * CliBootstrapService - shared logic for the Storyboard Screen 4
- * login-completion ceremony. Returns inherited providers + monthly
- * budget. Consumed by both:
+ * CliBootstrapService - shared logic for the login-completion ceremony.
+ * Returns the member's available AI tools (coding assistants they can run),
+ * the model providers they can mint a personal virtual key for, and their
+ * monthly budget. Consumed by both:
  *
  *   - tRPC `api.user.cliBootstrap` (session-cookie auth, /me dashboard)
  *   - REST `/api/auth/cli/bootstrap` (Bearer access_token, CLI device-flow)
  *
- * Both surfaces need the same shape so the CLI's
- * `formatLoginCeremony({ providers, budget })` (typescript-sdk
- * b8b21bb79) renders identically regardless of which path the data
- * came through.
+ * Both surfaces share this shape so the CLI's `formatLoginCeremony` renders
+ * identically regardless of which path the data came through.
  *
- * Empty-state safe - returns providers=[] + budget={null, 0, MONTHLY}
- * when the user has no personal workspace yet (fresh login flow,
- * no admin VK provisioning yet).
+ * Tools + providers are sourced from the org's AI Tools catalog (the same
+ * tiles the /me portal renders), so the CLI only ever surfaces tools the org
+ * actually published, not env-fed project providers the org never assigned.
  *
- * Spec contracts:
- *   - Storyboard Screen 4 (gateway.md)
- *   - Phase 1B.5 atomic-task block (PR-3524-DESCRIPTION.md)
+ * Empty-state safe - tools/providers fall back to empty when the org has no
+ * catalog, and budget collapses to {null, 0, MONTHLY} when the user has no
+ * personal workspace yet (fresh login flow, no VK provisioning yet).
  */
 import type { PrismaClient } from "@prisma/client";
 
@@ -30,11 +29,6 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
-import {
-  getProviderModelOptions,
-  modelProviders as modelProviderRegistry,
-} from "~/server/modelProviders/registry";
 import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
@@ -46,10 +40,29 @@ import {
 } from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
+  /**
+   * Coding assistants the member can run via `langwatch <slug>`. Sourced
+   * from the org's published coding_assistant catalog tiles (the same tiles
+   * the /me portal renders), so the CLI "your AI tools" list and "try it"
+   * commands only ever surface tools the org actually offers. Empty when the
+   * org has not published any coding-assistant tile; the CLI then falls back
+   * to its built-in default wrapper list.
+   */
+  tools: Array<{
+    slug: string;
+    displayName: string;
+  }>;
+  /**
+   * Model providers the member can mint a personal virtual key for. Sourced
+   * from the org's published model_provider catalog tiles (NOT the env-fed
+   * project providers), each flagged with whether a live credential exists.
+   * This is distinct from `tools`: providers back virtual keys, tools are the
+   * coding assistants you run.
+   */
   providers: Array<{
     name: string;
     displayName: string;
-    models: string[];
+    configured: boolean;
   }>;
   budget: {
     monthlyLimitUsd: number | null;
@@ -118,25 +131,38 @@ export class CliBootstrapService {
       userId: input.userId,
     });
 
+    // Tools + providers come from the org's catalog (org + member scoped),
+    // not the personal workspace — a member sees the tools they can run and
+    // the providers they can mint a key for even before any VK provisioning.
+    const catalog = await AiToolEntryService.create(
+      this.prisma,
+    ).resolveCliCatalogForUser({
+      organizationId: input.organizationId,
+      userId: input.userId,
+    });
+    const providers = catalog.providers.map((p) => ({
+      name: p.providerKey,
+      displayName: p.displayName,
+      configured: p.configured,
+    }));
+    const adminEmail = await this.resolveAdminEmail(input.organizationId);
+
     const workspaceService = new PersonalWorkspaceService(this.prisma);
     const workspace = await workspaceService.findExisting({
       userId: input.userId,
       organizationId: input.organizationId,
     });
-    if (!workspace) {
-      return emptyBootstrap(toolPolicies);
-    }
-
-    const providers = await this.resolveProviders(workspace.project.id);
-    const budget = await this.resolveBudget({
-      userId: input.userId,
-      organizationId: input.organizationId,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-    });
-    const adminEmail = await this.resolveAdminEmail(input.organizationId);
+    const budget = workspace
+      ? await this.resolveBudget({
+          userId: input.userId,
+          organizationId: input.organizationId,
+          teamId: workspace.team.id,
+          projectId: workspace.project.id,
+        })
+      : { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
 
     return {
+      tools: catalog.tools,
       providers,
       budget,
       gatewayUrl: resolveGatewayUrl(),
@@ -181,38 +207,6 @@ export class CliBootstrapService {
       orderBy: { createdAt: "asc" },
     });
     return admin?.user.email ?? null;
-  }
-
-  private async resolveProviders(
-    personalProjectId: string,
-  ): Promise<CliBootstrapResult["providers"]> {
-    const providerService = ModelProviderService.create(this.prisma);
-    const accessibleProviders =
-      await providerService.getProjectModelProviders(personalProjectId);
-    return Object.entries(accessibleProviders)
-      .filter(([providerKey, mp]) => {
-        const def =
-          modelProviderRegistry[
-            providerKey as keyof typeof modelProviderRegistry
-          ];
-        if (!def || def.type !== "llm") return false;
-        return mp.enabled;
-      })
-      .map(([providerKey]) => {
-        const def =
-          modelProviderRegistry[
-            providerKey as keyof typeof modelProviderRegistry
-          ];
-        const models = getProviderModelOptions(providerKey, "chat").map(
-          (m) => m.value,
-        );
-        return {
-          name: providerKey,
-          displayName: def?.name ?? providerKey,
-          models,
-        };
-      })
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
   private async resolveBudget(input: {
@@ -273,18 +267,3 @@ export class CliBootstrapService {
   }
 }
 
-function emptyBootstrap(
-  toolPolicies: PlatformToolPolicyMap,
-): CliBootstrapResult {
-  return {
-    providers: [],
-    budget: {
-      monthlyLimitUsd: null,
-      monthlyUsedUsd: 0,
-      period: "MONTHLY",
-    },
-    gatewayUrl: resolveGatewayUrl(),
-    adminEmail: null,
-    toolPolicies,
-  };
-}

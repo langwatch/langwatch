@@ -502,6 +502,91 @@ export class AiToolEntryService {
   }
 
   /**
+   * The CLI login-ceremony projection: the coding assistants the member can
+   * run via `langwatch <slug>` and the model providers they can mint a
+   * personal virtual key for. Both come from the same visible catalog tiles
+   * the /me portal renders ({@link resolveVisibleTilesForUser}), so the CLI
+   * summary stays in lockstep with the portal instead of leaking env-fed
+   * project providers the org never published to the catalog.
+   *
+   * `tools` carries only assistant kinds that have a `langwatch <slug>`
+   * wrapper ({@link ASSISTANT_KIND_TO_TOOL_SLUG}); `providers` carries every
+   * model_provider tile's `providerKey`, each flagged with whether the org
+   * actually has a live credential for it ({@link
+   * listConfiguredProvidersForUser}). Both lists dedupe on their key, keeping
+   * the lowest-`order` tile (the same precedence the portal grid renders).
+   */
+  async resolveCliCatalogForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<{
+    tools: Array<{ slug: string; displayName: string }>;
+    providers: Array<{
+      providerKey: string;
+      displayName: string;
+      configured: boolean;
+    }>;
+  }> {
+    const [assistantTiles, providerTiles, configuredProviders] =
+      await Promise.all([
+        this.resolveVisibleTilesForUser({
+          organizationId,
+          userId,
+          type: "coding_assistant",
+        }),
+        this.resolveVisibleTilesForUser({
+          organizationId,
+          userId,
+          type: "model_provider",
+        }),
+        this.listConfiguredProvidersForUser({ organizationId, userId }),
+      ]);
+    const configuredSet = new Set(configuredProviders);
+
+    const byOrder = <T extends { order: number; displayName: string }>(
+      a: T,
+      b: T,
+    ) => a.order - b.order || a.displayName.localeCompare(b.displayName);
+
+    const tools: Array<{ slug: string; displayName: string }> = [];
+    const seenSlugs = new Set<string>();
+    for (const tile of [...assistantTiles].sort(byOrder)) {
+      const config = (tile.config as Record<string, unknown>) ?? {};
+      const kind = config.assistantKind;
+      if (typeof kind !== "string") continue;
+      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as AssistantKind];
+      if (!slug || seenSlugs.has(slug)) continue;
+      seenSlugs.add(slug);
+      tools.push({ slug, displayName: tile.displayName });
+    }
+
+    const providers: Array<{
+      providerKey: string;
+      displayName: string;
+      configured: boolean;
+    }> = [];
+    const seenProviders = new Set<string>();
+    for (const tile of [...providerTiles].sort(byOrder)) {
+      const config = (tile.config as Record<string, unknown>) ?? {};
+      const providerKey = config.providerKey;
+      if (typeof providerKey !== "string" || seenProviders.has(providerKey)) {
+        continue;
+      }
+      seenProviders.add(providerKey);
+      providers.push({
+        providerKey,
+        displayName: tile.displayName,
+        configured: configuredSet.has(providerKey),
+      });
+    }
+
+    return { tools, providers };
+  }
+
+  /**
    * Resolve the catalog tiles visible to one member, with the
    * department-overrides-org shadow already applied. Shared by the
    * user-facing list ({@link listForUser}) and the CLI path-policy

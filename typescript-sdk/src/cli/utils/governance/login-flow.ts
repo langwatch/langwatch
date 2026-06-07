@@ -133,6 +133,7 @@ export async function runUnifiedLoginFlow(
       const ceremonyLines = formatLoginCeremony({
         email: cfg.user?.email ?? result.user.email,
         organizationName: cfg.organization?.name,
+        tools: bootstrap?.tools,
         providers: bootstrap?.providers,
         budget:
           bootstrap?.budget?.monthlyLimitUsd != null

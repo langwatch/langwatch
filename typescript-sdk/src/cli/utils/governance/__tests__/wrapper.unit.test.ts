@@ -20,10 +20,11 @@ const bootstrapWith = (
   names: string[],
   adminEmail: string | null = "admin@acme.test",
 ) => async () => ({
+  tools: [],
   providers: names.map((name) => ({
     name,
     displayName: name,
-    models: [`${name}-default`],
+    configured: true,
   })),
   budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
   adminEmail,
