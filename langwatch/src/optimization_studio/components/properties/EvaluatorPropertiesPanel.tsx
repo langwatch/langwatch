@@ -12,9 +12,9 @@ import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "../../../server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";

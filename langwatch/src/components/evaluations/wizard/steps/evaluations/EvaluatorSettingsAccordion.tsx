@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import {
+  evaluatorsSchema,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
-import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import { api } from "../../../../../utils/api";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";

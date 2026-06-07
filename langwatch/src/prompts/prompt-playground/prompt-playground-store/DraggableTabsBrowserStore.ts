@@ -7,7 +7,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { chatMessageSchema } from "~/server/tracer/types.generated";
+import { chatMessageSchema } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
 import { createTabId, createWindowId } from "./utils/id-generators";
 

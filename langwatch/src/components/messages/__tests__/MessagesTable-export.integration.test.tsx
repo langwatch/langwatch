@@ -174,7 +174,7 @@ vi.mock("~/hooks/useTraceUpdateListener", () => ({
   useTraceUpdateListener: stableSetFn,
 }));
 
-vi.mock("~/server/tracer/types.generated", () => ({
+vi.mock("~/server/tracer/types", () => ({
   reservedTraceMetadataSchema: {},
 }));
 

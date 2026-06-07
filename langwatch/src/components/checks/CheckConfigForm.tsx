@@ -31,14 +31,12 @@ import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
-import type {
-  Evaluators,
-  EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
   evaluatorTypesSchema,
-} from "../../server/evaluations/evaluators.zod.generated";
+  type Evaluators,
+  type EvaluatorTypes,
+} from "../../server/evaluations/evaluators.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
