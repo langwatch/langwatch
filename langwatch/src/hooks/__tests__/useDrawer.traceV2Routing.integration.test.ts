@@ -39,55 +39,63 @@ describe("openDrawer traces-v2 opt-in routing", () => {
     window.localStorage.clear();
   });
 
-  describe("when the device has opted into traces v2", () => {
-    /** @scenario "A trace opened from a results view uses the new explorer when the device opted in" */
-    it("rewrites a traceDetails open to the v2 drawer in the URL", () => {
+  describe("given the device has opted into traces v2", () => {
+    beforeEach(() => {
       setTracesV2Preferred(true);
-      const { result } = renderHook(() => useDrawer());
-
-      act(() => {
-        result.current.openDrawer("traceDetails", { traceId: "trace-abc" });
-      });
-
-      const url = lastOpenedUrl();
-      expect(url).toMatch(/drawer\.open=traceV2Details/);
-      expect(url).toContain("trace-abc");
-      expect(url).not.toMatch(/drawer\.open=traceDetails(?![a-zA-Z])/);
     });
 
-    /** @scenario "Viewing a trace from evaluation results honors the opt-in" */
-    it("routes the evaluation-results View action and drops the legacy-only tab param", () => {
-      setTracesV2Preferred(true);
-      const { result } = renderHook(() => useDrawer());
+    describe("when opening a trace's details from a results view", () => {
+      /** @scenario "A trace opened from a results view uses the new explorer when the device opted in" */
+      it("rewrites the open to the v2 drawer in the URL", () => {
+        const { result } = renderHook(() => useDrawer());
 
-      // Mirrors the exact payload the eval results "View" button sends.
-      act(() => {
-        result.current.openDrawer("traceDetails", {
-          traceId: "trace-eval",
-          selectedTab: "traceDetails",
+        act(() => {
+          result.current.openDrawer("traceDetails", { traceId: "trace-abc" });
         });
-      });
 
-      const url = lastOpenedUrl();
-      expect(url).toMatch(/drawer\.open=traceV2Details/);
-      expect(url).toContain("trace-eval");
-      expect(url).not.toContain("selectedTab");
+        const url = lastOpenedUrl();
+        expect(url).toMatch(/drawer\.open=traceV2Details/);
+        expect(url).toContain("trace-abc");
+        expect(url).not.toMatch(/drawer\.open=traceDetails(?![a-zA-Z])/);
+      });
+    });
+
+    describe("when opening a trace from the evaluation results View action", () => {
+      /** @scenario "Viewing a trace from evaluation results honors the opt-in" */
+      it("routes to v2 and drops the legacy-only tab param", () => {
+        const { result } = renderHook(() => useDrawer());
+
+        // Mirrors the exact payload the eval results "View" button sends.
+        act(() => {
+          result.current.openDrawer("traceDetails", {
+            traceId: "trace-eval",
+            selectedTab: "traceDetails",
+          });
+        });
+
+        const url = lastOpenedUrl();
+        expect(url).toMatch(/drawer\.open=traceV2Details/);
+        expect(url).toContain("trace-eval");
+        expect(url).not.toContain("selectedTab");
+      });
     });
   });
 
-  describe("when the device has not opted into traces v2", () => {
-    /** @scenario "A trace opened from a results view uses the legacy drawer when the device has not opted in" */
-    it("keeps a traceDetails open on the legacy drawer in the URL", () => {
-      const { result } = renderHook(() => useDrawer());
+  describe("given the device has not opted into traces v2", () => {
+    describe("when opening a trace's details from a results view", () => {
+      /** @scenario "A trace opened from a results view uses the legacy drawer when the device has not opted in" */
+      it("keeps the open on the legacy drawer in the URL", () => {
+        const { result } = renderHook(() => useDrawer());
 
-      act(() => {
-        result.current.openDrawer("traceDetails", { traceId: "trace-abc" });
+        act(() => {
+          result.current.openDrawer("traceDetails", { traceId: "trace-abc" });
+        });
+
+        const url = lastOpenedUrl();
+        expect(url).toMatch(/drawer\.open=traceDetails/);
+        expect(url).toContain("trace-abc");
+        expect(url).not.toContain("traceV2Details");
       });
-
-      const url = lastOpenedUrl();
-      expect(url).toMatch(/drawer\.open=traceDetails/);
-      expect(url).toContain("trace-abc");
-      expect(url).not.toContain("traceV2Details");
     });
   });
 });

@@ -41,8 +41,8 @@ Feature: Trace drawer honors the new-explorer opt-in from every entry point
     @integration
     Scenario: The opt-in applies to every trace entry point, not only the traces table
       Given I have opted into the new Trace Explorer on this device
-      When any screen requests to open a trace's details
-      Then the request is routed to the new Trace Explorer
+      When I open a trace's details from any screen
+      Then the new Trace Explorer drawer opens for that trace
 
   Rule: Non-trace drawers and incomplete requests are never rerouted
 
