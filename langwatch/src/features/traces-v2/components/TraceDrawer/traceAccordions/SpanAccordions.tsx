@@ -219,6 +219,7 @@ export function SpanAccordions({
                           : undefined
                       }
                       title="Span Attributes"
+                      spanId={detail?.spanId ?? span.spanId}
                     />
                   ) : resources.isLoading || detailQuery.isLoading ? (
                     <EmptyHint>Loading attributes…</EmptyHint>
