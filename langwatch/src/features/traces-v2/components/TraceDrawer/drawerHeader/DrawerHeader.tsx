@@ -57,6 +57,8 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { Chip } from "../Chip";
+import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
+import { TooltipRow } from "../../shared/TooltipRow";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
@@ -70,7 +72,6 @@ import {
   renderPinPills,
 } from "./PinStrip";
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
-import { TooltipRow } from "./TooltipRow";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import {
   formatPinValue,
@@ -1109,37 +1110,14 @@ export const DrawerHeader = memo(function DrawerHeader({
         {grandCost > 0 && (
           <Tooltip
             content={
-              <VStack align="stretch" gap={0.5} minWidth="160px">
-                {isBundledCost ? (
-                  <>
-                    <TooltipRow label="Billed" value={formatCost(billedCost)} />
-                    <TooltipRow
-                      label="Non-billed"
-                      value={formatCost(nonBilledCost)}
-                    />
-                    <Box height="1px" bg="border" marginY={1} />
-                    <TooltipRow
-                      label="Theoretical total"
-                      value={formatCost(grandCost, trace.tokensEstimated)}
-                    />
-                    <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                      Bundled plan, not billed per token
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <TooltipRow
-                      label="Total"
-                      value={formatCost(grandCost, trace.tokensEstimated)}
-                    />
-                    {trace.tokensEstimated && !hasAuthoritativeTokens && (
-                      <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                        Cost is estimated from token counts
-                      </Text>
-                    )}
-                  </>
-                )}
-              </VStack>
+              <CostBreakdownTooltipContent
+                isBundled={isBundledCost}
+                billedCost={billedCost}
+                nonBilledCost={nonBilledCost}
+                grandCost={grandCost}
+                tokensEstimated={trace.tokensEstimated}
+                estimatedNote={trace.tokensEstimated && !hasAuthoritativeTokens}
+              />
             }
             positioning={{ placement: "top" }}
           >

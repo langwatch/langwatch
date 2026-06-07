@@ -16,7 +16,6 @@ export function TooltipRow({ label, value }: { label: string; value: string }) {
         whiteSpace="nowrap"
         textOverflow="ellipsis"
         overflow="hidden"
-        // minWidth={0}
       >
         {value}
       </Text>

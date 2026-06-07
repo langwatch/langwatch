@@ -8,8 +8,8 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
+import { TooltipRow } from "../../shared/TooltipRow";
 import { Chip, type ChipTone } from "../Chip";
-import { TooltipRow } from "./TooltipRow";
 
 /**
  * Thin wrapper around `<Chip>` for the duration / spans / cost / tokens /
