@@ -9,7 +9,7 @@
  * We mock at the stagePayloadToS3 boundary + the Lambda client so the test is a
  * pure-function check of lambdaFetch.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted so these are initialized before the hoisted vi.mock factories
 // (which reference them) run at import time.
@@ -80,6 +80,12 @@ beforeEach(() => {
   mockEnv.LANGEVALS_STAGING_TTL_SECONDS = 600;
   mockEnv.EVAL_MAX_PAYLOAD_BYTES = 16_000_000;
   lambdaState.rejectWith = null;
+});
+
+afterEach(() => {
+  // The self-hosted HTTP test stubs global fetch; restore it so the stub does
+  // not leak into later tests sharing this worker.
+  vi.unstubAllGlobals();
 });
 
 describe("lambdaFetch staging", () => {

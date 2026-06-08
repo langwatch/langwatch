@@ -70,7 +70,7 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
 
   @unit
   Scenario: An invoke body over the hard cap is rejected before staging
-    Given an invoke body larger than EVAL_MAX_PAYLOAD_BYTES
+    Given an invoke body larger than the maximum allowed payload size
     When the control plane invokes the per-project nlpgo Lambda
     Then the invoke is rejected with an actionable payload-too-large error
     And no S3 object is created
@@ -81,7 +81,7 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
 
   @unit
   Scenario: Staging falls back to a built-in threshold when the env var is unset
-    Given LANGEVALS_STAGING_THRESHOLD_BYTES is not configured
+    Given the staging threshold is not configured
     And the serialized invoke envelope is above the built-in default threshold
     When the control plane invokes the per-project nlpgo Lambda
     Then the invoke is still staged via S3
