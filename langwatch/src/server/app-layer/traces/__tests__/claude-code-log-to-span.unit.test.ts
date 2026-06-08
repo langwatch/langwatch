@@ -172,6 +172,60 @@ describe("convertClaudeCodeLogsToSpans", () => {
     });
   });
 
+  describe("when a model call carries its request and response bodies", () => {
+    /** @scenario "A model call keeps its full request and response bodies on the span" */
+    it("keeps the verbatim request and response bodies next to the readable input and output", () => {
+      const reqBody = requestBody("Reply with PONG-Z");
+      const respBody = responseBody("PONG-Z");
+      const spans = convertClaudeCodeLogsToSpans([
+        rec({
+          eventName: "api_request_body",
+          spanId: "bbbbbbbbbbbbbbbb",
+          timeUnixMs: 1_700_000_001_000,
+          attrs: {
+            "event.name": "api_request_body",
+            model: "claude-opus-4-7",
+            query_source: "repl_main_thread",
+            body: reqBody,
+          },
+        }),
+        rec({
+          eventName: "api_request",
+          spanId: "aaaaaaaaaaaaaaaa",
+          timeUnixMs: 1_700_000_002_113,
+          attrs: {
+            "event.name": "api_request",
+            model: "claude-opus-4-7",
+            request_id: "req_a",
+            query_source: "repl_main_thread",
+          },
+        }),
+        rec({
+          eventName: "api_response_body",
+          spanId: "cccccccccccccccc",
+          timeUnixMs: 1_700_000_002_100,
+          attrs: {
+            "event.name": "api_response_body",
+            model: "claude-opus-4-7",
+            request_id: "req_a",
+            query_source: "repl_main_thread",
+            body: respBody,
+          },
+        }),
+      ]);
+      const { span } = spans[0]!;
+      // The verbatim bodies are surfaced for full-fidelity debugging (the system
+      // prompt, tool/skill schemas, and message history behind the cache tokens).
+      expect(strVal(span, "langwatch.claude_code.request_body")).toBe(reqBody);
+      expect(strVal(span, "langwatch.claude_code.response_body")).toBe(respBody);
+      // The light readable view is unchanged.
+      expect(strVal(span, "gen_ai.input.messages")).toBe(
+        JSON.stringify([{ role: "user", content: "Reply with PONG-Z" }]),
+      );
+      expect(strVal(span, "gen_ai.completion")).toBe("PONG-Z");
+    });
+  });
+
   describe("when a model call's reply is a tool invocation", () => {
     /** @scenario "The model call that invokes a tool shows the tool call as its output" */
     it("renders the chosen tool as the model span's output", () => {
@@ -568,12 +622,15 @@ describe("convertClaudeCodeLogsToSpans", () => {
       );
     });
 
-    it("drops the input rather than leaking the raw truncated JSON blob", () => {
+    it("keeps the truncated blob out of the readable input but still surfaces it as the raw request body", () => {
       const { span } = build(new Map())[0]!;
+      // The readable input is dropped rather than showing clipped JSON...
       expect(strVal(span, "gen_ai.input.messages")).toBeUndefined();
-      for (const a of span.attributes) {
-        expect(a.value.stringValue ?? "").not.toContain(truncated);
-      }
+      expect(strVal(span, "gen_ai.completion") ?? "").not.toContain(truncated);
+      // ...but the verbatim request body still carries what we DO have: the
+      // first ~60KB holds the system prompt + tool schemas that drive the cache
+      // tokens, confined to its own raw debugging attribute.
+      expect(strVal(span, "langwatch.claude_code.request_body")).toBe(truncated);
     });
   });
 

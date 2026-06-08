@@ -122,6 +122,14 @@ export const ATTR_KEYS = {
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",
+  // The verbatim provider request/response bodies a Claude Code model call was
+  // folded from. The light gen_ai.input.messages / gen_ai.completion give the
+  // readable chat view; these carry the FULL payload (system prompt, every
+  // tool/skill schema, the whole message history with cache_control markers) so
+  // a call's cache_creation / cache_read token counts can be traced to what
+  // actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
+  CLAUDE_CODE_REQUEST_BODY: "langwatch.claude_code.request_body",
+  CLAUDE_CODE_RESPONSE_BODY: "langwatch.claude_code.response_body",
   LANGWATCH_RESERVED_VALUE_TYPES: "langwatch.reserved.value_types",
   LANGWATCH_PARAMS: "langwatch.params",
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",

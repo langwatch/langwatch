@@ -1,5 +1,8 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { CLAUDE_CODE_KIND_ATTR } from "~/server/app-layer/traces/claude-code-log-to-span";
+import {
+  CLAUDE_CODE_KIND_ATTR,
+  CLAUDE_CODE_LOG_RETENTION_DAYS,
+} from "~/server/app-layer/traces/claude-code-log-to-span";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -29,6 +32,16 @@ export class LogRecordStorageClickHouseRepository
     try {
       const client = await this.resolveClient(record.tenantId);
       const now = new Date();
+      // Raw claude_code logs the span fold consumes turn into pure duplication
+      // once the claudeCodeSpanSync reactor folds them into stored_spans, so GC
+      // them far sooner than the platform default (the spans inherit the real
+      // retention). The existing `_retention_days` DELETE TTL does the eviction;
+      // we just stamp the shorter floor on these rows here. Stamped, not min'd
+      // against the caller's value, so an indefinite (0) project retention can't
+      // make a fold-intermediate log live forever.
+      const effectiveRetentionDays = record.attributes[CLAUDE_CODE_KIND_ATTR]
+        ? CLAUDE_CODE_LOG_RETENTION_DAYS
+        : retentionDays;
       await client.insert({
         table: TABLE_NAME,
         values: [
@@ -47,7 +60,7 @@ export class LogRecordStorageClickHouseRepository
             ScopeVersion: record.scopeVersion,
             CreatedAt: now,
             UpdatedAt: now,
-            _retention_days: retentionDays,
+            _retention_days: effectiveRetentionDays,
           },
         ],
         format: "JSONEachRow",

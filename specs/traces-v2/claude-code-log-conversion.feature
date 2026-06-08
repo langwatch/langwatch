@@ -126,3 +126,31 @@ Feature: Claude Code logs become gen_ai and tool spans by folding the whole turn
       When the turn has been ingested
       Then an llm span is still emitted with the model, tokens, and cost
       And it simply has no input or output text
+
+  Rule: nothing the logs carried is dropped on the way to the span, so a model
+  call keeps its full request and response bodies — the system prompt, every
+  tool and skill schema, and the whole message history that drive its cache
+  tokens — next to the light readable input and output.
+
+    @unit
+    Scenario: A model call keeps its full request and response bodies on the span
+      Given a folded model call whose request and response bodies were ingested
+      When the call becomes an llm span
+      Then the span carries the verbatim request body next to its readable input
+      And the span carries the verbatim response body next to its readable output
+
+  Rule: once a turn's logs are folded into spans the spans carry every field the
+  logs did, so the raw Claude Code logs are duplicated data and are evicted far
+  sooner than the platform default retention.
+
+    @unit
+    Scenario: A folded Claude Code log is retained only briefly
+      Given a Claude Code log record that the span fold consumes
+      When the receiver stores it
+      Then its retention is capped to the short claude-fold floor instead of the platform default
+
+    @unit
+    Scenario: A log record outside the Claude Code fold keeps the platform default retention
+      Given an OTLP log record that is not part of a Claude Code fold
+      When the receiver stores it
+      Then its retention is the platform default

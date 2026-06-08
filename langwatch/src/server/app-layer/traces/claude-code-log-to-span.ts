@@ -137,6 +137,22 @@ export const CLAUDE_CODE_KIND_ATTR = "langwatch.claude_code.kind";
 export const CLAUDE_CODE_PII_ATTR = "langwatch.claude_code.pii";
 
 /**
+ * Retention (in days) for the raw claude_code logs the span fold consumes. Once
+ * the claudeCodeSpanSync reactor folds a turn's logs into stored_spans the raw
+ * rows are pure duplication — every field they carried now lives on the spans,
+ * including the full request/response bodies. The fold re-reads the WHOLE turn's
+ * log set on each incremental batch, so this floor must outlast the longest
+ * single turn plus any late-arriving export batches; one day clears a marathon
+ * agentic turn by a wide margin while being far shorter than the platform
+ * default retention. The existing `IF(_retention_days > 0, …) DELETE` TTL on
+ * stored_log_records does the GC — we just stamp this shorter value on the
+ * claude-kind rows at insert. Day granularity is the floor of that mechanism;
+ * going sub-day would risk clipping a long turn mid-fold, so one day is the
+ * sweet spot.
+ */
+export const CLAUDE_CODE_LOG_RETENTION_DAYS = 1;
+
+/**
  * The span kind a claude_code log event feeds, or null when the event is not
  * folded into a span (so it stays a plain, visible log). The receiver marks +
  * saves every event with a non-null kind; the reactor folds them; the read path
@@ -512,10 +528,23 @@ function buildModelSpan(
 
   // INPUT: structured conversation parsed from the request body (system + every
   // turn); falls back to the clean user_prompt text when the body was truncated.
+  // We ALSO attach the verbatim request body, so the call's full payload (the
+  // system prompt, every tool/skill schema, the whole message history with its
+  // cache_control markers) is inspectable on the span — that is where the
+  // cache_creation / cache_read tokens come from, which the light view hides.
   if (body) {
     const inputMessages = resolveInputMessages(body, promptTextById);
     if (inputMessages) {
       attrs.push(strAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages));
+    }
+    const requestBody = asNonEmpty(body.attrs.body);
+    if (requestBody) {
+      attrs.push(
+        strAttr(
+          ATTR_KEYS.CLAUDE_CODE_REQUEST_BODY,
+          capPayloadString(requestBody, undefined, "claude_request_body"),
+        ),
+      );
     }
   }
 
@@ -523,13 +552,23 @@ function buildModelSpan(
   // whose reply is a tool invocation shows the tool it chose to call rather
   // than an empty output. Attached to every model call (conversational or
   // utility); the trace headline stays conversational-only via the fold's
-  // accumulation gate (trace-io-accumulation.service.ts).
+  // accumulation gate (trace-io-accumulation.service.ts). The verbatim response
+  // body rides alongside for the same full-fidelity debugging.
   if (response) {
     const outputText = extractAssistantOutputFromResponseBody(
       response.attrs.body,
     );
     if (outputText) {
       attrs.push(strAttr(ATTR_KEYS.GEN_AI_COMPLETION, outputText));
+    }
+    const responseBody = asNonEmpty(response.attrs.body);
+    if (responseBody) {
+      attrs.push(
+        strAttr(
+          ATTR_KEYS.CLAUDE_CODE_RESPONSE_BODY,
+          capPayloadString(responseBody, undefined, "claude_response_body"),
+        ),
+      );
     }
   }
 
