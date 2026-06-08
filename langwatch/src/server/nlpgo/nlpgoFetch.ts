@@ -157,6 +157,10 @@ export async function nlpgoFetch<T = unknown>(
     method: "POST",
     headers,
     body: bodyStr,
+    // Scopes S3 staging when the body is too large for the 6 MiB Lambda
+    // sync-invoke Payload cap (per-project ARN path only; no-op for the
+    // self-hosted HTTP URL path).
+    projectId: opts.projectId,
   });
 
   return {
