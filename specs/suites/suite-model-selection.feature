@@ -45,3 +45,10 @@ Feature: Run plan user-simulator and judge model selection
     Then I see a user-simulator model field
     And I see a judge model field
     And both default to the project Default model
+
+  @visual
+  Scenario: The run plan model pickers fill the drawer width
+    Given I open the run plan drawer
+    When I open the user-simulator model dropdown
+    Then the picker and its dropdown span the full width of the drawer
+    And each model name reads on a single line without truncation

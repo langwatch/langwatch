@@ -82,7 +82,7 @@ export function SimulationModelSelect({
   const inheritModel = resolvedDefault.data?.model ?? "";
 
   return (
-    <VStack align="stretch" gap={1}>
+    <VStack align="stretch" gap={1} width="full">
       <Text fontSize="sm" fontWeight="medium">
         {label}
       </Text>
