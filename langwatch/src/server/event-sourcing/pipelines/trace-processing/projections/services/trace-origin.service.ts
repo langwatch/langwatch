@@ -94,7 +94,19 @@ export class TraceOriginService {
     mergedAttributes: Record<string, string>;
   }): void {
     const isRootSpan = span.parentSpanId === null;
-    const explicitOrigin = span.spanAttributes["langwatch.origin"];
+    // The ingest-key provenance stamp writes langwatch.origin onto the RESOURCE
+    // attributes (so an upstream payload can't forge a different origin per
+    // span) — e.g. Claude Code's log-derived spans carry `coding_agent` only on
+    // the resource, never on the span. Treat a resource-level origin as an
+    // explicit signal too, falling back to it when the span carries none, so
+    // these traces resolve their origin deterministically at fold time instead
+    // of decaying to the deferred "application" fallback when the fold is slow.
+    const spanOrigin = span.spanAttributes["langwatch.origin"];
+    const resourceOrigin = span.resourceAttributes["langwatch.origin"];
+    const explicitOrigin =
+      typeof spanOrigin === "string" && spanOrigin !== ""
+        ? spanOrigin
+        : resourceOrigin;
     const hasExplicitOrigin =
       typeof explicitOrigin === "string" && explicitOrigin !== "";
     const existingOrigin = state.attributes["langwatch.origin"];
