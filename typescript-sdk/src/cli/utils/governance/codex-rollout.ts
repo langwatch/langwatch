@@ -130,182 +130,225 @@ function capInputMessages(messages: CodexChatMessage[]): CodexChatMessage[] {
   return capped;
 }
 
+/** One parsed rollout JSONL line: a tagged envelope with an opaque payload. */
+interface RolloutLine {
+  type?: string;
+  payload?: Record<string, unknown>;
+}
+
+/** Resolve a tool call's id, preferring `call_id`, then `id`, then a fallback. */
+function toolCallId(payload: Record<string, unknown>, fallback: string): string {
+  return (
+    (typeof payload.call_id === "string" && payload.call_id) ||
+    (typeof payload.id === "string" && payload.id) ||
+    fallback
+  );
+}
+
 /**
- * Parse a codex rollout JSONL into one chat-message request/reply record per
- * turn. Turns with no assistant reply are dropped (an empty span helps no one).
+ * Replays a codex rollout's events into a running chat history and snapshots one
+ * {@link CodexTurnIO} per turn boundary. All the cross-event state (the running
+ * history, the open turn, the held assistant text, the authoritative final
+ * answer, the session model) lives here so {@link parseCodexRollout} stays a
+ * thin parse-and-dispatch coordinator.
  */
-export function parseCodexRollout(content: string): CodexTurnIO[] {
-  const result: CodexTurnIO[] = [];
+class CodexTurnAccumulator {
+  /** Emitted turns, in rollout order. */
+  private readonly turns: CodexTurnIO[] = [];
   /** Accumulating conversation across the whole rollout (claude-style). */
-  const history: CodexChatMessage[] = [];
-  let sessionModel: string | null = null;
-  let cur: {
+  private readonly history: CodexChatMessage[] = [];
+  private sessionModel: string | null = null;
+  private cur: {
     traceId: string;
     turnId: string | null;
     model: string | null;
     startedAtMs: number | null;
   } | null = null;
   /** Latest assistant text not yet committed to history (the final-answer candidate). */
-  let pendingAssistant: string | null = null;
+  private pendingAssistant: string | null = null;
   /** Authoritative final answer from the agent_message(final_answer) event. */
-  let agentFinal: string | null = null;
+  private agentFinal: string | null = null;
 
-  const flushPendingAssistant = () => {
-    if (pendingAssistant !== null) {
-      history.push({ role: "assistant", content: pendingAssistant });
-      pendingAssistant = null;
-    }
-  };
-
-  const closeTurn = () => {
-    if (cur) {
-      const finalAnswer = agentFinal ?? pendingAssistant;
-      if (finalAnswer?.trim()) {
-        result.push({
-          traceId: cur.traceId,
-          turnId: cur.turnId,
-          model: cur.model ?? sessionModel,
-          inputMessages: capInputMessages([...history]),
-          output: truncate(finalAnswer.trim(), MAX_OUTPUT_CHARS),
-          startedAtMs: cur.startedAtMs,
-        });
-        history.push({ role: "assistant", content: finalAnswer.trim() });
-      }
-    }
-    cur = null;
-    pendingAssistant = null;
-    agentFinal = null;
-  };
-
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let obj: { type?: string; payload?: Record<string, unknown> };
-    try {
-      obj = JSON.parse(trimmed);
-    } catch {
-      continue;
-    }
+  /** Route one parsed rollout line to the handler for its event type. */
+  handle(obj: RolloutLine): void {
     const payload = obj.payload ?? {};
-
-    if (obj.type === "session_meta") {
-      const bi = payload.base_instructions;
-      if (typeof bi === "string" && bi.trim()) {
-        history.push({ role: "system", content: bi.trim() });
-      }
-      continue;
-    }
-
-    if (obj.type === "turn_context") {
-      const m = payload.model;
-      if (typeof m === "string" && m) {
-        sessionModel = m;
-        if (cur) cur.model = m;
-      }
-      continue;
-    }
-
-    if (obj.type === "event_msg" && payload.type === "task_started") {
-      closeTurn();
-      const traceId =
-        typeof payload.trace_id === "string" ? payload.trace_id : null;
-      if (!traceId) continue;
-      cur = {
-        traceId,
-        turnId: typeof payload.turn_id === "string" ? payload.turn_id : null,
-        model: sessionModel,
-        startedAtMs:
-          typeof payload.started_at === "number"
-            ? payload.started_at * 1000
-            : null,
-      };
-      continue;
-    }
-
-    if (obj.type === "event_msg" && payload.type === "task_complete") {
-      closeTurn();
-      continue;
-    }
-
-    if (!cur) continue;
-
-    // The clean final answer rides the agent_message(final_answer) event; prefer
-    // it over the raw assistant response_item which can repeat tool scaffolding.
-    if (obj.type === "event_msg" && payload.type === "agent_message") {
-      const msg = payload.message;
-      if (
-        typeof msg === "string" &&
-        msg.trim() &&
-        payload.phase === "final_answer"
-      ) {
-        agentFinal = msg.trim();
-      }
-      continue;
-    }
-
-    if (obj.type === "response_item" && payload.type === "message") {
-      const role = payload.role;
-      const text = textFromContent(payload.content);
-      if (!text) continue;
-      if (role === "developer") {
-        flushPendingAssistant();
-        history.push({ role: "system", content: text });
-      } else if (role === "user") {
-        flushPendingAssistant();
-        history.push({ role: "user", content: text });
-      } else if (role === "assistant") {
-        // Hold: this may be a mid-turn preamble (committed to history when the
-        // next item arrives) or the turn's final answer (consumed by closeTurn).
-        flushPendingAssistant();
-        pendingAssistant = text;
-      }
-      continue;
-    }
-
-    if (obj.type === "response_item" && payload.type === "function_call") {
-      flushPendingAssistant();
-      const callId =
-        (typeof payload.call_id === "string" && payload.call_id) ||
-        (typeof payload.id === "string" && payload.id) ||
-        `call_${history.length}`;
-      const name = typeof payload.name === "string" ? payload.name : "tool";
-      const args =
-        typeof payload.arguments === "string"
-          ? payload.arguments
-          : payload.arguments != null
-            ? JSON.stringify(payload.arguments)
-            : "";
-      history.push({
-        role: "assistant",
-        tool_calls: [
-          {
-            id: callId,
-            type: "function",
-            function: { name, arguments: truncate(args, MAX_CONTENT_CHARS) },
-          },
-        ],
-      });
-      continue;
-    }
-
-    if (
-      obj.type === "response_item" &&
-      payload.type === "function_call_output"
-    ) {
-      flushPendingAssistant();
-      const callId =
-        (typeof payload.call_id === "string" && payload.call_id) ||
-        (typeof payload.id === "string" && payload.id) ||
-        `call_${history.length}`;
-      history.push({
-        role: "tool",
-        tool_call_id: callId,
-        content: truncate(outputToText(payload.output), MAX_CONTENT_CHARS),
-      });
-      continue;
+    switch (obj.type) {
+      case "session_meta":
+        return this.onSessionMeta(payload);
+      case "turn_context":
+        return this.onTurnContext(payload);
+      case "event_msg":
+        return this.onEventMsg(payload);
+      case "response_item":
+        return this.onResponseItem(payload);
     }
   }
 
-  closeTurn();
-  return result;
+  /** Close the trailing open turn and return every emitted turn. */
+  finish(): CodexTurnIO[] {
+    this.closeTurn();
+    return this.turns;
+  }
+
+  private onSessionMeta(payload: Record<string, unknown>): void {
+    const bi = payload.base_instructions;
+    if (typeof bi === "string" && bi.trim()) {
+      this.history.push({ role: "system", content: bi.trim() });
+    }
+  }
+
+  private onTurnContext(payload: Record<string, unknown>): void {
+    const m = payload.model;
+    if (typeof m === "string" && m) {
+      this.sessionModel = m;
+      if (this.cur) this.cur.model = m;
+    }
+  }
+
+  private onEventMsg(payload: Record<string, unknown>): void {
+    if (payload.type === "task_started") return this.onTaskStarted(payload);
+    if (payload.type === "task_complete") return this.closeTurn();
+    // Everything below belongs to the open turn; ignore it outside one.
+    if (!this.cur) return;
+    if (payload.type === "agent_message") this.onAgentMessage(payload);
+  }
+
+  private onTaskStarted(payload: Record<string, unknown>): void {
+    this.closeTurn();
+    const traceId =
+      typeof payload.trace_id === "string" ? payload.trace_id : null;
+    if (!traceId) return;
+    this.cur = {
+      traceId,
+      turnId: typeof payload.turn_id === "string" ? payload.turn_id : null,
+      model: this.sessionModel,
+      startedAtMs:
+        typeof payload.started_at === "number"
+          ? payload.started_at * 1000
+          : null,
+    };
+  }
+
+  private onAgentMessage(payload: Record<string, unknown>): void {
+    // The clean final answer rides the agent_message(final_answer) event; prefer
+    // it over the raw assistant response_item which can repeat tool scaffolding.
+    const msg = payload.message;
+    if (
+      typeof msg === "string" &&
+      msg.trim() &&
+      payload.phase === "final_answer"
+    ) {
+      this.agentFinal = msg.trim();
+    }
+  }
+
+  private onResponseItem(payload: Record<string, unknown>): void {
+    // response_items belong to the open turn; ignore them outside one.
+    if (!this.cur) return;
+    switch (payload.type) {
+      case "message":
+        return this.onMessage(payload);
+      case "function_call":
+        return this.onFunctionCall(payload);
+      case "function_call_output":
+        return this.onFunctionCallOutput(payload);
+    }
+  }
+
+  private onMessage(payload: Record<string, unknown>): void {
+    const role = payload.role;
+    const text = textFromContent(payload.content);
+    if (!text) return;
+    if (role === "developer") {
+      this.flushPendingAssistant();
+      this.history.push({ role: "system", content: text });
+    } else if (role === "user") {
+      this.flushPendingAssistant();
+      this.history.push({ role: "user", content: text });
+    } else if (role === "assistant") {
+      // Hold: this may be a mid-turn preamble (committed to history when the
+      // next item arrives) or the turn's final answer (consumed by closeTurn).
+      this.flushPendingAssistant();
+      this.pendingAssistant = text;
+    }
+  }
+
+  private onFunctionCall(payload: Record<string, unknown>): void {
+    this.flushPendingAssistant();
+    const callId = toolCallId(payload, `call_${this.history.length}`);
+    const name = typeof payload.name === "string" ? payload.name : "tool";
+    const args =
+      typeof payload.arguments === "string"
+        ? payload.arguments
+        : payload.arguments != null
+          ? JSON.stringify(payload.arguments)
+          : "";
+    this.history.push({
+      role: "assistant",
+      tool_calls: [
+        {
+          id: callId,
+          type: "function",
+          function: { name, arguments: truncate(args, MAX_CONTENT_CHARS) },
+        },
+      ],
+    });
+  }
+
+  private onFunctionCallOutput(payload: Record<string, unknown>): void {
+    this.flushPendingAssistant();
+    const callId = toolCallId(payload, `call_${this.history.length}`);
+    this.history.push({
+      role: "tool",
+      tool_call_id: callId,
+      content: truncate(outputToText(payload.output), MAX_CONTENT_CHARS),
+    });
+  }
+
+  private flushPendingAssistant(): void {
+    if (this.pendingAssistant !== null) {
+      this.history.push({ role: "assistant", content: this.pendingAssistant });
+      this.pendingAssistant = null;
+    }
+  }
+
+  private closeTurn(): void {
+    if (this.cur) {
+      const finalAnswer = this.agentFinal ?? this.pendingAssistant;
+      if (finalAnswer?.trim()) {
+        this.turns.push({
+          traceId: this.cur.traceId,
+          turnId: this.cur.turnId,
+          model: this.cur.model ?? this.sessionModel,
+          inputMessages: capInputMessages([...this.history]),
+          output: truncate(finalAnswer.trim(), MAX_OUTPUT_CHARS),
+          startedAtMs: this.cur.startedAtMs,
+        });
+        this.history.push({ role: "assistant", content: finalAnswer.trim() });
+      }
+    }
+    this.cur = null;
+    this.pendingAssistant = null;
+    this.agentFinal = null;
+  }
+}
+
+/**
+ * Parse a codex rollout JSONL into one chat-message request/reply record per
+ * turn. Turns with no assistant reply are dropped (an empty span helps no one).
+ */
+export function parseCodexRollout(content: string): CodexTurnIO[] {
+  const acc = new CodexTurnAccumulator();
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj: RolloutLine;
+    try {
+      obj = JSON.parse(trimmed) as RolloutLine;
+    } catch {
+      continue;
+    }
+    acc.handle(obj);
+  }
+  return acc.finish();
 }
