@@ -122,11 +122,6 @@ function buildTestSpan({
  * and real ClickHouse — mirroring `createTraceTestPipeline` from the sibling
  * integration test, except processRole is "web" so jobs are staged but never
  * dispatched. This lets us inspect the GQ :data hash before it is drained.
- *
- * IMPORTANT: `.withCommand("recordSpan", RecordSpanCommand as any)` is kept
- * with NO options, faithfully mirroring the production registration shape.
- * The test's purpose is to prove the current shape lacks dedup (Scenario 1
- * fails before the fix); the production fix at pipeline.ts adds dedup options.
  */
 function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
   any,
