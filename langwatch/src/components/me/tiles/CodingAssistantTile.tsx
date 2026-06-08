@@ -140,21 +140,23 @@ function CommandRow({ command }: { command: string }) {
       backgroundColor="bg.subtle"
       alignItems="flex-start"
     >
-      <HStack gap={1.5} flex={1} minWidth={0} alignItems="flex-start">
+      <HStack gap={1.5} flex={1} minWidth={0} alignItems="baseline">
         {/*
           The "$" is a separate, non-selectable element (lighter than the
           command) so it reads as a shell prompt but never lands in the user's
-          selection/clipboard when they copy the command by hand.
+          selection/clipboard when they copy the command by hand. Baseline
+          alignment sits it on the command's first line; a touch of left
+          indent gives the prompt some breathing room from the box edge.
         */}
         <Text
           as="span"
           fontFamily="mono"
           fontSize="sm"
-          color="fg.subtle"
+          color={{ base: "gray.300", _dark: "gray.600" }}
           userSelect="none"
           flexShrink={0}
           aria-hidden="true"
-          marginTop="-4px"
+          marginLeft={1}
         >
           $
         </Text>
