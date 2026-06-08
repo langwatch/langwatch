@@ -226,9 +226,9 @@ describe("user.persona-home customization integration", () => {
       });
       expect(resolved.isOverride).toBe(false);
       // No personal VK, has app projects → persona project_only,
-      // destination /<firstProjectSlug>/messages.
+      // destination is the bare project home /<firstProjectSlug>.
       expect(resolved.persona).toBe("project_only");
-      expect(resolved.destination).toMatch(/^\/(alpha|beta)-.*\/messages$/);
+      expect(resolved.destination).toMatch(/^\/(alpha|beta)-[^/]+$/);
     });
   });
 });

@@ -253,11 +253,14 @@ export const useOrganizationTeamProject = (
     if (project && project.slug !== localStorageProjectSlug) {
       setLocalStorageProjectSlug(project.slug);
     }
-    // Visiting any /[project]/* page marks the implicit home preference
-    // as "project". Pairs with MyLayout's "personal" marker so the `/`
-    // index resolver can fall through to whichever home was visited
-    // last when the user has no explicit pin set via the picker.
-    if (project) {
+    // Visiting an actual /[project]/* page marks the implicit home preference
+    // as "project". Pairs with MyLayout's "personal" marker so the `/` index
+    // resolver can fall through to whichever home was visited last when the
+    // user has no explicit pin. Gate on the URL actually carrying a project
+    // slug: `project` also resolves from the persisted selectedProjectSlug on
+    // non-project routes (e.g. /me), and marking "project" there would clobber
+    // MyLayout's "personal" and wrongly bounce `/` back to the project.
+    if (project && typeof router.query.project === "string") {
       setLastVisitedHomeKind("project");
     }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage

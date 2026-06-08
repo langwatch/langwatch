@@ -48,7 +48,9 @@ export function resolveHomeDestination({
   }
 
   if (lastVisitedHomeKind === "project" && lastProjectSlug) {
-    return `/${lastProjectSlug}/messages`;
+    // The bare project slug is the project HOME (pages/[project]/index renders
+    // HomePage); never append /messages, which is a legacy surface.
+    return `/${lastProjectSlug}`;
   }
 
   return resolverDestination;

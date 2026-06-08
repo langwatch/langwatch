@@ -21,9 +21,9 @@ describe("resolveHomeDestination", () => {
       expect(
         resolveHomeDestination({
           ...base,
-          resolverDestination: "/acme/messages",
+          resolverDestination: "/acme",
         }),
-      ).toBe("/acme/messages");
+      ).toBe("/acme");
     });
   });
 
@@ -37,7 +37,7 @@ describe("resolveHomeDestination", () => {
           lastVisitedHomeKind: "project",
           lastProjectSlug: "inbox-narrator",
         }),
-      ).toBe("/inbox-narrator/messages");
+      ).toBe("/inbox-narrator");
     });
 
     it("also overrides a /governance default for an admin who last opened a project", () => {
@@ -48,7 +48,7 @@ describe("resolveHomeDestination", () => {
           lastVisitedHomeKind: "project",
           lastProjectSlug: "inbox-narrator",
         }),
-      ).toBe("/inbox-narrator/messages");
+      ).toBe("/inbox-narrator");
     });
 
     it("falls back to the resolver destination when there is no project to return to", () => {
@@ -68,7 +68,7 @@ describe("resolveHomeDestination", () => {
       expect(
         resolveHomeDestination({
           ...base,
-          resolverDestination: "/acme/messages",
+          resolverDestination: "/acme",
           lastVisitedHomeKind: "personal",
         }),
       ).toBe("/me");
@@ -80,11 +80,11 @@ describe("resolveHomeDestination", () => {
       expect(
         resolveHomeDestination({
           ...base,
-          resolverDestination: "/acme/messages",
+          resolverDestination: "/acme",
           lastVisitedHomeKind: "personal",
           governanceUiEnabled: false,
         }),
-      ).toBe("/acme/messages");
+      ).toBe("/acme");
     });
   });
 
