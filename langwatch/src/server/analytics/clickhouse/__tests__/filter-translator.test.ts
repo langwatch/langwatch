@@ -177,6 +177,54 @@ describe("filter-translator", () => {
       });
     });
 
+    describe("stored_spans subquery partition pruning", () => {
+      // The stored_spans facet subqueries must accept a StartTime predicate so
+      // they prune to the dashboard's date range instead of cold-scanning every
+      // weekly partition on S3. The predicate is the caller's responsibility
+      // (aggregation-builder passes the date envelope); the translator just has
+      // to thread it into the subquery WHERE.
+      const SPAN_TIME = "AND StartTime >= {startDate:DateTime64(3)}";
+      const SPAN_SUBQUERY_FILTERS = [
+        { field: "spans.type", values: ["llm"], key: undefined },
+        { field: "spans.model", values: ["gpt-4"], key: undefined },
+        { field: "events.event_type", values: ["feedback"], key: undefined },
+        { field: "events.metrics.key", values: ["score"], key: "feedback" },
+        { field: "events.event_details.key", values: ["note"], key: "feedback" },
+      ] as const;
+
+      for (const { field, values, key } of SPAN_SUBQUERY_FILTERS) {
+        it(`injects the StartTime predicate into the ${field} subquery`, () => {
+          const result = translateFilter(
+            field,
+            [...values],
+            key,
+            undefined,
+            SPAN_TIME,
+          );
+          expect(result.whereClause).toContain("stored_spans");
+          expect(result.whereClause).toContain(SPAN_TIME);
+        });
+
+        it(`omits the StartTime predicate for ${field} when none is given (unchanged behavior)`, () => {
+          const result = translateFilter(field, [...values], key);
+          expect(result.whereClause).toContain("stored_spans");
+          expect(result.whereClause).not.toContain("StartTime");
+        });
+      }
+
+      it("leaves non-span filters untouched even when a predicate is supplied", () => {
+        const result = translateFilter(
+          "topics.topics",
+          ["topic-1"],
+          undefined,
+          undefined,
+          SPAN_TIME,
+        );
+        expect(result.whereClause).not.toContain("StartTime");
+        expect(result.whereClause).not.toContain("stored_spans");
+      });
+    });
+
     describe("evaluation filters", () => {
       it("translates evaluations.evaluator_id filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.evaluator_id", [
