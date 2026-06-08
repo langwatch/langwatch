@@ -16,8 +16,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 const mockSetSelectedOrganizationId = vi.fn();
+const mockSetSelectedProjectSlug = vi.fn();
+const mockSetSelectedTeamId = vi.fn();
 vi.mock("usehooks-ts", () => ({
-  useLocalStorage: () => ["", mockSetSelectedOrganizationId],
+  useLocalStorage: (key: string) => {
+    if (key === "selectedProjectSlug") return ["", mockSetSelectedProjectSlug];
+    if (key === "selectedTeamId") return ["", mockSetSelectedTeamId];
+    return ["", mockSetSelectedOrganizationId];
+  },
 }));
 
 import { useOrgQueryParamSelection } from "../useOrgQueryParamSelection";
@@ -34,6 +40,8 @@ describe("useOrgQueryParamSelection", () => {
   beforeEach(() => {
     mockSetSearchParams.mockClear();
     mockSetSelectedOrganizationId.mockClear();
+    mockSetSelectedProjectSlug.mockClear();
+    mockSetSelectedTeamId.mockClear();
     mockOrganizations = [
       { id: "org_alpha", slug: "alpha" },
       { id: "org_beta", slug: "beta" },
@@ -48,6 +56,10 @@ describe("useOrgQueryParamSelection", () => {
       renderHook(() => useOrgQueryParamSelection());
 
       expect(mockSetSelectedOrganizationId).toHaveBeenCalledWith("org_beta");
+      // Switching org resets the project/team context so /me and other
+      // org-scoped pages resolve their org from the new selection.
+      expect(mockSetSelectedProjectSlug).toHaveBeenCalledWith("");
+      expect(mockSetSelectedTeamId).toHaveBeenCalledWith("");
       expect(mockSetSearchParams).toHaveBeenCalledTimes(1);
       expect(applyStrip("org=beta").get("org")).toBeNull();
     });

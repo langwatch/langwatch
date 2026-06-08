@@ -31,10 +31,13 @@ export function useOrgQueryParamSelection(): void {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const [, setSelectedOrganizationId] = useLocalStorage<string>(
-    "selectedOrganizationId",
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useLocalStorage<string>("selectedOrganizationId", "");
+  const [, setSelectedProjectSlug] = useLocalStorage<string>(
+    "selectedProjectSlug",
     "",
   );
+  const [, setSelectedTeamId] = useLocalStorage<string>("selectedTeamId", "");
 
   const orgParam = searchParams.get("org");
 
@@ -45,8 +48,14 @@ export function useOrgQueryParamSelection(): void {
     if (!organizations) return;
 
     const match = organizations.find((org) => org.slug === orgParam);
-    if (match) {
+    if (match && match.id !== selectedOrganizationId) {
       setSelectedOrganizationId(match.id);
+      // The org resolver pins an org-scoped page (e.g. /me) to the previously
+      // selected project's org, so clear the project/team context to let the
+      // newly selected org take effect. The resolver then picks the new org's
+      // default project/team.
+      setSelectedProjectSlug("");
+      setSelectedTeamId("");
     }
 
     // Strip `?org` whether it was applied or ignored, preserving every other
@@ -59,5 +68,13 @@ export function useOrgQueryParamSelection(): void {
       },
       { replace: true },
     );
-  }, [orgParam, organizations, setSelectedOrganizationId, setSearchParams]);
+  }, [
+    orgParam,
+    organizations,
+    selectedOrganizationId,
+    setSelectedOrganizationId,
+    setSelectedProjectSlug,
+    setSelectedTeamId,
+    setSearchParams,
+  ]);
 }
