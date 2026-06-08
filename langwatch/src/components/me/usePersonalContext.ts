@@ -9,7 +9,10 @@ import { useWorkspaceData } from "../useWorkspaceData";
 import type { WorkspaceSwitcherProps } from "../WorkspaceSwitcher";
 
 export type PersonalSummary = {
+  /** Theoretical (list-price) total, including bundled / non-billed usage. */
   spentThisMonthUsd: number;
+  /** Portion actually billed per token; the bundled part is spent - billed. */
+  billedThisMonthUsd: number;
   budgetUsd: number | null;
   requestsThisMonth: number;
   requestsDeltaPctVsLastMonth: number | null;
@@ -174,6 +177,7 @@ export function usePersonalContext(): PersonalContext {
     switcher,
     summary: {
       spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
+      billedThisMonthUsd: personalUsageQuery.data?.summary.billedUsd ?? 0,
       // Always-on chip data: `limitUsd` flows through whenever the user
       // has any applicable budget, regardless of `status`. Banner-only
       // surfaces (BudgetExceededBanner) still gate on `budget.status`.

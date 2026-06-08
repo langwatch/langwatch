@@ -160,6 +160,9 @@ describe("PersonalUsageService spend rollups", () => {
       });
       expect(summary.requests).toBe(2);
       expect(summary.spentUsd).toBeCloseTo(1.5, 5);
+      // Only the billed trace counts toward billed; the bundled one nets to 0,
+      // so the headline reflects real money out and bundled = spent - billed.
+      expect(summary.billedUsd).toBeCloseTo(0.5, 5);
     });
 
     it("executes dailyBuckets and splits billed from theoretical", async () => {

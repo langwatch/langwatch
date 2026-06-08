@@ -529,6 +529,7 @@ export const userRouter = createTRPCRouter({
         return {
           summary: {
             spentUsd: 0,
+            billedUsd: 0,
             requests: 0,
             promptTokens: 0,
             completionTokens: 0,

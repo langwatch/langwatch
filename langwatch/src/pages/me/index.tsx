@@ -44,6 +44,24 @@ function MyUsagePage() {
 
   const isOverBudget = budget.status === "exceeded";
 
+  // "Spent this month" leads with the actually-billed amount; the theoretical
+  // bundled portion (e.g. Claude Max usage that isn't billed per token) is most
+  // of a coding-assistant user's spend and would mislead as the headline, so it
+  // rides in the subline instead.
+  const bundledThisMonthUsd = Math.max(
+    0,
+    summary.spentThisMonthUsd - summary.billedThisMonthUsd,
+  );
+  const budgetSubline = isOverBudget
+    ? "Limit reached"
+    : summary.budgetUsd !== null
+      ? `of ${fmtUsd(summary.budgetUsd)} budget`
+      : "No budget set";
+  const spentSubline =
+    bundledThisMonthUsd > 0
+      ? `${fmtUsd(bundledThisMonthUsd)} bundled · ${budgetSubline}`
+      : budgetSubline;
+
   // Two cost series across the spend charts: the theoretical list-price total
   // (includes bundled / not-billed-per-token usage like Claude Max) and the
   // amount actually billed. Each can be toggled off; hiding "theoretical"
@@ -118,14 +136,8 @@ function MyUsagePage() {
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
           <SummaryCard
             title="Spent this month"
-            value={fmtUsd(summary.spentThisMonthUsd)}
-            subline={
-              isOverBudget
-                ? "Limit reached"
-                : summary.budgetUsd !== null
-                  ? `of ${fmtUsd(summary.budgetUsd)} budget`
-                  : "No budget set"
-            }
+            value={fmtUsd(summary.billedThisMonthUsd)}
+            subline={spentSubline}
             tone={isOverBudget ? "red" : "default"}
           />
           <SummaryCard

@@ -42,7 +42,14 @@ export interface PersonalUsageWindow {
 }
 
 export interface PersonalUsageSummary {
+  /** Theoretical (list-price) spend — the grand total regardless of plan. */
   spentUsd: number;
+  /**
+   * Portion actually billed per token. Excludes bundled / non-billable spend
+   * (e.g. a Claude Max session), so it reflects real money out the door. The
+   * bundled portion is `spentUsd - billedUsd`.
+   */
+  billedUsd: number;
   requests: number;
   promptTokens: number;
   completionTokens: number;
@@ -145,6 +152,10 @@ export class PersonalUsageService {
       : null;
 
     const totalCost = summaryRow.totalCost + (ingestion?.totalCost ?? 0);
+    // The gateway ledger records real per-token spend (virtual-key traffic the
+    // customer pays for), so its whole amount is billed; the trace_summaries
+    // path already nets out the non-billable (bundled) portion.
+    const totalBilled = summaryRow.billedCost + (ingestion?.totalCost ?? 0);
     const totalRequests =
       summaryRow.requestCount + (ingestion?.requestCount ?? 0);
     const totalPromptTokens =
@@ -171,6 +182,7 @@ export class PersonalUsageService {
 
     return {
       spentUsd: totalCost,
+      billedUsd: totalBilled,
       requests: totalRequests,
       promptTokens: totalPromptTokens,
       completionTokens: totalCompletionTokens,
@@ -476,6 +488,7 @@ export class PersonalUsageService {
     params: { tenantId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
+    billedCost: number;
     requestCount: number;
     promptTokens: number;
     completionTokens: number;
@@ -484,6 +497,7 @@ export class PersonalUsageService {
       query: `
         SELECT
           sum(SpentUsd)        AS TotalCost,
+          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledCost,
           countDistinct(TraceId) AS RequestCount,
           sum(PromptTokens)    AS PromptTokens,
           sum(CompletionTokens) AS CompletionTokens
@@ -491,6 +505,7 @@ export class PersonalUsageService {
           SELECT
             TraceId,
             argMax(TotalCost, UpdatedAt)               AS SpentUsd,
+            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd,
             argMax(TotalPromptTokenCount, UpdatedAt)   AS PromptTokens,
             argMax(TotalCompletionTokenCount, UpdatedAt) AS CompletionTokens
           FROM trace_summaries
@@ -511,6 +526,7 @@ export class PersonalUsageService {
 
     type RawSummary = {
       TotalCost: number | null;
+      BilledCost: number | null;
       RequestCount: number | null;
       PromptTokens: number | null;
       CompletionTokens: number | null;
@@ -519,6 +535,7 @@ export class PersonalUsageService {
     if (!row) {
       return {
         totalCost: 0,
+        billedCost: 0,
         requestCount: 0,
         promptTokens: 0,
         completionTokens: 0,
@@ -526,6 +543,7 @@ export class PersonalUsageService {
     }
     return {
       totalCost: Number(row.TotalCost) || 0,
+      billedCost: Number(row.BilledCost) || 0,
       requestCount: Number(row.RequestCount) || 0,
       promptTokens: Number(row.PromptTokens) || 0,
       completionTokens: Number(row.CompletionTokens) || 0,
@@ -722,6 +740,7 @@ function fillEmptyBuckets(
 function emptySummary(): PersonalUsageSummary {
   return {
     spentUsd: 0,
+    billedUsd: 0,
     requests: 0,
     promptTokens: 0,
     completionTokens: 0,
