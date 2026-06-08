@@ -24,6 +24,8 @@ type SimulationSuite = {
   targets: Array<{ type: string; referenceId: string }>;
   repeatCount: number;
   labels: string[];
+  simulatorModel: string | null;
+  judgeModel: string | null;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -110,6 +112,8 @@ function makeSuite(
     targets: [{ type: "http", referenceId: "agent_1" }],
     repeatCount: 1,
     labels: ["regression"],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

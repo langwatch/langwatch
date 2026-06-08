@@ -18,6 +18,7 @@ import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
+import { extractSuiteId } from "../../suites/suite-set-id";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -57,6 +58,26 @@ export interface ScenarioFetcher {
     situation: string;
     criteria: string[];
     labels: string[];
+    /** Per-scenario user-simulator model override (null = use default). */
+    simulatorModel?: string | null;
+    /** Per-scenario judge model override (null = use default). */
+    judgeModel?: string | null;
+  } | null>;
+}
+
+/**
+ * Resolves run-plan-level (suite) simulator/judge model overrides for a
+ * scenario run. The set id encodes the suite (see `getSuiteSetId`), so the
+ * prefetcher can pick up a run plan's choices without threading them through
+ * the event-sourcing queue. Returns null when the run is not part of a suite.
+ */
+export interface SuiteModelFetcher {
+  getBySetId(
+    setId: string,
+    projectId: string,
+  ): Promise<{
+    simulatorModel: string | null;
+    judgeModel: string | null;
   } | null>;
 }
 
@@ -131,6 +152,7 @@ export interface ModelParamsProvider {
 /** All dependencies required by prefetchScenarioData */
 export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
+  suiteModelFetcher: SuiteModelFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
@@ -177,15 +199,16 @@ export async function prefetchScenarioData(
     "Prefetching scenario data",
   );
 
-  const scenario = await fetchScenario(
+  const scenarioResult = await fetchScenario(
     context.projectId,
     context.scenarioId,
     deps.scenarioFetcher,
   );
-  if (!scenario) {
+  if (!scenarioResult) {
     logger.warn({ projectId: context.projectId, scenarioId: context.scenarioId }, "Scenario not found");
     return { success: false, error: `Scenario ${context.scenarioId} not found` };
   }
+  const scenario = scenarioResult.config;
 
   const projectResult = await fetchProject(context.projectId, deps.projectFetcher);
   if (!projectResult.success) {
@@ -227,39 +250,76 @@ export async function prefetchScenarioData(
     };
   }
 
-  // When target is a prompt, use the prompt's configured model for
-  // fetching model params. Otherwise resolve the project's DEFAULT
-  // model via the cascade. ModelNotConfiguredError bubbles as a
-  // structured failure with the "model not configured" message.
+  // Resolve the three model roles a run needs:
+  //   - the target adapter (prompt / workflow under test): the prompt's own
+  //     model when set, else the project's scenarios.generator default.
+  //   - the user-simulator and the judge: a run-plan override, else the
+  //     scenario's own override, else the DEFAULT-role scenarios.user_simulator
+  //     / scenarios.judge model. The split lets the role-play and evaluation
+  //     use a smart model independently of the agent under test.
+  // ModelNotConfiguredError bubbles as a structured "model not configured"
+  // failure with the resolver's message.
+  const suiteOverrides = await deps.suiteModelFetcher.getBySetId(
+    context.setId,
+    context.projectId,
+  );
   let modelForParams: string;
-  if (adapterData.type === "prompt" && adapterData.model) {
-    modelForParams = adapterData.model;
-  } else {
-    try {
-      modelForParams = await deps.modelResolver.resolve(
-        "scenarios.generator",
+  let simulatorModel: string;
+  let judgeModel: string;
+  try {
+    modelForParams =
+      adapterData.type === "prompt" && adapterData.model
+        ? adapterData.model
+        : await deps.modelResolver.resolve(
+            "scenarios.generator",
+            context.projectId,
+          );
+    simulatorModel =
+      suiteOverrides?.simulatorModel ??
+      scenarioResult.simulatorModel ??
+      (await deps.modelResolver.resolve(
+        "scenarios.user_simulator",
         context.projectId,
+      ));
+    judgeModel =
+      suiteOverrides?.judgeModel ??
+      scenarioResult.judgeModel ??
+      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "No default model configured for this project";
+    return { success: false, error: message };
+  }
+
+  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
+    await Promise.all([
+      deps.modelParamsProvider.prepare(context.projectId, modelForParams),
+      deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
+      deps.modelParamsProvider.prepare(context.projectId, judgeModel),
+    ]);
+  for (const { label, model, result } of [
+    { label: "adapter", model: modelForParams, result: modelParamsResult },
+    { label: "user-simulator", model: simulatorModel, result: simulatorParamsResult },
+    { label: "judge", model: judgeModel, result: judgeParamsResult },
+  ]) {
+    if (!result.success) {
+      logger.warn(
+        { projectId: context.projectId, role: label, model, reason: result.reason },
+        `Failed to prepare model params: ${result.message}`,
       );
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "No default model configured for this project";
-      return { success: false, error: message };
+      return { success: false, error: result.message, reason: result.reason };
     }
   }
-  const modelParamsResult = await deps.modelParamsProvider.prepare(
-    context.projectId,
-    modelForParams,
-  );
-  if (!modelParamsResult.success) {
-    logger.warn(
-      { projectId: context.projectId, model: modelForParams, reason: modelParamsResult.reason },
-      `Failed to prepare model params: ${modelParamsResult.message}`,
-    );
-    return { success: false, error: modelParamsResult.message, reason: modelParamsResult.reason };
+  // Narrowing: the loop above returns on any failure, so all three succeeded.
+  if (
+    !modelParamsResult.success ||
+    !simulatorParamsResult.success ||
+    !judgeParamsResult.success
+  ) {
+    return { success: false, error: "Failed to prepare model params" };
   }
-  const modelParams = modelParamsResult.params;
 
   logger.debug(
     { projectId: context.projectId, scenarioId: context.scenarioId, targetType: target.type },
@@ -272,7 +332,9 @@ export async function prefetchScenarioData(
       context,
       scenario,
       adapterData,
-      modelParams,
+      modelParams: modelParamsResult.params,
+      simulatorModelParams: simulatorParamsResult.params,
+      judgeModelParams: judgeParamsResult.params,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
       target,
     },
@@ -291,15 +353,23 @@ async function fetchScenario(
   projectId: string,
   scenarioId: string,
   fetcher: ScenarioFetcher,
-): Promise<ScenarioConfig | null> {
+): Promise<{
+  config: ScenarioConfig;
+  simulatorModel: string | null;
+  judgeModel: string | null;
+} | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
   return {
-    id: scenario.id,
-    name: scenario.name,
-    situation: scenario.situation,
-    criteria: scenario.criteria,
-    labels: scenario.labels,
+    config: {
+      id: scenario.id,
+      name: scenario.name,
+      situation: scenario.situation,
+      criteria: scenario.criteria,
+      labels: scenario.labels,
+    },
+    simulatorModel: scenario.simulatorModel ?? null,
+    judgeModel: scenario.judgeModel ?? null,
   };
 }
 
@@ -771,6 +841,21 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
   return {
     scenarioFetcher: {
       getById: (params) => scenarioService.getById(params),
+    },
+    suiteModelFetcher: {
+      getBySetId: async (setId, projectId) => {
+        const suiteId = extractSuiteId(setId);
+        if (!suiteId) return null;
+        const suite = await prisma.simulationSuite.findFirst({
+          where: { id: suiteId, projectId },
+          select: { simulatorModel: true, judgeModel: true },
+        });
+        if (!suite) return null;
+        return {
+          simulatorModel: suite.simulatorModel,
+          judgeModel: suite.judgeModel,
+        };
+      },
     },
     promptFetcher: {
       getPromptByIdOrHandle: (params) =>

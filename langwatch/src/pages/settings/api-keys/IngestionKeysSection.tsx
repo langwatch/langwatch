@@ -53,7 +53,7 @@ export function IngestionKeysSection({
       </VStack>
 
       <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0}>
+        <Card.Body paddingY={0} paddingX={0} overflowX="auto">
           <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>

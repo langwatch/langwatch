@@ -25,6 +25,8 @@ function makeSuiteRow(
     targets: [{ type: "http", referenceId: "agent_1" }],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),

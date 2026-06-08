@@ -30,6 +30,19 @@ describe("feature registry", () => {
     expect(f?.displayName).toBe("AI search");
   });
 
+  /** @scenario "User-simulator and judge are registered as DEFAULT-role features" */
+  it("registers the scenario simulator and judge as DEFAULT-role features", () => {
+    expect(featureByKey("scenarios.user_simulator")?.role).toBe("DEFAULT");
+    expect(featureByKey("scenarios.judge")?.role).toBe("DEFAULT");
+  });
+
+  /** @scenario "New scenario model features surface under the Default role expansion" */
+  it("surfaces the scenario simulator and judge under the DEFAULT role expansion", () => {
+    const defaultKeys = featuresByRole("DEFAULT").map((f) => f.key);
+    expect(defaultKeys).toContain("scenarios.user_simulator");
+    expect(defaultKeys).toContain("scenarios.judge");
+  });
+
   it("returns undefined for an unknown key", () => {
     expect(featureByKey("not-a-real-key")).toBeUndefined();
   });

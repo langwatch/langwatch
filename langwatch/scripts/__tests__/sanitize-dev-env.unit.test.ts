@@ -44,6 +44,12 @@ echo "__BASE_HOST=\${BASE_HOST:-}"
       encoding: "utf8",
       input: script,
       stdio: ["pipe", "pipe", "pipe"],
+      // Isolate the subprocess env. The helper reads APP_PORT / NEXTAUTH_URL /
+      // BASE_HOST, so any of those present on the parent process (e.g. loaded
+      // from the developer's langwatch/.env) would leak in and make assertions
+      // depend on the local machine. Start from a bare PATH and let each
+      // test's own export/unset lines be the single source of truth.
+      env: { PATH: process.env.PATH ?? "" },
     });
   } catch (e) {
     const err = e as { status?: number; stdout?: string; stderr?: string };

@@ -67,6 +67,33 @@ export class ModelProviderRepository {
     return result ? this.withDecryptedKeys(result) : null;
   }
 
+  /**
+   * Find a ModelProvider by id anywhere inside an organization, regardless
+   * of whether it is granted at the org, team, or a (possibly sibling)
+   * project scope. The single-org `organizationId` anchor (ADR-021) bounds
+   * the lookup to the caller's tenant, so an id from another org can't be
+   * probed.
+   *
+   * The settings list surfaces org- and sibling-project-scoped rows (see
+   * `findAllAccessibleForProject` / `findAllInOrganization`), so a
+   * PROJECT-scope lookup misses them — which is why deleting an org-scoped
+   * provider from a project view used to 404. The delete path uses this
+   * org-anchored lookup and then gates the action on the per-scope manage
+   * authz.
+   */
+  async findByIdForOrganization(
+    id: string,
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ModelProviderWithScopes | null> {
+    const client = tx ?? this.prisma;
+    const result = await client.modelProvider.findFirst({
+      where: { id, organizationId },
+      include: { scopes: true },
+    });
+    return result ? this.withDecryptedKeys(result) : null;
+  }
+
   async findAll(
     projectId: string,
     tx?: Prisma.TransactionClient,
