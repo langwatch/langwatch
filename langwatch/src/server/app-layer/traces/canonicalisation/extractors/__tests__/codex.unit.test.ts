@@ -213,6 +213,32 @@ describe("CodexExtractor.applyLog", () => {
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
     });
 
+    it("types an unknown usage-bearing codex span as llm but keeps its tokens", () => {
+      // A hypothetical future codex span that carries usage NOT folded into the
+      // turn rollup must be counted, not silently dropped — so it is typed as a
+      // model call but NOT marked skip_token_accumulation.
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.usage.input_tokens": 4096,
+          "gen_ai.usage.output_tokens": 128,
+        },
+        {
+          name: "handle_completions",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.span.type"]).toBe("llm");
+      expect(
+        ctx.out["langwatch.reserved.skip_token_accumulation"],
+      ).toBeUndefined();
+      expect(ctx.recordRule).not.toHaveBeenCalledWith(
+        "codex/skip-redundant-usage",
+      );
+    });
+
     it("does not flag a non-turn codex span without usage", () => {
       const ctx = createExtractorContext(
         { "code.module.name": "session" },
