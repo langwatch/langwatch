@@ -8,7 +8,10 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
-import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import {
+  RecordSpanCommand,
+  RECORD_SPAN_DEDUPLICATION,
+} from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
@@ -107,7 +110,9 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
   }
 
   return builder
-    .withCommand("recordSpan", RecordSpanCommand)
+    .withCommand("recordSpan", RecordSpanCommand, {
+      deduplication: RECORD_SPAN_DEDUPLICATION,
+    })
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
