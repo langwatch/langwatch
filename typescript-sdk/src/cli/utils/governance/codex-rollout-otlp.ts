@@ -149,13 +149,22 @@ export async function harvestAndEmitCodexIO(args: {
 
   const body = buildCodexIOExportRequest(turns, nowMs);
   const doFetch = fetchImpl ?? fetch;
-  await doFetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  // Cap the POST so a slow or unreachable endpoint can't wedge the user's
+  // shell after codex has already exited.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    await doFetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   return turns.length;
 }
