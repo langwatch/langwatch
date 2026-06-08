@@ -1,4 +1,4 @@
-import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
+import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
@@ -211,7 +211,7 @@ export class TraceRequestCollectionService {
     resource: OtlpResource | null;
     instrumentationScope: OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef?: import("@opentelemetry/api").Span;
+    otelSpanRef?: OtelSpan;
   }): Promise<SpanIngestionResult> {
     let lockAcquired = false;
 
@@ -284,7 +284,7 @@ export class TraceRequestCollectionService {
     resource: OtlpResource | null;
     scope: OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef: import("@opentelemetry/api").Span;
+    otelSpanRef: OtelSpan;
   }): Promise<SpanIngestionResult> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
