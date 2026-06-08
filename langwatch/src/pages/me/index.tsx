@@ -303,12 +303,12 @@ function MyUsagePage() {
                       minWidth="90px"
                       fontSize="sm"
                     >
-                      {showTheoretical && (
-                        <Text color="fg.muted">{fmtUsd(tool.usd)}</Text>
+                      {showBilled && (
+                        <Text>{fmtUsd(tool.billedUsd)}</Text>
                       )}
-                      {showBilled && tool.billedUsd !== tool.usd && (
-                        <Text color="blue.600" fontSize="xs">
-                          {fmtUsd(tool.billedUsd)} billed
+                      {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
+                        <Text color="fg.subtle" fontSize="xs">
+                          {fmtUsd(tool.usd - tool.billedUsd)} bundled
                         </Text>
                       )}
                     </VStack>
