@@ -23,10 +23,12 @@ tone_instructions: >
 
 reviews:
   profile: assertive
-  # Comment-only reviews: CodeRabbit posts its verdict as a COMMENTED event,
-  # never APPROVED/CHANGES_REQUESTED, so its review cannot satisfy the
-  # required_approving_review_count gate. A human must still approve.
-  # (PR #4672 merged on CR's approval alone before this was set.)
+  # request_changes_workflow: false disables CodeRabbit's approval verdicts —
+  # both the automatic post-resolution Approve and the manual @coderabbitai
+  # approve command require this to be true. CodeRabbit's reviews land as
+  # COMMENTED, so they cannot satisfy the required_approving_review_count gate;
+  # a human must still approve. (PR #4672 merged on CR's approval alone before
+  # this was set.)
   request_changes_workflow: false
   high_level_summary: true
   poem: false
