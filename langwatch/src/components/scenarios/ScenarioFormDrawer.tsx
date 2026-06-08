@@ -192,19 +192,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
 
   const handleSave = useCallback(
-    async (
-      data: ScenarioFormData,
-      {
-        skipTransition = false,
-        models,
-      }: {
-        skipTransition?: boolean;
-        /** Model overrides chosen in the run dialog. Omitted on a plain save
-         *  so existing scenario models are left untouched (undefined = no-op
-         *  in the Prisma update). */
-        models?: { simulatorModel: string | null; judgeModel: string | null };
-      } = {},
-    ): Promise<Scenario | null> => {
+    async ({
+      data,
+      skipTransition = false,
+      models,
+    }: {
+      data: ScenarioFormData;
+      skipTransition?: boolean;
+      /** Model overrides chosen in the run dialog. Omitted on a plain save
+       *  so existing scenario models are left untouched (undefined = no-op
+       *  in the Prisma update). */
+      models?: { simulatorModel: string | null; judgeModel: string | null };
+    }): Promise<Scenario | null> => {
       if (!project?.id) return null;
 
       // Edit mode: scenarioId is in URL and scenario data is loaded
@@ -323,7 +322,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // fires after — `onClose()` does its own router.push inside
         // closeDrawer, and back-to-back router.push calls get coalesced
         // (the cleanup push wins, the redirect gets dropped silently).
-        const savedScenario = await handleSave(data, {
+        const savedScenario = await handleSave({
+          data,
           skipTransition: true,
           models: {
             simulatorModel: runSimulatorModel,
@@ -373,7 +373,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     if (!form) return;
     await form.handleSubmit(async (data) => {
       try {
-        const saved = await handleSave(data, { skipTransition: true });
+        const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
             title: scenario ? "Scenario updated" : "Scenario created",
