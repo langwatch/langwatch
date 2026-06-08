@@ -30,6 +30,19 @@ export interface JobEntry {
   data: Record<string, unknown> | null;
 }
 
+/** Result returned by {@link QueueRepository.reconcileTotalPending}. */
+export interface ReconcileResult {
+  /** The value of the counter before this reconcile cycle. */
+  counter: number;
+  /** The authoritative Σ ZCARD over ALL `group:*:jobs` keys for the queue. */
+  groundTruth: number;
+  /**
+   * How far the counter was above ground truth before healing.
+   * Positive = over-counted; negative = under-counted.
+   */
+  drift: number;
+}
+
 export interface QueueRepository {
   discoverQueueNames(): Promise<string[]>;
 
@@ -149,8 +162,7 @@ export interface QueueRepository {
 
   reconcileTotalPending(
     queueName: string,
-    singleFlightWindowMs?: number,
-  ): Promise<{ counter: number; groundTruth: number; drift: number } | null>;
+  ): Promise<ReconcileResult | null>;
 }
 
 export class NullQueueRepository implements QueueRepository {
@@ -250,11 +262,7 @@ export class NullQueueRepository implements QueueRepository {
     return { totalAffected: 0, byPipeline: [], byError: [] };
   }
 
-  async reconcileTotalPending(): Promise<{
-    counter: number;
-    groundTruth: number;
-    drift: number;
-  } | null> {
+  async reconcileTotalPending(): Promise<ReconcileResult | null> {
     return null;
   }
 }

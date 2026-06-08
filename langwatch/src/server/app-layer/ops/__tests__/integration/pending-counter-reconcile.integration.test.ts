@@ -19,22 +19,24 @@ let queueCounter = 0;
 
 describe("QueueRedisRepository.reconcileTotalPending", () => {
   let repo: QueueRedisRepository;
+  let queueName: string;
+  let markerKey: string;
 
   beforeEach(() => {
     repo = new QueueRedisRepository(redis);
     queueCounter++;
+    queueName = `test-recon-${queueCounter}`;
+    markerKey = `${queueName}:gq:stats:pending-recon-ts`;
   });
 
   describe("given the pending counter has drifted above ground truth", () => {
     describe("when reconcile runs", () => {
       /** @scenario Reconcile heals an over-counted pending counter to the live ground truth */
       it("heals the counter to ground truth and returns the drift", async () => {
-        const queueName = `test-recon-${queueCounter}`;
         const counterKey = `${queueName}:gq:stats:total-pending`;
         const groupAJobsKey = `${queueName}:gq:group:groupA:jobs`;
         const groupBJobsKey = `${queueName}:gq:group:groupB:jobs`;
         const readyKey = `${queueName}:gq:ready`;
-        const markerKey = `${queueName}:gq:stats:pending-recon-ts`;
 
         // Clear any leftover marker from a previous run
         await redis.del(markerKey);
@@ -48,9 +50,6 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // SET counter = 100 (drifted well above ground truth 5)
         await redis.set(counterKey, "100");
-
-        // Pre-assert: counter is 100 and is greater than ground truth 5
-        expect(await redis.get(counterKey)).toBe("100");
 
         const result = await repo.reconcileTotalPending(queueName);
 
@@ -69,10 +68,8 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     describe("when reconcile runs", () => {
       /** @scenario Reconcile returns zero drift when the counter is already accurate */
       it("returns zero drift and leaves the counter unchanged", async () => {
-        const queueName = `test-recon-${queueCounter}`;
         const counterKey = `${queueName}:gq:stats:total-pending`;
         const groupJobsKey = `${queueName}:gq:group:groupX:jobs`;
-        const markerKey = `${queueName}:gq:stats:pending-recon-ts`;
 
         // Clear any leftover marker
         await redis.del(markerKey);
@@ -84,6 +81,8 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         const result = await repo.reconcileTotalPending(queueName);
 
         expect(result).not.toBeNull();
+        expect(result!.counter).toBe(2);
+        expect(result!.groundTruth).toBe(2);
         expect(result!.drift).toBe(0);
         expect(await redis.get(counterKey)).toBe("2");
       });
@@ -94,10 +93,8 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     describe("when reconcile runs again immediately", () => {
       /** @scenario Single-flight gate prevents a redundant reconcile within the same window */
       it("returns null on the second call and leaves the counter unchanged from the first heal", async () => {
-        const queueName = `test-recon-${queueCounter}`;
         const counterKey = `${queueName}:gq:stats:total-pending`;
         const groupJobsKey = `${queueName}:gq:group:groupY:jobs`;
-        const markerKey = `${queueName}:gq:stats:pending-recon-ts`;
 
         // Clear any leftover marker
         await redis.del(markerKey);
@@ -117,6 +114,60 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // Counter must be unchanged from the first heal
         expect(await redis.get(counterKey)).toBe("1");
+      });
+    });
+  });
+
+  describe("given the pending counter is below the actual number of jobs", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario Reconcile corrects an under-counted pending counter upward to ground truth */
+      it("heals the counter upward and returns negative drift", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        // Clear any leftover marker
+        await redis.del(markerKey);
+
+        // Seed 7 jobs across groups
+        await redis.zadd(`${queueName}:gq:group:ga:jobs`, 1, "j1", 2, "j2", 3, "j3");
+        await redis.zadd(`${queueName}:gq:group:gb:jobs`, 4, "j4", 5, "j5");
+        await redis.zadd(`${queueName}:gq:group:gc:jobs`, 6, "j6", 7, "j7");
+
+        // SET counter = 3 (under-counted)
+        await redis.set(counterKey, "3");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result).not.toBeNull();
+        expect(result!.counter).toBe(3);
+        expect(result!.groundTruth).toBe(7);
+        expect(result!.drift).toBe(-4);
+
+        // Counter must be healed upward to ground truth
+        expect(await redis.get(counterKey)).toBe("7");
+      });
+    });
+  });
+
+  describe("given no group jobs remain in the queue", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario Reconcile sets the counter to zero when no jobs remain */
+      it("sets the counter to zero and returns the full positive drift", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        // Clear any leftover marker
+        await redis.del(markerKey);
+
+        // Seed NO group:*:jobs keys — queue is empty
+        await redis.set(counterKey, "50");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result).not.toBeNull();
+        expect(result!.groundTruth).toBe(0);
+        expect(result!.drift).toBe(50);
+
+        // Counter must be healed to zero
+        expect(await redis.get(counterKey)).toBe("0");
       });
     });
   });

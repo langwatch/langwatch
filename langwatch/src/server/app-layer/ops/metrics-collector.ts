@@ -337,6 +337,7 @@ export class OpsMetricsCollector {
       () => this.reconcilePending(),
       PENDING_RECONCILE_INTERVAL_MS,
     );
+    void this.reconcilePending();
     this.broadcastInterval = setInterval(() => {
       if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
       try {
@@ -428,7 +429,7 @@ export class OpsMetricsCollector {
       let totalDrift = 0;
       for (const queueName of this.groupQueueNames) {
         const result = await this.queueRepo.reconcileTotalPending(queueName);
-        if (result) totalDrift += result.drift;
+        if (result) totalDrift += Math.abs(result.drift);
       }
       this.latestPendingDrift = totalDrift;
       if (totalDrift !== 0) {

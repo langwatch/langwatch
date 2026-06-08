@@ -7,13 +7,17 @@ import type {
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
+  ReconcileResult,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
+import { createLogger } from "~/utils/logger/server";
 import {
   GROUP_QUEUE_REGISTRY_KEY,
   TTL_HELPER_LUA,
   PARK_HELPER_LUA,
 } from "~/server/event-sourcing/queues/groupQueue/scripts";
+
+const logger = createLogger("langwatch:ops:queue-redis-repository");
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
@@ -196,6 +200,7 @@ return count
 const SUMMARY_TOP_N = 200;
 const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
+const PENDING_RECONCILE_SCAN_COUNT = 1000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -1437,6 +1442,17 @@ export class QueueRedisRepository implements QueueRepository {
    * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
    * ground truth is safe and does not affect dispatch correctness.
    *
+   * The ground truth is the authoritative Σ ZCARD over ALL `group:*:jobs` keys
+   * for this queue — intentionally the complete count, distinct from the top-N
+   * sampled per-group dashboard tile.
+   *
+   * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
+   * window is acceptable and self-corrects on the next scheduled cycle.
+   *
+   * The single-flight window default is shorter than the collector's reconcile
+   * interval so each scheduled cycle can acquire the marker while still guarding
+   * against multi-pod overlap.
+   *
    * The reconcile is single-flighted per `singleFlightWindowMs` so only one
    * pod recomputes per window. It is intentionally off the hot dispatch path.
    *
@@ -1445,7 +1461,7 @@ export class QueueRedisRepository implements QueueRepository {
   async reconcileTotalPending(
     queueName: string,
     singleFlightWindowMs = 55_000,
-  ): Promise<{ counter: number; groundTruth: number; drift: number } | null> {
+  ): Promise<ReconcileResult | null> {
     const prefix = `${queueName}:gq:`;
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
@@ -1474,7 +1490,7 @@ export class QueueRedisRepository implements QueueRepository {
         "MATCH",
         matchPattern,
         "COUNT",
-        1000,
+        PENDING_RECONCILE_SCAN_COUNT,
       );
       cursor = nextCursor;
       for (const key of keys) {
@@ -1483,6 +1499,8 @@ export class QueueRedisRepository implements QueueRepository {
     } while (cursor !== "0");
 
     // Pipeline ZCARD for every collected key and sum the results.
+    // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
+    // a partial under-count as ground truth; the next cycle retries.
     let groundTruth = 0;
     if (jobsKeys.length > 0) {
       const pipeline = this.redis.pipeline();
@@ -1491,7 +1509,11 @@ export class QueueRedisRepository implements QueueRepository {
       }
       const results = await pipeline.exec();
       if (results) {
-        for (const [, val] of results) {
+        for (const [err, val] of results) {
+          if (err) {
+            logger.warn({ error: err }, "ZCARD pipeline error during pending reconcile — aborting to avoid under-count");
+            return null;
+          }
           groundTruth += Number(val) || 0;
         }
       }
