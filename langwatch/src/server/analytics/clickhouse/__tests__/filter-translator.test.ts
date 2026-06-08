@@ -177,7 +177,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("stored_spans subquery partition pruning", () => {
+    describe("when a span or event facet filter targets stored_spans", () => {
       // The stored_spans facet subqueries must accept a StartTime predicate so
       // they prune to the dashboard's date range instead of cold-scanning every
       // weekly partition on S3. The predicate is the caller's responsibility
