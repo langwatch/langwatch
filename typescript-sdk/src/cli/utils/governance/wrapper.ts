@@ -170,6 +170,28 @@ export interface PreflightResult {
   ok: boolean;
   /** Human-readable, action-oriented message rendered to stderr on failure. */
   message?: string;
+  /**
+   * Set on a failure a later retry might clear on its own - the gateway data
+   * plane is momentarily unreachable. When absent/false the gateway path is
+   * structurally unusable for this account/org (no virtual key, no provider
+   * configured), so a remembered gateway choice is worth forgetting to re-offer
+   * direct OTLP next time.
+   */
+  retryable?: boolean;
+}
+
+/**
+ * Whether to forget a remembered gateway path choice after a failed gateway
+ * preflight. True only when the user had pinned gateway AND the failure is
+ * structural (no virtual key / no provider) rather than a retryable
+ * gateway-down, so the next run re-prompts and can offer direct OTLP instead
+ * of dead-ending on the same pinned choice every time.
+ */
+export function shouldForgetGatewayPin(args: {
+  pinnedMode: string | undefined;
+  retryable: boolean | undefined;
+}): boolean {
+  return args.pinnedMode === "gateway" && args.retryable !== true;
 }
 
 export interface PreflightOptions {
@@ -257,6 +279,7 @@ export async function preflightWrapper(
     if (!res.ok) {
       return {
         ok: false,
+        retryable: true,
         message:
           `AI Gateway at ${gw} returned HTTP ${res.status}.\n` +
           `The wrapper cannot route \`langwatch ${tool}\` requests until the\n` +
@@ -267,6 +290,7 @@ export async function preflightWrapper(
   } catch (err) {
     return {
       ok: false,
+      retryable: true,
       message:
         `Cannot reach AI Gateway at ${gw}\n` +
         `  ${(err as Error).message}\n` +
@@ -453,6 +477,29 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     const probe = await preflightWrapper(cfg, tool);
     if (!probe.ok) {
       process.stderr.write(probe.message ?? "preflight failed\n");
+      // A remembered gateway choice that can't actually serve this account/org
+      // (no virtual key / no provider configured) would re-fail every run. Drop
+      // the pin so the next run re-asks and the user can pick direct OTLP. A
+      // transient gateway-down failure keeps the pin (a retry may succeed).
+      if (
+        shouldForgetGatewayPin({
+          pinnedMode: cfg.tool_mode?.[tool],
+          retryable: probe.retryable,
+        })
+      ) {
+        const toolMode = { ...cfg.tool_mode };
+        delete toolMode[tool];
+        cfg.tool_mode = toolMode;
+        try {
+          saveConfig(cfg);
+          process.stderr.write(
+            `${lwTag()} cleared the saved gateway path for \`${tool}\`; ` +
+              `you'll be asked again next time so you can pick direct OTLP.\n`,
+          );
+        } catch {
+          // Best-effort: a config write failure just leaves the pin in place.
+        }
+      }
       process.exit(2);
     }
     if (modeResult.codexConfigPath) {
