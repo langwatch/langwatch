@@ -145,6 +145,7 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out).toEqual({
+        "langwatch.span.type": "agent",
         "gen_ai.request.model": "gpt-5.5",
         "gen_ai.response.model": "gpt-5.5",
         "gen_ai.usage.input_tokens": 14365,
@@ -209,6 +210,7 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+      expect(ctx.out["langwatch.span.type"]).toBe("llm");
     });
 
     it("does not flag a non-turn codex span without usage", () => {
@@ -280,6 +282,7 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out).toEqual({
+        "langwatch.span.type": "agent",
         "gen_ai.request.model": "gpt-5.5",
         "gen_ai.response.model": "gpt-5.5",
       });

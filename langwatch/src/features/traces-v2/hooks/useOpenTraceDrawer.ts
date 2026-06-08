@@ -207,6 +207,14 @@ export function useOpenTraceDrawer() {
           occurredAtMs: trace.timestamp,
         };
         const opts = { staleTime: 300_000 };
+        // The row seed above paints the header instantly, but the list row
+        // carries no attribute map (`attributes: {}`), so everything the
+        // header reads from attributes — cache-read / cache-write + reasoning
+        // token sums and the reasoning-effort setting — stays blank. `setData`
+        // marks that seed fresh for the 5-min staleTime, so without forcing a
+        // fetch the cache tokens never appear until a hard refresh. staleTime:0
+        // pulls the full header (with attributes) immediately, behind the seed.
+        void utils.tracesV2.header.prefetch(input, { staleTime: 0 });
         void utils.tracesV2.spanTree.prefetch(input, opts);
         void utils.tracesV2.spanLangwatchSignals.prefetch(input, opts);
         void utils.tracesV2.traceEvents.prefetch(input, opts);

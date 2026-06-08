@@ -109,6 +109,12 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       return;
     }
 
+    // The turn rollup is the agentic step that contains the model call(s).
+    // Without a type the drawer renders it as a generic span; "agent" gives
+    // it the right icon + grouping so a codex trace reads as an agent turn
+    // rather than two untyped orphan rows.
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "agent");
+
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
     const inputTokens = asNumber(
@@ -183,6 +189,10 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
     if (!hasUsage) return;
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+    // It's a model call (handle_responses), so type it as an LLM span — the
+    // drawer then renders it with the model icon under the agent turn instead
+    // of as an untyped generic row.
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
     ctx.recordRule("codex/skip-redundant-usage");
   }
 
