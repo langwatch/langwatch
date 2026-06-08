@@ -28,9 +28,6 @@ import {
   translateAllFilters,
   type FilterTranslation,
 } from "./filter-translator";
-import { createLogger } from "../../../utils/logger/server";
-
-const logger = createLogger("langwatch:analytics:aggregation-builder");
 
 /**
  * Resolve which columns a joined table needs based on the SQL expressions
