@@ -173,3 +173,27 @@ Feature: Persona-aware home resolver
     When the user navigates to "/"
     Then the existing signin redirect chain runs
     And the resolver does not execute
+
+  # ---------------------------------------------------------------------------
+  # Last-visited home stickiness (client-side, pages/index.tsx)
+  # ---------------------------------------------------------------------------
+
+  Rule: the last-visited home sticks until the user visits the other kind, so a
+  user whose persona default is /me still returns to the project they last
+  opened, symmetric with how /me sticks for someone who last sat there. An
+  explicit picker pin always wins.
+
+    @unit
+    Scenario: A last-visited project sticks over the persona /me default
+      Given the persona resolver's default destination is "/me"
+      And the user has no explicit picker pin
+      And the user last opened a project
+      When the "/" destination is resolved on the client
+      Then the client redirects to that project's home, not /me
+
+    @unit
+    Scenario: An explicit picker pin still wins over the last-visited project
+      Given the user pinned a home via the picker
+      And the user last opened a project
+      When the "/" destination is resolved on the client
+      Then the client redirects to the pinned home
