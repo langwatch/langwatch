@@ -136,13 +136,13 @@ interface RolloutLine {
   payload?: Record<string, unknown>;
 }
 
-/** Resolve a tool call's id, preferring `call_id`, then `id`, then a fallback. */
-function toolCallId(payload: Record<string, unknown>, fallback: string): string {
-  return (
-    (typeof payload.call_id === "string" && payload.call_id) ||
-    (typeof payload.id === "string" && payload.id) ||
-    fallback
-  );
+/** The tool call's explicit id (`call_id`, then `id`), or null if codex omitted both. */
+function explicitToolCallId(payload: Record<string, unknown>): string | null {
+  if (typeof payload.call_id === "string" && payload.call_id) {
+    return payload.call_id;
+  }
+  if (typeof payload.id === "string" && payload.id) return payload.id;
+  return null;
 }
 
 /**
@@ -168,6 +168,13 @@ class CodexTurnAccumulator {
   private pendingAssistant: string | null = null;
   /** Authoritative final answer from the agent_message(final_answer) event. */
   private agentFinal: string | null = null;
+  /**
+   * Synthetic ids minted for tool calls that arrived without a `call_id`, queued
+   * FIFO so the matching (also id-less) function_call_output pairs to the same id
+   * instead of drifting as the running history grows.
+   */
+  private readonly pendingToolCallIds: string[] = [];
+  private autoToolCallSeq = 0;
 
   /** Route one parsed rollout line to the handler for its event type. */
   handle(obj: RolloutLine): void {
@@ -275,7 +282,12 @@ class CodexTurnAccumulator {
 
   private onFunctionCall(payload: Record<string, unknown>): void {
     this.flushPendingAssistant();
-    const callId = toolCallId(payload, `call_${this.history.length}`);
+    let callId = explicitToolCallId(payload);
+    if (!callId) {
+      // codex omitted the id: mint a stable one and queue it for the output.
+      callId = `call_auto_${this.autoToolCallSeq++}`;
+      this.pendingToolCallIds.push(callId);
+    }
     const name = typeof payload.name === "string" ? payload.name : "tool";
     const args =
       typeof payload.arguments === "string"
@@ -297,7 +309,11 @@ class CodexTurnAccumulator {
 
   private onFunctionCallOutput(payload: Record<string, unknown>): void {
     this.flushPendingAssistant();
-    const callId = toolCallId(payload, `call_${this.history.length}`);
+    // Reuse the id codex gave; else pair FIFO with the matching id-less call.
+    const callId =
+      explicitToolCallId(payload) ??
+      this.pendingToolCallIds.shift() ??
+      `call_auto_${this.autoToolCallSeq++}`;
     this.history.push({
       role: "tool",
       tool_call_id: callId,

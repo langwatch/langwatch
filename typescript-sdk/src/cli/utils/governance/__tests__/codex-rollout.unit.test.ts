@@ -168,6 +168,43 @@ describe("parseCodexRollout", () => {
     });
   });
 
+  describe("given a tool call codex emitted without a call_id", () => {
+    describe("when it is parsed", () => {
+      /** @scenario "An id-less tool call and its output share one synthetic id so they still pair" */
+      it("mints one stable id for the call and reuses it on the output", () => {
+        const turns = parseCodexRollout(
+          rollout(
+            taskStarted("abc123", "t1"),
+            userMsg("run ls"),
+            // codex can omit call_id; the call and its output must still pair.
+            {
+              type: "response_item",
+              payload: {
+                type: "function_call",
+                name: "exec_command",
+                arguments: '{"cmd":"ls"}',
+              },
+            },
+            {
+              type: "response_item",
+              payload: { type: "function_call_output", output: "a.txt" },
+            },
+            agentMessage("done"),
+          ),
+        );
+
+        const input = turns[0]!.inputMessages;
+        const call = input.find((m) => m.tool_calls);
+        const result = input.find((m) => m.role === "tool");
+        const callId = call?.tool_calls?.[0]?.id;
+        expect(callId).toBeTruthy();
+        // The output carries the SAME id, so the pair joins instead of drifting
+        // apart as the running history grows.
+        expect(result?.tool_call_id).toBe(callId);
+      });
+    });
+  });
+
   describe("given both an agent_message and a response_item assistant message", () => {
     describe("when it is parsed", () => {
       /** @scenario "The assistant final answer is taken from the agent_message when present" */

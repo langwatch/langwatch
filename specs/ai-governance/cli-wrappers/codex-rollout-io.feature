@@ -50,6 +50,12 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
     Then the request body carries an assistant tool_call and a tool message with the output
 
   @unit
+  Scenario: An id-less tool call and its output share one synthetic id so they still pair
+    Given a rollout turn whose function_call and function_call_output both omit the call_id
+    When the rollout is parsed
+    Then the assistant tool_call and the tool message carry the same synthetic id
+
+  @unit
   Scenario: The assistant final answer is taken from the agent_message when present
     Given a rollout turn with an agent_message of phase "final_answer" and message "done"
     When the rollout is parsed
