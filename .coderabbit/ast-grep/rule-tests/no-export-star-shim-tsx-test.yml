@@ -1,0 +1,6 @@
+id: no-export-star-shim-tsx
+valid:
+  - 'export { Button } from "./Button";'
+  - 'import { Button } from "./Button";'
+invalid:
+  - 'export * from "./Button";'

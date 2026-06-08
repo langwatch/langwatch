@@ -1,0 +1,151 @@
+# Semgrep rules — semantic patterns CodeRabbit's path_instructions can't
+# express deterministically. Loaded via reviews.tools.semgrep.config_file
+# in /.coderabbit.yaml.
+#
+# Highest-value rule per #3754 Investigation #6: PII-in-logger
+# (only 3 audit hits — easy to baseline-clear, high signal).
+
+rules:
+  # ── PII in logger calls ────────────────────────────────────────────────
+  # Pattern enumeration: literal email/userId/etc. keys, spread of User-named
+  # variables, shorthand property where the value-name suggests a user object.
+  # Doesn't catch `logger.info("msg", user)` — that needs taint-mode (deferred
+  # to a follow-up if AC6 shows the shape mismatters).
+  - id: pii-in-logger-call
+    message: >
+      Logger call references PII fields (email, phone, name, ip, userId,
+      apiKey, token, etc.) without redaction. Wrap with `redact(...)` or
+      `hashEmail(...)`, or pass the minimal non-identifying fields needed
+      for debugging. See #3754 AC2.
+    severity: WARNING
+    languages: [typescript, javascript]
+    paths:
+      include:
+        - "langwatch/src/**/*.ts"
+        - "langwatch/src/**/*.tsx"
+      exclude:
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.test.tsx"
+        - "**/*.spec.ts"
+        - "**/*.spec.tsx"
+        - "**/__fixtures__/**"
+    patterns:
+      - pattern-either:
+          # Literal PII keys anywhere in an object argument. Semgrep ellipsis is
+          # `...` (the bare token); `$...` is NOT valid semgrep and fails to
+          # parse — see #3754 (semgrep --validate is now a CI gate).
+          - pattern: 'logger.$LEVEL(..., { ..., email: $E, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., phone: $P, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., userId: $U, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., apiKey: $K, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., token: $T, ... }, ...)'
+          - pattern: 'console.$LEVEL(..., { ..., email: $E, ... }, ...)'
+          - pattern: 'console.$LEVEL(..., { ..., userId: $U, ... }, ...)'
+          - pattern: 'console.$LEVEL(..., { ..., apiKey: $K, ... }, ...)'
+          - pattern: 'console.$LEVEL(..., { ..., token: $T, ... }, ...)'
+          # Spread of a user/session/account object.
+          - pattern: 'logger.$LEVEL(..., { ...$USER, ... }, ...)'
+          - pattern: 'console.$LEVEL(..., { ...$USER, ... }, ...)'
+          # Shorthand / named property with a user-shaped name.
+          - pattern: 'logger.$LEVEL(..., { ..., user: $U, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., session: $S, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., account: $A, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., user, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., session, ... }, ...)'
+          - pattern: 'logger.$LEVEL(..., { ..., account, ... }, ...)'
+
+  # ── PII regex literals outside fixtures ────────────────────────────────
+  # SSN dropped: 3-2-4-digit regex false-positives on dates (`2026-05-21`),
+  # version strings, etc. The investigation didn't cite an SSN leak; bring
+  # the rule back when one exists.
+  - id: pii-literal-api-key
+    message: >
+      String literal matches API key prefix (`sk_live_`, `pk_live_`,
+      `xai-`, `sk-`, `lw_`). Use env-var indirection — never check live
+      keys into source. Gitleaks should also catch this; this rule
+      catches near-misses that gitleaks lets through.
+    severity: ERROR
+    languages: [typescript, javascript, python]
+    paths:
+      exclude:
+        - "**/__fixtures__/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+    pattern-regex: '"(sk_live_|pk_live_|xai-|sk-proj-|sk-ant-)[A-Za-z0-9_-]{16,}"'
+
+  # ── ClickHouse migrations: unqualified table names only ────────────────
+  # Anchored to SQL DDL keywords to avoid matching `langwatch.io`,
+  # comment tokens, etc.
+  - id: clickhouse-no-qualified-table
+    message: >
+      ClickHouse migrations must use unqualified table names — they run
+      against the connected database. `${CLICKHOUSE_DATABASE}.<table>`
+      or `langwatch.<table>` in a DDL context breaks BYOC deployments
+      where the database name differs.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "langwatch/src/server/clickhouse/migrations/**/*.sql"
+        - "langwatch/src/server/clickhouse/migrations/**/*.ts"
+    pattern-either:
+      - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
+      - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
+
+  # ── ClickHouse runtime queries must filter by TenantId ─────────────────
+  # Surfaced as a follow-up by CR on PR #4170: every ClickHouse query MUST
+  # include `WHERE TenantId = {tenantId:String}` to keep tenants isolated.
+  # Migrations (DDL) are exempt — they don't filter by tenant. This rule
+  # targets query files only, where a missing TenantId predicate is a
+  # cross-tenant leak.
+  - id: clickhouse-require-tenant-id
+    message: >
+      ClickHouse query missing `WHERE TenantId = {tenantId:String}`
+      predicate. Every runtime query must filter by TenantId to keep
+      tenants isolated. See
+      `dev/docs/best_practices/clickhouse-queries.md` § Tenant scoping.
+    severity: ERROR
+    languages: [typescript, javascript]
+    paths:
+      include:
+        - "langwatch/src/server/clickhouse/**/*.ts"
+        - "langwatch/src/server/repositories/**/clickhouse*.ts"
+      exclude:
+        - "**/migrations/**"
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.spec.ts"
+    patterns:
+      - pattern-either:
+          - pattern: 'clickhouse.query({ query: $Q, ... })'
+          - pattern: 'clickhouse.exec({ query: $Q, ... })'
+          - pattern: 'clickhouseClient.query({ query: $Q, ... })'
+      - pattern-not-regex: 'TenantId\s*=\s*\{tenantId'
+
+  # ── ClickHouse dedup anti-pattern: ORDER BY … LIMIT 1 + heavy cols ─────
+  # Anti-pattern 1 from clickhouse-queries.md. Reading heavy columns while
+  # sorting all unmerged versions of a row saturates ClickHouse.
+  - id: clickhouse-no-version-order-limit
+    message: >
+      ClickHouse query selects heavy columns AND uses
+      `ORDER BY <Version|UpdatedAt> DESC LIMIT 1` to pick the latest
+      version. This loads every unmerged version of every matching row
+      into memory before sorting. Use the IN-tuple dedup pattern
+      (lightweight key columns inner subquery + heavy columns in the
+      outer select). See
+      `dev/docs/best_practices/clickhouse-queries.md` § Anti-Pattern 1.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "langwatch/src/server/clickhouse/**/*.ts"
+        - "langwatch/src/server/clickhouse/**/*.sql"
+      exclude:
+        - "**/migrations/**"
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.spec.ts"
+    patterns:
+      - pattern-regex: '(Messages|ComputedInput|Inputs|Details|SpanAttributes|RoleCosts|Metadata)\b'
+      - pattern-regex: 'ORDER\s+BY\s+\w*(Version|UpdatedAt)\s+DESC\s+LIMIT\s+1'

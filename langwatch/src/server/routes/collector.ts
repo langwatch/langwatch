@@ -494,7 +494,7 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
 
       return c.json({
         message: "No changes",
-        partialSuccess: { rejectedSpans: 0, errorMessage: "" },
+        partialSuccess: { rejectedSpans: 0, dedupedSpans: 0, errorMessage: "" },
       });
     }
 
@@ -520,6 +520,7 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
     }
 
     let rejectedSpans = 0;
+    let dedupedSpans = 0;
     let rejectionErrors: string[] = [];
     try {
       const resource = CollectorSpanUtils.buildResource({
@@ -528,35 +529,38 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
         expectedOutput,
       });
 
-      const results = await Promise.allSettled(
+      const ingestion = getApp().traces.collection;
+      const results = await Promise.all(
         spans.map((span) =>
-          getApp().traces.recordSpan({
+          ingestion.ingestNormalizedSpan({
             tenantId: project.id,
             span: CollectorSpanUtils.convertSpanToOtlp(span),
             resource,
             instrumentationScope: { name: "langwatch.rest.collector" },
             piiRedactionLevel: project.piiRedactionLevel,
-            occurredAt: Date.now(),
           }),
         ),
       );
 
-      const failures = results.filter(
-        (r): r is PromiseRejectedResult => r.status === "rejected",
-      );
+      const failures = results.filter((r) => r.status === "failed");
+      dedupedSpans = results.filter((r) => r.status === "deduped").length;
       rejectedSpans = failures.length;
-      rejectionErrors = failures.map((f) =>
-        f.reason instanceof Error ? f.reason.message : String(f.reason),
-      );
+      rejectionErrors = failures.map((f) => f.error ?? "unknown error");
       if (failures.length > 0) {
         logger.error(
           {
             projectId: project.id,
             traceId,
             failureCount: failures.length,
-            errors: failures.map((f) => f.reason),
+            errors: rejectionErrors,
           },
           "Error dispatching collector spans to event sourcing",
+        );
+      }
+      if (dedupedSpans > 0) {
+        logger.info(
+          { projectId: project.id, traceId, dedupedSpans },
+          "REST collector deduped repeated spans",
         );
       }
     } catch (error) {
@@ -626,6 +630,7 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
       message: "Trace received successfully.",
       partialSuccess: {
         rejectedSpans,
+        dedupedSpans,
         errorMessage: rejectionErrors.join("; "),
       },
     });
