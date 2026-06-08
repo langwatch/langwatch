@@ -239,6 +239,9 @@ describe("oversized nlpgo invoke staged through real S3 to live nlpgo", () => {
               key: reaped.key,
               projectId: PROJECT_ID,
             });
+            // Require the specific missing-key response (404), not just any
+            // error — an AccessDenied / expired-creds failure must NOT pass for
+            // "it is gone".
             await expect(
               reaped.s3Client.send(
                 new HeadObjectCommand({
@@ -246,7 +249,7 @@ describe("oversized nlpgo invoke staged through real S3 to live nlpgo", () => {
                   Key: reaped.key,
                 }),
               ),
-            ).rejects.toThrow();
+            ).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
           } finally {
             // Error-path cleanup only: the happy path already reaped + nulled it.
             if (staged) {
