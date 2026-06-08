@@ -13,13 +13,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted so these are initialized before the hoisted vi.mock factories
 // (which reference them) run at import time.
-const { invokePayloads, stageCalls, deleteCalls, mockEnv } = vi.hoisted(() => ({
+const { invokePayloads, stageCalls, deleteCalls, lambdaState, mockEnv } =
+  vi.hoisted(() => ({
   invokePayloads: [] as string[],
   stageCalls: [] as any[],
   deleteCalls: [] as any[],
+  // Lets a single test force the Lambda invoke to reject so we can assert the
+  // staged object is still reaped in the finally block.
+  lambdaState: { rejectWith: null as Error | null },
   mockEnv: {
     LANGEVALS_STAGING_THRESHOLD_BYTES: 1000,
     LANGEVALS_STAGING_TTL_SECONDS: 600,
+    EVAL_MAX_PAYLOAD_BYTES: 16_000_000,
   } as Record<string, unknown>,
 }));
 
@@ -35,6 +40,7 @@ vi.mock("../../optimization_studio/server/lambda", () => ({
   createLambdaClient: () => ({
     send: vi.fn(async (cmd: { input: { Payload: string } }) => {
       invokePayloads.push(cmd.input.Payload);
+      if (lambdaState.rejectWith) throw lambdaState.rejectWith;
       return { StatusCode: 200, Payload: Buffer.from('{"ok":true}', "utf-8") };
     }),
   }),
@@ -58,7 +64,7 @@ vi.mock("../../server/s3/stagePayload", () => ({
   }),
 }));
 
-import { lambdaFetch } from "../lambdaFetch";
+import { InvokePayloadTooLargeError, lambdaFetch } from "../lambdaFetch";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:nlpgo-project";
 
@@ -72,6 +78,8 @@ beforeEach(() => {
   deleteCalls.length = 0;
   mockEnv.LANGEVALS_STAGING_THRESHOLD_BYTES = 1000;
   mockEnv.LANGEVALS_STAGING_TTL_SECONDS = 600;
+  mockEnv.EVAL_MAX_PAYLOAD_BYTES = 16_000_000;
+  lambdaState.rejectWith = null;
 });
 
 describe("lambdaFetch staging", () => {
@@ -134,6 +142,45 @@ describe("lambdaFetch staging", () => {
       expect(deleteCalls[0]!.s3Bucket).toBe("test-staging-bucket");
       expect(deleteCalls[0]!.key).toBe(stageCalls[0]!.keyPrefix + "/staged.json");
       expect(deleteCalls[0]!.projectId).toBe("project_cleanup");
+    });
+
+    /** @scenario "A staged object is deleted even when the invoke fails" */
+    it("reaps the staged object and propagates the error when the invoke rejects", async () => {
+      lambdaState.rejectWith = new Error("lambda boom");
+
+      await expect(
+        lambdaFetch(ARN, "/go/studio/execute_sync", {
+          method: "POST",
+          body: bigBody,
+          projectId: "project_failure",
+        }),
+      ).rejects.toThrow("lambda boom");
+
+      // The whole point of the finally block: the staged object is reaped even
+      // though the invoke threw, so a failed run does not leak an S3 object.
+      expect(stageCalls).toHaveLength(1);
+      expect(deleteCalls).toHaveLength(1);
+      expect(deleteCalls[0]!.projectId).toBe("project_failure");
+    });
+  });
+
+  describe("given a body larger than EVAL_MAX_PAYLOAD_BYTES", () => {
+    /** @scenario "An invoke body over the hard cap is rejected before staging" */
+    it("throws before staging or invoking instead of offloading an unbounded body", async () => {
+      mockEnv.EVAL_MAX_PAYLOAD_BYTES = 2000;
+      const body = JSON.stringify({ traces: "x".repeat(5000) });
+
+      await expect(
+        lambdaFetch(ARN, "/go/studio/execute_sync", {
+          method: "POST",
+          body,
+          projectId: "project_oversized",
+        }),
+      ).rejects.toBeInstanceOf(InvokePayloadTooLargeError);
+
+      // Fail fast: nothing was staged to S3 and no Lambda invoke was attempted.
+      expect(stageCalls).toHaveLength(0);
+      expect(invokePayloads).toHaveLength(0);
     });
   });
 

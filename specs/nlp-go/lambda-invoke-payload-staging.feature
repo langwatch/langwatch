@@ -60,6 +60,26 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     And a delete failure is non-fatal because a bucket lifecycle rule reaps orphans
 
   @unit
+  Scenario: A staged object is deleted even when the invoke fails
+    Given a payload was staged to S3 for a nlpgo invoke
+    When the Lambda invoke rejects with an error
+    Then the staged object is still deleted from the same bucket and key
+    And the invoke error propagates to the caller
+    # The finally-block reap must run on failure too, otherwise a failed run
+    # leaks an S3 object that only the lifecycle rule would eventually clean up.
+
+  @unit
+  Scenario: An invoke body over the hard cap is rejected before staging
+    Given an invoke body larger than EVAL_MAX_PAYLOAD_BYTES
+    When the control plane invokes the per-project nlpgo Lambda
+    Then the invoke is rejected with an actionable payload-too-large error
+    And no S3 object is created
+    And no Lambda invoke is attempted
+    # Staging would otherwise offload an unbounded body that the engine then
+    # re-fetches whole into memory, moving the 6 MiB invoke failure to an OOM.
+    # The hard cap mirrors the langevals HTTP path's fail-fast.
+
+  @unit
   Scenario: Staging falls back to a built-in threshold when the env var is unset
     Given LANGEVALS_STAGING_THRESHOLD_BYTES is not configured
     And the serialized invoke envelope is above the built-in default threshold
