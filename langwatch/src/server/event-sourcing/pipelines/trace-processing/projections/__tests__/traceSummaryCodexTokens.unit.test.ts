@@ -24,114 +24,124 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
   });
 
   describe("given a turn whose rollup and response spans report the same usage", () => {
-    /** @scenario "Codex turn tokens are counted once when two spans report the same usage" */
-    it("counts the usage once, not twice", () => {
-      const turnSpan = createTestSpan({
-        spanAttributes: {
-          "gen_ai.request.model": "gpt-5.5",
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-        },
-      });
-      const responseSpan = createTestSpan({
-        spanAttributes: {
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-          "langwatch.reserved.skip_token_accumulation": "true",
-        },
-      });
+    describe("when both spans are folded into the trace summary", () => {
+      /** @scenario "Codex turn tokens are counted once when two spans report the same usage" */
+      it("counts the usage once, not twice", () => {
+        const turnSpan = createTestSpan({
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+          },
+        });
+        const responseSpan = createTestSpan({
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+            "langwatch.reserved.skip_token_accumulation": "true",
+          },
+        });
 
-      let state = createInitState();
-      state = applySpanToSummary({ state, span: turnSpan });
-      state = applySpanToSummary({ state, span: responseSpan });
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: turnSpan });
+        state = applySpanToSummary({ state, span: responseSpan });
 
-      expect(state.totalPromptTokenCount).toBe(13297);
-      expect(state.totalCompletionTokenCount).toBe(23);
+        expect(state.totalPromptTokenCount).toBe(13297);
+        expect(state.totalCompletionTokenCount).toBe(23);
+      });
     });
 
-    it("would double-count without the redundant-copy flag (control)", () => {
-      const turnSpan = createTestSpan({
-        spanAttributes: {
-          "gen_ai.request.model": "gpt-5.5",
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-        },
+    describe("when the redundant copy is not flagged (control)", () => {
+      it("double-counts the usage", () => {
+        const turnSpan = createTestSpan({
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+          },
+        });
+        const unflaggedDuplicate = createTestSpan({
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: turnSpan });
+        state = applySpanToSummary({ state, span: unflaggedDuplicate });
+
+        expect(state.totalPromptTokenCount).toBe(26594);
       });
-      const unflaggedDuplicate = createTestSpan({
-        spanAttributes: {
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-        },
-      });
-
-      let state = createInitState();
-      state = applySpanToSummary({ state, span: turnSpan });
-      state = applySpanToSummary({ state, span: unflaggedDuplicate });
-
-      expect(state.totalPromptTokenCount).toBe(26594);
-    });
-  });
-
-  describe("given a span carrying a reasoning effort setting", () => {
-    /** @scenario "Reasoning effort is lifted onto the trace summary" */
-    it("lifts gen_ai.request.reasoning_effort onto the trace summary attributes", () => {
-      const span = createTestSpan({
-        spanAttributes: {
-          "gen_ai.request.model": "gpt-5.5",
-          "gen_ai.usage.input_tokens": 100,
-          "gen_ai.usage.output_tokens": 20,
-          "gen_ai.request.reasoning_effort": "high",
-        },
-      });
-
-      const result = applySpanToSummary({ state: createInitState(), span });
-
-      expect(result.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
-    });
-
-    it("leaves the reasoning effort attribute absent when no span carries it", () => {
-      const span = createTestSpan({
-        spanAttributes: {
-          "gen_ai.request.model": "gpt-5.5",
-          "gen_ai.usage.input_tokens": 100,
-          "gen_ai.usage.output_tokens": 20,
-        },
-      });
-
-      const result = applySpanToSummary({ state: createInitState(), span });
-
-      expect(
-        result.attributes["gen_ai.request.reasoning_effort"],
-      ).toBeUndefined();
     });
   });
 
-  describe("given a flagged span also reporting cache tokens", () => {
-    it("excludes its cache tokens from the trace reserved sums", () => {
-      const turnSpan = createTestSpan({
-        spanAttributes: {
-          "gen_ai.request.model": "gpt-5.5",
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-          "gen_ai.usage.cache_read.input_tokens": 4480,
-        },
-      });
-      const responseSpan = createTestSpan({
-        spanAttributes: {
-          "gen_ai.usage.input_tokens": 13297,
-          "gen_ai.usage.output_tokens": 23,
-          "gen_ai.usage.cache_read.input_tokens": 4480,
-          "langwatch.reserved.skip_token_accumulation": "true",
-        },
-      });
+  describe("given a model call span", () => {
+    describe("when it carries a reasoning effort setting", () => {
+      /** @scenario "Reasoning effort is lifted onto the trace summary" */
+      it("lifts gen_ai.request.reasoning_effort onto the trace summary attributes", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 20,
+            "gen_ai.request.reasoning_effort": "high",
+          },
+        });
 
-      let state = createInitState();
-      state = applySpanToSummary({ state, span: turnSpan });
-      state = applySpanToSummary({ state, span: responseSpan });
+        const result = applySpanToSummary({ state: createInitState(), span });
 
-      expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "4480",
-      );
+        expect(result.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
+      });
+    });
+
+    describe("when no span carries a reasoning effort setting", () => {
+      it("leaves the reasoning effort attribute absent", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 20,
+          },
+        });
+
+        const result = applySpanToSummary({ state: createInitState(), span });
+
+        expect(
+          result.attributes["gen_ai.request.reasoning_effort"],
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a flagged redundant span also reporting cache tokens", () => {
+    describe("when it is folded into the trace summary", () => {
+      it("excludes its cache tokens from the trace reserved sums", () => {
+        const turnSpan = createTestSpan({
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+            "gen_ai.usage.cache_read.input_tokens": 4480,
+          },
+        });
+        const responseSpan = createTestSpan({
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 13297,
+            "gen_ai.usage.output_tokens": 23,
+            "gen_ai.usage.cache_read.input_tokens": 4480,
+            "langwatch.reserved.skip_token_accumulation": "true",
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: turnSpan });
+        state = applySpanToSummary({ state, span: responseSpan });
+
+        expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+          "4480",
+        );
+      });
     });
   });
 });
