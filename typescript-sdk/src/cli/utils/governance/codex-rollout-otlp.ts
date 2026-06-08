@@ -29,6 +29,13 @@ interface OtlpExportRequest {
  * span rides codex's real trace_id and carries `langwatch.input` /
  * `langwatch.output` (read directly by the trace-summary IO accumulation) plus
  * `langwatch.span.type=llm` so the drawer renders it as the model response.
+ *
+ * `langwatch.input` is the full request body as the LangWatch structured
+ * `chat_messages` envelope (system prompt + accumulated conversation + tool
+ * calls). The receiver's `parseJsonStringValues` step parses the JSON string
+ * into the `{ type, value }` object, and the LangWatch extractor canonicalises
+ * it to `gen_ai.input.messages` + `gen_ai.system_instructions`, so the drawer
+ * renders the same full conversation a claude trace does.
  */
 export function buildCodexIOExportRequest(
   turns: CodexTurnIO[],
@@ -39,7 +46,10 @@ export function buildCodexIOExportRequest(
     const endMs = Math.max(startMs, nowMs);
     const attributes = [
       attr("langwatch.span.type", "llm"),
-      attr("langwatch.input", turn.input),
+      attr(
+        "langwatch.input",
+        JSON.stringify({ type: "chat_messages", value: turn.inputMessages }),
+      ),
       attr("langwatch.output", turn.output),
     ];
     if (turn.model) {
