@@ -24,6 +24,7 @@ import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
+import { harvestAndEmitCodexIO } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
 
 export interface ToolEnv {
@@ -571,6 +572,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
   const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
 
+  // Stamp the session start so the post-exit codex rollout harvest only reads
+  // rollout files this run produced (codex names them by start time + mtime).
+  const sessionStartMs = Date.now();
+
   let child;
   if (aliasShell) {
     const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -605,12 +610,33 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(`exec ${tool}: ${err.message}\n`);
     process.exit(1);
   });
-  await new Promise<void>((resolve) => {
-    child.on("close", (code) => {
-      process.exit(code ?? 1);
-      resolve();
-    });
+  const exitCode = await new Promise<number>((resolve) => {
+    child.on("close", (code) => resolve(code ?? 1));
   });
-  // unreachable
-  process.exit(0);
+
+  // Codex never puts the prompt or the assistant reply on the wire (its OTLP
+  // spans carry tokens + model only), but it writes the full transcript to a
+  // rollout file whose per-turn `task_started` records the exact OTLP trace_id.
+  // After the session, recover that content and POST it onto codex's own
+  // trace_ids so the trace summary's input/output populate. Best-effort: a
+  // coding session must never fail (or stall) on the content harvest.
+  if (
+    tool === "codex" &&
+    modeResult.mode === "ingestion" &&
+    modeResult.endpoint &&
+    modeResult.ingestionToken
+  ) {
+    try {
+      await harvestAndEmitCodexIO({
+        sinceMs: sessionStartMs,
+        nowMs: Date.now(),
+        endpoint: `${modeResult.endpoint.replace(/\/+$/, "")}/v1/traces`,
+        token: modeResult.ingestionToken,
+      });
+    } catch {
+      /* content recovery is non-essential; never block exit on it */
+    }
+  }
+
+  process.exit(exitCode);
 }
