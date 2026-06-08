@@ -29,12 +29,16 @@
  *   - model
  *   - codex.turn.token_usage.input_tokens / output_tokens
  *   - codex.turn.token_usage.cached_input_tokens (a.k.a. cache_read)
+ *   - codex.turn.token_usage.reasoning_output_tokens (a.k.a. reasoning)
  *   - codex.turn.token_usage.total_tokens
+ *   - codex.turn.reasoning_effort (the request setting, e.g. "high")
  *   - turn.id (a.k.a. thread / turn identifier)
- * This extractor lifts those to langwatch.* canonical so the trace
+ * This extractor lifts those to gen_ai.* canonical so the trace
  * summary fold mirrors them to the top-level columns and the
  * receiver-side pricing lookup computes cost (codex never emits cost
- * on the wire).
+ * on the wire). Every OTHER codex_cli_rs span that carries the same
+ * usage natively (e.g. `handle_responses`) is flagged so the fold does
+ * not double-count it.
  *
  * Canonical attributes produced (only when the corresponding wire
  * field is present):
@@ -92,7 +96,18 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
     if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
-    if (ctx.span.name !== CODEX_TURN_SPAN_NAME) return;
+
+    // codex emits ONE authoritative per-turn rollup span
+    // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
+    // lower-level response span (`handle_responses`) that natively reports
+    // the SAME usage under gen_ai.usage.*. The rollup is the source of
+    // truth; without intervention the fold sums both and the trace's token
+    // totals double. Flag the redundant response span so the fold skips its
+    // token math — its own per-span detail is left untouched.
+    if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
+      this.markRedundantUsageSpan(ctx);
+      return;
+    }
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
@@ -105,6 +120,10 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     const cacheReadTokens = asNumber(
       attrs.take("codex.turn.token_usage.cached_input_tokens"),
     );
+    const reasoningTokens = asNumber(
+      attrs.take("codex.turn.token_usage.reasoning_output_tokens"),
+    );
+    const reasoningEffort = asString(attrs.take("codex.turn.reasoning_effort"));
     const turnId = asString(attrs.take("turn.id"));
 
     let fired = false;
@@ -128,11 +147,43 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       );
       fired = true;
     }
+    if (reasoningTokens !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        reasoningTokens,
+      );
+      fired = true;
+    }
+    if (reasoningEffort !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
+        reasoningEffort,
+      );
+      fired = true;
+    }
     if (turnId !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, turnId);
       fired = true;
     }
     if (fired) ctx.recordRule("codex/session_task.turn");
+  }
+
+  /**
+   * Flags a non-turn `codex_cli_rs` span that carries token usage as a
+   * redundant copy of the turn rollup. GenAIExtractor runs before this one
+   * and lifts native gen_ai.usage.* into `out`, so we look there as well as
+   * the still-unconsumed bag. The marker drives the fold's
+   * skip-token-accumulation gate; nothing is removed from the span itself.
+   */
+  private markRedundantUsageSpan(ctx: ExtractorContext): void {
+    const hasUsage =
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    if (!hasUsage) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+    ctx.recordRule("codex/skip-redundant-usage");
   }
 
   applyLog(ctx: LogExtractorContext): void {

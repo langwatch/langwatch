@@ -150,9 +150,81 @@ describe("CodexExtractor.applyLog", () => {
         "gen_ai.usage.input_tokens": 14365,
         "gen_ai.usage.output_tokens": 6,
         "gen_ai.usage.cache_read.input_tokens": 10112,
+        "gen_ai.request.reasoning_effort": "high",
         "gen_ai.conversation.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
       });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+
+    /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
+    it("canonicalises codex.turn.reasoning_effort to gen_ai.request.reasoning_effort", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.reasoning_effort": "high",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
+    });
+
+    /** @scenario "Codex reasoning output tokens are captured" */
+    it("lifts codex.turn.token_usage.reasoning_output_tokens to gen_ai.usage.reasoning_tokens", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "1000",
+          "codex.turn.token_usage.output_tokens": "50",
+          "codex.turn.token_usage.reasoning_output_tokens": "10",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(10);
+    });
+
+    it("flags a non-turn codex span carrying usage as a redundant token copy", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.usage.input_tokens": 13297,
+          "gen_ai.usage.output_tokens": 23,
+        },
+        {
+          name: "handle_responses",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+    });
+
+    it("does not flag a non-turn codex span without usage", () => {
+      const ctx = createExtractorContext(
+        { "code.module.name": "session" },
+        {
+          name: "build_tool_call",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(
+        ctx.out["langwatch.reserved.skip_token_accumulation"],
+      ).toBeUndefined();
     });
 
     it("is a no-op for codex_cli_rs spans other than session_task.turn", () => {

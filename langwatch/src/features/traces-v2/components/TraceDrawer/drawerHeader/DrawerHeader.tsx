@@ -518,6 +518,12 @@ export const DrawerHeader = memo(function DrawerHeader({
     "gen_ai.usage.reasoning_tokens",
   );
 
+  // The reasoning EFFORT request setting (low/medium/high/...), lifted onto
+  // the trace summary by the fold. Distinct from the reasoning TOKEN count
+  // above; shown next to the model since it is a per-request model setting.
+  const reasoningEffort =
+    trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
+
   // Total tokens the model actually processed = input + output PLUS cache
   // read + cache write. Anthropic reports `input_tokens` as the NON-cached
   // portion, so the cache counts are additive, not a subset (which is why a
@@ -1204,6 +1210,9 @@ export const DrawerHeader = memo(function DrawerHeader({
               <ExtraModelsBadge models={trace.models.slice(1)} size="sm" />
             )}
           </HStack>
+        )}
+        {reasoningEffort && (
+          <MetricPill label="Reasoning effort" value={reasoningEffort} />
         )}
 
         {/* Section 2: Source / tools chips (service, origin, scenario, sdk,

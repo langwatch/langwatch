@@ -15,6 +15,7 @@ import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -901,7 +902,7 @@ export const tracesV2Router = createTRPCRouter({
       const spans = rows.map((r) => ({
         spanId: r.spanId,
         parentSpanId: r.parentSpanId,
-        resourceAttributes: r.resourceAttributes,
+        resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
         scope: { name: r.scopeName ?? "", version: r.scopeVersion },
       }));
 
@@ -910,7 +911,9 @@ export const tracesV2Router = createTRPCRouter({
 
       return {
         rootSpanId: root?.spanId ?? null,
-        resourceAttributes: root?.resourceAttributes ?? {},
+        resourceAttributes: withoutHiddenResourceAttrs(
+          root?.resourceAttributes ?? {},
+        ),
         scope: root
           ? { name: root.scopeName ?? "", version: root.scopeVersion }
           : null,
