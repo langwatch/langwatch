@@ -290,7 +290,7 @@
     "@types/semver": "^7.7.1",
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260415.1",
-    "@vitest/browser": "^4.1.7",
+    "@vitest/browser": "^4.1.8",
     "@vitest/browser-playwright": "^4.1.7",
     "@vitest/coverage-v8": "^4.1.5",
     "@vitest/ui": "^4.1.5",
