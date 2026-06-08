@@ -797,7 +797,7 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       }
     }
 
-    await getApp().traces.recordSpan({
+    await getApp().traces.collection.ingestNormalizedSpan({
       tenantId: project.id,
       span: {
         traceId: body.trace_id,
@@ -825,7 +825,6 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       resource: { attributes: [] },
       instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
       piiRedactionLevel: project.piiRedactionLevel,
-      occurredAt: Date.now(),
     });
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");
