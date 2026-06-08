@@ -27,6 +27,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   ...TRACE_IDENTITY_COLUMNS,
   "CreatedAt",
   "TotalCost",
+  "NonBilledCost",
   "TotalDurationMs",
   "TimeToFirstTokenMs",
   "TotalPromptTokenCount",
