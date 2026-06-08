@@ -1423,6 +1423,88 @@ export class QueueRedisRepository implements QueueRepository {
     };
   }
 
+  // ── Counter Reconciliation ──────────────────────────────────────
+
+  /**
+   * Reconcile the total-pending counter against the live ground truth.
+   *
+   * WHY: The `total-pending` counter is incremented at dispatch (INCR) and
+   * decremented at complete (DECR), but several paths leak without a DECR:
+   *   - worker death after dispatch but before complete
+   *   - the 6-hour `:jobs` TTL reaping a group without a DECR
+   *   - MOVE_TO_DLQ_LUA which deletes `:jobs` without decrementing the counter
+   * Over time the counter drifts upward. Since it is read-only ops metadata
+   * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
+   * ground truth is safe and does not affect dispatch correctness.
+   *
+   * The reconcile is single-flighted per `singleFlightWindowMs` so only one
+   * pod recomputes per window. It is intentionally off the hot dispatch path.
+   *
+   * See issue #4683.
+   */
+  async reconcileTotalPending(
+    queueName: string,
+    singleFlightWindowMs = 55_000,
+  ): Promise<{ counter: number; groundTruth: number; drift: number } | null> {
+    const prefix = `${queueName}:gq:`;
+    const counterKey = `${prefix}stats:total-pending`;
+    const markerKey = `${prefix}stats:pending-recon-ts`;
+
+    // Single-flight gate: only one pod/cycle runs per window.
+    const acquired = await this.redis.set(
+      markerKey,
+      String(Date.now()),
+      "PX",
+      singleFlightWindowMs,
+      "NX",
+    );
+    if (acquired !== "OK") return null;
+
+    // Read the pre-reconcile counter.
+    const raw = await this.redis.get(counterKey);
+    const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
+
+    // Enumerate all group-jobs zsets via SCAN.
+    const jobsKeys: string[] = [];
+    const matchPattern = `${prefix}group:*:jobs`;
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await this.redis.scan(
+        cursor,
+        "MATCH",
+        matchPattern,
+        "COUNT",
+        1000,
+      );
+      cursor = nextCursor;
+      for (const key of keys) {
+        jobsKeys.push(key);
+      }
+    } while (cursor !== "0");
+
+    // Pipeline ZCARD for every collected key and sum the results.
+    let groundTruth = 0;
+    if (jobsKeys.length > 0) {
+      const pipeline = this.redis.pipeline();
+      for (const key of jobsKeys) {
+        pipeline.zcard(key);
+      }
+      const results = await pipeline.exec();
+      if (results) {
+        for (const [, val] of results) {
+          groundTruth += Number(val) || 0;
+        }
+      }
+    }
+
+    const drift = counter - groundTruth;
+
+    // Overwrite the counter with the ground truth.
+    await this.redis.set(counterKey, String(groundTruth));
+
+    return { counter, groundTruth, drift };
+  }
+
   // ── Private Filter Helpers ──────────────────────────────────────
 
   private async filterByPipelineName(params: {

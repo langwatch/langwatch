@@ -146,6 +146,11 @@ export interface QueueRepository {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<DrainPreview>;
+
+  reconcileTotalPending(
+    queueName: string,
+    singleFlightWindowMs?: number,
+  ): Promise<{ counter: number; groundTruth: number; drift: number } | null>;
 }
 
 export class NullQueueRepository implements QueueRepository {
@@ -243,5 +248,13 @@ export class NullQueueRepository implements QueueRepository {
 
   async drainAllBlockedPreview(): Promise<DrainPreview> {
     return { totalAffected: 0, byPipeline: [], byError: [] };
+  }
+
+  async reconcileTotalPending(): Promise<{
+    counter: number;
+    groundTruth: number;
+    drift: number;
+  } | null> {
+    return null;
   }
 }
