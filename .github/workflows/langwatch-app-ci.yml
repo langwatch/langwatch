@@ -128,7 +128,7 @@ jobs:
 
       - name: Upload unit test coverage to Codecov
         if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
-        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           files: langwatch/coverage/lcov.info
           flags: unit
@@ -263,7 +263,7 @@ jobs:
 
       - name: Upload integration test coverage to Codecov
         if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
-        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           files: langwatch/coverage/lcov.info
           flags: integration
