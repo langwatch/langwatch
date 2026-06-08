@@ -13,6 +13,7 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -92,6 +93,7 @@ export class TraceRequestCollectionService {
         let droppedSpanCount = 0;
         let dedupedSpanCount = 0;
         let ingestionFailureCount = 0;
+        let filteredSpanCount = 0;
         const errors: string[] = [];
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
@@ -135,6 +137,9 @@ export class TraceRequestCollectionService {
                 case "deduped":
                   dedupedSpanCount++;
                   break;
+                case "filtered":
+                  filteredSpanCount++;
+                  break;
                 case "failed":
                   ingestionFailureCount++;
                   break;
@@ -150,7 +155,10 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
         span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
+        span.setAttribute("spans.ingestion.filtered", filteredSpanCount);
 
+        // Filtered spans are intentionally not stored (coding-agent infra
+        // noise), so they are NOT rejections.
         const rejectedSpans = droppedSpanCount + ingestionFailureCount;
         return {
           rejectedSpans,
@@ -179,7 +187,7 @@ export class TraceRequestCollectionService {
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: import("@opentelemetry/api").Span;
   }): Promise<{
-    status: "collected" | "dropped" | "deduped" | "failed";
+    status: "collected" | "dropped" | "deduped" | "failed" | "filtered";
     error?: string;
   }> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
@@ -208,6 +216,21 @@ export class TraceRequestCollectionService {
         status: "dropped",
         error: "span start time is more than 31 days in the past",
       };
+    }
+
+    // Drop pure-infra spans from the noisy coding-agent tools (codex/opencode)
+    // so their traces read like claude's and the infra-only fragment traces
+    // never get created. Scoped to those two instrumentation scopes; all other
+    // OTLP is untouched. Opt out globally with the kill-switch env var.
+    if (
+      process.env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== "true" &&
+      shouldFilterCodingAgentSpan({
+        scopeName: scope?.name,
+        spanName: spanParseResult.data.name,
+        attributeKeys: spanParseResult.data.attributes.map((a) => a.key),
+      })
+    ) {
+      return { status: "filtered" };
     }
 
     const normalizedSpan = normalizeSpanIds(spanParseResult.data);

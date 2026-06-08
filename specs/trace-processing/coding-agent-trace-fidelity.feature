@@ -62,3 +62,39 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Given a bundled coding-agent span priced from the model pricing tables
     When the trace summary is computed
     Then the bundled portion of the cost is recorded as non-billed cost
+
+  # --- Span noise filter (codex/opencode only) ------------------------------
+  # codex and opencode export their whole internal call graph (DB, file, auth,
+  # websocket, session-init), drowning the AI spans and fragmenting a session
+  # into hundreds of traces. We keep only the AI-semantic spans for those two
+  # KNOWN tools and never touch any other OTLP.
+
+  @unit
+  Scenario: Codex infrastructure spans are filtered out at ingestion
+    Given a codex Path B infrastructure span (session init, websocket, plugin list)
+    When the span is ingested
+    Then the span is filtered out and not stored
+
+  @unit
+  Scenario: The codex turn span survives the noise filter
+    Given a codex Path B session_task.turn span
+    When the span is ingested
+    Then the span is kept
+
+  @unit
+  Scenario: Opencode infrastructure spans are filtered out at ingestion
+    Given an opencode Path B infrastructure span (sql, config, filesystem, auth)
+    When the span is ingested
+    Then the span is filtered out and not stored
+
+  @unit
+  Scenario: Opencode AI SDK spans survive the noise filter
+    Given an opencode Path B ai.* span (ai.streamText, ai.toolCall)
+    When the span is ingested
+    Then the span is kept
+
+  @unit
+  Scenario: Spans from other instrumentation scopes are never filtered
+    Given a span from any scope other than codex_cli_rs or opencode
+    When the span is ingested
+    Then the span is kept regardless of its name or attributes
