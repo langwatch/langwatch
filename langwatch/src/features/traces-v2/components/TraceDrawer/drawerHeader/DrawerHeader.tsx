@@ -58,6 +58,7 @@ import {
 } from "../../../utils/formatters";
 import { Chip } from "../Chip";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
+import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { TooltipRow } from "../../shared/TooltipRow";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ModeSwitch } from "../ModeSwitch";
@@ -1139,49 +1140,15 @@ export const DrawerHeader = memo(function DrawerHeader({
         {trace.totalTokens > 0 && (
           <Tooltip
             content={
-              <VStack align="stretch" gap={0.5} minWidth="180px">
-                <TooltipRow
-                  label="Input"
-                  value={trace.inputTokens?.toLocaleString() ?? "—"}
-                />
-                <TooltipRow
-                  label="Output"
-                  value={trace.outputTokens?.toLocaleString() ?? "—"}
-                />
-                {/* Cache + reasoning rows render only when the trace
-                    actually reported them. Anthropic never emits reasoning
-                    tokens, so a permanent "Reasoning —" row was pure noise;
-                    a model with no prompt caching likewise shouldn't carry
-                    empty cache rows. Show what we measured, hide the rest. */}
-                {cacheReadTokens != null && (
-                  <TooltipRow
-                    label="Cache read"
-                    value={cacheReadTokens.toLocaleString()}
-                  />
-                )}
-                {cacheCreationTokens != null && (
-                  <TooltipRow
-                    label="Cache write"
-                    value={cacheCreationTokens.toLocaleString()}
-                  />
-                )}
-                {reasoningTokens != null && (
-                  <TooltipRow
-                    label="Reasoning"
-                    value={reasoningTokens.toLocaleString()}
-                  />
-                )}
-                <Box height="1px" bg="border" marginY={1} />
-                <TooltipRow
-                  label="Total"
-                  value={totalTokensWithCache.toLocaleString()}
-                />
-                {trace.tokensEstimated && !hasAuthoritativeTokens && (
-                  <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                    Tokens are estimated
-                  </Text>
-                )}
-              </VStack>
+              <TokenBreakdownTooltipContent
+                inputTokens={trace.inputTokens}
+                outputTokens={trace.outputTokens}
+                cacheReadTokens={cacheReadTokens}
+                cacheCreationTokens={cacheCreationTokens}
+                reasoningTokens={reasoningTokens}
+                totalWithCache={totalTokensWithCache}
+                estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
+              />
             }
             positioning={{ placement: "top" }}
           >
