@@ -34,6 +34,7 @@ import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -402,6 +403,12 @@ export const DashboardLayout = ({
   const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
+
+  // Apply a one-shot `?org=<slug>` selection on any org-scoped page, then strip
+  // the param so the URL returns to its clean path. See
+  // useOrgQueryParamSelection — this is what the switcher's per-org "My
+  // Workspace" links and the in-place org switch target.
+  useOrgQueryParamSelection();
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 

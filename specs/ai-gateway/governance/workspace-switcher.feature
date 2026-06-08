@@ -131,6 +131,45 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     When the user opens the workspace switcher
     Then the "My Workspace" personal entry is shown
 
+  # ---------------------------------------------------------------------------
+  # Personal entry nests per organization (multi-org)
+  # ---------------------------------------------------------------------------
+  #
+  # A user can hold a personal workspace in more than one organization. Rather
+  # than a single top-level "My Workspace" that silently follows the ambient
+  # selected org, the personal entry nests directly under each organization that
+  # enables governance, so a multi-org user can see and pick which org's personal
+  # workspace they mean. The per-org entry targets `/me?org=<slug>` so landing
+  # selects the right org (see org-query-param-switch.feature).
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: My Workspace nests under each governance-enabled organization
+    Given the user belongs to organizations "Alpha" and "Beta", both enabling governance
+    When the user opens the workspace switcher
+    Then a "My Workspace" entry appears under the "Alpha" organization header
+    And a "My Workspace" entry appears under the "Beta" organization header
+    And no standalone top-level "My Workspace" group is shown
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: An organization without governance shows no My Workspace row
+    Given the user belongs to "Alpha" and "Beta" (governance on) and "Gamma" (governance off)
+    When the user opens the workspace switcher
+    Then a "My Workspace" entry appears under "Alpha" and under "Beta"
+    And no "My Workspace" entry appears under "Gamma"
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: With a single governance organization, My Workspace links to /me
+    Given exactly one of the user's organizations enables governance
+    When the user opens the workspace switcher
+    Then that organization's "My Workspace" entry links to "/me" with no "?org" parameter
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: With multiple governance organizations, each My Workspace carries its org
+    Given organizations "Alpha" and "Beta" both enable governance
+    When the user opens the workspace switcher
+    Then "Alpha"'s "My Workspace" entry links to "/me?org=alpha"
+    And "Beta"'s "My Workspace" entry links to "/me?org=beta"
+
   @bdd @ui @workspace-switcher @single-team
   Scenario: A solo user (no teams/projects) — switcher remains visible but does not auto-collapse
     Given the user only has access to "My Workspace"
