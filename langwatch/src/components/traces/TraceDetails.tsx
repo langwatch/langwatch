@@ -412,7 +412,10 @@ export function TraceDetails(props: {
           {selectedTab === "traceDetails" && (
             <VStack paddingBottom={6}>
               <TraceSummary traceId={props.traceId} />
-              <SpanTree traceId={props.traceId} />
+              <SpanTree
+                traceId={props.traceId}
+                occurredAtMs={trace.data?.timestamps.started_at}
+              />
             </VStack>
           )}
         </Tabs.Content>

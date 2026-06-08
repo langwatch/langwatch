@@ -32,12 +32,19 @@ export interface FilterTranslation {
 }
 
 /**
- * Handler function type for filter translation
+ * Handler function type for filter translation.
+ *
+ * `spanTimePredicate` is an optional SQL fragment (e.g. `AND StartTime >= ...`)
+ * that handlers whose subquery reads the time-partitioned `stored_spans` table
+ * inject into that subquery's WHERE, so the scan prunes to the dashboard's date
+ * range instead of cold-scanning every weekly partition (incl. cold S3).
+ * Handlers that don't touch `stored_spans` ignore it.
  */
 type FilterHandler = (
   values: string[],
   key?: string,
   subkey?: string,
+  spanTimePredicate?: string,
 ) => FilterTranslation;
 
 /**
@@ -89,8 +96,10 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "traces.name": (values) => translateTraceNameFilter(values),
 
   // Span Filters
-  "spans.type": (values) => translateSpanTypeFilter(values),
-  "spans.model": (values) => translateSpanModelFilter(values),
+  "spans.type": (values, _key, _subkey, spanTime) =>
+    translateSpanTypeFilter(values, spanTime),
+  "spans.model": (values, _key, _subkey, spanTime) =>
+    translateSpanModelFilter(values, spanTime),
 
   // Evaluation Filters
   "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
@@ -115,13 +124,14 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
     translateEvaluationStateFilter(values, key),
 
   // Event Filters
-  "events.event_type": (values) => translateEventTypeFilter(values),
-  "events.metrics.key": (values, key) =>
-    translateEventMetricKeyFilter(values, key),
-  "events.metrics.value": (values, key, subkey) =>
-    translateEventMetricValueFilter(values, key, subkey),
-  "events.event_details.key": (values, key) =>
-    translateEventDetailKeyFilter(values, key),
+  "events.event_type": (values, _key, _subkey, spanTime) =>
+    translateEventTypeFilter(values, spanTime),
+  "events.metrics.key": (values, key, _subkey, spanTime) =>
+    translateEventMetricKeyFilter(values, key, spanTime),
+  "events.metrics.value": (values, key, subkey, spanTime) =>
+    translateEventMetricValueFilter(values, key, subkey, spanTime),
+  "events.event_details.key": (values, key, _subkey, spanTime) =>
+    translateEventDetailKeyFilter(values, key, spanTime),
 
   // Annotation Filters
   "annotations.hasAnnotation": (values) => translateAnnotationFilter(values),
@@ -146,13 +156,14 @@ export function translateFilter(
   values: string[],
   key?: string,
   subkey?: string,
+  spanTimePredicate?: string,
 ): FilterTranslation {
   if (values.length === 0) {
     return noOpFilter;
   }
 
   const handler = filterHandlers[field];
-  return handler ? handler(values, key, subkey) : noOpFilter;
+  return handler ? handler(values, key, subkey, spanTimePredicate) : noOpFilter;
 }
 
 /**
@@ -366,7 +377,10 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
  * subqueries (issue #2660). IN subqueries are semantically equivalent and avoid
  * this planner bug.
  */
-function translateSpanTypeFilter(values: string[]): FilterTranslation {
+function translateSpanTypeFilter(
+  values: string[],
+  spanTimePredicate = "",
+): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("spanTypes");
 
@@ -374,6 +388,7 @@ function translateSpanTypeFilter(values: string[]): FilterTranslation {
     whereClause: `${ts}.TraceId IN (
       SELECT TraceId FROM stored_spans
       WHERE TenantId = {tenantId:String}
+        ${spanTimePredicate}
         AND SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
@@ -384,7 +399,10 @@ function translateSpanTypeFilter(values: string[]): FilterTranslation {
 /**
  * Translate span model filter (requires JOIN)
  */
-function translateSpanModelFilter(values: string[]): FilterTranslation {
+function translateSpanModelFilter(
+  values: string[],
+  spanTimePredicate = "",
+): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("models");
 
@@ -392,6 +410,7 @@ function translateSpanModelFilter(values: string[]): FilterTranslation {
     whereClause: `${ts}.TraceId IN (
       SELECT TraceId FROM stored_spans
       WHERE TenantId = {tenantId:String}
+        ${spanTimePredicate}
         AND SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
@@ -566,7 +585,10 @@ function translateEvaluationStateFilter(
 /**
  * Translate event type filter
  */
-function translateEventTypeFilter(values: string[]): FilterTranslation {
+function translateEventTypeFilter(
+  values: string[],
+  spanTimePredicate = "",
+): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("eventTypes");
 
@@ -574,6 +596,7 @@ function translateEventTypeFilter(values: string[]): FilterTranslation {
     whereClause: `${ts}.TraceId IN (
       SELECT TraceId FROM stored_spans
       WHERE TenantId = {tenantId:String}
+        ${spanTimePredicate}
         AND hasAny("Events.Name", {${paramName}:Array(String)})
     )`,
     requiredJoins: [],
@@ -590,6 +613,7 @@ function translateEventTypeFilter(values: string[]): FilterTranslation {
 function translateEventMetricKeyFilter(
   values: string[],
   eventType?: string,
+  spanTimePredicate = "",
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const keysParam = genParamName("metricKeys");
@@ -621,6 +645,7 @@ function translateEventMetricKeyFilter(
     whereClause: `${ts}.TraceId IN (
       SELECT TraceId FROM stored_spans
       WHERE TenantId = {tenantId:String}
+        ${spanTimePredicate}
         AND ${metricKeyCondition}
     )`,
     requiredJoins: [],
@@ -638,6 +663,7 @@ function translateEventMetricValueFilter(
   values: string[],
   eventType?: string,
   metricKey?: string,
+  spanTimePredicate = "",
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
 
@@ -685,6 +711,7 @@ function translateEventMetricValueFilter(
     whereClause: `${ts}.TraceId IN (
       SELECT TraceId FROM stored_spans
       WHERE TenantId = {tenantId:String}
+        ${spanTimePredicate}
         AND ${valueCondition}
     )`,
     requiredJoins: [],
@@ -698,9 +725,10 @@ function translateEventMetricValueFilter(
 function translateEventDetailKeyFilter(
   values: string[],
   eventType?: string,
+  spanTimePredicate = "",
 ): FilterTranslation {
   // Same as metric key filter - event details are stored in Events.Attributes
-  return translateEventMetricKeyFilter(values, eventType);
+  return translateEventMetricKeyFilter(values, eventType, spanTimePredicate);
 }
 
 /**
@@ -777,6 +805,7 @@ export function translateAllFilters(
       | Record<string, Record<string, string[]>>
     >
   >,
+  spanTimePredicate?: string,
 ): FilterTranslation {
   const translations: FilterTranslation[] = [];
 
@@ -787,13 +816,27 @@ export function translateAllFilters(
 
     if (Array.isArray(value)) {
       // Simple array filter
-      translations.push(translateFilter(field as FilterField, value));
+      translations.push(
+        translateFilter(
+          field as FilterField,
+          value,
+          undefined,
+          undefined,
+          spanTimePredicate,
+        ),
+      );
     } else if (typeof value === "object") {
       // Nested filter with key
       for (const [key, subValue] of Object.entries(value)) {
         if (Array.isArray(subValue)) {
           translations.push(
-            translateFilter(field as FilterField, subValue, key),
+            translateFilter(
+              field as FilterField,
+              subValue,
+              key,
+              undefined,
+              spanTimePredicate,
+            ),
           );
         } else if (typeof subValue === "object") {
           // Double nested with key and subkey
@@ -805,6 +848,7 @@ export function translateAllFilters(
                   subSubValue,
                   key,
                   subkey,
+                  spanTimePredicate,
                 ),
               );
             }
