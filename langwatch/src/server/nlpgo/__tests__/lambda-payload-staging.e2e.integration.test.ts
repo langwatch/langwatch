@@ -151,122 +151,140 @@ describe("oversized nlpgo invoke staged through real S3 to live nlpgo", () => {
     await nlpgo?.stop();
   });
 
-  /** @scenario "A real oversized payload round-trips through S3 to the live engine" */
-  it.skipIf(!runE2E)(
-    "stages a >6 MiB body to S3 and the receiver fetches + executes the full payload",
-    async () => {
-      const sentinel = `SENTINEL-${Date.now()}-end`;
-      const { event, blob } = buildOversizedExecuteFlowEvent(sentinel);
-      const bodyStr = JSON.stringify(event);
-      const bodyBytes = Buffer.byteLength(bodyStr, "utf-8");
+  describe("given an oversized invoke body staged to S3", () => {
+    describe("when nlpgo receives an empty body with the staged-payload header", () => {
+      /** @scenario "A real oversized payload round-trips through S3 to the live engine" */
+      it.skipIf(!runE2E)(
+        "stages a >6 MiB body to S3 and the receiver fetches + executes the full payload",
+        async () => {
+          const sentinel = `SENTINEL-${Date.now()}-end`;
+          const { event, blob } = buildOversizedExecuteFlowEvent(sentinel);
+          const bodyStr = JSON.stringify(event);
+          const bodyBytes = Buffer.byteLength(bodyStr, "utf-8");
 
-      // The body would breach the synchronous InvokeFunction cap if inlined —
-      // i.e. staging is genuinely required, not incidental.
-      expect(bodyBytes).toBeGreaterThan(LAMBDA_INVOKE_CAP_BYTES);
+          // The body would breach the synchronous InvokeFunction cap if inlined —
+          // i.e. staging is genuinely required, not incidental.
+          expect(bodyBytes).toBeGreaterThan(LAMBDA_INVOKE_CAP_BYTES);
 
-      let staged: StagedObject | null = null;
-      try {
-        staged = await stagePayloadToS3({
-          projectId: PROJECT_ID,
-          keyPrefix: KEY_PREFIX,
-          serialized: Buffer.from(bodyStr, "utf-8"),
-          ttlSeconds: 600,
-        });
+          let staged: StagedObject | null = null;
+          try {
+            staged = await stagePayloadToS3({
+              projectId: PROJECT_ID,
+              keyPrefix: KEY_PREFIX,
+              serialized: Buffer.from(bodyStr, "utf-8"),
+              ttlSeconds: 600,
+            });
 
-        // The REAL presigned host our code emits must be one the Go receiver
-        // accepts; a custom endpoint that fails this is a latent prod bug.
-        const host = new URL(staged.stagedUrl).host;
-        expect(new URL(staged.stagedUrl).protocol).toBe("https:");
-        expect(isAWSS3Host(host), `presigned host ${host} must pass the Go SSRF guard`).toBe(true);
+            // The REAL presigned host our code emits must be one the Go receiver
+            // accepts; a custom endpoint that fails this is a latent prod bug.
+            const host = new URL(staged.stagedUrl).host;
+            expect(new URL(staged.stagedUrl).protocol).toBe("https:");
+            expect(
+              isAWSS3Host(host),
+              `presigned host ${host} must pass the Go SSRF guard`,
+            ).toBe(true);
 
-        // Object actually LANDED in S3 at the full body size — proven against
-        // S3 directly, independent of the receiver fetch.
-        const head = await staged.s3Client.send(
-          new HeadObjectCommand({ Bucket: staged.s3Bucket, Key: staged.key }),
-        );
-        expect(head.ContentLength).toBe(bodyBytes);
+            // Object actually LANDED in S3 at the full body size — proven against
+            // S3 directly, independent of the receiver fetch.
+            const head = await staged.s3Client.send(
+              new HeadObjectCommand({
+                Bucket: staged.s3Bucket,
+                Key: staged.key,
+              }),
+            );
+            expect(head.ContentLength).toBe(bodyBytes);
 
-        // Empty body + staged header = exactly what lambdaFetch sends and what
-        // readStudioRequestBody fetches from S3 instead of the inline body.
-        const res = await fetch(`${nlpgo!.baseUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
-          },
-          body: "",
-        });
+            // Empty body + staged header = exactly what lambdaFetch sends and what
+            // readStudioRequestBody fetches from S3 instead of the inline body.
+            const res = await fetch(
+              `${nlpgo!.baseUrl}/go/studio/execute_sync`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
+                },
+                body: "",
+              },
+            );
 
-        expect(res.status).toBe(200);
-        const result = (await res.json()) as {
-          status: string;
-          result?: { blob?: string };
-          error?: { message?: string };
-        };
-        expect(result.status, JSON.stringify(result.error)).toBe("success");
+            expect(res.status).toBe(200);
+            const result = (await res.json()) as {
+              status: string;
+              result?: { blob?: string };
+              error?: { message?: string };
+            };
+            expect(result.status, JSON.stringify(result.error)).toBe("success");
 
-        // Full-fetch proof: the echoed value is byte-complete (same length and
-        // the sentinel that lived at the very end of the >6 MiB blob survived),
-        // so nlpgo fetched the whole object, not a 6 MiB-truncated prefix.
-        expect(result.result?.blob?.length).toBe(blob.length);
-        expect(result.result?.blob?.endsWith(sentinel)).toBe(true);
+            // Full-fetch proof: the echoed value is byte-complete (same length and
+            // the sentinel that lived at the very end of the >6 MiB blob survived),
+            // so nlpgo fetched the whole object, not a 6 MiB-truncated prefix.
+            expect(result.result?.blob?.length).toBe(blob.length);
+            expect(result.result?.blob?.endsWith(sentinel)).toBe(true);
 
-        // eslint-disable-next-line no-console
-        console.log(
-          `[dogfood] staged ${bodyBytes} bytes -> s3://${staged.s3Bucket}/${staged.key} ` +
-            `(host ${host}, isAWSS3Host=true); nlpgo echoed ${result.result?.blob?.length} bytes ` +
-            `ending in the sentinel -> full round-trip OK`,
-        );
+            // eslint-disable-next-line no-console
+            console.log(
+              `[dogfood] staged ${bodyBytes} bytes -> s3://${staged.s3Bucket}/${staged.key} ` +
+                `(host ${host}, isAWSS3Host=true); nlpgo echoed ${result.result?.blob?.length} bytes ` +
+                `ending in the sentinel -> full round-trip OK`,
+            );
 
-        // Reap it and PROVE it is gone — the staged object carries customer
-        // trace data, so the finally-delete must actually remove it.
-        const reaped = staged;
-        staged = null;
-        await deleteStagedObject({
-          s3Client: reaped.s3Client,
-          s3Bucket: reaped.s3Bucket,
-          key: reaped.key,
-          projectId: PROJECT_ID,
-        });
-        await expect(
-          reaped.s3Client.send(
-            new HeadObjectCommand({
-              Bucket: reaped.s3Bucket,
-              Key: reaped.key,
-            }),
-          ),
-        ).rejects.toThrow();
-      } finally {
-        // Error-path cleanup only: the happy path already reaped + nulled it.
-        if (staged) {
-          await deleteStagedObject({
-            s3Client: staged.s3Client,
-            s3Bucket: staged.s3Bucket,
-            key: staged.key,
-            projectId: PROJECT_ID,
-          });
-        }
-      }
-    },
-    120_000,
-  );
-
-  /** @scenario "The engine refuses a staged-payload header pointing off S3" */
-  it.skipIf(!runE2E)(
-    "rejects a staged-payload header whose host is not an AWS S3 host",
-    async () => {
-      // SSRF guard: a tampered header pointing off-S3 must be refused before
-      // any fetch, even though the rest of the request is well-formed.
-      const res = await fetch(`${nlpgo!.baseUrl}/go/studio/execute_sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [STAGED_PAYLOAD_HEADER]: "https://evil.example.com/staged.json?sig=x",
+            // Reap it and PROVE it is gone — the staged object carries customer
+            // trace data, so the finally-delete must actually remove it.
+            const reaped = staged;
+            staged = null;
+            await deleteStagedObject({
+              s3Client: reaped.s3Client,
+              s3Bucket: reaped.s3Bucket,
+              key: reaped.key,
+              projectId: PROJECT_ID,
+            });
+            await expect(
+              reaped.s3Client.send(
+                new HeadObjectCommand({
+                  Bucket: reaped.s3Bucket,
+                  Key: reaped.key,
+                }),
+              ),
+            ).rejects.toThrow();
+          } finally {
+            // Error-path cleanup only: the happy path already reaped + nulled it.
+            if (staged) {
+              await deleteStagedObject({
+                s3Client: staged.s3Client,
+                s3Bucket: staged.s3Bucket,
+                key: staged.key,
+                projectId: PROJECT_ID,
+              });
+            }
+          }
         },
-        body: "",
-      });
-      expect(res.status).toBe(400);
-    },
-    60_000,
-  );
+        120_000,
+      );
+    });
+  });
+
+  describe("given a staged-payload header pointing off S3", () => {
+    describe("when nlpgo receives the invoke", () => {
+      /** @scenario "The engine refuses a staged-payload header pointing off S3" */
+      it.skipIf(!runE2E)(
+        "rejects a staged-payload header whose host is not an AWS S3 host",
+        async () => {
+          // SSRF guard: a tampered header pointing off-S3 must be refused before
+          // any fetch, even though the rest of the request is well-formed.
+          const res = await fetch(`${nlpgo!.baseUrl}/go/studio/execute_sync`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              [STAGED_PAYLOAD_HEADER]:
+                "https://evil.example.com/staged.json?sig=x",
+            },
+            body: "",
+          });
+          expect(res.status).toBe(400);
+        },
+        60_000,
+      );
+    });
+  });
 });
