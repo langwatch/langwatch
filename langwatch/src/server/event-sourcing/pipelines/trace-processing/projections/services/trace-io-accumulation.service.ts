@@ -32,7 +32,7 @@ export const CLAUDE_CODE_SCOPE_NAMES = new Set([
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 /**
- * Priority: root > explicit > last-finishing.
+ * Priority: root (latest-finishing among roots) > explicit > last-finishing.
  * @internal Exported for unit testing
  */
 export function shouldOverrideOutput({
@@ -50,7 +50,14 @@ export function shouldOverrideOutput({
   endTime: number;
   currentEndTime: number;
 }): boolean {
-  if (isRoot) return true;
+  // A parentless span is "root". A claude_code Path B turn synthesizes MANY
+  // parentless spans under one trace (one per model call), so "root" is not
+  // unique here: among roots the latest-finishing reply wins, so the trace
+  // output is deterministic by end time instead of last-folded-wins (the real
+  // reply often sits on a middle call, with utility calls finishing after it).
+  // A root still beats a non-root child that set the output. For a conventional
+  // single-root trace this is a no-op — there is only ever one root.
+  if (isRoot) return !outputFromRoot || endTime >= currentEndTime;
   if (outputFromRoot) return false;
   if (isExplicit && !currentIsExplicit) return true;
   if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
@@ -198,7 +205,29 @@ export class TraceIOAccumulationService {
       }
     }
 
-    if (spanType === "evaluation" || spanType === "guardrail") {
+    // Claude Code utility model calls (prompt_suggestion autosuggest,
+    // generate_session_title) are not the conversation — their reply is now
+    // attached to the span (so the span detail shows it) but must NOT become
+    // the trace's headline I/O. Like tool spans, they're parentless (= root),
+    // so without this skip a utility reply could win the headline by end-time.
+    // Mirrors the log-path gate in extractIOFromLogRecord so both agree.
+    const claudeQuerySource = span.spanAttributes["claude_code.query_source"];
+    const isClaudeUtilitySpan =
+      typeof claudeQuerySource === "string" &&
+      !isConversationalQuerySource(claudeQuerySource);
+
+    // Tool spans never define the trace's headline I/O: they are
+    // sub-operations (a Bash run, an Edit), not the conversation. This is
+    // load-bearing for synthesized claude_code tool spans, which are
+    // parentless (= root) so their langwatch.input would otherwise hijack the
+    // trace input. Skipping them lets a tool span carry its own input/output
+    // for the span detail without polluting the trace summary.
+    if (
+      spanType === "evaluation" ||
+      spanType === "guardrail" ||
+      spanType === "tool" ||
+      isClaudeUtilitySpan
+    ) {
       return {
         computedInput,
         computedOutput,

@@ -30,6 +30,7 @@ import {
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
+import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -359,6 +360,13 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
       // / langwatch.template.id) — even a malicious upstream cannot forge a
       // different source / key / org identity onto its own traces.
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Whether this tool's direct-OTLP usage is bundled (non-billed per
+        // token). Cached per (org, sourceType); drives the trace summary's
+        // billed-vs-non-billed cost split. Gateway usage never reaches here.
+        const nonBillable = await resolveSourceNonBillable({
+          organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
         // OTLP SDK types and the local stamp helper agree structurally on
         // the slice we mutate (resourceSpans → resource → attributes). The
         // cast bridges nullability differences in deeper fields the helper
@@ -368,6 +376,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
           sourceType: resolved.ingestSourceType,
           organizationId: resolved.organizationId,
           templateId: resolved.ingestionTemplateId,
+          nonBillable,
         });
       }
 
@@ -449,11 +458,21 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       }
 
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
+        // need the same bundled-vs-billed resolution the trace path does —
+        // without it their cost never gets the non-billable marker and a
+        // bundled coding session reads as real spend. Cached per
+        // (org, sourceType).
+        const nonBillable = await resolveSourceNonBillable({
+          organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
         stampIngestKeyProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0], {
           apiKeyId: resolved.apiKeyId,
           sourceType: resolved.ingestSourceType,
           organizationId: resolved.organizationId,
           templateId: resolved.ingestionTemplateId,
+          nonBillable,
         });
       }
 

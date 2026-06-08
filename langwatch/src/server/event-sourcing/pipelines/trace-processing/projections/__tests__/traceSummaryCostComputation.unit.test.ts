@@ -399,3 +399,128 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
     });
   });
 });
+
+describe("applySpanToSummary cache + reasoning token roll-up", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when cache write lands on the first span and cache read on later spans", () => {
+    it("sums cache read + cache write across the trace into reserved keys", () => {
+      const first = createTestSpan({
+        spanId: "span-a",
+        spanAttributes: {
+          "gen_ai.request.model": "claude-opus-4-8",
+          "gen_ai.usage.cache_creation.input_tokens": 19701,
+        },
+      });
+      const second = createTestSpan({
+        spanId: "span-b",
+        spanAttributes: {
+          "gen_ai.request.model": "claude-opus-4-8",
+          "gen_ai.usage.cache_read.input_tokens": 19701,
+          "gen_ai.usage.cache_creation.input_tokens": 10852,
+        },
+      });
+
+      const afterFirst = applySpanToSummary({
+        state: createInitState(),
+        span: first,
+      });
+      const result = applySpanToSummary({ state: afterFirst, span: second });
+
+      // The last span carries no cache write, so reading the raw merged
+      // attribute would drop it entirely — the sum is what keeps it visible.
+      expect(result.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+        "19701",
+      );
+      expect(
+        result.attributes["langwatch.reserved.cache_creation_tokens"],
+      ).toBe("30553");
+    });
+  });
+
+  describe("when no span reports reasoning tokens", () => {
+    it("leaves the reserved reasoning key unset so the drawer hides the row", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "claude-opus-4-8",
+          "gen_ai.usage.cache_read.input_tokens": 100,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(
+        result.attributes["langwatch.reserved.reasoning_tokens"],
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when a span reports reasoning tokens", () => {
+    it("sums them onto the reserved reasoning key", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "o3",
+          "gen_ai.usage.reasoning_tokens": 512,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
+        "512",
+      );
+    });
+  });
+});
+
+describe("applySpanToSummary model ordering", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when a utility model is used before the conversational one", () => {
+    it("orders models most-recently-used first so models[0] is conversational", () => {
+      const titleGen = createTestSpan({
+        spanId: "span-a",
+        spanAttributes: { "gen_ai.request.model": "claude-haiku-4-5" },
+      });
+      const conversation = createTestSpan({
+        spanId: "span-b",
+        spanAttributes: { "gen_ai.request.model": "claude-opus-4-8" },
+      });
+
+      const afterFirst = applySpanToSummary({
+        state: createInitState(),
+        span: titleGen,
+      });
+      const result = applySpanToSummary({
+        state: afterFirst,
+        span: conversation,
+      });
+
+      expect(result.models).toEqual(["claude-opus-4-8", "claude-haiku-4-5"]);
+    });
+  });
+});

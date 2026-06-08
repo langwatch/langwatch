@@ -1514,6 +1514,7 @@ export class ClickHouseTraceService {
             ts.ErrorMessage AS ts_ErrorMessage,
             ts.Models AS ts_Models,
             ts.TotalCost AS ts_TotalCost,
+            ts.NonBilledCost AS ts_NonBilledCost,
             ts.TokensEstimated AS ts_TokensEstimated,
             ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
             ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -1678,6 +1679,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -1822,6 +1824,7 @@ export class ClickHouseTraceService {
           ErrorMessage AS ts_ErrorMessage,
           Models AS ts_Models,
           TotalCost AS ts_TotalCost,
+          NonBilledCost AS ts_NonBilledCost,
           TokensEstimated AS ts_TokensEstimated,
           TotalPromptTokenCount AS ts_TotalPromptTokenCount,
           TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -2016,6 +2019,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -2242,6 +2246,7 @@ interface TraceSummaryRow {
   ts_ErrorMessage: string | null;
   ts_Models: string[];
   ts_TotalCost: number | null;
+  ts_NonBilledCost: number | null;
   ts_TokensEstimated: boolean;
   ts_TotalPromptTokenCount: number | null;
   ts_TotalCompletionTokenCount: number | null;

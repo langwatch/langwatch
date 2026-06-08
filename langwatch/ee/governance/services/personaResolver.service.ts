@@ -12,7 +12,7 @@
  *
  * Critical invariant per rchaves directive 2026-04-29: most current LangWatch
  * customers are LLMOps admins NOT using the AI Gateway. They must continue to
- * land on `/[project]/messages`. The persona-4 gate is therefore conjunctive
+ * land on `/[project]`. The persona-4 gate is therefore conjunctive
  * (org-manage permission AND Enterprise plan AND hasIngestionSources) — any
  * single signal missing falls through to project_only.
  *
@@ -142,7 +142,7 @@ export function resolvePersonaHomeSafe(
     return {
       persona: "project_only",
       destination: input.firstProjectSlug
-        ? `/${input.firstProjectSlug}/messages`
+        ? `/${input.firstProjectSlug}`
         : "/me",
       isOverride: false,
       governanceUiEnabled: input.hasGovernanceUi ?? false,
@@ -176,7 +176,7 @@ function mapPersonaToDestination(
   input: PersonaResolverInput,
 ): string {
   const projectHome = input.firstProjectSlug
-    ? `/${input.firstProjectSlug}/messages`
+    ? `/${input.firstProjectSlug}`
     : noProjectFallback(input.hasGovernanceUi);
 
   // `/me` and `/governance` are gated behind release_ui_ai_governance_enabled

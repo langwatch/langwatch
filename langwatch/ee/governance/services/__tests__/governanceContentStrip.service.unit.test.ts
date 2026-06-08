@@ -121,13 +121,21 @@ describe("GovernanceContentStripService.governanceTargetOrgId", () => {
     });
   });
 
-  describe("when origin is 'ingest_key' and organization_id is set", () => {
+  describe("when origin is an ingest-key origin and organization_id is set", () => {
     // Ingestion-key-routed traces (sk-lw- ingest keys) need to participate
-    // in the org's no-spy / strip-IO policy. See
-    // ingestKeyProvenance.utils.ts:INGEST_KEY_ORIGIN_VALUE.
-    it("returns the organization id (ingest-key traces are subject to the policy)", () => {
+    // in the org's no-spy / strip-IO policy. See ingestKeyProvenance.utils.ts:
+    // CODING_AGENT_ORIGIN_VALUE / AI_TOOL_ORIGIN_VALUE.
+    it("returns the organization id for a coding_agent trace", () => {
       const orgId = GovernanceContentStripService.governanceTargetOrgId({
-        "langwatch.origin": "ingest_key",
+        "langwatch.origin": "coding_agent",
+        "langwatch.organization_id": "org-acme",
+      });
+      expect(orgId).toBe("org-acme");
+    });
+
+    it("returns the organization id for an ai_tool trace", () => {
+      const orgId = GovernanceContentStripService.governanceTargetOrgId({
+        "langwatch.origin": "ai_tool",
         "langwatch.organization_id": "org-acme",
       });
       expect(orgId).toBe("org-acme");

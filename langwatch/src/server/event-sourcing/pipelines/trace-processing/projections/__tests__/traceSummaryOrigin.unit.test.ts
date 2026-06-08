@@ -34,6 +34,35 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
+  describe("when the ingest-key provenance puts langwatch.origin on the resource", () => {
+    it("hoists the resource-level origin (claude code's coding_agent rides the resource, not the span)", () => {
+      const span = createTestSpan({
+        parentSpanId: null, // root agent span
+        spanAttributes: {}, // claude log-derived spans carry no span-level origin
+        resourceAttributes: {
+          "langwatch.origin": "coding_agent",
+          "langwatch.source": "claude_code",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.origin"]).toBe("coding_agent");
+    });
+
+    it("prefers a span-level origin over the resource-level one when both exist", () => {
+      const span = createTestSpan({
+        parentSpanId: null,
+        spanAttributes: { "langwatch.origin": "simulation" },
+        resourceAttributes: { "langwatch.origin": "coding_agent" },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
+    });
+  });
+
   describe("when child span has langwatch.origin and root span does not", () => {
     /** @scenario "Root span without origin preserves child span origin" */
     it("preserves child span origin value", () => {

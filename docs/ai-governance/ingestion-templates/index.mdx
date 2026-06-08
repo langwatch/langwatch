@@ -139,7 +139,8 @@ Open the trace. You should see:
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
   `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all receiver-stamped
   post-auth (authoritative attribution + template provenance), with
-  `langwatch.origin = "ingest_key"`.
+  `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
+  assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
 
 That's it. From here, every Claude Code action you run flows into your personal workspace
 shaped correctly, same as if you'd been running through the gateway VK path.
@@ -205,7 +206,8 @@ receiver:
 6. **Post-auth re-stamps** the closed `protectedTemplateAttributeKeys` (and, for
    org-authored OTTL, the tier-of-trust additions covering cost, tokens, model) as
    receiver-authoritative, including `langwatch.api_key.id` and
-   `langwatch.origin = "ingest_key"` provenance. If the OTTL tried to write any of those
+   `langwatch.origin` provenance (derived from the key's source: `coding_agent`
+   for a CLI assistant, `ai_tool` otherwise). If the OTTL tried to write any of those
    keys, the original value is restored and an audit row
    `gateway.template_ottl_protected_field_attempt` fires with the rejected-key list.
 7. **Hands off** to the trace pipeline, same path as every other ingest source from
@@ -225,7 +227,8 @@ The `protectedTemplateAttributeKeys` closed list:
 - `langwatch.template.id`, receiver-stamped provenance.
 - `langwatch.api_key.id`, receiver-stamped provenance (the ingestion key that landed
   the trace).
-- `langwatch.origin`, receiver-stamped provenance (`ingest_key` on this path).
+- `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
+  assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
   `/me/traces`).
 

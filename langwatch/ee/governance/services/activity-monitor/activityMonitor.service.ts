@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * ActivityMonitorService — read-side queries powering the /governance
+ * ActivityMonitorService - read-side queries powering the /governance
  * admin dashboard.
  *
  * Reads from the unified trace store (the same `trace_summaries` +
@@ -19,7 +19,7 @@
  * short-circuit to empty results.
  *
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
- * `prisma.anomalyAlert` — unaffected by the trace-store path.
+ * `prisma.anomalyAlert` - unaffected by the trace-store path.
  *
  * Spec contracts:
  *   - specs/ai-gateway/governance/folds.feature
@@ -37,9 +37,9 @@ import {
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "../governanceAttributeKeys";
 import {
-  UNASSIGNED_COST_CENTER,
-  resolveTraceCostCenterId,
-} from "../cost-center/costCenterAttribution";
+  UNASSIGNED_DEPARTMENT,
+  resolveTraceDepartmentId,
+} from "../department/departmentAttribution";
 
 export interface SummaryResult {
   spentThisWindowUsd: number;
@@ -87,13 +87,13 @@ export interface SpendByTeamRow {
    * spend AND current is also empty; 100 when previous was zero and
    * current is non-zero (matches `summary.windowOverPreviousPct`).
    * UI should consult `hasPriorBaseline` before rendering this as a
-   * percentage — `100` is overloaded (real doubling vs zero-baseline
+   * percentage - `100` is overloaded (real doubling vs zero-baseline
    * artifact).
    */
   deltaPctVsPriorWindow: number;
   /**
    * False when the previous-window spend was zero (no baseline data
-   * to compare against). UI mutes the trend cell to '—' rather than
+   * to compare against). UI mutes the trend cell to '-' rather than
    * showing a misleading +100% on every brand-new team.
    */
   hasPriorBaseline: boolean;
@@ -102,11 +102,11 @@ export interface SpendByTeamRow {
   sourceCount: number;
 }
 
-export interface SpendByCostCenterRow {
-  /** CostCenter.id, or null for the synthetic "Unassigned" bucket. */
-  costCenterId: string | null;
-  /** CostCenter.name, or "Unassigned". */
-  costCenterName: string;
+export interface SpendByDepartmentRow {
+  /** Department.id, or null for the synthetic "Unassigned" bucket. */
+  departmentId: string | null;
+  /** Department.name, or "Unassigned". */
+  departmentName: string;
   spendUsd: number;
   requestCount: number;
   lastActivityIso: string | null;
@@ -132,7 +132,7 @@ export interface SpendOverTimeBucket {
    */
   points: Array<{
     /**
-     * Stable group identifier — teamId, user_id, or model name. Used
+     * Stable group identifier - teamId, user_id, or model name. Used
      * for color-derivation (name-hash) + click-through scope params.
      */
     key: string;
@@ -212,7 +212,7 @@ export interface RecentAnomalyRow {
   state: string;
   currentState: "open" | "acknowledged" | "resolved";
   detail: Record<string, unknown>;
-  /** Back-compat alias — same as `ruleName`, used by the iter-10 dashboard renderer. */
+  /** Back-compat alias - same as `ruleName`, used by the iter-10 dashboard renderer. */
   rule: string;
   /** Best-effort source label pulled from `detail` for the dashboard row. */
   sourceLabel: string;
@@ -290,7 +290,7 @@ export class ActivityMonitorService {
   /**
    * Resolves the org's hidden internal_governance Project ID. Returns null
    * when the org has no Gov Project yet (no IngestionSource has ever been
-   * minted) — callers short-circuit to empty results in that case.
+   * minted) - callers short-circuit to empty results in that case.
    */
   private async resolveGovProjectId(
     organizationId: string,
@@ -387,7 +387,7 @@ export class ActivityMonitorService {
       // newUsers requires a baseline-window comparison query which is a
       // follow-up (3b: governance_kpis fold materialises the per-user
       // first-seen). For now the dashboard renders the field but the value
-      // is conservative — treat all active as new only when prev=0.
+      // is conservative - treat all active as new only when prev=0.
       newUsersThisWindow: prevSpend === 0 ? thisUsers : 0,
       openAnomalyCount,
       anomalyBreakdown,
@@ -430,14 +430,14 @@ export class ActivityMonitorService {
     const offset = Math.max(0, input.offset ?? 0);
     const sortBy = input.sortBy ?? "spend";
     const sortDir = input.sortDir ?? "desc";
-    // Whitelist the ORDER BY expression — the sortBy/sortDir values come
+    // Whitelist the ORDER BY expression - the sortBy/sortDir values come
     // from a Zod enum at the route layer but we re-validate here so a
     // direct service-layer caller (tests, scripts) can't smuggle SQL.
     const orderExpr = SORT_FIELD_TO_AGG_EXPR[sortBy];
     const orderDir = sortDir === "asc" ? "ASC" : "DESC";
 
     // ClickHouse 25.x resolves bare column names in ORDER BY to outer
-    // aliases when the alias shadows a subquery column — so
+    // aliases when the alias shadows a subquery column - so
     // `ORDER BY sum(spendUsd)` against an outer alias of `spendUsd =
     // toString(sum(...))` evaluates as sum-over-String and fails with
     // ILLEGAL_TYPE_OF_ARGUMENT (43). Aliasing the outer string to a
@@ -505,46 +505,46 @@ export class ActivityMonitorService {
   }
 
   /**
-   * Spend rolled up by cost center across EVERY project in the org — the
+   * Spend rolled up by department across EVERY project in the org - the
    * fix for the empty bird's-eye graphs. Unlike `summary`/`spendByUser`,
    * which read only the hidden governance project and the governance
    * ingestion origin, this aggregates the whole org's AI spend so an org
    * with real traffic but no ingestion source still populates.
    *
-   * A trace's cost center is resolved by precedence (principal user → the
+   * A trace's department is resolved by precedence (principal user → the
    * user's team → the project, else Unassigned), so a person's personal
    * use and the autonomous agents their team runs can land in the same
-   * cost center. The principal user is the `langwatch.user_id` attribute;
+   * department. The principal user is the `langwatch.user_id` attribute;
    * traces without it (plain application traffic) attribute by project.
    *
    * Tenancy: the project tenant IDs come from Prisma scoped to the org, so
    * the ClickHouse `WHERE TenantId IN (...)` can only ever read this org's
-   * own projects — cross-org isolation holds by construction.
+   * own projects - cross-org isolation holds by construction.
    *
-   * Spec: specs/ai-gateway/governance/cost-centers.feature
+   * Spec: specs/ai-gateway/governance/departments.feature
    *       (the @birds-eye scenarios)
    */
-  async spendByCostCenter(input: {
+  async spendByDepartment(input: {
     organizationId: string;
     windowDays: number;
-  }): Promise<SpendByCostCenterRow[]> {
+  }): Promise<SpendByDepartmentRow[]> {
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId: input.organizationId }, archivedAt: null },
-      select: { id: true, costCenterId: true },
+      select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
 
     const ch = await this.getClickhouse(input.organizationId);
     if (!ch) return [];
 
-    const projectCostCenterById = new Map(
-      projects.map((p) => [p.id, p.costCenterId] as const),
+    const projectDepartmentById = new Map(
+      projects.map((p) => [p.id, p.departmentId] as const),
     );
     const tenantIds = projects.map((p) => p.id);
 
-    const { userCostCenterByEmail, userTeamCostCenterByEmail } =
-      await this.resolveUserCostCenters(input.organizationId);
-    const activeCostCenterNames = await this.activeCostCenterNames(
+    const { userDepartmentByEmail, userTeamDepartmentByEmail } =
+      await this.resolveUserDepartments(input.organizationId);
+    const activeDepartmentNames = await this.activeDepartmentNames(
       input.organizationId,
     );
 
@@ -592,19 +592,19 @@ export class ActivityMonitorService {
     >();
     for (const r of rows) {
       const hasPrincipalUser = r.actor !== "";
-      const costCenterId = resolveTraceCostCenterId({
+      const departmentId = resolveTraceDepartmentId({
         hasPrincipalUser,
-        userCostCenterId: userCostCenterByEmail.get(r.actor),
-        userTeamCostCenterId: userTeamCostCenterByEmail.get(r.actor),
-        projectCostCenterId: projectCostCenterById.get(r.projectId) ?? null,
+        userDepartmentId: userDepartmentByEmail.get(r.actor),
+        userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
+        projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
       });
-      // An archived or otherwise-unknown cost center rolls up as Unassigned
+      // An archived or otherwise-unknown department rolls up as Unassigned
       // without a backfill: it is simply absent from the active name map.
       const key =
-        costCenterId !== UNASSIGNED_COST_CENTER &&
-        activeCostCenterNames.has(costCenterId)
-          ? costCenterId
-          : UNASSIGNED_COST_CENTER;
+        departmentId !== UNASSIGNED_DEPARTMENT &&
+        activeDepartmentNames.has(departmentId)
+          ? departmentId
+          : UNASSIGNED_DEPARTMENT;
       const prior = acc.get(key) ?? {
         spendUsd: 0,
         requestCount: 0,
@@ -619,11 +619,11 @@ export class ActivityMonitorService {
 
     return [...acc.entries()]
       .map(([key, v]) => ({
-        costCenterId: key === UNASSIGNED_COST_CENTER ? null : key,
-        costCenterName:
-          key === UNASSIGNED_COST_CENTER
+        departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
+        departmentName:
+          key === UNASSIGNED_DEPARTMENT
             ? "Unassigned"
-            : activeCostCenterNames.get(key)!,
+            : activeDepartmentNames.get(key)!,
         spendUsd: v.spendUsd,
         requestCount: v.requestCount,
         lastActivityIso:
@@ -634,10 +634,10 @@ export class ActivityMonitorService {
       .sort((a, b) => b.spendUsd - a.spendUsd);
   }
 
-  private async activeCostCenterNames(
+  private async activeDepartmentNames(
     organizationId: string,
   ): Promise<Map<string, string>> {
-    const rows = await this.prisma.costCenter.findMany({
+    const rows = await this.prisma.department.findMany({
       where: { organizationId, archivedAt: null },
       select: { id: true, name: true },
     });
@@ -646,18 +646,18 @@ export class ActivityMonitorService {
 
   /**
    * Maps a principal user's email (the `langwatch.user_id` attribute) to
-   * their own cost center and, separately, an inherited team cost center.
+   * their own department and, separately, an inherited team department.
    * A member can belong to several teams; the inherited default is the
-   * first non-personal team that carries a cost center.
+   * first non-personal team that carries a department.
    */
-  private async resolveUserCostCenters(organizationId: string): Promise<{
-    userCostCenterByEmail: Map<string, string | null>;
-    userTeamCostCenterByEmail: Map<string, string | null>;
+  private async resolveUserDepartments(organizationId: string): Promise<{
+    userDepartmentByEmail: Map<string, string | null>;
+    userTeamDepartmentByEmail: Map<string, string | null>;
   }> {
     const members = await this.prisma.organizationUser.findMany({
       where: { organizationId },
       select: {
-        costCenterId: true,
+        departmentId: true,
         user: {
           select: {
             email: true,
@@ -666,32 +666,32 @@ export class ActivityMonitorService {
                 team: {
                   organizationId,
                   isPersonal: false,
-                  costCenterId: { not: null },
+                  departmentId: { not: null },
                 },
               },
-              select: { team: { select: { costCenterId: true } } },
+              select: { team: { select: { departmentId: true } } },
             },
           },
         },
       },
     });
 
-    const userCostCenterByEmail = new Map<string, string | null>();
-    const userTeamCostCenterByEmail = new Map<string, string | null>();
+    const userDepartmentByEmail = new Map<string, string | null>();
+    const userTeamDepartmentByEmail = new Map<string, string | null>();
     for (const m of members) {
       const email = m.user.email;
       if (!email) continue;
-      userCostCenterByEmail.set(email, m.costCenterId);
+      userDepartmentByEmail.set(email, m.departmentId);
       const inherited = m.user.teamMemberships.find(
-        (tm) => tm.team.costCenterId,
-      )?.team.costCenterId;
-      userTeamCostCenterByEmail.set(email, inherited ?? null);
+        (tm) => tm.team.departmentId,
+      )?.team.departmentId;
+      userTeamDepartmentByEmail.set(email, inherited ?? null);
     }
-    return { userCostCenterByEmail, userTeamCostCenterByEmail };
+    return { userDepartmentByEmail, userTeamDepartmentByEmail };
   }
 
   /**
-   * Per-team spend rollup for the admin governance home — the
+   * Per-team spend rollup for the admin governance home - the
    * organization-wide bird's-eye view that complements `spendByUser`
    * (top spenders) with the team breakdown.
    *
@@ -709,7 +709,7 @@ export class ActivityMonitorService {
    * middleware on the tRPC procedure handle that). Service-side
    * defense-in-depth: every CH query filters by `TenantId =
    * govProjectId`, where `govProjectId` is the caller's hidden
-   * Governance Project — cross-org leak is structurally impossible.
+   * Governance Project - cross-org leak is structurally impossible.
    */
   async spendByTeam(input: {
     organizationId: string;
@@ -865,11 +865,11 @@ export class ActivityMonitorService {
    * needs without any client-side reshape gymnastics.
    *
    * Density invariant: `buckets` covers every day in the window, even
-   * empty ones — Recharts AreaChart with `stackId="1"` requires a
+   * empty ones - Recharts AreaChart with `stackId="1"` requires a
    * dense X axis or it draws gaps that visually misrepresent quiet
    * days as "missing data". Empty days surface as `points: []`.
    *
-   * Tenancy: same as every other read in this service — every CH query
+   * Tenancy: same as every other read in this service - every CH query
    * filters by `TenantId = govProjectId`. groupBy='team' rolls up
    * IngestionSource rows (CH-side spend) by their teamId via a PG join
    * (Org-wide bucket for null-teamId sources). groupBy='user' /
@@ -910,7 +910,7 @@ export class ActivityMonitorService {
 
     // `OccurredAt` is DateTime64(3, 'UTC'). `toStartOfDay()` returns
     // plain `DateTime` (seconds resolution), and `toUnixTimestamp64Milli`
-    // refuses anything but DateTime64 — so we go the other way:
+    // refuses anything but DateTime64 - so we go the other way:
     // `toUnixTimestamp()` gives seconds, then multiply by 1000 to get
     // millisecond ticks. Same wire shape as `toUnixTimestamp64Milli`
     // would produce; matches the JS-side `windowStart`/dayMs math.
@@ -1040,7 +1040,7 @@ export class ActivityMonitorService {
       });
     }
 
-    // Stable per-bucket ordering — descending spend so the largest
+    // Stable per-bucket ordering - descending spend so the largest
     // contributor renders at the bottom of the stacked area (Recharts
     // stacks in array order; bottom-up = largest-first).
     for (const bucket of buckets) {
@@ -1054,7 +1054,7 @@ export class ActivityMonitorService {
    * Recent anomaly alerts produced by the anomaly-detection reactor.
    * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
    * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
-   * — callers render the empty-state in the dashboard.
+   * - callers render the empty-state in the dashboard.
    */
   async recentAnomalies(input: {
     organizationId: string;

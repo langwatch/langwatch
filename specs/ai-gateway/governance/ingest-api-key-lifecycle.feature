@@ -8,12 +8,14 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   type to learn or migrate
 
   Why one primitive (replaces the retired UserIngestionBinding):
-    There is ONE credential primitive: ApiKey (`sk-lw-{lookupId}_{secret}`,
-    HMAC-SHA256 + pepper). An "ingestion key" is an ApiKey with
+    There is ONE credential primitive: ApiKey (HMAC-SHA256 + pepper, split
+    `{prefix}{lookupId}_{secret}` format). An "ingestion key" is an ApiKey with
     `keyType = "ingest"` plus a single project-scoped RoleBinding granting the
-    system "Ingest Only" role (permissions = ["traces:create"] only). The
-    `ik-lw-` binding token, its plain-SHA256 hash, and the
-    user_ingestion_binding resolver branch are GONE.
+    system "Ingest Only" role (permissions = ["traces:create"] only). Ingest
+    keys carry an `ik-lw-` prefix (vs full-access `sk-lw-`) purely for
+    identifiability; resolution is identical (lookup by lookupId). The retired
+    UserIngestionBinding primitive — a separate `ik-lw-` token with its own
+    plain-SHA256 hash and resolver branch — is GONE.
 
   Why ingest-only is genuinely write-only:
     `traces:create` gates exactly the three trace-WRITE endpoints (the OTLP
@@ -51,7 +53,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
       | scopeType     | PROJECT                        |
       | scopeId       | "personal-jane"                |
       | customRole    | "Ingest Only" (traces:create)  |
-    And the plaintext token is shown exactly once with the `sk-lw-` prefix
+    And the plaintext token is shown exactly once with the `ik-lw-` prefix
     And re-requesting the same (project, sourceType) rotates in place, never 409
 
   @bdd @ingest-api-key @issue @structural-impossibility
@@ -90,7 +92,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   Scenario: Rotating an ingestion key revokes the previous token immediately
     Given jane has an ingestion key with token T_OLD
     When jane rotates the key
-    Then a new token T_NEW is issued and shown one-time with the `sk-lw-` prefix
+    Then a new token T_NEW is issued and shown one-time with the `ik-lw-` prefix
     And `hashedSecret` is updated to HMAC-SHA256(T_NEW's secret)
     When jane's upstream tool emits a trace using T_OLD
     Then the receiver returns 401 (token miss, no enumeration)
@@ -120,7 +122,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
       | attribute            | value (source)                              |
       | langwatch.source     | "claude_code" (from ingestSourceType)       |
       | langwatch.api_key.id | the ingest key id                           |
-      | langwatch.origin     | "ingest_key"                                |
+      | langwatch.origin     | "coding_agent" (derived from ingestSourceType) |
       | langwatch.project.id | "personal-jane" (the bound project)         |
     And `langwatch.template.id` is stamped ONLY when ingestionTemplateId is set
 
@@ -163,27 +165,6 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # Same primitive, same ingest-only role; not a personal-only concept.
 
   # ---------------------------------------------------------------------------
-  # Company-wide push ingestion — one key for the whole org's Governance Project
-  # ---------------------------------------------------------------------------
-
-  @bdd @ingest-api-key @company-wide
-  Scenario: A sysadmin mints one company-wide push ingestion key
-    Given the caller has ingestionSources:manage on "acme"
-    When the caller mints a company-wide ingestion key with sourceType "copilot_studio"
-    Then an ingest-only ApiKey is created bound to the org's hidden Governance Project
-    And the response carries the token once plus the OTLP endpoint to paste into the tool
-    # The sysadmin pastes the sk-lw- key into Copilot Studio's OTLP endpoint field;
-    # the whole company's telemetry then pushes into the single Governance Project.
-
-  @bdd @ingest-api-key @company-wide @isolation
-  Scenario: The company-wide key resolves to the Governance Project with no projectId
-    Given a company-wide ingestion key bound to "acme"'s Governance Project
-    When a tool emits OTLP authenticated by the bearer token alone
-    Then the receiver resolves it to the Governance Project (its single bound project)
-    And the spans are stamped langwatch.source / api_key.id / origin=ingest_key
-    And the key cannot write into any other project
-
-  # ---------------------------------------------------------------------------
   # List visibility: personal ingest keys are private to their owner
   # ---------------------------------------------------------------------------
 
@@ -192,9 +173,9 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Given jane and ben each hold a personal ingestion key in "acme"
     When ben opens Settings > API Keys as a non-admin member
     Then ben sees his own ingestion key but not jane's
-    And ben does not see the org's company-wide ingestion keys
+    And ben does not see org-owned (userId-null) ingestion keys
     # Personal ingest keys are user-owned, so the API-key list scopes them to
-    # their owner; company-wide keys stay admin-only.
+    # their owner; org-owned ingest keys stay admin-only.
 
   # ---------------------------------------------------------------------------
   # Activity tracking — lastUsedAt, not audit volume

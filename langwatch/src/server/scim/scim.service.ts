@@ -2,7 +2,7 @@ import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generate } from "@langwatch/ksuid";
 import { UserService } from "../users/user.service";
-import { CostCenterService } from "@ee/governance/services/cost-center/costCenter.service";
+import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
@@ -20,11 +20,11 @@ import {
  */
 export class ScimService {
   private readonly userService: UserService;
-  private readonly costCenterService: CostCenterService;
+  private readonly departmentService: DepartmentService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.userService = UserService.create(prisma);
-    this.costCenterService = CostCenterService.create(prisma);
+    this.departmentService = DepartmentService.create(prisma);
   }
 
   static create(prisma: PrismaClient): ScimService {
@@ -51,22 +51,22 @@ export class ScimService {
 
     const trimmed = typeof costCenter === "string" ? costCenter.trim() : "";
     if (trimmed === "") {
-      await this.costCenterService.assignUser({
+      await this.departmentService.assignUser({
         organizationId,
         userId,
-        costCenterId: null,
+        departmentId: null,
       });
       return;
     }
 
-    const center = await this.costCenterService.resolveByNameOrCreate({
+    const department = await this.departmentService.resolveByNameOrCreate({
       organizationId,
       name: trimmed,
     });
-    await this.costCenterService.assignUser({
+    await this.departmentService.assignUser({
       organizationId,
       userId,
-      costCenterId: center.id,
+      departmentId: department.id,
     });
   }
 

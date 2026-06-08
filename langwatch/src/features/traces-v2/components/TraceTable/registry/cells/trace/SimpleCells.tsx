@@ -67,6 +67,8 @@ const ORIGIN_LABEL: Record<string, string> = {
   playground: "Playground",
   gateway: "Gateway",
   sample: "Sample",
+  coding_agent: "Coding Agent",
+  ai_tool: "AI Tool",
 };
 
 /**
@@ -84,6 +86,8 @@ const ORIGIN_PALETTE: Record<string, string> = {
   playground: "teal",
   gateway: "purple",
   sample: "gray",
+  coding_agent: "orange",
+  ai_tool: "yellow",
 };
 
 export const OriginCell = {

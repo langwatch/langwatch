@@ -26,6 +26,7 @@ export function useTraceDrawerNavigation() {
       toTraceId,
       toTimestamp,
       toViewMode,
+      persistViewMode = true,
     }: {
       fromTraceId: string;
       fromViewMode: DrawerViewMode;
@@ -44,6 +45,12 @@ export function useTraceDrawerNavigation() {
        */
       toTimestamp?: number;
       toViewMode?: DrawerViewMode;
+      /**
+       * When false, apply `toViewMode` for this navigation only without
+       * persisting it as the remembered default — e.g. peeking at a
+       * conversation turn's Summary shouldn't make Summary the user's tab.
+       */
+      persistViewMode?: boolean;
     }) => {
       if (
         fromTraceId === toTraceId &&
@@ -56,7 +63,10 @@ export function useTraceDrawerNavigation() {
         viewMode: fromViewMode,
         occurredAtMs: fromTimestamp,
       });
-      if (toViewMode) setViewMode(toViewMode);
+      if (toViewMode) {
+        if (persistViewMode) setViewMode(toViewMode);
+        else useDrawerStore.getState().setViewModeTransient(toViewMode);
+      }
       // Push into the store immediately so drawer hooks render with the
       // right traceId/occurredAtMs before the URL change settles.
       useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);

@@ -115,6 +115,12 @@ interface DrawerState extends DrawerUrlState {
   clearSpan: () => void;
   setViewMode: (mode: DrawerViewMode) => void;
   /**
+   * Apply a view mode without writing to localStorage. Use for programmatic
+   * one-off forcing (e.g. clicking a conversation turn jumps to that trace's
+   * Summary) so the operator's remembered tab preference isn't clobbered.
+   */
+  setViewModeTransient: (mode: DrawerViewMode) => void;
+  /**
    * Persist the operator's chosen viz tab AND apply it. Use for any
    * UI-initiated change (tab click, keyboard shortcut, overflow menu).
    */
@@ -510,6 +516,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     persistLastViewMode(mode);
     set({ viewMode: mode });
   },
+  setViewModeTransient: (mode) => set({ viewMode: mode }),
   setVizTab: (tab) => {
     persistLastVizTab(tab);
     set({ vizTab: tab });

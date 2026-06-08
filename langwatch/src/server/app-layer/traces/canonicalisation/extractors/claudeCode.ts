@@ -188,6 +188,195 @@ export function extractAssistantTextFromResponseBody(
 }
 
 /**
+ * Parse a string-or-already-parsed JSON body into an object. The upstream
+ * attribute bag (`parseJsonStringValues`) eagerly JSON.parses string
+ * attributes that look like JSON, so a body attribute can arrive as either a
+ * raw string OR a pre-parsed object — accept both. Returns null when absent or
+ * unparseable (claude truncates large bodies inline, making them invalid JSON).
+ */
+function parseJsonBody(raw: unknown): Record<string, unknown> | null {
+  if (raw === null || raw === undefined) return null;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  return parsed as Record<string, unknown>;
+}
+
+/**
+ * The assistant's reply for a model call's span OUTPUT, rendered from its
+ * api_response_body. Unlike {@link extractAssistantTextFromResponseBody} (the
+ * headline path, text only), this includes `tool_use` blocks so a model call
+ * whose reply IS a tool invocation still shows what it did: the call that
+ * decided to run Bash renders `[tool_use: Bash]` plus the command instead of an
+ * empty output. Text and tool_use blocks are concatenated in wire order.
+ *
+ * Used only for the synthesized span's `gen_ai.completion`; the trace headline
+ * keeps the text-only extractor so a tool-deciding turn's headline stays the
+ * final text reply, not a tool marker.
+ *
+ * @internal exported for the log-to-span converter + unit testing
+ */
+export function extractAssistantOutputFromResponseBody(
+  raw: unknown,
+): string | null {
+  const parsed = parseJsonBody(raw);
+  if (!parsed) return null;
+  const content = parsed.content;
+  if (!Array.isArray(content)) return null;
+  const parts: string[] = [];
+  for (const c of content) {
+    if (!c || typeof c !== "object") continue;
+    const block = c as {
+      type?: unknown;
+      text?: unknown;
+      name?: unknown;
+      input?: unknown;
+    };
+    if (block.type === "text") {
+      if (typeof block.text === "string" && block.text.length > 0) {
+        parts.push(block.text);
+      }
+    } else if (block.type === "tool_use" && typeof block.name === "string") {
+      const args =
+        block.input !== undefined && block.input !== null
+          ? safeStringify(block.input)
+          : "";
+      parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
+    }
+  }
+  if (parts.length === 0) return null;
+  return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/**
+ * Recover the tool RESULTS fed back to the model from an api_request_body
+ * conversation. Claude Code's telemetry never carries a tool's stdout (see
+ * project_claude_tool_output_no_env_var) — the only place a tool's output
+ * appears is the NEXT model call's request body, where the result is sent back
+ * as a `tool_result` content block keyed by `tool_use_id`. Returns a map from
+ * `tool_use_id` to its flattened result text so the converter can attach each
+ * tool's output to the matching tool span. The first occurrence of a given
+ * `tool_use_id` wins (the result is identical in every later turn that echoes
+ * the conversation).
+ *
+ * Claude truncates a large request body INLINE at ~60KB (`body_truncated=true`),
+ * so on a real tool-using turn the whole body does NOT JSON.parse — its tail
+ * (the most recent tool_result) is cut. So this falls back to a string-aware
+ * brace scan that recovers every COMPLETE tool_result block present before the
+ * truncation point and skips the cut-off trailing one. The real wire shape is
+ * `{"tool_use_id":"…","type":"tool_result","content":"…"|[…],"is_error":bool}`,
+ * with `content` a plain string (Bash) or an array of blocks (Read, etc.) —
+ * {@link contentToText} flattens both.
+ *
+ * @internal exported for the log-to-span converter + unit testing
+ */
+export function collectToolResultsFromRequestBody(
+  raw: unknown,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const parsed = parseJsonBody(raw);
+  if (parsed && Array.isArray(parsed.messages)) {
+    // Clean path: the body parsed whole (short turn, not truncated).
+    for (const m of parsed.messages) {
+      if (!m || typeof m !== "object") continue;
+      collectToolResultBlocks((m as { content?: unknown }).content, out);
+    }
+    return out;
+  }
+  // Truncated body: scan the raw string for complete tool_result objects.
+  if (typeof raw === "string" && raw.length > 0) {
+    scanToolResultsFromTruncatedBody(raw, out);
+  }
+  return out;
+}
+
+/** Record any `tool_result` blocks in a message `content` array into `out`. */
+function collectToolResultBlocks(
+  content: unknown,
+  out: Map<string, string>,
+): void {
+  if (!Array.isArray(content)) return;
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+    if (b.type !== "tool_result") continue;
+    if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
+      continue;
+    }
+    if (out.has(b.tool_use_id)) continue;
+    const text = contentToText(b.content);
+    if (text.length > 0) out.set(b.tool_use_id, text);
+  }
+}
+
+/**
+ * String-aware brace scan that pulls every COMPLETE `{…}` object out of a
+ * (possibly truncated) JSON body and records the ones that are `tool_result`
+ * blocks. An object whose closing brace was cut by truncation never balances,
+ * so it is simply never recorded — which is the right behaviour: a truncated
+ * result has no recoverable text. Tracks string/escape state so braces inside
+ * string values do not corrupt the depth count.
+ */
+function scanToolResultsFromTruncatedBody(
+  raw: string,
+  out: Map<string, string>,
+): void {
+  const stack: number[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") stack.push(i);
+    else if (ch === "}") {
+      const start = stack.pop();
+      if (start === undefined) continue;
+      // Only attempt the ones that could be a tool_result block (innermost
+      // pops first, so the block itself is tried before its enclosing message).
+      const slice = raw.slice(start, i + 1);
+      if (!slice.includes('"tool_result"')) continue;
+      let obj: unknown;
+      try {
+        obj = JSON.parse(slice);
+      } catch {
+        continue;
+      }
+      if (!obj || typeof obj !== "object") continue;
+      const b = obj as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+      if (b.type !== "tool_result") continue;
+      if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
+        continue;
+      }
+      if (out.has(b.tool_use_id)) continue;
+      const text = contentToText(b.content);
+      if (text.length > 0) out.set(b.tool_use_id, text);
+    }
+  }
+}
+
+/** JSON.stringify that never throws on a circular/odd value. */
+function safeStringify(value: unknown): string {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Walk a claude_code.api_request_body JSON payload (the Anthropic
  * /v1/messages REQUEST) and pull out the latest user turn's text — the
  * span's gen_ai.prompt. The body shape:
@@ -207,6 +396,94 @@ export function extractAssistantTextFromResponseBody(
  *
  * @internal exported for the log-to-span converter + unit testing
  */
+/**
+ * Flatten one Anthropic message `content` (string OR array of content blocks)
+ * to display text. Text + tool_result blocks contribute their text; tool_use
+ * blocks render as a compact `[tool_use: name]` marker so the turn reads as a
+ * conversation rather than raw JSON; thinking blocks are redacted by Anthropic
+ * and images carry no text, so both are dropped.
+ */
+function contentToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (typeof block === "string") {
+      if (block.length > 0) parts.push(block);
+      continue;
+    }
+    if (!block || typeof block !== "object") continue;
+    const b = block as {
+      type?: unknown;
+      text?: unknown;
+      name?: unknown;
+      content?: unknown;
+    };
+    if (b.type === "text" && typeof b.text === "string") {
+      if (b.text.length > 0) parts.push(b.text);
+    } else if (b.type === "tool_result") {
+      const nested = contentToText(b.content);
+      if (nested.length > 0) parts.push(nested);
+    } else if (b.type === "tool_use" && typeof b.name === "string") {
+      parts.push(`[tool_use: ${b.name}]`);
+    }
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * Parse a claude_code.api_request_body JSON payload (the Anthropic
+ * /v1/messages REQUEST) into the canonical `gen_ai.input.messages` chat array:
+ * the system prompt (when present) followed by every turn as `{ role, content }`
+ * with each message's content flattened to text via {@link contentToText}.
+ *
+ * This is what makes the trace detail render a real multi-turn conversation
+ * instead of a single user message holding the raw request JSON — the failure
+ * mode when the converter fell back to the raw body blob. Returns null when the
+ * body isn't parseable (claude truncates large bodies inline, so the caller
+ * falls back to the clean `user_prompt` text), has no `messages` array, or every
+ * turn flattened to empty.
+ *
+ * @internal exported for the log-to-span converter + unit testing
+ */
+export function buildInputMessagesFromRequestBody(
+  raw: unknown,
+): Array<{ role: string; content: string }> | null {
+  if (raw === null || raw === undefined) return null;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as { system?: unknown; messages?: unknown };
+  if (!Array.isArray(obj.messages)) return null;
+
+  const out: Array<{ role: string; content: string }> = [];
+
+  if (obj.system !== undefined) {
+    const systemText = contentToText(obj.system);
+    if (systemText.length > 0) {
+      out.push({ role: "system", content: systemText });
+    }
+  }
+
+  for (const m of obj.messages) {
+    if (!m || typeof m !== "object") continue;
+    const message = m as { role?: unknown; content?: unknown };
+    const role = typeof message.role === "string" ? message.role : "user";
+    const content = contentToText(message.content);
+    if (content.length === 0) continue;
+    out.push({ role, content });
+  }
+
+  return out.length > 0 ? out : null;
+}
+
 export function extractUserTextFromRequestBody(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   let parsed: unknown = raw;

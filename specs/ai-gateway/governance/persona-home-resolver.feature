@@ -1,6 +1,6 @@
 Feature: Persona-aware home resolver
   When a user authenticates and lands on `/`, the resolver picks the right
-  default home for their persona from {`/me`, `/[project]/messages`,
+  default home for their persona from {`/me`, `/[project]`,
   `/governance`}. This is the apache2-floor demo wedge plus the
   must-not-break-existing-LLMOps-customers invariant from rchaves's
   directive 2026-04-29.
@@ -53,13 +53,13 @@ Feature: Persona-aware home resolver
   # Persona 3 — Project-only LLMOps (the existing customer majority — DO NOT BREAK)
   # ---------------------------------------------------------------------------
 
-  Scenario: Existing LLMOps customer with no governance + no personal-VK → /[project]/messages
+  Scenario: Existing LLMOps customer with no governance + no personal-VK → /[project]
     Given user "ben@acme.com" has NO personal VirtualKey
     And the user is a member of project "ben-team-prod"
     And the org has application traces (hasApplicationTraces=true)
     And the org has no governance ingest (hasGovernanceIngest=false)
     When the resolver runs for the user
-    Then the resolver returns "/<projectSlug>/messages"
+    Then the resolver returns "/<projectSlug>"
     And the destination matches Persona 3 (project-only LLMOps)
     And the resolver chose the user's first ProjectMember.project as the projectSlug
 
@@ -70,7 +70,7 @@ Feature: Persona-aware home resolver
     And the user has no personal VirtualKey
     And the user is a member of project "carol-team-prod"
     When the resolver runs for the user
-    Then the resolver returns "/<projectSlug>/messages"
+    Then the resolver returns "/<projectSlug>"
     And NOT "/governance"
     And the resolver explicitly avoids accidental governance-admin routing
       when the org has no governance state
@@ -102,7 +102,7 @@ Feature: Persona-aware home resolver
     And the user is a member of project "jane-team-prod"
     But the org does not have the governance UI enabled
     When the resolver runs for the user
-    Then the resolver returns "/<projectSlug>/messages"
+    Then the resolver returns "/<projectSlug>"
     And NOT "/me"
 
   Scenario: Would-be governance admin in a non-governance org → project home, not /governance
@@ -112,7 +112,7 @@ Feature: Persona-aware home resolver
     But the org does not have the governance UI enabled
     And the user is a member of project "carol-team-prod"
     When the resolver runs for the user
-    Then the resolver returns "/<projectSlug>/messages"
+    Then the resolver returns "/<projectSlug>"
     And NOT "/governance"
 
   Scenario: Non-governance org member with no projects → onboarding, not the gated /me
@@ -129,9 +129,9 @@ Feature: Persona-aware home resolver
 
   Scenario: A user-pinned lastHomePath wins over persona detection
     Given user "alex@acme.com" matches Persona 2 (mixed)
-    And the user has explicitly pinned `User.lastHomePath = "/<projectSlug>/messages"`
+    And the user has explicitly pinned `User.lastHomePath = "/<projectSlug>"`
     When the resolver runs for the user
-    Then the resolver returns "/<projectSlug>/messages"
+    Then the resolver returns "/<projectSlug>"
     And the persona-2 default is overridden by the user pin
     And the user can re-pin via /me/settings
 
@@ -143,7 +143,7 @@ Feature: Persona-aware home resolver
     Given the api.governance.setupState query throws on resolve
     And the user is a member of at least one project
     When the resolver runs for the user
-    Then the resolver returns "/<firstProjectSlug>/messages"
+    Then the resolver returns "/<firstProjectSlug>"
     And the resolver does NOT crash
     And the LLMOps majority experience is preserved on transient backend errors
 
@@ -173,3 +173,27 @@ Feature: Persona-aware home resolver
     When the user navigates to "/"
     Then the existing signin redirect chain runs
     And the resolver does not execute
+
+  # ---------------------------------------------------------------------------
+  # Last-visited home stickiness (client-side, pages/index.tsx)
+  # ---------------------------------------------------------------------------
+
+  Rule: the last-visited home sticks until the user visits the other kind, so a
+  user whose persona default is /me still returns to the project they last
+  opened, symmetric with how /me sticks for someone who last sat there. An
+  explicit picker pin always wins.
+
+    @unit
+    Scenario: A last-visited project sticks over the persona /me default
+      Given the persona resolver's default destination is "/me"
+      And the user has no explicit picker pin
+      And the user last opened a project
+      When the "/" destination is resolved on the client
+      Then the client redirects to that project's home, not /me
+
+    @unit
+    Scenario: An explicit picker pin still wins over the last-visited project
+      Given the user pinned a home via the picker
+      And the user last opened a project
+      When the "/" destination is resolved on the client
+      Then the client redirects to the pinned home

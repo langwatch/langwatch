@@ -49,6 +49,23 @@ Feature: Unified API Keys
     Then I do not see an "Ingestion keys" section heading
     And the regular API keys render exactly as before
 
+  Scenario: API keys render above ingestion keys
+    Given the organization has an ingestion key with source "claude_code"
+    And I have a regular API key named "CI Pipeline"
+    When I navigate to Settings > API Keys
+    Then the "API keys" section renders above the "Ingestion keys" section
+
+  Scenario: Legacy project key row names its project
+    Given the project has a legacy per-project service key
+    When I navigate to Settings > API Keys
+    Then the legacy "Project API Key" row's scope names the project
+
+  Scenario: Ingestion key names the device session that minted it
+    Given the organization has an ingestion key minted from "Rogerio's MacBook Pro"
+    When I navigate to Settings > API Keys
+    Then the ingestion key row shows the device label "Rogerio's MacBook Pro"
+    And an ingestion key with no captured device falls back to "Unknown device"
+
   @unimplemented
   Scenario: Legacy project key row displays in table
     When I navigate to Settings > API Keys

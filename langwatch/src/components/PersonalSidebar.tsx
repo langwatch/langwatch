@@ -75,6 +75,15 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
     ? `/${personalProjectSlug}/traces`
     : null;
 
+  // The personal library entries link to the personal project's own
+  // `/[project]/<section>` routes, so highlight them off the current path
+  // the same way MainMenu does for project nav.
+  const isTracesActive = router.pathname.includes("/traces");
+  const isEvaluationsActive = router.pathname.includes("/evaluations");
+  const isDatasetsActive = router.pathname.includes("/datasets");
+  const isAnnotationsActive = router.pathname.includes("/annotations");
+  const isAutomationsActive = router.pathname.includes("/automations");
+
   // Personal-workspace advanced features unlock the library nav entries
   // (datasets, evaluations, annotations, automations). Default-empty
   // storage means existing users see Traces only; clicking the bundle
@@ -129,7 +138,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={ListTree}
                 label="Traces"
                 href={tracesHref}
-                isActive={false}
+                isActive={isTracesActive}
                 showLabel={showExpanded}
               />
             )}
@@ -138,7 +147,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={ClipboardList}
                 label="Evaluations"
                 href={`/${personalProjectSlug}/evaluations`}
-                isActive={false}
+                isActive={isEvaluationsActive}
                 showLabel={showExpanded}
               />
             )}
@@ -147,7 +156,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={Database}
                 label="Datasets"
                 href={`/${personalProjectSlug}/datasets`}
-                isActive={false}
+                isActive={isDatasetsActive}
                 showLabel={showExpanded}
               />
             )}
@@ -156,7 +165,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={Sparkles}
                 label="Annotations"
                 href={`/${personalProjectSlug}/annotations`}
-                isActive={false}
+                isActive={isAnnotationsActive}
                 showLabel={showExpanded}
               />
             )}
@@ -165,7 +174,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={Bot}
                 label="Automations"
                 href={`/${personalProjectSlug}/automations`}
-                isActive={false}
+                isActive={isAutomationsActive}
                 showLabel={showExpanded}
               />
             )}

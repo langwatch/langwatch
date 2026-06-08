@@ -52,7 +52,7 @@ export type ScimPatchRequest = z.infer<typeof scimPatchRequestSchema>;
 
 /**
  * SCIM 2.0 Enterprise User extension (RFC 7643 §4.3). The IdP carries
- * org-chart attributes here; we read `costCenter` to drive cost-center
+ * org-chart attributes here; we read `costCenter` to drive department
  * assignment, mirroring how it drives department/division elsewhere.
  */
 export const SCIM_ENTERPRISE_USER_SCHEMA =

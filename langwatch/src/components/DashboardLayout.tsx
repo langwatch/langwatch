@@ -12,9 +12,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
-import { Activity, Building2, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
+import {
+  Activity,
+  ChevronDown,
+  ChevronRight,
+  Info,
+  KeyRound,
+  Plus,
+} from "lucide-react";
 import numeral from "numeral";
 import React, { useEffect, useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 import { ErrorBoundary } from "react-error-boundary";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
@@ -34,7 +42,12 @@ import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
-import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
+import {
+  buildProjectSwitchHref,
+  findCurrentRoute,
+  projectRoutes,
+  type Route,
+} from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
@@ -57,7 +70,7 @@ import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
-  // No redirects from the breadcrumb path — it only reads `project` for the
+  // No redirects from the breadcrumb path - it only reads `project` for the
   // dashboard link. The owning DashboardLayout call handles bouncing.
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -110,7 +123,7 @@ const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitc
 /**
  * Header chip rendered on project-scope routes (`/[project]/*`,
  * `/settings/*`, `/governance/*`). Same `<WorkspaceSwitcher>` component
- * as the personal-scope chrome — the only switcher in the app — with
+ * as the personal-scope chrome - the only switcher in the app - with
  * `current` auto-derived from the URL via `useWorkspaceCurrent`. The
  * legacy `<ProjectSelector>` was a separate component with overlapping
  * but inconsistent UX (different drop list, different context grouping,
@@ -125,6 +138,61 @@ const ProjectScopeHeaderSwitcher = React.memo(function ProjectScopeHeaderSwitche
   return <WorkspaceSwitcher {...data} />;
 });
 
+/**
+ * Header chip rendered on org-scope routes (`/settings/*`, `/governance`).
+ * These routes carry no project/team slug, so the resolved organization comes
+ * from the `selectedOrganizationId` localStorage key. Renders the shared
+ * `<WorkspaceSwitcher>` with the org as the current chip so the user can jump
+ * straight back into any project or their personal workspace (the regression
+ * that prompted this: the old static chip had no way back to a project).
+ * Multi-org users additionally get an in-place org switch, which writes the
+ * chosen org to the same `selectedOrganizationId` key the resolver reads
+ * (usehooks-ts broadcasts a `local-storage` event so every reader re-resolves
+ * in this tab) and navigates to `/settings`, the parent of every org-scoped
+ * route, always valid for any org the user belongs to.
+ */
+const OrganizationScopeHeaderSwitcher = React.memo(
+  function OrganizationScopeHeaderSwitcher() {
+    const router = useRouter();
+    const data = useWorkspaceData();
+    const { organization, organizations } = useOrganizationTeamProject({
+      redirectToOnboarding: false,
+      redirectToProjectOnboarding: false,
+    });
+    const [, setSelectedOrganizationId] = useLocalStorage<string>(
+      "selectedOrganizationId",
+      "",
+    );
+
+    if (!organization) return null;
+
+    const orgList = (organizations ?? []).map((org) => ({
+      orgId: org.id,
+      orgName: org.name,
+      orgSlug: org.slug,
+    }));
+
+    const onSwitchOrganization = (orgId: string) => {
+      if (orgId === organization.id) return;
+      setSelectedOrganizationId(orgId);
+      void router.push("/settings");
+    };
+
+    return (
+      <WorkspaceSwitcher
+        {...data}
+        current={{
+          kind: "organization",
+          orgId: organization.id,
+          orgName: organization.name,
+        }}
+        organizations={orgList}
+        onSwitchOrganization={onSwitchOrganization}
+      />
+    );
+  },
+);
+
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
   project,
@@ -133,7 +201,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   project: Project;
 }) {
   const router = useRouter();
-  const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
   const [open, setOpen] = useState(false);
 
@@ -216,47 +283,13 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                         >
                           <Link
                             key={project_.id}
-                            href={(() => {
-                              const currentPath = window.location.pathname;
-                              const hasProjectInRoute =
-                                currentRoute?.path.includes("[project]");
-                              const hasProjectInPath = currentPath.includes(
-                                project.slug,
-                              );
-
-                              if (hasProjectInRoute) {
-                                // Check if route has other dynamic segments beyond [project]
-                                // If so, redirect to parent route to avoid 404
-                                const hasOtherDynamicSegments =
-                                  currentRoute?.path
-                                    .replace("[project]", "")
-                                    .includes("[");
-
-                                if (
-                                  hasOtherDynamicSegments &&
-                                  currentRoute?.parent
-                                ) {
-                                  const parentRoute =
-                                    projectRoutes[currentRoute.parent];
-                                  return parentRoute.path
-                                    .replace("[project]", project_.slug)
-                                    .replace(/\/\/+/g, "/");
-                                }
-
-                                return currentRoute?.path
-                                  .replace("[project]", project_.slug)
-                                  .replace(/\/\/+/g, "/");
-                              } else if (hasProjectInPath) {
-                                return currentPath.replace(
-                                  project.slug,
-                                  project_.slug,
-                                );
-                              } else {
-                                return `/${
-                                  project_.slug
-                                }?return_to=${encodeURIComponent(currentPath)}`;
-                              }
-                            })()}
+                            href={buildProjectSwitchHref({
+                              routePattern: router.pathname,
+                              resolvedPathname: window.location.pathname,
+                              currentProjectSlug: project.slug,
+                              targetSlug: project_.slug,
+                              homeFallback: "returnTo",
+                            })}
                             onClick={() => {
                               const currentPath = window.location.pathname;
                               const hasProjectInPath = currentPath.includes(
@@ -338,7 +371,7 @@ export type DashboardLayoutProps = {
    * `<ProjectSelector>` with a flat org-name indicator (admins crossing
    * /governance ↔ /:project/* should never see the project picker on
    * the governance side, since governance is org-scoped, not
-   * project-scoped — see governance-home-routing.feature).
+   * project-scoped - see governance-home-routing.feature).
    */
   orgScope?: boolean;
   /**
@@ -347,7 +380,7 @@ export type DashboardLayoutProps = {
    * Set on org-scope routes (governance overview, view-all listings,
    * detail pages) where the project-based default would otherwise read
    * "LangWatch - Personal Workspace" because the user has no active
-   * project. Surfaced as Ariana QA finding G12 — child <Head> writers
+   * project. Surfaced as Ariana QA finding G12 - child <Head> writers
    * lost the layout-effect race against the parent layout's <Head>,
    * so the only correct fix is to push the title down through props.
    */
@@ -397,7 +430,7 @@ export const DashboardLayout = ({
   // The "My Workspace" entry in the user-avatar dropdown is part of the
   // governance preview surface, distinct from the existing AI Gateway
   // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
-  // The flag is org-targeted, so it must resolve on the org id — gating on
+  // The flag is org-targeted, so it must resolve on the org id - gating on
   // project would diverge from the /me pages (which key off the org) and
   // show the menu entry while the page it links to 404s.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
@@ -417,7 +450,7 @@ export const DashboardLayout = ({
 
   const isOpsRoute = router.pathname.startsWith("/ops");
   // Personal-project URLs (`/[personalProjectSlug]/*`) get the /me chrome
-  // automatically — clicking from PersonalSidebar's Traces link into the
+  // automatically - clicking from PersonalSidebar's Traces link into the
   // existing project-scoped explorer keeps the sidebar shape consistent
   // with the rest of /me/* instead of flipping to MainMenu. Detection:
   // current team is the caller's own Personal Workspace (Team.isPersonal
@@ -426,14 +459,14 @@ export const DashboardLayout = ({
     !!team?.isPersonal && team.ownerUserId === session?.user?.id;
   // Admin viewing-as detection: org-admin is on a project that belongs
   // to ANOTHER user's Personal Workspace. Drives the persistent
-  // <AdminViewingAsBanner> chrome — the only legitimate "you're using
+  // <AdminViewingAsBanner> chrome - the only legitimate "you're using
   // admin bypass to view someone else's data" case. ORG:ADMIN cascades
   // to every team in the org as implicit membership, so a team-kind
   // banner would shout "viewing as admin" on the admin's own dashboards
   // (rchaves bug 19: solo and small-org admins kept seeing it on teams
   // they de-facto own). Team drill-throughs are silent.
   //
-  // Gated to URL-anchored project routes ONLY — admin-self surfaces
+  // Gated to URL-anchored project routes ONLY - admin-self surfaces
   // (/governance, /settings/*, /me/*, /ops/*) MUST NOT fire the banner
   // even when `team` is sticky-resolved from a previously-visited project
   // context, otherwise the admin sees "Viewing X's workspace" plastered on
@@ -456,7 +489,7 @@ export const DashboardLayout = ({
   const isOrgScopeRoute = orgScope || router.pathname === "/governance";
 
   // Audit/OCSF emission for cross-scope reads. Fires once per project
-  // navigation when admin's drilled into another user/team's workspace —
+  // navigation when admin's drilled into another user/team's workspace -
   // sergey's recordWorkspaceView writes the AuditLog row + OCSF event
   // synchronously. Fail-quiet: emission errors don't block render.
   const recordWorkspaceViewMutation =
@@ -484,7 +517,7 @@ export const DashboardLayout = ({
     (!session ||
       isLoading ||
       // Persona-1 (org-less CLI/IDE devs) are a first-class persona on
-      // /me — they legitimately have no organization. Don't trap them
+      // /me - they legitimately have no organization. Don't trap them
       // in LoadingScreen on personal-scope routes. Other route classes
       // (project chrome, ops, governance/orgScope) still require an
       // organization context.
@@ -500,7 +533,7 @@ export const DashboardLayout = ({
   const userIsPartOfTeam =
     publicPage ||
     // Personal-scope routes (/me/* and the caller's own Personal Workspace
-    // project URLs) are theirs by construction — the user is always "on
+    // project URLs) are theirs by construction - the user is always "on
     // their own team" in this scope, even when team membership of the
     // ambient org-default team can't be confirmed (e.g. team isn't resolved
     // for /me/*, or the privacy filter redacts member rows below the field
@@ -512,7 +545,7 @@ export const DashboardLayout = ({
     isDemoProject ||
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     // Org admins created via RoleBinding-only flow have no TeamUser row but still
-    // have full team access — mirrors server-side org-scoped ADMIN RoleBinding logic.
+    // have full team access - mirrors server-side org-scoped ADMIN RoleBinding logic.
     organizationRole === OrganizationUserRole.ADMIN;
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
@@ -614,38 +647,13 @@ export const DashboardLayout = ({
               >
                 <Info size={12} color="var(--chakra-colors-orange-400)" />
                 <Text fontSize="xs" color="orange.400">
-                  Platform-wide — not scoped to a project
+                  Platform-wide - not scoped to a project
                 </Text>
               </HStack>
             </HStack>
           ) : isOrgScopeRoute && organization ? (
-            <HStack gap={3} alignItems="center" paddingLeft={2}>
-              <HStack
-                gap={1.5}
-                paddingX={2.5}
-                height="28px"
-                borderRadius="md"
-                bg="bg.emphasized"
-              >
-                <Building2 size={14} />
-                <Text fontSize="sm" fontWeight="medium">
-                  {organization.name}
-                </Text>
-              </HStack>
-              <HStack
-                gap={1.5}
-                paddingX={2.5}
-                height="28px"
-                borderRadius="md"
-                bg="purple.500/8"
-                border="1px solid"
-                borderColor="purple.500/15"
-              >
-                <Info size={12} color="var(--chakra-colors-purple-400)" />
-                <Text fontSize="xs" color="purple.400">
-                  Organization-scoped, not tied to a project
-                </Text>
-              </HStack>
+            <HStack gap={0} alignItems="center" paddingLeft={2}>
+              <OrganizationScopeHeaderSwitcher />
             </HStack>
           ) : isPersonalScopeRoute && organizations ? (
             <HStack gap={0} alignItems="center" paddingLeft={2}>
@@ -981,7 +989,7 @@ export const DashboardLayout = ({
               // Page body absorbs leftover vertical space inside the
               // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
               // pages that use `height="full"` interpret it as "100%
-              // of the VStack" — which includes banner height — so
+              // of the VStack" - which includes banner height - so
               // showing a banner pushed the bottom of the page off
               // the viewport. Wrapping the body in a flex-1 box makes
               // banners take their natural height above and leaves
@@ -1041,7 +1049,7 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
       <GlobalUpgradeModal />
-      {/* No MissingModelModal mount — the global tRPC / QueryCache
+      {/* No MissingModelModal mount - the global tRPC / QueryCache
           interceptors emit a sticky orange toast via
           `showMissingModelToast` (deduped per (featureKey, role)).
           Toast lives in the toaster portal that's already at the app

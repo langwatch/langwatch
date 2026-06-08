@@ -41,14 +41,24 @@ Feature: AI Tools Portal — Grid layout on /me
     And the "Internal tools" section heading does NOT render
     And the "Model providers" section renders normally
 
-  Scenario: brand-new org with no catalog shows CLI-fallback callout
+  Scenario: brand-new org with no catalog shows a member empty-state note
     Given the org-scoped catalog is empty
     And no team-scoped entries are published for any of jane's teams
+    And user "jane@acme.com" cannot manage the catalog (member, not admin)
     When user "jane@acme.com" loads "/me"
     Then a single empty-state callout renders titled "Your AI tools portal"
-    And the callout explains the user can install the LangWatch CLI and run `langwatch login` to get started
+    And the callout tells the member their admin has not added any tools yet
+    And no install-the-CLI affordance renders in the empty state
     And no tile sections render
     And the existing "My Usage" dashboard still renders below
+
+  Scenario: brand-new org shows the getting-started banner to a catalog admin
+    Given the org-scoped catalog is empty
+    And user "alice@acme.com" can manage the catalog (aiTools:manage)
+    When user "alice@acme.com" loads "/me"
+    Then the AI-governance getting-started banner renders
+    And it links to the tool catalog at "/settings/governance/tool-catalog"
+    And no install-the-CLI affordance renders in the empty state
 
   Scenario: team-scoped entries override org-scoped entries by slug
     Given the org-scoped catalog publishes "Claude Code" with `setupCommand=langwatch claude`

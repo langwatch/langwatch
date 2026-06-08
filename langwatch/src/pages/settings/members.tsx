@@ -19,8 +19,8 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { AddMembersForm } from "../../components/AddMembersForm";
-import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
-import { useCostCenterColumn } from "../../components/settings/useCostCenterColumn";
+import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
+import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
 import { CopyInput } from "../../components/CopyInput";
 import { InvitesTable } from "../../components/members/InvitesTable";
@@ -95,8 +95,8 @@ function MembersList({
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
-  const costCenter = useCostCenterColumn(organization.id);
-  const showCostCenter = costCenter.show && hasOrganizationManagePermission;
+  const department = useDepartmentColumn(organization.id);
+  const showDepartment = department.show && hasOrganizationManagePermission;
 
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -290,10 +290,10 @@ function MembersList({
           {/*
             Card wraps the table in overflowX="auto" so the row never
             clips the rightmost ⋮ actions menu on narrow viewports; the
-            cost-center picker keeps its full width (rchaves: do NOT
-            shrink it), and the email column truncates with a hover
-            tooltip via OverflownTextWithTooltip so long synthetic
-            addresses don't push the row width past the viewport.
+            department picker keeps its full width (do NOT shrink it), and
+            the email column truncates with a hover tooltip via
+            OverflownTextWithTooltip so long synthetic addresses don't
+            push the row width past the viewport.
           */}
           <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" size="md" width="full">
@@ -305,8 +305,8 @@ function MembersList({
                   {hasOrganizationManagePermission && (
                     <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   )}
-                  {showCostCenter && (
-                    <Table.ColumnHeader>Cost center</Table.ColumnHeader>
+                  {showDepartment && (
+                    <Table.ColumnHeader>Department</Table.ColumnHeader>
                   )}
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
@@ -366,15 +366,15 @@ function MembersList({
                           />
                         </Table.Cell>
                       )}
-                      {showCostCenter && (
+                      {showDepartment && (
                         <Table.Cell>
-                          <CostCenterPicker
+                          <DepartmentPicker
                             organizationId={organization.id}
                             kind="user"
                             entityId={member.userId}
-                            value={costCenter.byUser.get(member.userId) ?? null}
-                            costCenters={costCenter.costCenters}
-                            onAssigned={costCenter.refetch}
+                            value={department.byUser.get(member.userId) ?? null}
+                            departments={department.departments}
+                            onAssigned={department.refetch}
                           />
                         </Table.Cell>
                       )}
@@ -533,7 +533,7 @@ function roleBadgeColor(role: string) {
 
 function MemberAccessDisplay({ bindings, isLoading }: { bindings: Binding[]; isLoading?: boolean }) {
   if (isLoading) {
-    return <Text fontSize="xs" color="fg.subtle" textAlign="right">—</Text>;
+    return <Text fontSize="xs" color="fg.subtle" textAlign="right">-</Text>;
   }
   if (bindings.length === 0) {
     return <Text fontSize="xs" color="fg.subtle" textAlign="right">No access configured</Text>;

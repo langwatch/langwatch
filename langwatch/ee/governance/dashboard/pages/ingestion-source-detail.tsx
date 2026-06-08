@@ -47,7 +47,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { api, type RouterOutputs } from "~/utils/api";
 
 /**
- * Per-source detail page — health metrics + recent events with raw vs
+ * Per-source detail page - health metrics + recent events with raw vs
  * normalised side-by-side. Wired to api.activityMonitor.eventsForSource +
  * sourceHealthMetrics (Sergey f2cb9de7a).
  *
@@ -77,7 +77,7 @@ const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
 
 const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const diffMs = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
@@ -327,7 +327,7 @@ function StaleTimestampCallout({
   // events across 24h/7d/30d but the events list has rows, the user
   // most likely sent test events with stale `startTimeUnixNano`. CH
   // health queries filter by EventTimestamp, the events list does not
-  // — they appear contradictory. Surface a callout that names the
+  // - they appear contradictory. Surface a callout that names the
   // diagnosis + the fix (use Date.now() at the moment you fire the
   // event).
   if (!health) return null;
@@ -384,7 +384,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         source&apos;s origin tag, viewable in the trace viewer. If
         you are sending agent traces from your own LangWatch SDK,
         use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-        project API key — different auth, same trace store. See{" "}
+        project API key - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -394,7 +394,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         .
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above —
+        Lost the secret? Click <strong>Rotate secret</strong> above -
         the new bearer is shown once with a copy-paste curl example, and
         the prior secret stays valid for 24h while you roll the new
         value through every upstream client.
@@ -642,7 +642,7 @@ function SecretRevealModal({
   // page.
   // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
   // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
-  // metadata-only: tokens, cost, durations, tool sizes-in-bytes — but
+  // metadata-only: tokens, cost, durations, tool sizes-in-bytes - but
   // no user prompt text, no assistant response text, no tool I/O
   // content. With them on, langwatch.input + langwatch.output lift
   // verbatim from claude's api_request + api_response_body events.
@@ -682,7 +682,7 @@ function SecretRevealModal({
           <DialogTitle>
             <HStack gap={2}>
               <KeyRound size={16} />
-              <Text>New secret minted — old valid for 24h</Text>
+              <Text>New secret minted - old valid for 24h</Text>
             </HStack>
           </DialogTitle>
         </DialogHeader>
@@ -734,7 +734,7 @@ function SecretRevealModal({
                     <Code fontSize="xs" backgroundColor="transparent">
                       OTEL_EXPORTER_OTLP_ENDPOINT
                     </Code>
-                    {" "}— Claude Code&apos;s SDK appends
+                    {" "}- Claude Code&apos;s SDK appends
                     {" "}
                     <Code fontSize="xs" backgroundColor="transparent">
                       /v1/logs
@@ -777,13 +777,14 @@ function SecretRevealModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     claude
                   </Code>
-                  . To attribute spend to a specific team or cost center,
-                  also export{" "}
+                  . To attribute spend to a specific team, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…
                   </Code>
-                  {" "}— those land as resource attributes and slot into
+                  {" "}- it lands as a resource attribute and slots into
                   /governance&apos;s spendByTeam without further config.
+                  Department attribution is resolved from the project&apos;s
+                  assignment at read time, not from an OTEL attribute.
                 </Text>
               </VStack>
             )}

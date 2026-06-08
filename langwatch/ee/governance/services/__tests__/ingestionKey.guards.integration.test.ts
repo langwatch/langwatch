@@ -9,8 +9,8 @@
  *   so `ApiKeyRepository.findAllByUser` returned every one of them to every
  *   non-admin org member, leaking their source / activity metadata through the
  *   Settings > API Keys list. They are now user-owned, so the list scopes them
- *   to their owner; company-wide keys stay org-owned but are excluded from the
- *   non-admin list (admins reach them via the company-wide list).
+ *   to their owner; org-owned keys (userId null) are excluded from the
+ *   non-admin list and reached only by org admins.
  *
  * The first case doubles as a regression guard: a personal key is now created
  * with userId set, which subjects the mint to the owner's permission ceiling.
@@ -102,7 +102,7 @@ describe("IngestionKey ownership + list visibility", () => {
         projectId: PROJECT_ID,
         sourceType: "claude_code",
       });
-      expect(issued.token).toMatch(/^sk-lw-/);
+      expect(issued.token).toMatch(/^ik-lw-/);
 
       const row = await apiKeyRepo.findById({ id: issued.apiKeyId });
       expect(row?.userId).toBe(USER_A);
@@ -110,10 +110,10 @@ describe("IngestionKey ownership + list visibility", () => {
     });
   });
 
-  describe("given user A and user B each own a personal ingest key plus a company-wide and a regular service key", () => {
+  describe("given user A and user B each own a personal ingest key plus an org-owned and a regular service key", () => {
     describe("when user A lists API keys (non-admin list path)", () => {
       /** @scenario Personal ingestion keys are not listed to other organization members */
-      it("returns A's own ingest key and the regular service key, but not B's ingest key or the company-wide ingest key", async () => {
+      it("returns A's own ingest key and the regular service key, but not B's ingest key or the org-owned ingest key", async () => {
         const aKey = await ingestKeys.ensureForProject({
           callerUserId: USER_A,
           ownerUserId: USER_A,
@@ -128,12 +128,12 @@ describe("IngestionKey ownership + list visibility", () => {
           projectId: PROJECT_ID,
           sourceType: "opencode",
         });
-        const companyWide = await ingestKeys.ensureForProject({
+        const orgOwned = await ingestKeys.ensureForProject({
           callerUserId: USER_A,
           ownerUserId: null,
           organizationId: ORG_ID,
           projectId: PROJECT_ID,
-          sourceType: "copilot_studio_cw",
+          sourceType: "org_service_cw",
         });
         // A genuine org service key: userId null, no ingestSourceType, must
         // stay visible to all members exactly as before.
@@ -156,7 +156,7 @@ describe("IngestionKey ownership + list visibility", () => {
         expect(ids.has(aKey.apiKeyId)).toBe(true);
         expect(ids.has(serviceKey.id)).toBe(true);
         expect(ids.has(bKey.apiKeyId)).toBe(false);
-        expect(ids.has(companyWide.apiKeyId)).toBe(false);
+        expect(ids.has(orgOwned.apiKeyId)).toBe(false);
       });
     });
   });

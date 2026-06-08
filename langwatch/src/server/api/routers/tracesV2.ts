@@ -1,5 +1,6 @@
 import { on } from "node:events";
 import { z } from "zod";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
@@ -92,6 +93,12 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
 
   const status = deriveTraceStatus(summary);
 
+  const nonBilledCost = resolveNonBilledCost({
+    foldedNonBilledCost: summary.nonBilledCost,
+    totalCost: summary.totalCost,
+    attributes: summary.attributes,
+  });
+
   return {
     traceId: summary.traceId,
     timestamp: summary.occurredAt,
@@ -112,6 +119,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     output: summary.computedOutput,
     models: summary.models,
     totalCost: summary.totalCost,
+    nonBilledCost,
     totalTokens,
     inputTokens: summary.totalPromptTokenCount,
     outputTokens: summary.totalCompletionTokenCount,

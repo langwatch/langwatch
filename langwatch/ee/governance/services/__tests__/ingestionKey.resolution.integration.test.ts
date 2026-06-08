@@ -33,7 +33,6 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 
 import { IngestionKeyService } from "../ingestionKey.service";
-import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-ik-${suffix}`;
@@ -120,7 +119,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         projectId: PROJECT_ID,
         sourceType: "claude_code",
       });
-      expect(issued.token).toMatch(/^sk-lw-/);
+      expect(issued.token).toMatch(/^ik-lw-/);
 
       // The OTLP exporter inside the wrapped tool sends the bearer token
       // alone — no projectId. The key must resolve to its bound project.
@@ -132,6 +131,22 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         expect(resolved.ingestSourceType).toBe("claude_code");
         expect(resolved.ingestionTemplateId).toBeNull();
       }
+    });
+
+    it("persists the minting device label for the API-keys settings page", async () => {
+      const issued = await ingestKeys.ensureForProject({
+        callerUserId: USER_ID,
+        ownerUserId: USER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "codex",
+        createdByDeviceLabel: "Rogerio's MacBook Pro",
+      });
+      const row = await prisma.apiKey.findUniqueOrThrow({
+        where: { id: issued.apiKeyId },
+        select: { createdByDeviceLabel: true },
+      });
+      expect(row.createdByDeviceLabel).toBe("Rogerio's MacBook Pro");
     });
   });
 
@@ -213,26 +228,4 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
     });
   });
 
-  describe("when an admin mints a company-wide governance-project key", () => {
-    it("binds to the org Governance Project and self-scopes there", async () => {
-      const govProject = await ensureHiddenGovernanceProject(prisma, ORG_ID);
-
-      const issued = await ingestKeys.ensureForOrganizationGovernanceProject({
-        callerUserId: USER_ID,
-        organizationId: ORG_ID,
-        sourceType: "copilot_studio",
-      });
-      expect(issued.token).toMatch(/^sk-lw-/);
-
-      // The OTLP exporter inside the company-wide tool (Copilot Studio) sends
-      // the bearer token alone; it must resolve to the hidden Governance
-      // Project, not a personal one.
-      const resolved = await resolver.resolve({ token: issued.token, projectId: null });
-      expect(resolved?.type).toBe("apiKey");
-      if (resolved?.type === "apiKey") {
-        expect(resolved.project.id).toBe(govProject.id);
-        expect(resolved.ingestSourceType).toBe("copilot_studio");
-      }
-    });
-  });
 });

@@ -25,6 +25,9 @@ export const ATTR_KEYS = {
   GEN_AI_REQUEST_SEED: "gen_ai.request.seed",
   GEN_AI_REQUEST_STOP_SEQUENCES: "gen_ai.request.stop_sequences",
   GEN_AI_REQUEST_CHOICE_COUNT: "gen_ai.request.choice.count",
+  // Reasoning effort knob (OpenAI low|medium|high; Anthropic emits it as
+  // `effort`, e.g. xhigh, on its claude_code api_request events).
+  GEN_AI_REQUEST_REASONING_EFFORT: "gen_ai.request.reasoning_effort",
   GEN_AI_INPUT_MESSAGES: "gen_ai.input.messages",
   GEN_AI_OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_OUTPUT_TYPE: "gen_ai.output.type",
@@ -119,6 +122,14 @@ export const ATTR_KEYS = {
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",
+  // The verbatim provider request/response bodies a Claude Code model call was
+  // folded from. The light gen_ai.input.messages / gen_ai.completion give the
+  // readable chat view; these carry the FULL payload (system prompt, every
+  // tool/skill schema, the whole message history with cache_control markers) so
+  // a call's cache_creation / cache_read token counts can be traced to what
+  // actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
+  CLAUDE_CODE_REQUEST_BODY: "langwatch.claude_code.request_body",
+  CLAUDE_CODE_RESPONSE_BODY: "langwatch.claude_code.response_body",
   LANGWATCH_RESERVED_VALUE_TYPES: "langwatch.reserved.value_types",
   LANGWATCH_PARAMS: "langwatch.params",
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",

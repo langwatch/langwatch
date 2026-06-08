@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
@@ -149,6 +150,33 @@ export function useTraceFreshness() {
     debounceMs: 2000,
     maxWaitMs: 2000,
   });
+
+  // `discover` (facets) freshness. The server fires `discover_updated` when a
+  // background refresh in TraceListService lands a fresher facets payload in
+  // the shared cache; on receipt we invalidate, which refetches against the
+  // now-warm cache. This lives in the page-level coordinator rather than inside
+  // useTraceFacets because that hook is consumed by several sidebar components
+  // (SearchBar, FilterSidebar, TokenValuePicker) and tRPC subscriptions are not
+  // deduplicated across hook instances the way queries are: one subscription
+  // per consumer opened a duplicate SSE connection each, and on HTTP/1.1 (dev)
+  // those persistent connections starve the 6-per-origin pool, leaving query
+  // bursts (the drawer opening) stuck pending. One coordinator subscription
+  // invalidates the shared query, refreshing every consumer.
+  useSSESubscription<
+    { tenantId: string; timestamp: number },
+    { projectId: string }
+  >(
+    // @ts-expect-error - tRPC subscription type isn't perfectly inferred for the
+    // hook's generic; the underlying procedure shape matches.
+    api.tracesV2.onDiscoverUpdate,
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id,
+      onData: () => {
+        void trpcUtils.tracesV2.discover.invalidate();
+      },
+    },
+  );
 
   useEffect(() => {
     setSseConnectionState(

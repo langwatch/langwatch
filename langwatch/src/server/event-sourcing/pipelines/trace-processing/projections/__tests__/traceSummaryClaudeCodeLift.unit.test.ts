@@ -333,7 +333,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       expect(state.models).toEqual(["gpt-5.5"]);
     });
 
-    it("unions multiple distinct models across turns", () => {
+    it("orders distinct models most-recently-used first", () => {
       const projection = makeProjection();
       let state = createInitState();
       state = projection.handleTraceLogRecordReceived(
@@ -344,7 +344,10 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
         codexTurn("gpt-5.5", "100", "50"),
         state,
       );
-      expect(state.models).toEqual(["gpt-5-mini", "gpt-5.5"]);
+      // models[0] is the last model the trace used (the conversational
+      // one), not the first-touched utility call — so every consumer that
+      // reads models[0] as "the model" shows the right one.
+      expect(state.models).toEqual(["gpt-5.5", "gpt-5-mini"]);
     });
 
     it("leaves top-level columns untouched when no canonical lift fires", () => {

@@ -1,5 +1,5 @@
 /**
- * Wrapper mode selection — Path A (gateway) vs Path B (ingestion).
+ * Wrapper mode selection - Path A (gateway) vs Path B (ingestion).
  *
  * Decides, before each `langwatch <tool>` invocation, which routing
  * shape to apply:
@@ -15,7 +15,7 @@
  *     exporter env block for the child.
  *
  * The two modes are mutually exclusive per the no-double-trace
- * rule — gateway capture + OTel emission of the same call would
+ * rule - gateway capture + OTel emission of the same call would
  * double-count both traces and cost.
  *
  * Persisted preference lives at cfg.tool_mode[tool]; an unset
@@ -30,6 +30,7 @@ import {
 } from "@/cli/utils/codex-config-toml";
 import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
+import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
 import { GovernanceCliError, mintIngestionKey } from "./cli-api";
@@ -91,19 +92,26 @@ const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
 
 /**
  * Resolve mode for a single tool invocation. Returns the env block
- * the wrapper should hand to the child process. May persist
- * `tool_mode[tool]` + a refreshed ingestion token cache to
- * ~/.langwatch/config.json as a side effect.
+ * the wrapper should hand to the child process. May persist a
+ * refreshed ingestion token cache to ~/.langwatch/config.json as a
+ * side effect.
  *
- * Does NOT prompt the user — defaults are picked from cfg state.
- * Layering an interactive prompt for the "ask" state lives in a
- * future shell-rc-shaped helper (mode_preference, "save", "never").
+ * Does NOT prompt the user. The path-selection UX (interactive select
+ * when both paths are allowed) lives upstream in `resolveWrapperPath`,
+ * which passes its decision in via `forcedMode`. When `forcedMode` is
+ * omitted the resolver falls back to the legacy state-only derivation
+ * (persisted tool_mode, else VK-present-implies-gateway).
+ *
+ * The platform policy still GATES the resolved mode here (downgrade /
+ * throw) regardless of how the mode was chosen, so a forced mode the
+ * org admin disabled is handled the same as before.
  */
 export async function resolveWrapperMode(
   cfg: GovernanceConfig,
   tool: string,
   gatewayVars: Record<string, string>,
   gatewayClears: string[] = [],
+  forcedMode?: WrapperMode,
 ): Promise<WrapperModeResult> {
   const persistedMode = cfg.tool_mode?.[tool];
   const hasVk = !!cfg.default_personal_vk?.secret;
@@ -124,6 +132,9 @@ export async function resolveWrapperMode(
   let notice: string | undefined;
 
   // EFFECTIVE mode rules:
+  //   forcedMode set        -> use it (the path-selection UX upstream
+  //                            already applied flag / pref / prompt /
+  //                            single-allowed-path; we just honor it).
   //   persisted="gateway"   -> gateway (even if VK absent; preflight surfaces the gap)
   //   persisted="ingestion" -> ingestion
   //   persisted="ask" / unset:
@@ -137,13 +148,14 @@ export async function resolveWrapperMode(
   //   - mode=ingestion + !allowOtelDirect -> route through the gateway
   //     (never minting an ingestion key the admin disabled)
   let mode: WrapperMode =
-    persistedMode === "gateway"
+    forcedMode ??
+    (persistedMode === "gateway"
       ? "gateway"
       : persistedMode === "ingestion"
         ? "ingestion"
         : hasVk
           ? "gateway"
-          : "ingestion";
+          : "ingestion");
 
   // Symmetric fall-back: when the resolved mode is disabled but the
   // OTHER mode is allowed, swap into it rather than throwing. Lets
@@ -157,11 +169,11 @@ export async function resolveWrapperMode(
   // guaranteed true here, since the both-disabled case threw above).
   if (mode === "gateway" && !policy.allowVk) {
     mode = "ingestion";
-    notice = `langwatch: gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
+    notice = `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
   }
   if (mode === "ingestion" && !policy.allowOtelDirect) {
     mode = "gateway";
-    notice = `langwatch: direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
+    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
   }
 
   if (mode === "gateway") {
@@ -196,7 +208,7 @@ export async function resolveWrapperMode(
   const sourceType = SOURCE_TYPE_BY_TOOL[tool];
   if (!sourceType) {
     // No ingestion template defined for this tool (cursor is the
-    // current example — GUI app, no useful OTel). Fall through to
+    // current example - GUI app, no useful OTel). Fall through to
     // gateway shape; the existing preflight will tell the user
     // what's missing.
     return { mode: "gateway", vars: gatewayVars, clears: gatewayClears, notice };
@@ -241,7 +253,7 @@ export async function resolveWrapperMode(
   let codexConfigPath: string | undefined;
   if (tool === "codex") {
     // codex's OTLP/HTTP exporter sends every signal to the configured
-    // endpoint verbatim — it does NOT append `/v1/traces` the way the
+    // endpoint verbatim - it does NOT append `/v1/traces` the way the
     // OTel SDKs in Node/Python/Go do. Spell the trace-signal suffix
     // out here so the POST lands on the real handler. codex only
     // emits traces today (no logs/metrics), so one suffix suffices.
@@ -257,7 +269,7 @@ export async function resolveWrapperMode(
     // opencode constructs its OTLP exporter but only EMITS spans when
     // `experimental.openTelemetry` is true in ~/.config/opencode/opencode.jsonc.
     // Without this the OTEL_EXPORTER_OTLP_* env vars we set below are
-    // accepted-and-ignored — Path B silently produces nothing. Idempotent
+    // accepted-and-ignored - Path B silently produces nothing. Idempotent
     // merge: if the user already turned it on, no write; if they
     // explicitly set false, we don't overwrite their intent.
     setOpencodeOpenTelemetryFlag();
@@ -279,7 +291,7 @@ export async function resolveWrapperMode(
   try {
     saveConfig(next);
   } catch {
-    // Best-effort cache — failure to persist doesn't block this run.
+    // Best-effort cache - failure to persist doesn't block this run.
   }
 
   return { mode, vars, codexConfigPath, newKeyMinted: minted, notice };
@@ -301,28 +313,28 @@ function buildOtelEnvBlock(
       // bundled binary string sweep (alongside OTEL_LOG_USER_PROMPTS
       // which we already set), all four officially documented on
       // code.claude.com/docs/en/monitoring-usage:
-      //   OTEL_LOG_TOOL_DETAILS  — lifts tool_input / tool_parameters
+      //   OTEL_LOG_TOOL_DETAILS  - lifts tool_input / tool_parameters
       //     attrs (Bash command text, Edit diffs, Read file paths,
       //     etc) onto tool_decision + tool_result events. The
       //     receiver-side previously had only `tool_input_size_bytes`
-      //     and `tool_result_size_bytes` — proven across the
+      //     and `tool_result_size_bytes` - proven across the
       //     andre-claude-tool-calls + sergey-third-eye dump set.
-      //   OTEL_LOG_TOOL_CONTENT  — TRACES-ONLY + requires beta
+      //   OTEL_LOG_TOOL_CONTENT  - TRACES-ONLY + requires beta
       //     tracing. claude 2.x is LOGS-ONLY today so this is a
       //     no-op for us. Set anyway as forward-compat for when
       //     claude turns on traces. Tool I/O on the logs path
       //     actually comes from TOOL_DETAILS + RAW_API_BODIES.
-      //   OTEL_LOG_RAW_API_BODIES — emits two NEW event types
+      //   OTEL_LOG_RAW_API_BODIES - emits two NEW event types
       //     `api_request_body` + `api_response_body` carrying the
       //     FULL JSON of every message (system prompts + user content
       //     + assistant text + tool_use blocks). THIS IS THE ONLY
-      //     surface that carries the assistant response text — every
+      //     surface that carries the assistant response text - every
       //     other event (api_request, user_prompt, tool_*) is
       //     metadata only. Andre's live-dogfood (proxy intercept on
       //     :4318) found "UNLOCK-KNOBS-TEST-PROOF-7777" in
       //     api_response_body.content[].text with this flag set. Also
       //     the heaviest payload class (system prompts can be 100KB+,
-      //     message history grows turn-over-turn) — same fat-payload
+      //     message history grows turn-over-turn) - same fat-payload
       //     class as the CH merge memory-ceiling incident
       //     [[project_skai_ch_merge_memory_ceiling_outage]].
       //
@@ -336,7 +348,7 @@ function buildOtelEnvBlock(
       // a Body cap in case future claude versions remove the 60KB
       // inline limit. PII / logging-opt-out controls already live on
       // the platform settings page. Note: extended-thinking content
-      // is ALWAYS redacted by claude from raw bodies — we cannot
+      // is ALWAYS redacted by claude from raw bodies - we cannot
       // capture it regardless of flag state.
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
@@ -360,7 +372,7 @@ function buildOtelEnvBlock(
       };
     case "gemini":
       // gemini-cli 0.46 telemetry resolver (packages/core/dist/src/telemetry/config.js):
-      //   target ∈ {local, gcp} — NOT otlp. The JSON-schema doc string
+      //   target ∈ {local, gcp} - NOT otlp. The JSON-schema doc string
       //   mentions otlp as an "example", but the runtime validator
       //   (parseTelemetryTargetValue) only accepts local|gcp; passing
       //   otlp throws FatalConfigError at startup.
@@ -373,7 +385,7 @@ function buildOtelEnvBlock(
       //   user prompt + tool calls land as span attributes (not just
       //   token counts).
       //   `logPrompts=true` is what makes gemini-cli embed the actual
-      //   user prompt text in the user_prompt event — without it the
+      //   user prompt text in the user_prompt event - without it the
       //   receiver-side fold has no input text to lift onto
       //   langwatch.input.value, same class as claude-code.
       return {

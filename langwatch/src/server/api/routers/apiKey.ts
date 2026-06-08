@@ -190,6 +190,9 @@ export const apiKeyRouter = createTRPCRouter({
         // personal / service key. Drives the API Keys page section split.
         ingestSourceType: apiKey.ingestSourceType,
         ingestionTemplateId: apiKey.ingestionTemplateId,
+        // Human label of the CLI device session that minted this ingestion key
+        // ("Rogerio's MacBook Pro"); null for keys without device provenance.
+        createdByDeviceLabel: apiKey.createdByDeviceLabel,
         roleBindings: apiKey.roleBindings.map((rb) => ({
           id: rb.id,
           role: rb.role,

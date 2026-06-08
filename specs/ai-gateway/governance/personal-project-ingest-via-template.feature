@@ -21,8 +21,9 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
     ingest-only (traces:create) → tenantId = the key's bound project → apply
     template.ottlRules WITH principal-field guard (only when the key carries a
     templateId) → post-OTTL receiver-stamp authoritative attribution +
-    provenance keys (langwatch.api_key.id, langwatch.origin = ingest_key) →
-    handoff to trace pipeline.
+    provenance keys (langwatch.api_key.id, langwatch.origin derived from the
+    key's ingestSourceType — coding_agent for a CLI assistant, ai_tool
+    otherwise) → handoff to trace pipeline.
 
   Background:
     Given organization "acme" exists
@@ -66,7 +67,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
       | langwatch.project.id               | "personal-jane" (receiver-stamped)              |
       | langwatch.template.id              | claude_code-template-id (receiver-stamped)      |
       | langwatch.api_key.id               | jane's ingestion key id (receiver-stamped)      |
-      | langwatch.origin                   | "ingest_key" (receiver-stamped)                 |
+      | langwatch.origin                   | "coding_agent" (receiver-stamped, from source)  |
       | langwatch.source                   | "claude_code" (receiver-stamped post-OTTL)      |
     And the ingestion key's `lastUsedAt` is updated to the trace's timestamp
 

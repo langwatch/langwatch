@@ -197,10 +197,25 @@ export async function getGovernanceStatus(
   return getJSON(cfg, `/api/auth/cli/governance/status`, options);
 }
 
+/**
+ * A coding assistant the member can run via `langwatch <slug>`. Sourced from
+ * the org's published coding_assistant catalog tiles, so the CLI only offers
+ * tools the org actually publishes.
+ */
+export interface CliBootstrapTool {
+  slug: string;
+  displayName: string;
+}
+
+/**
+ * A model provider the member can mint a personal virtual key for. Sourced
+ * from the org's published model_provider catalog tiles. Distinct from a
+ * tool: a provider backs a virtual key, a tool is a coding assistant you run.
+ */
 export interface CliBootstrapProvider {
   name: string;
   displayName: string;
-  models: string[];
+  configured: boolean;
 }
 
 export interface CliBootstrapBudget {
@@ -210,6 +225,13 @@ export interface CliBootstrapBudget {
 }
 
 export interface CliBootstrapResponse {
+  /**
+   * Coding assistants the member can run via `langwatch <slug>`. Empty when
+   * the org has published no coding-assistant tiles; the ceremony then falls
+   * back to its built-in default wrapper list. `undefined` on legacy servers
+   * without the field (same fallback).
+   */
+  tools?: CliBootstrapTool[];
   providers: CliBootstrapProvider[];
   budget: CliBootstrapBudget;
   /**

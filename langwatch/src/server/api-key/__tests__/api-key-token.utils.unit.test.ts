@@ -6,6 +6,7 @@ import {
   verifySecret,
   getTokenType,
   API_KEY_PREFIX,
+  INGEST_KEY_PREFIX,
 } from "../api-key-token.utils";
 
 describe("generateApiKeyToken", () => {
@@ -30,6 +31,13 @@ describe("generateApiKeyToken", () => {
     expect(a.token).not.toBe(b.token);
     expect(a.lookupId).not.toBe(b.lookupId);
   });
+
+  describe("when an ingest prefix is passed", () => {
+    it("mints an ik-lw- token (ingestion keys)", () => {
+      const { token } = generateApiKeyToken({ prefix: INGEST_KEY_PREFIX });
+      expect(token.startsWith("ik-lw-")).toBe(true);
+    });
+  });
 });
 
 describe("splitApiKeyToken", () => {
@@ -49,6 +57,18 @@ describe("splitApiKeyToken", () => {
       const result = splitApiKeyToken("pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr");
       expect(result).not.toBeNull();
       expect(result!.lookupId).toBe("abcdefghijklmnop");
+    });
+  });
+
+  describe("when given an ingest ik-lw- token", () => {
+    it("extracts lookupId and secret (resolves like any API key)", () => {
+      const { token, lookupId } = generateApiKeyToken({
+        prefix: INGEST_KEY_PREFIX,
+      });
+      const parts = splitApiKeyToken(token);
+      expect(parts).not.toBeNull();
+      expect(parts!.lookupId).toBe(lookupId);
+      expect(parts!.secret).toBeTruthy();
     });
   });
 
@@ -111,6 +131,12 @@ describe("getTokenType", () => {
   describe("when given a new sk-lw- token with underscore", () => {
     it("returns apiKey", () => {
       expect(getTokenType("sk-lw-abcdef1234567890_secretsecret")).toBe("apiKey");
+    });
+  });
+
+  describe("when given an ingest ik-lw- token", () => {
+    it("returns apiKey", () => {
+      expect(getTokenType("ik-lw-abcdef1234567890_secretsecret")).toBe("apiKey");
     });
   });
 

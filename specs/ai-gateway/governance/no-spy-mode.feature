@@ -105,7 +105,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
     Then the trace lands at /me/traces with:
       | attribute                       | value                                                       |
       | gen_ai.usage.* + cost.usd       | populated                                                    |
-      | langwatch.origin                | "ingest_key" (receiver-stamped — ingestKeyProvenance 5-key set) |
+      | langwatch.origin                | "coding_agent" (receiver-stamped — ingestKeyProvenance 5-key set) |
       | langwatch.organization_id       | acme-privacy.id (receiver-stamped — ingestKeyProvenance)     |
       | langwatch.template.id           | claude_code template id (receiver-stamped — ingestKeyProvenance) |
       | langwatch.api_key.id            | jane's ingestion key id (receiver-stamped — ingestKeyProvenance) |

@@ -181,3 +181,60 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
     expect(result.computedOutput).toBe("Already a plain string");
   });
 });
+
+describe("TraceIOAccumulationService — claude utility spans", () => {
+  const utilityOutput = stubExtractor({
+    output: {
+      raw: "echo 'test otlp 4'",
+      text: "echo 'test otlp 4'",
+      source: "gen_ai",
+    },
+  });
+
+  describe("given a non-conversational claude_code query source", () => {
+    it("does not let a prompt_suggestion reply become the trace headline output", () => {
+      const accumulator = new TraceIOAccumulationService(utilityOutput);
+
+      const result = accumulator.accumulateIO({
+        state: emptyState(),
+        span: rootSpan({
+          spanAttributes: { "claude_code.query_source": "prompt_suggestion" },
+        }),
+      });
+
+      // The suggestion is on the span (for the span detail) but must not
+      // clobber the trace's headline output, like a tool span.
+      expect(result.computedOutput).toBeNull();
+    });
+
+    it("skips generate_session_title too", () => {
+      const accumulator = new TraceIOAccumulationService(utilityOutput);
+
+      const result = accumulator.accumulateIO({
+        state: emptyState(),
+        span: rootSpan({
+          spanAttributes: {
+            "claude_code.query_source": "generate_session_title",
+          },
+        }),
+      });
+
+      expect(result.computedOutput).toBeNull();
+    });
+  });
+
+  describe("given a conversational claude_code query source", () => {
+    it("still lifts the reply for repl_main_thread", () => {
+      const accumulator = new TraceIOAccumulationService(utilityOutput);
+
+      const result = accumulator.accumulateIO({
+        state: emptyState(),
+        span: rootSpan({
+          spanAttributes: { "claude_code.query_source": "repl_main_thread" },
+        }),
+      });
+
+      expect(result.computedOutput).toBe("echo 'test otlp 4'");
+    });
+  });
+});

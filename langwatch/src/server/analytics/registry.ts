@@ -235,6 +235,20 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
 
     },
+    cost_billed: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cost_billed"),
+      label: "Billed Cost",
+      colorSet: "greenTones",
+      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      increaseIs: "neutral",
+    },
+    cost_non_billed: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cost_non_billed"),
+      label: "Non-billed (theoretical) Cost",
+      colorSet: "grayTones",
+      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      increaseIs: "neutral",
+    },
     prompt_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.prompt_tokens"),
       label: "Prompt Tokens",

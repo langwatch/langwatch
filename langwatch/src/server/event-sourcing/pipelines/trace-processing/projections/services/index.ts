@@ -3,7 +3,7 @@
 export { SpanTimingService } from "./span-timing.service";
 export { SpanStatusService } from "./span-status.service";
 export { TraceOriginService } from "./trace-origin.service";
-export { SpanCostService } from "./span-cost.service";
+export { SpanCostService, NON_BILLABLE_ATTR } from "./span-cost.service";
 export { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service";
 export {
   TraceIOAccumulationService,

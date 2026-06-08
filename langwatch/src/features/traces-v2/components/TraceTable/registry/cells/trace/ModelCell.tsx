@@ -132,7 +132,7 @@ function ProviderIcon({
   );
 }
 
-function ExtraModelsBadge({
+export function ExtraModelsBadge({
   models,
   size,
 }: {

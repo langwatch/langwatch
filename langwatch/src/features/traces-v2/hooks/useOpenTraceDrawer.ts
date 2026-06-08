@@ -28,6 +28,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     output: item.output,
     models: item.models,
     totalCost: item.totalCost,
+    nonBilledCost: item.nonBilledCost,
     totalTokens: item.totalTokens,
     inputTokens: item.inputTokens ?? null,
     outputTokens: item.outputTokens ?? null,

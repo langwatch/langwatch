@@ -52,7 +52,10 @@ export function PresenceMenuItem() {
         // dot/label flip without the dropdown collapsing on them. They
         // dismiss manually via outside-click or Escape.
         closeOnSelect={false}
-        onSelect={featureEnabled ? toggleHidden : undefined}
+        // onClick (not onSelect): Chakra v3 Menu.Item exposes the click
+        // handler as onClick; onSelect is the DOM text-selection event, so it
+        // never fired - the toggle was a dead click with no visual feedback.
+        onClick={featureEnabled ? toggleHidden : undefined}
         disabled={!featureEnabled}
         opacity={featureEnabled ? 1 : 0.55}
         cursor={featureEnabled ? "pointer" : "not-allowed"}

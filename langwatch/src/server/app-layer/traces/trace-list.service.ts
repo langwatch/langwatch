@@ -2,6 +2,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createLogger } from "~/utils/logger/server";
 import type {
   ExpressionCategoricalDef,
@@ -34,7 +35,10 @@ export interface TraceListItem {
   name: string;
   serviceName: string;
   durationMs: number;
+  /** Grand list-price cost. `nonBilledCost` is the bundled (theoretical)
+   *  portion; billed = totalCost - nonBilledCost. */
   totalCost: number;
+  nonBilledCost: number;
   totalTokens: number;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -1078,6 +1082,11 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,
     totalCost: row.totalCost ?? 0,
+    nonBilledCost: resolveNonBilledCost({
+      foldedNonBilledCost: row.nonBilledCost,
+      totalCost: row.totalCost,
+      attributes: row.attributes,
+    }),
     totalTokens,
     inputTokens: row.totalPromptTokenCount,
     outputTokens: row.totalCompletionTokenCount,

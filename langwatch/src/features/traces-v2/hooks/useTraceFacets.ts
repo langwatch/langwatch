@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
 
@@ -14,7 +13,6 @@ export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const trpcUtils = api.useContext();
 
   // Backoff counter for the cold-miss polling fallback below. Ref because
   // refetchInterval is read by React Query's scheduler outside React's
@@ -69,30 +67,12 @@ export function useTraceFacets() {
     },
   );
 
-  // Subscribe to `discover_updated` for the active project. The server
-  // fires this event when a background-refresh in TraceListService
-  // lands a fresher payload in the shared cache. On receipt we
-  // invalidate, which kicks a refetch that hits the now-warm cache.
-  // Cheap because the server-side TtlCache value is already in Redis;
-  // the client just needs to ask for it.
-  useSSESubscription<
-    { tenantId: string; timestamp: number },
-    { projectId: string }
-  >(
-    // @ts-expect-error - tRPC subscription type isn't perfectly inferred
-    // for the hook's generic; the underlying procedure shape matches.
-    api.tracesV2.onDiscoverUpdate,
-    { projectId: projectId ?? "" },
-    {
-      enabled: !!projectId,
-      onData: () => {
-        // SSE delivered — drop the backoff so the post-invalidate refetch
-        // (and any subsequent pending-state poll) starts from a clean 2s.
-        pendingPollAttemptsRef.current = 0;
-        void trpcUtils.tracesV2.discover.invalidate();
-      },
-    },
-  );
+  // Live `discover_updated` freshness is owned by the single page-level
+  // coordinator (useTraceFreshness), not here: useTraceFacets is consumed by
+  // several sidebar components and a per-consumer subscription would open a
+  // duplicate SSE connection each. The coordinator's one subscription
+  // invalidates this shared query, so the cold-miss `refetchInterval` poll
+  // below is the only freshness path this hook needs to own.
 
   // keepPreviousData is project-blind — without this guard it would surface
   // project A's facets while project B's discover request is in flight.

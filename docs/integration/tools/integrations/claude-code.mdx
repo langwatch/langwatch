@@ -171,7 +171,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 
 # Custom resource attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_center=eng-123"
+export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform"
 ```
 
 ### Debug Configuration
@@ -194,13 +194,13 @@ Organizations with multiple teams can add custom attributes to distinguish betwe
 
 ```bash
 # Add custom attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_center=eng-123,project=langwatch-integration"
+export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,project=langwatch-integration"
 ```
 
 These custom attributes will be included in all traces sent to LangWatch, allowing you to:
 
 * Filter traces by team or department
-* Track usage per cost center
+* Track usage per department
 * Create team-specific dashboards
 * Set up alerts for specific teams
 

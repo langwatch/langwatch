@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { CompanyWideIngestionPanel } from "@ee/governance/dashboard/components/CompanyWideIngestionPanel";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 
@@ -52,7 +51,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 /**
- * Admin CRUD for IngestionSources — the per-platform fleet config that
+ * Admin CRUD for IngestionSources - the per-platform fleet config that
  * powers the Activity Monitor pillar. One source per platform fleet
  * Wires to
  * api.ingestionSources.* per Sergey's slice 4.
@@ -83,14 +82,14 @@ const SOURCE_TYPE_OPTIONS: Array<{
     label: "Generic OTel",
     mode: "push",
     blurb:
-      "Anything that speaks OTLP/HTTP. Simplest setup — paste an OTLP URL + bearer token into the upstream agent's exporter config.",
+      "Anything that speaks OTLP/HTTP. Simplest setup - paste an OTLP URL + bearer token into the upstream agent's exporter config.",
   },
   {
     value: "claude_code",
     label: "Claude Code (Anthropic OAuth)",
     mode: "push",
     blurb:
-      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat — distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
+      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat - distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
   },
   {
     value: "claude_cowork",
@@ -185,7 +184,7 @@ interface ComposerState {
 /**
  * Maps user-facing pull-mode source-types onto the PullerAdapter id
  * registered server-side (`pullerAdapterRegistry.ids()`). Hardcoded
- * curated list per @ai_gateway_sergey_2's directive — keeps the UI
+ * curated list per @ai_gateway_sergey_2's directive - keeps the UI
  * free of a round-trip enumeration call. Entries land in lockstep
  * with the reference adapters Sergey ships in `services/pullers/`.
  */
@@ -197,7 +196,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
 };
 
 /**
- * Default cron schedule per puller adapter — mirrors the locked
+ * Default cron schedule per puller adapter - mirrors the locked
  * `*_PULL_CONFIG.schedule` from the reference impl. Keeps the UI in
  * sync without a server round-trip; if the locked default ever
  * diverges, update both ends.
@@ -219,7 +218,7 @@ const blankComposer = (): ComposerState => ({
 });
 
 function fmtRelative(date: Date | string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   const diffMs = Date.now() - d.getTime();
   const sec = Math.floor(diffMs / 1000);
@@ -264,7 +263,7 @@ function IngestionSourcesPage() {
       setComposing(false);
       setComposer(blankComposer());
       setSecretModal({
-        title: "Source created — paste this secret upstream",
+        title: "Source created - paste this secret upstream",
         secret: data.ingestSecret,
         sourceId: data.source.id,
         sourceName: data.source.name,
@@ -283,7 +282,7 @@ function IngestionSourcesPage() {
     onSuccess: (data) => {
       void refetch();
       setSecretModal({
-        title: "New secret minted — old one valid for 24h",
+        title: "New secret minted - old one valid for 24h",
         secret: data.ingestSecret,
         sourceId: data.source.id,
         sourceName: data.source.name,
@@ -331,7 +330,7 @@ function IngestionSourcesPage() {
     // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
     // generic adapter can run unmodified. The locked-shape reference pullers
     // (copilot_studio / openai_compliance / claude_compliance) only need the
-    // adapter id — their validateConfig override returns the frozen config.
+    // adapter id - their validateConfig override returns the frozen config.
     const pullConfig =
       composer.sourceType === "http_custom"
         ? buildHttpCustomPullConfig(composer)
@@ -340,7 +339,7 @@ function IngestionSourcesPage() {
           : null;
     if (composer.sourceType === "http_custom" && !pullConfig) {
       // buildHttpCustomPullConfig returns null when required fields are
-      // empty — keep the drawer open so the user can fix the form.
+      // empty - keep the drawer open so the user can fix the form.
       toaster.create({
         title: "Missing required HTTP source fields",
         description:
@@ -427,8 +426,6 @@ function IngestionSourcesPage() {
             )}
           </VStack>
         </HStack>
-
-        <CompanyWideIngestionPanel />
 
         <SourceComposerDrawer
           isOpen={composing}
@@ -595,7 +592,7 @@ function SourceRow({
         size="sm"
         variant="ghost"
         onClick={onEdit}
-        title="Edit source — name, description, OTTL statements"
+        title="Edit source - name, description, OTTL statements"
       >
         <Pencil size={14} /> Edit
       </Button>
@@ -786,7 +783,7 @@ function SourceComposerDrawer({
 /**
  * Edit a previously-created IngestionSource. Scoped to the fields that
  * are safe to mutate without affecting the upstream operator's pasted
- * env block — name, description, parserConfig (incl. ottlStatements).
+ * env block - name, description, parserConfig (incl. ottlStatements).
  *
  * Source type is immutable after create (changing it would invalidate
  * the upstream's running configuration); admins who need to change it
@@ -816,7 +813,7 @@ function SourceEditDrawer({
   const [description, setDescription] = useState("");
   const [statements, setStatements] = useState<string[]>([]);
 
-  // Sync local state when the drawer opens for a new source — drives
+  // Sync local state when the drawer opens for a new source - drives
   // the form fields off whatever the row carries on the wire.
   useEffect(() => {
     if (!source) return;
@@ -950,7 +947,7 @@ interface FieldDef {
 }
 
 const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
-  // No parser-config fields for generic OTel sources today — the
+  // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
   // referenced a `LangWatchSourceType` attribute filter that the
   // normaliser doesn't actually implement; removed during bugbash so
@@ -1142,7 +1139,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
  * (auth header / token / JSONPaths / mapping DSL) onto the structured
  * shape that `HttpPollingPullerAdapter.validateConfig` expects.
  *
- * Returns null when required fields are missing — the caller should
+ * Returns null when required fields are missing - the caller should
  * keep the form open + surface the missing-field state via the existing
  * required-field markers rather than fire a dispatch that the worker
  * would reject at validateConfig time.
@@ -1303,7 +1300,7 @@ function buildParserConfig(c: ComposerState): Record<string, unknown> {
     }
     out[k] = v;
   }
-  // Strip empty rows from the OTTL statement list — admins may leave a
+  // Strip empty rows from the OTTL statement list - admins may leave a
   // blank trailing row from clicking "Add statement"; persisting it
   // would force the gateway parser to handle empty input as an error.
   const ottl = c.ottlStatements
@@ -1354,7 +1351,7 @@ function SecretModal({
   // seven lines off the docs page.
   // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
   // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
-  // metadata-only — tokens, cost, durations, tool sizes-in-bytes —
+  // metadata-only - tokens, cost, durations, tool sizes-in-bytes -
   // and user prompt text, assistant response text, and tool I/O
   // content are silently absent. With them on, langwatch.input +
   // langwatch.output lift verbatim from claude's api_request +
@@ -1378,7 +1375,7 @@ function SecretModal({
   }, [isClaudeCode, details, otlpUrl]);
 
   // F-OTEL-3 (Sergey draft): a copy-paste curl that exercises the full
-  // happy path — body parses, attribute parser sees the canonical
+  // happy path - body parses, attribute parser sees the canonical
   // gen_ai.* + user.email keys, KPI strip moves on the first event.
   // Timestamp is fresh at modal open so the test event lands inside
   // the 24h health window even if the user delays a bit before
@@ -1544,7 +1541,7 @@ function SecretModal({
                   trace viewer. If you are sending agent traces from
                   your own LangWatch SDK, use{" "}
                   <Code fontSize="xs">/api/otel/v1/traces</Code> with
-                  your project API key — different auth, same trace
+                  your project API key - different auth, same trace
                   store. See{" "}
                   <Link
                     href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
@@ -1612,11 +1609,11 @@ function SecretModal({
                     /v1/metrics
                   </Code>{" "}
                   itself off the base endpoint. To attribute spend to a
-                  specific team or cost center, also export{" "}
+                  specific team or department, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
                   </Code>
-                  {" "}— those land as resource attributes and slot into
+                  {" "}- those land as resource attributes and slot into
                   /governance&apos;s spendByTeam without further config.
                 </Text>
               </VStack>
@@ -1624,7 +1621,7 @@ function SecretModal({
             {testCurl && (
               <VStack align="stretch" gap={1}>
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Test it now — paste this into a terminal
+                  Test it now - paste this into a terminal
                 </Text>
                 <Box position="relative">
                   <Code
@@ -1651,7 +1648,7 @@ function SecretModal({
                   Returns HTTP 202 with{" "}
                   <Code fontSize="xs">events: 1</Code> on success. If you
                   get <Code fontSize="xs">events: 0</Code> with a hint,
-                  the body shape didn&apos;t parse — check the docs.
+                  the body shape didn&apos;t parse - check the docs.
                 </Text>
               </VStack>
             )}
