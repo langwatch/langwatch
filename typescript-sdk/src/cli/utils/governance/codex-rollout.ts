@@ -101,7 +101,10 @@ function outputToText(output: unknown): string {
       return "";
     }
   }
-  return output == null ? "" : String(output);
+  if (typeof output === "number" || typeof output === "boolean") {
+    return String(output);
+  }
+  return "";
 }
 
 /**
@@ -157,7 +160,7 @@ export function parseCodexRollout(content: string): CodexTurnIO[] {
   const closeTurn = () => {
     if (cur) {
       const finalAnswer = agentFinal ?? pendingAssistant;
-      if (finalAnswer !== null && finalAnswer.trim()) {
+      if (finalAnswer?.trim()) {
         result.push({
           traceId: cur.traceId,
           turnId: cur.turnId,
