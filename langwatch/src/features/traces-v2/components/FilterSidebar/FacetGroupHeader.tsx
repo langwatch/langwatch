@@ -12,15 +12,6 @@ interface FacetGroupHeaderProps {
    * Renders a small dot next to the label so users can see at a glance which
    * groups are currently driving narrowing. */
   isModified?: boolean;
-  /**
-   * Facet entries (key + display label) that the backend has data for
-   * but that are currently hidden from this group (density default OR
-   * explicit hide). Drives the trailing "+ Add facet" menu — when
-   * empty, the menu is not rendered.
-   */
-  hiddenKeys?: Array<{ key: string; label: string }>;
-  /** Called with a hidden key to add it back to the sidebar. */
-  onAddFacet?: (key: string) => void;
   children: React.ReactNode;
 }
 
@@ -37,8 +28,6 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
   id,
   label,
   isModified = false,
-  hiddenKeys = [],
-  onAddFacet,
   children,
 }) => {
   const {
@@ -146,13 +135,6 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
             title={`${label} group has filters applied`}
           />
         )}
-        {/* Per-group "+ Add facet" menu retired in Round 3 — adding a
-            hidden facet back is now done exclusively from the
-            FacetManagerPopover (the kebab on the sidebar shell). The
-            inline "+" cluttered every group header for an action users
-            took rarely; `hiddenKeys` / `onAddFacet` props are still
-            threaded through for the popover to drive the same store
-            action. */}
       </HStack>
       {children}
     </Box>
