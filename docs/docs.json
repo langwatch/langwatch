@@ -1086,7 +1086,9 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/update-project",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/archive-project",
+              "api-reference/projects/get-api-key",
+              "api-reference/projects/regenerate-api-key"
             ]
           },
           {
@@ -1097,7 +1099,28 @@
               "api-reference/teams/create-team",
               "api-reference/teams/get-team",
               "api-reference/teams/update-team",
-              "api-reference/teams/archive-team"
+              "api-reference/teams/archive-team",
+              "api-reference/teams/list-members",
+              "api-reference/teams/add-member",
+              "api-reference/teams/remove-member",
+              "api-reference/teams/list-projects"
+            ]
+          },
+          {
+            "group": "Groups",
+            "pages": [
+              "api-reference/groups/overview",
+              "api-reference/groups/list-groups",
+              "api-reference/groups/create-group",
+              "api-reference/groups/get-group",
+              "api-reference/groups/rename-group",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/list-members",
+              "api-reference/groups/add-member",
+              "api-reference/groups/remove-member",
+              "api-reference/groups/list-bindings",
+              "api-reference/groups/add-binding",
+              "api-reference/groups/remove-binding"
             ]
           },
           {
