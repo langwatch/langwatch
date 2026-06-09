@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import {
   COLUMN_DRAG_THRESHOLD_PX,
   useColumnEducationStore,
@@ -281,8 +282,19 @@ function HeaderCell<T>({
   // `columnEducationStore` flips true and the handler short-circuits.
   const openEducation = useColumnEducationStore((s) => s.open);
   const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
+  // Pinned headers (the row-select column) have no drag handle and no
+  // reorder path, so the education dialog is meaningless there — the
+  // checkbox would also open it on every click. Both handlers bail
+  // when `reorderable` is false.
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      dragCleanupRef.current?.();
+    },
+    [],
+  );
   const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    if (educationDismissed) return;
+    if (!reorderable || educationDismissed) return;
     // Skip drags that originate on the resize grip (legitimate sizing
     // gesture) OR on the drag-reorder grip (legitimate reorder
     // gesture) — surfacing the education dialog from either of those
@@ -304,7 +316,9 @@ function HeaderCell<T>({
     const cleanup = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      dragCleanupRef.current = null;
     };
+    dragCleanupRef.current = cleanup;
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -313,7 +327,7 @@ function HeaderCell<T>({
     // this header" gesture — treat it the same as a drag attempt for
     // the education path so users who instinctively double-tap also
     // see the dialog.
-    if (educationDismissed) return;
+    if (!reorderable || educationDismissed) return;
     openEducation();
   };
   const size = header.column.getSize();

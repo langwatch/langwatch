@@ -209,9 +209,11 @@ export const FlameView = memo(function FlameView({
         );
       };
 
-      const handleUp = () => {
+      const cleanup = () => {
         window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointerup", cleanup);
+        window.removeEventListener("pointercancel", cleanup);
+        window.removeEventListener("blur", cleanup);
         document.body.style.cursor = "";
         // Defer flag reset so synchronous click handlers see we just dragged.
         setTimeout(() => {
@@ -220,7 +222,9 @@ export const FlameView = memo(function FlameView({
       };
 
       window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointerup", cleanup);
+      window.addEventListener("pointercancel", cleanup);
+      window.addEventListener("blur", cleanup);
     },
     [cancelAnimation, clampViewport],
   );
@@ -358,9 +362,7 @@ export const FlameView = memo(function FlameView({
       };
 
       const handleUp = (ev: PointerEvent) => {
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-        setDragSelection(null);
+        cleanup();
         if (!dragged) return;
         const t = xToTime(ev.clientX);
         const sel: Viewport = {
@@ -371,9 +373,18 @@ export const FlameView = memo(function FlameView({
           animateTo(sel);
         }
       };
+      const cleanup = () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointercancel", cleanup);
+        window.removeEventListener("blur", cleanup);
+        setDragSelection(null);
+      };
 
       window.addEventListener("pointermove", handleMove);
       window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", cleanup);
+      window.addEventListener("blur", cleanup);
     },
     [animateTo, cancelAnimation],
   );

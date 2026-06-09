@@ -127,7 +127,7 @@ export function FlameBlock({
     pctOfParent !== null && node.parent
       ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
       : null,
-    pctOfTrace !== null && node.parent
+    pctOfTrace !== null
       ? `${formatPercent(pctOfTrace)} of trace`
       : null,
     span.model ? `Model: ${span.model}` : null,

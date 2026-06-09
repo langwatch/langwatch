@@ -38,10 +38,13 @@ const MAX_DYNAMIC_ITEMS = 10;
 
 type RankedValue = { value: string; count: number; label?: string };
 
-function rankAndSlice(
-  values: readonly RankedValue[],
-  query: string,
-): {
+function rankAndSlice({
+  values,
+  query,
+}: {
+  values: readonly RankedValue[];
+  query: string;
+}): {
   items: string[];
   counts: Record<string, number>;
   labels?: Record<string, string>;
@@ -279,7 +282,7 @@ export const SearchBar: React.FC = () => {
       if (!facetField) return null;
       const source = valueSourceByField.get(facetField);
       if (!source) return null;
-      return rankAndSlice(source, query.replace(/\*+$/, ""));
+      return rankAndSlice({ values: source, query: query.replace(/\*+$/, "") });
     },
     [valueSourceByField],
   );

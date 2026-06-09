@@ -369,7 +369,10 @@ export function useFilterSidebarData() {
 }
 
 export interface FacetGroupSlice {
-  id: FacetGroupDef["id"];
+  // `"other"` is the synthetic trailing bucket for keys that don't map
+  // to any registered FACET_GROUPS entry — kept distinct from the
+  // user-facing `"custom"` group so the two never collide on `.id`.
+  id: FacetGroupDef["id"] | "other";
   label: string;
   keys: string[];
 }
@@ -418,7 +421,7 @@ export function partitionIntoGroups(
   }));
 
   if (ungrouped.length > 0) {
-    slices.push({ id: "custom", label: "Other", keys: ungrouped });
+    slices.push({ id: "other", label: "Other", keys: ungrouped });
   }
   return slices;
 }

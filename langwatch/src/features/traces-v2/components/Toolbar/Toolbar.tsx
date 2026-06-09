@@ -104,7 +104,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
         <LiveIndicator />
         {/* Vertical separator clusters the toolbar into:
               [Save · Tour · Live] · [Time] · [Display: cols, group, density]
-              · [Tools: find, export, automate] · [Help]
+              · [Tools: export, automate] · [Help]
             Previously these were a flat row of 10 controls with no
             visual hierarchy — auditor pain was "I don't know what
             each icon does, and they all blur together". */}

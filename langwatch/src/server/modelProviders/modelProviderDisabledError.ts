@@ -26,7 +26,7 @@ export interface ResolvedAlternate {
 /**
  * Thrown by `getVercelAIModel` when the cascade resolver picked a
  * model whose provider is currently disabled. The frontend
- * `extractModelProviderDisabledInfo` interceptor matches on
+ * `extractProviderDisabledInfo` interceptor matches on
  * `cause === MODEL_PROVIDER_DISABLED` and opens the swap toast.
  *
  * Carries:
@@ -34,8 +34,7 @@ export interface ResolvedAlternate {
  *   - resolvedScope / resolvedModel / providerKey — the disabled config
  *   - alternate — the next cascade candidate, if any, so the toast can
  *     offer a one-click swap
- *   - projectId / projectScopeConfigId — so the action button knows
- *     which scope row to clear
+ *   - projectId — so the action button knows which scope row to clear
  */
 export class ModelProviderDisabledError extends Error {
   public readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;

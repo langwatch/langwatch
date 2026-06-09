@@ -436,7 +436,7 @@ export function useFilterEditor({
         if (!text) return false;
         const flattened = text
           .replace(/[\r\n\t]+/g, " ")
-          .replace(/[ --]/g, "")
+          .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
           .slice(0, PASTE_MAX_CHARS);
         if (flattened === text) return false;
         event.preventDefault();

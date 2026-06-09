@@ -1,5 +1,6 @@
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 import type {
   LiqeQuery,
@@ -465,7 +466,7 @@ let chipLabelLookup: Record<string, Record<string, string>> = {};
  * bar, but rendering two in a single page (test harness, side-by-side
  * design experiments) shouldn't drop refreshes on the second one.
  */
-const subscribedViews = new Set<import("@tiptap/pm/view").EditorView>();
+const subscribedViews = new Set<EditorView>();
 
 export const LABEL_REFRESH_META = "filterHighlight:labelRefresh" as const;
 
@@ -478,9 +479,7 @@ export function setFilterChipLabels(
   }
 }
 
-function computeDecorations(
-  doc: import("@tiptap/pm/model").Node,
-): DecorationSet {
+function computeDecorations(doc: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;

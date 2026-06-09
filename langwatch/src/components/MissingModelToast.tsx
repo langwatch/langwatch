@@ -181,9 +181,7 @@ export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
 
   const swapAvailable =
     info.alternate?.providerEnabled === true && info.onSwapToAlternate;
-  const altSummary = info.alternate
-    ? `${info.alternate.model} (${info.alternate.scope})`
-    : null;
+  const altSummary = info.alternate ? info.alternate.model : null;
 
   const description = swapAvailable
     ? `${info.resolvedModel} is set at ${SCOPE_LABEL[info.resolvedScope]} scope, but its provider "${info.providerKey}" is disabled. The ${info.alternate?.scope} default (${info.alternate?.model}) is still available.`
