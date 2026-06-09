@@ -48,13 +48,13 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
           select?.team
             ? Promise.resolve({
                 team: {
-                  id: "team_1",
-                  organizationId: "org_1",
+                  id: TEAM_ID,
+                  organizationId: ORG_ID,
                   organization: { members: [] }, // no OrganizationUser row either
                 },
               })
             : Promise.resolve({
-                id: "project_1",
+                id: PROJECT_ID,
                 apiKey: "lw_test_key",
                 archivedAt: null as Date | null,
               }),
