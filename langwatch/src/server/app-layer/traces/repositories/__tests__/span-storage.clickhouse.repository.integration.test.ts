@@ -103,9 +103,20 @@ beforeAll(async () => {
 
   // A stale earlier version of the first span: the dedup must return the
   // latest version (no `stale` marker), never this one.
+  //
+  // Override StartTime as well as UpdatedAt: stored_spans is
+  // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
+  // collapse the two versions at merge time keeping whichever was inserted
+  // last among the tie (the stale row here, inserted after the live span 0)
+  // — leaving the read with only the stale row to dedup. A strictly older
+  // StartTime makes the stale row deterministically lose the merge
+  // regardless of merge timing or shard load. (Same fix the events fixture
+  // below already applies for `evt-span-1`.)
   await insertRows([
     makeSpanRow(0, {
       SpanAttributes: { idx: "0", stale: "yes" },
+      StartTime: new Date(base - 10_000),
+      EndTime: new Date(base - 10_000 + 50),
       UpdatedAt: new Date(base - 10_000),
       CreatedAt: new Date(base - 10_000),
     }),

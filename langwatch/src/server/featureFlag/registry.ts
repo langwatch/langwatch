@@ -129,6 +129,18 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
+  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
+  // ingestion request (not per span) via the postgres-cached store, so the
+  // hot-path cost is one cached lookup. When on, over-threshold spans get
+  // routed via the transient S3 spool at the edge (ADR-022). Off = today's
+  // behavior — the existing capOversizedAttributes(256 KB) is the only cap.
+  {
+    key: "release_trace_blob_offload",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",

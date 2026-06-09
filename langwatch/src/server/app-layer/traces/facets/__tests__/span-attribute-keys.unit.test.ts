@@ -125,6 +125,32 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
     });
   });
 
+  describe("excludes reserved namespace keys from user-visible facet results", () => {
+    /** @scenario Reserved namespace is excluded from user-visible facet enumeration */
+    it("filters out keys starting with 'langwatch.reserved.' in the outer WHERE", () => {
+      // Reserved keys (e.g. langwatch.reserved.eventref.langwatch.output) are
+      // server-internal plumbing that should never appear in the Traces UI
+      // facet sidebar. A span with offloaded fields will carry these keys in
+      // SpanAttributes; without this filter they would surface as browsable
+      // facet entries exposing raw ref JSON as values. Concern 1 / #4215.
+      const query = buildSpanAttributeKeysFacetQuery(baseCtx);
+      expect(query.sql).toContain(
+        "NOT startsWith(key, 'langwatch.reserved.')",
+      );
+    });
+
+    it("SQL would exclude langwatch.reserved.eventref.langwatch.output from discovered keys", () => {
+      // Validate the filter is in the outer WHERE (post-arrayJoin) so it applies
+      // before GROUP BY — the reserved key must not appear in the result set.
+      const query = buildSpanAttributeKeysFacetQuery(baseCtx);
+      // The filter must appear in the WHERE clause after the subquery
+      const outerWhereIdx = query.sql.lastIndexOf("WHERE key");
+      expect(outerWhereIdx).toBeGreaterThan(-1);
+      const outerWhere = query.sql.slice(outerWhereIdx);
+      expect(outerWhere).toContain("NOT startsWith(key, 'langwatch.reserved.')");
+    });
+  });
+
   describe("memory safety", () => {
     it("never reads the SpanAttributes values column", () => {
       // Both the projection and the empty-map filter must stay on the keys

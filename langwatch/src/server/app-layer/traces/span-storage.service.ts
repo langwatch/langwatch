@@ -9,6 +9,24 @@ import type {
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
 import type { SpanInsertData } from "./types";
+import type { BlobStore } from "./blob-store.service";
+import type { TraceIOExtractionService } from "./trace-io-extraction.service";
+import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
+import { mapNormalizedSpanToSpan, mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
+import { createLogger } from "~/utils/logger/server";
+
+/**
+ * Optional blob-offload resolution dependencies for the v2 read path (ADR-022).
+ *
+ * When provided, `getSpansByTraceId` and `getSpanById` resolve any
+ * `langwatch.reserved.eventref.*` pointers before mapping to `Span[]`.
+ * When omitted, the service falls back to the preview values already stored
+ * in `stored_spans` — identical to pre-ADR-022 behaviour.
+ */
+export interface SpanReadBlobResolutionDeps {
+  blobStore: BlobStore;
+  ioExtractionService: TraceIOExtractionService;
+}
 
 type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
 type BySpanId = ByTraceId & { spanId: string };
@@ -16,14 +34,46 @@ type Paginated = ByTraceId & { limit: number; offset: number };
 type Since = ByTraceId & { sinceStartTimeMs: number };
 
 export class SpanStorageService {
-  constructor(readonly repository: SpanStorageRepository) {}
+  private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
+  private readonly logger = createLogger("langwatch:traces:span-storage-service");
+
+  constructor(
+    readonly repository: SpanStorageRepository,
+    blobResolutionDeps?: SpanReadBlobResolutionDeps,
+  ) {
+    this.blobResolutionDeps = blobResolutionDeps;
+  }
 
   async insertSpan(span: SpanInsertData): Promise<void> {
     await this.repository.insertSpan(span);
   }
 
+  /**
+   * Returns full spans for a trace, resolving any ADR-022 offloaded eventref
+   * pointers when `blobResolutionDeps` were supplied at construction.
+   *
+   * Resolution is a no-op when no span in the trace carries a
+   * `langwatch.reserved.eventref.*` attribute — the cost is one
+   * `getNormalizedSpansByTraceId` call instead of `getSpansByTraceId`.
+   * On resolution failure (missing event_log row) the preview value is
+   * kept in place and the error is logged at warn level; the call never
+   * throws due to a stale ref.
+   */
   async getSpansByTraceId(params: ByTraceId & { limit?: number }): Promise<Span[]> {
-    return this.repository.getSpansByTraceId(params);
+    if (!this.blobResolutionDeps) {
+      return this.repository.getSpansByTraceId(params);
+    }
+
+    // Fetch normalized spans so resolution can access raw spanAttributes.
+    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const { resolvedSpans } = await resolveOffloadedTraces({
+      projectId: params.tenantId,
+      normalizedSpans,
+      blobStore: this.blobResolutionDeps.blobStore,
+      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
+      logger: this.logger,
+    });
+    return mapNormalizedSpansToSpans(resolvedSpans);
   }
 
   async getNormalizedSpansByTraceId(
@@ -32,8 +82,32 @@ export class SpanStorageService {
     return this.repository.getNormalizedSpansByTraceId(params);
   }
 
+  /**
+   * Returns a single span by its ID, resolving any ADR-022 offloaded eventref
+   * pointers when `blobResolutionDeps` were supplied at construction.
+   *
+   * Resolution fetches normalized spans for the whole trace and isolates the
+   * requested span after resolution — this reuses the same
+   * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
+   * eventref pointers on the same trace are also resolved consistently.
+   */
   async getSpanById(params: BySpanId): Promise<Span | null> {
-    return this.repository.getSpanByIds(params);
+    if (!this.blobResolutionDeps) {
+      return this.repository.getSpanByIds(params);
+    }
+
+    // Resolve the single span via the normalized+resolve path.
+    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const { resolvedSpans } = await resolveOffloadedTraces({
+      projectId: params.tenantId,
+      normalizedSpans,
+      blobStore: this.blobResolutionDeps.blobStore,
+      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
+      logger: this.logger,
+    });
+    const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
+    if (!resolved) return null;
+    return mapNormalizedSpanToSpan(resolved);
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
