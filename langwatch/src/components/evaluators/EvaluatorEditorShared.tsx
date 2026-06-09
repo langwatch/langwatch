@@ -47,6 +47,8 @@ import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/W
 
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
+import { LLMJudgeVariableEditor } from "./LLMJudgeVariableEditor";
+import { parseHandlebars } from "./parseHandlebars";
 
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
@@ -456,6 +458,28 @@ export function useEvaluatorEditorController(
     if (!evaluatorType) return;
 
     const formValues = form.getValues();
+
+    // For custom LLM judges: block publish if prompt contains undeclared variables.
+    if (evaluatorType.startsWith("langevals/llm_")) {
+      const prompt = (formValues.settings?.prompt as string) ?? "";
+      const customVars = (formValues.settings?.custom_variables as string[]) ?? [];
+      const fixedFields = [
+        ...(evaluatorDef?.requiredFields ?? []),
+        ...(evaluatorDef?.optionalFields ?? []),
+      ];
+      const declared = new Set([...fixedFields, ...customVars]);
+      const used = parseHandlebars(prompt);
+      const undeclared = used.filter((v) => !declared.has(v));
+      if (undeclared.length > 0) {
+        toaster.create({
+          title: "Undeclared variable",
+          description: `${undeclared.map((v) => `{{${v}}}`).join(", ")} ${undeclared.length === 1 ? "is" : "are"} not declared as input variables. Add ${undeclared.length === 1 ? "it" : "them"} via "+ Add input variable" before saving.`,
+          type: "error",
+        });
+        return;
+      }
+    }
+
     const config = {
       evaluatorType,
       settings: formValues.settings,
@@ -649,6 +673,36 @@ export function EvaluatorEditorBody({
             data-testid="evaluator-name-input"
           />
         </Field.Root>
+
+        {evaluatorType?.startsWith("langevals/llm_") && (
+          <LLMJudgeVariableEditor
+            fixedFields={[
+              ...(evaluatorDef?.requiredFields ?? []),
+              ...(evaluatorDef?.optionalFields ?? []),
+            ]}
+            customVariables={
+              (form.watch("settings.custom_variables") as string[] | undefined) ?? []
+            }
+            onAddVariable={(name) => {
+              const current =
+                (form.getValues("settings.custom_variables") as string[] | undefined) ?? [];
+              form.setValue("settings.custom_variables", [...current, name]);
+            }}
+            onRemoveCustomVariable={(name) => {
+              const current =
+                (form.getValues("settings.custom_variables") as string[] | undefined) ?? [];
+              form.setValue(
+                "settings.custom_variables",
+                current.filter((v) => v !== name),
+              );
+            }}
+            onChipClick={(name) => {
+              const current =
+                (form.getValues("settings.prompt") as string | undefined) ?? "";
+              form.setValue("settings.prompt", `${current}{{${name}}}`);
+            }}
+          />
+        )}
 
         {hasSettings && evaluatorType && settingsSchema && (
           <DynamicZodForm
