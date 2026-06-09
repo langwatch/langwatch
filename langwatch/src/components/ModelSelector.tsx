@@ -190,6 +190,8 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode,
   showConfigureAction = false,
   forFeatureLabel,
+  open,
+  onOpenChange,
 }: {
   model: string;
   options: string[];
@@ -202,6 +204,10 @@ export const ModelSelector = React.memo(function ModelSelector({
    *  models are available — e.g. "for AI search", "for evaluators".
    *  Optional; the callout falls back to a generic message. */
   forFeatureLabel?: string;
+  /** Controlled open state. Pass with onOpenChange to drive the dropdown
+   *  from outside — e.g. force-close it when the parent collapses. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { selectOptions, groupedByProvider, isEmpty, isLoading } =
     useModelSelectionOptions(options, model, mode);
@@ -343,6 +349,10 @@ export const ModelSelector = React.memo(function ModelSelector({
           onChange(selectedValue);
         }
       }}
+      {...(open !== undefined ? { open } : {})}
+      {...(onOpenChange
+        ? { onOpenChange: (e) => onOpenChange(e.open) }
+        : {})}
       loopFocus={true}
       highlightedValue={highlightedValue}
       onHighlightChange={(details) => {

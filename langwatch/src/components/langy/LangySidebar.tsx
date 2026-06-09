@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Circle,
+  Flex,
   HStack,
   IconButton,
   Separator,
@@ -25,7 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
@@ -41,6 +42,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { api } from "~/utils/api";
 import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
@@ -1024,10 +1026,25 @@ function Composer({
   canSend: boolean;
 }) {
   const filled = input.trim().length > 0;
+  const [pickerExpanded, setPickerExpanded] = useState(false);
+  const [pickerDropdownOpen, setPickerDropdownOpen] = useState(false);
   const typewriterPlaceholder = useTypewriterPlaceholder(
     !filled && !isBusy && !disabled,
     COMPOSER_PLACEHOLDER_EXAMPLES,
   );
+  // Provider icon for the currently-selected model. Used by the collapsed
+  // pill so we render a clean centered logo instead of clipping the full
+  // ModelSelector trigger to 30px (which leaves the model name cut in half).
+  const collapsedProviderIcon = useMemo(() => {
+    const providerKey = (model ?? "").split("/")[0] ?? "";
+    return (
+      modelProviderIcons[providerKey as keyof typeof modelProviderIcons] ?? null
+    );
+  }, [model]);
+  const collapsePicker = () => {
+    setPickerExpanded(false);
+    setPickerDropdownOpen(false);
+  };
   return (
     <>
       <Separator />
@@ -1038,18 +1055,73 @@ function Composer({
         background="bg.surface"
         flexShrink={0}
       >
-        {/* Per-send model picker. ChatGPT-style chip above the input pill.
-            Pre-seeded with the project's currently-resolved Langy model;
-            user can switch on a per-send basis. */}
-        <Box marginBottom={2} data-testid="langy-model-picker">
-          <ModelSelector
-            model={model}
-            options={modelOptions}
-            onChange={onModelChange}
-            mode="chat"
-            size="sm"
-          />
-        </Box>
+        {/* Per-send model picker. Collapsed to a small bubble showing just
+            the provider logo; on hover/focus the bubble fluidly expands into
+            the full picker. ModelSelector stays mounted — width animation
+            reveals the model label + caret without a remount. */}
+        <Flex
+          justifyContent="flex-end"
+          marginBottom={1.5}
+          data-testid="langy-model-picker"
+          data-model={model}
+          onMouseEnter={() => setPickerExpanded(true)}
+          onMouseLeave={collapsePicker}
+          onFocus={() => setPickerExpanded(true)}
+        >
+          <Box
+            position="relative"
+            width={pickerExpanded ? "180px" : "30px"}
+            height="28px"
+            borderRadius="full"
+            transition="width 220ms ease-out"
+            transformOrigin="right center"
+            _dark={{ "& svg path": { fill: "white" } }}
+            cursor="pointer"
+          >
+            {/* Collapsed view: just the provider logo, centered, sized to
+                match the icon the expanded ModelSelector renders so the
+                logo doesn't visibly grow/shrink across the transition.
+                Crossfade is short so the swap reads as a reveal, not a
+                morph. */}
+            <Flex
+              position="absolute"
+              inset={0}
+              align="center"
+              justify="center"
+              opacity={pickerExpanded ? 0 : 1}
+              transition="opacity 120ms ease-out"
+              pointerEvents={pickerExpanded ? "none" : "auto"}
+              aria-hidden={pickerExpanded}
+            >
+              <Box width="14px" height="14px" lineHeight={0}>
+                {collapsedProviderIcon}
+              </Box>
+            </Flex>
+            {/* Expanded view: full ModelSelector. Controlled open state so
+                mouse-leave can close the dropdown alongside collapsing the
+                pill — otherwise the popover floats orphaned. */}
+            <Box
+              position="absolute"
+              inset={0}
+              overflow="hidden"
+              borderRadius="full"
+              opacity={pickerExpanded ? 1 : 0}
+              transition="opacity 200ms ease-out"
+              pointerEvents={pickerExpanded ? "auto" : "none"}
+              aria-hidden={!pickerExpanded}
+            >
+              <ModelSelector
+                model={model}
+                options={modelOptions}
+                onChange={onModelChange}
+                mode="chat"
+                size="sm"
+                open={pickerDropdownOpen}
+                onOpenChange={setPickerDropdownOpen}
+              />
+            </Box>
+          </Box>
+        </Flex>
         <HStack
           gap={2}
           paddingY={1.5}
@@ -1107,8 +1179,8 @@ function Composer({
               aria-label="Send"
               onClick={onSend}
               disabled={!canSend}
-              background={canSend ? "transparent" : "#f5f5f4"}
-              color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
+              background={canSend ? "transparent" : "bg.muted"}
+              color={canSend ? "white" : "fg.muted"}
               shadow={canSend}
               cursor={canSend ? "pointer" : "default"}
               meshOverlay={canSend}
