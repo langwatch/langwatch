@@ -60,8 +60,7 @@ export function serveStaticOrFallback({
   }
 
   const staticPath = path.join(clientDistDir, normalizedRelative);
-  if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
-    serveStaticFile(res, staticPath, pathname);
+  if (tryServeFile(res, staticPath, pathname)) {
     return true;
   }
 
@@ -74,32 +73,86 @@ export function serveStaticOrFallback({
   }
 
   const indexHtml = path.join(clientDistDir, "index.html");
-  if (fs.existsSync(indexHtml)) {
-    res.setHeader("Content-Type", "text/html");
-    res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
-    fs.createReadStream(indexHtml).pipe(res);
-    return true;
-  }
-
-  return false;
+  return tryServeSpaFallback(res, indexHtml);
 }
 
-function serveStaticFile(
+/**
+ * Open + stream a static file in one step, avoiding the TOCTOU race between
+ * existsSync and createReadStream. Returns false when the file doesn't exist
+ * or isn't a regular file so the caller can fall through.
+ */
+function tryServeFile(
   res: ServerResponse,
   filePath: string,
-  pathname: string
-) {
+  pathname: string,
+): boolean {
+  let fd: number;
+  try {
+    fd = fs.openSync(filePath, "r");
+  } catch {
+    return false;
+  }
+
+  const stat = fs.fstatSync(fd);
+  if (!stat.isFile()) {
+    fs.closeSync(fd);
+    return false;
+  }
+
   const ext = path.extname(filePath);
   res.setHeader(
     "Content-Type",
-    MIME_TYPES[ext] ?? "application/octet-stream"
+    MIME_TYPES[ext] ?? "application/octet-stream",
   );
   if (pathname.startsWith("/assets/")) {
     res.setHeader("Cache-Control", IMMUTABLE_CACHE);
   } else if (ext === ".html") {
-    // Direct /index.html hits this path; keep it revalidated like the SPA
-    // fallback so a post-deploy reload never re-serves a stale shell.
     res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
   }
-  fs.createReadStream(filePath).pipe(res);
+
+  pipeWithErrorHandling(fs.createReadStream("", { fd }), res);
+  return true;
+}
+
+/**
+ * Serve the SPA shell (index.html) as a fallback for non-asset routes.
+ * Returns false only when index.html itself doesn't exist.
+ */
+function tryServeSpaFallback(
+  res: ServerResponse,
+  indexHtmlPath: string,
+): boolean {
+  let fd: number;
+  try {
+    fd = fs.openSync(indexHtmlPath, "r");
+  } catch {
+    return false;
+  }
+
+  res.setHeader("Content-Type", "text/html");
+  res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
+  pipeWithErrorHandling(fs.createReadStream("", { fd }), res);
+  return true;
+}
+
+/**
+ * Pipe a readable stream to the response with error handling. On stream
+ * error, respond with 500 if headers haven't been sent yet, otherwise
+ * just destroy the connection cleanly.
+ */
+function pipeWithErrorHandling(
+  stream: fs.ReadStream,
+  res: ServerResponse,
+): void {
+  stream.on("error", () => {
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "text/plain");
+      res.setHeader("Cache-Control", NO_STORE_CACHE);
+      res.end("Internal Server Error");
+    } else {
+      res.destroy();
+    }
+  });
+  stream.pipe(res);
 }

@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, request as httpRequest, type Server } from "http";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { AddressInfo } from "net";
@@ -157,6 +163,25 @@ describe("serveStaticOrFallback", () => {
       const port = (server.address() as AddressInfo).port;
       const res = await rawRequest(port, "/assets/../../etc/passwd");
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("when a file is deleted between open and read (TOCTOU)", () => {
+    it("returns 404 instead of crashing with an unhandled stream error", async () => {
+      const ephemeralPath = join(
+        clientDistDir,
+        "assets",
+        "ephemeral-abc123.js",
+      );
+      writeFileSync(ephemeralPath, "console.log('ephemeral');\n");
+
+      const res = await fetch(`${baseUrl}/assets/ephemeral-abc123.js`);
+      expect(res.status).toBe(200);
+
+      unlinkSync(ephemeralPath);
+
+      const res2 = await fetch(`${baseUrl}/assets/ephemeral-abc123.js`);
+      expect(res2.status).toBe(404);
     });
   });
 });
