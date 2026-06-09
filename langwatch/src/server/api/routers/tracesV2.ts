@@ -3,6 +3,9 @@ import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
+import { prisma } from "~/server/db";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -638,6 +641,87 @@ export const tracesV2Router = createTRPCRouter({
       });
 
       return { traceId: input.traceId, newName: parsed.data.newName };
+    }),
+
+  changeMetadata: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        metadata: z.record(
+          z.union([
+            z.string().max(4096),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.record(z.unknown()),
+          ]),
+        ).refine((obj) => Object.keys(obj).length > 0, {
+          message: "metadata must contain at least one key",
+        }).refine(
+          (obj) => JSON.stringify(obj).length <= 32768,
+          { message: "total metadata payload must not exceed 32KB" },
+        ),
+      }),
+    )
+    .use(checkProjectPermission("traces:update"))
+    .mutation(async ({ input }) => {
+      const RESERVED_METADATA_KEYS = new Set([
+        "user_id", "customer_id", "thread_id", "labels",
+      ]);
+
+      const reserved: ReservedTraceMetadata = {};
+      const custom: CustomMetadata = {};
+      for (const [key, value] of Object.entries(input.metadata)) {
+        if (RESERVED_METADATA_KEYS.has(key)) {
+          (reserved as Record<string, unknown>)[key] = value;
+        } else {
+          custom[key] = value as CustomMetadata[string];
+        }
+      }
+
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata: reserved,
+        customMetadata: custom,
+      });
+
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: input.projectId },
+        select: { piiRedactionLevel: true },
+      });
+
+      const now = Date.now();
+      const nowNano = String(now * 1_000_000);
+      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      await getApp().traces.recordSpan({
+        tenantId: input.projectId,
+        span: {
+          traceId: input.traceId,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.metadata_update",
+          kind: 1,
+          startTimeUnixNano: nowNano,
+          endTimeUnixNano: nowNano,
+          attributes: [
+            { key: "langwatch.span.type", value: { stringValue: "span" } },
+          ],
+          events: [],
+          links: [],
+          status: { code: 1 },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource,
+        instrumentationScope: { name: "langwatch.api.metadata_update" },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: now,
+      });
+
+      return { traceId: input.traceId };
     }),
 
   spansPaginated: protectedProcedure
