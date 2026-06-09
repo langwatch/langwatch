@@ -25,13 +25,19 @@ const tag = nanoid();
 // short retention floor (a fixed past date would be GC'd by the _retention_days
 // TTL). The +/-2-day hint window dwarfs any host-vs-container clock skew, so the
 // host-side Date.now() hint reliably covers the container-side insert time.
-async function insertMarkedLog(
-  tenantId: string,
-  traceId: string,
-  spanId: string,
-  agoSec: number,
-  marked: boolean,
-) {
+async function insertMarkedLog({
+  tenantId,
+  traceId,
+  spanId,
+  agoSec,
+  marked,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  agoSec: number;
+  marked: boolean;
+}) {
   await ch.command({
     query: `
       INSERT INTO stored_log_records
@@ -75,10 +81,28 @@ describe("getMarkedClaudeCodeLogsByTrace partition hint", () => {
   const traceId = `${tag}-trace`;
 
   beforeAll(async () => {
-    await insertMarkedLog(tenantId, traceId, `${tag}-a`, 10, true);
-    await insertMarkedLog(tenantId, traceId, `${tag}-b`, 5, true);
+    await insertMarkedLog({
+      tenantId,
+      traceId,
+      spanId: `${tag}-a`,
+      agoSec: 10,
+      marked: true,
+    });
+    await insertMarkedLog({
+      tenantId,
+      traceId,
+      spanId: `${tag}-b`,
+      agoSec: 5,
+      marked: true,
+    });
     // An unmarked log for the same trace must never be returned.
-    await insertMarkedLog(tenantId, traceId, `${tag}-c`, 5, false);
+    await insertMarkedLog({
+      tenantId,
+      traceId,
+      spanId: `${tag}-c`,
+      agoSec: 5,
+      marked: false,
+    });
   });
 
   describe("when a TimeUnixMs hint around the turn is supplied", () => {
