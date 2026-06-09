@@ -23,6 +23,7 @@ const logger = createLogger("langwatch:ops:metrics-collector");
 
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
+const PENDING_RECONCILE_INTERVAL_MS = 60_000;
 const DASHBOARD_BROADCAST_INTERVAL_MS = 2_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
@@ -277,6 +278,7 @@ export class OpsMetricsCollector {
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
   private broadcastInterval: ReturnType<typeof setInterval> | null = null;
+  private reconcileInterval: ReturnType<typeof setInterval> | null = null;
   private lastCpuUsage = process.cpuUsage();
   private lastCpuTime = Date.now();
   private currentCpuPercent = 0;
@@ -291,6 +293,7 @@ export class OpsMetricsCollector {
   >();
   private currentJobNameMetrics: JobNameMetrics[] = [];
   private currentPausedKeys: string[] = [];
+  private latestPendingDrift = 0;
   private knownPipelinePaths: string[] = [];
   private isCollecting = false;
   private prevCompleted = new Map<string, number>();
@@ -330,6 +333,11 @@ export class OpsMetricsCollector {
       () => this.discoverQueues(),
       QUEUE_DISCOVERY_INTERVAL_MS,
     );
+    this.reconcileInterval = setInterval(
+      () => this.reconcilePending(),
+      PENDING_RECONCILE_INTERVAL_MS,
+    );
+    void this.reconcilePending();
     this.broadcastInterval = setInterval(() => {
       if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
       try {
@@ -352,6 +360,10 @@ export class OpsMetricsCollector {
     if (this.broadcastInterval) {
       clearInterval(this.broadcastInterval);
       this.broadcastInterval = null;
+    }
+    if (this.reconcileInterval) {
+      clearInterval(this.reconcileInterval);
+      this.reconcileInterval = null;
     }
     this.emitter.removeAllListeners();
   }
@@ -410,6 +422,25 @@ export class OpsMetricsCollector {
       computedAt: new Date(now),
     };
     return this.badgeCountsCache;
+  }
+
+  private async reconcilePending(): Promise<void> {
+    try {
+      let totalDrift = 0;
+      for (const queueName of this.groupQueueNames) {
+        const result = await this.queueRepo.reconcileTotalPending(queueName);
+        if (result) totalDrift += Math.abs(result.drift);
+      }
+      this.latestPendingDrift = totalDrift;
+      if (totalDrift !== 0) {
+        logger.info(
+          { pendingDrift: totalDrift },
+          "Reconciled GroupQueue pending counter to ground truth",
+        );
+      }
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to reconcile pending counter");
+    }
   }
 
   getDashboardData(): DashboardData {
@@ -486,6 +517,7 @@ export class OpsMetricsCollector {
       blockedGroups,
       parkedGroups,
       totalPendingJobs,
+      pendingDrift: this.latestPendingDrift,
       throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
       totalFailed: this.latestTotalFailed,

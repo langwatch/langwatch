@@ -121,6 +121,8 @@ export interface DashboardData {
   blockedGroups: number;
   parkedGroups: number;
   totalPendingJobs: number;
+  // counter − ground-truth drift from the last reconcile cycle (0 = healthy); see #4683
+  pendingDrift: number;
   throughputIngestedPerSec: number;
   totalCompleted: number;
   totalFailed: number;
