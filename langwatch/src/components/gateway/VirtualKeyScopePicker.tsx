@@ -3,13 +3,13 @@ import { Text, VStack } from "@chakra-ui/react";
 import { SmallLabel } from "../SmallLabel";
 import {
   ScopeChipPicker,
-  type ScopeChipPickerEntry,
-  type ScopeChipPickerScopeType,
+  type ScopeTriadEntry,
+  type ScopeTriadType,
 } from "../settings/ScopeChipPicker";
 import { ProviderScopeChips } from "../settings/ProviderScopeChips";
 
-export type VirtualKeyScopeType = ScopeChipPickerScopeType;
-export type VirtualKeyScopeEntry = ScopeChipPickerEntry;
+export type VirtualKeyScopeType = ScopeTriadType;
+export type VirtualKeyScopeEntry = ScopeTriadEntry;
 
 const VK_SCOPE_DESCRIPTION_SINGLE: Record<VirtualKeyScopeType, string> = {
   PROJECT: "Only this project's consumers can use this key.",
@@ -46,11 +46,11 @@ function summariseVkSelection(scopes: VirtualKeyScopeEntry[]): string {
  * Multi-scope picker for VirtualKey. Mirrors ModelProviderScopeSection
  * shape (iter 109): same `ScopeChipPicker` primitive, VK-specific copy.
  *
- * Read-only mode for existing VKs (`isExisting=true`) — scope changes
+ * Read-only mode for existing VKs (`isExisting=true`) - scope changes
  * happen by delete + recreate so trace ownership never silently shifts.
  *
  * Caller is responsible for filtering `availableTeams`/`availableProjects`
- * down to those where the user holds `virtualKeys:manage` at that scope —
+ * down to those where the user holds `virtualKeys:manage` at that scope -
  * the spec's RBAC contract (vk-scope-rbac.feature) requires every chosen
  * scope to be a perm-grant the user actually holds; the picker shouldn't
  * surface unreachable scopes.

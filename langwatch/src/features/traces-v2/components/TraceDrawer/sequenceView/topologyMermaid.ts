@@ -93,10 +93,10 @@ function nearestParentNode(
   return null;
 }
 
-// Palette mirrors the waterfall's SPAN_TYPE_COLORS / SPAN_TYPE_BADGE_STYLES.
-// Mermaid's graph parser doesn't reliably accept CSS `var(...)` refs inside
-// classDef, so we emit resolved hex per colour mode and let the surrounding
-// effect re-render on theme change.
+// Palette mirrors the waterfall's SPAN_TYPE_COLORS and SpanTypeBadge's
+// PALETTE_BY_TYPE. Mermaid's graph parser doesn't reliably accept CSS
+// `var(...)` refs inside classDef, so we emit resolved hex per colour
+// mode and let the surrounding effect re-render on theme change.
 const LIGHT_PALETTE = {
   agent: { bg: "#F3E8FF", fg: "#6B21A8", stroke: "#A855F7" },
   llm: { bg: "#DBEAFE", fg: "#1D4ED8", stroke: "#3B82F6" },

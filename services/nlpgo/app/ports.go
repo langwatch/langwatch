@@ -1,13 +1,12 @@
-// Package app is the nlpgo application layer. It wires the engine,
-// child-process manager, and gateway client together. All external
-// dependencies are accessed through interfaces declared here so the
-// app stays testable without real upstreams.
+// Package app is the nlpgo application layer. It wires the engine and
+// gateway client together. All external dependencies are accessed
+// through interfaces declared here so the app stays testable without
+// real upstreams.
 package app
 
 import (
 	"context"
 	"io"
-	"net/http"
 	"time"
 )
 
@@ -44,9 +43,8 @@ type GatewayResponse struct {
 }
 
 // StreamIterator is the gateway streaming-response shape. Mirrors
-// services/aigateway/domain.StreamIterator on purpose so the proxy
-// passthrough adapter (adapters/proxypass) can reuse the same wire
-// format without re-framing.
+// services/aigateway/domain.StreamIterator on purpose so the playground
+// proxy passthrough can reuse the same wire format without re-framing.
 type StreamIterator interface {
 	Next(ctx context.Context) bool
 	Chunk() []byte
@@ -177,29 +175,6 @@ type CodeError struct {
 	Type      string
 	Message   string
 	Traceback string
-}
-
-// ChildHealth probes the uvicorn child for readiness. Used by the
-// /healthz aggregation in serve.go.
-type ChildHealth interface {
-	Healthy(ctx context.Context) error
-}
-
-// ChildProxy reverse-proxies any unmatched (non-/go/*) request to the
-// uvicorn child process. Implemented by adapters/proxypass.
-type ChildProxy interface {
-	http.Handler
-}
-
-// ChildManager owns the lifecycle of the uvicorn child process.
-// Implemented by adapters/uvicornchild.
-type ChildManager interface {
-	Start(ctx context.Context) error
-	Stop()
-	Healthy(ctx context.Context) error
-	// Fatal returns a channel that emits when the child exits unexpectedly,
-	// so the lifecycle group can tear nlpgo down with the same exit code.
-	Fatal() <-chan error
 }
 
 // SecretsResolver resolves a secret reference like {{ secrets.NAME }} at

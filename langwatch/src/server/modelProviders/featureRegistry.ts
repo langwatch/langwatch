@@ -53,6 +53,20 @@ const REGISTRY: FeatureDescriptor[] = [
     description:
       "Model written into a freshly created LLM-as-a-judge evaluator.",
   },
+  {
+    key: "scenarios.user_simulator",
+    role: "DEFAULT",
+    displayName: "Scenario user simulator",
+    description:
+      "Model that role-plays the user in scenario simulations.",
+  },
+  {
+    key: "scenarios.judge",
+    role: "DEFAULT",
+    displayName: "Scenario judge",
+    description:
+      "Model that judges whether a scenario met its success criteria.",
+  },
 
   // FAST — assistive / background surfaces.
   {

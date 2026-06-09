@@ -7,7 +7,6 @@ import {
   createIngestionTemplate,
   getIngestionTemplate,
   GovernanceCliError,
-  listIngestionTemplates,
   updateIngestionTemplateOttlRules,
 } from "@/cli/utils/governance/cli-api";
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
@@ -68,23 +67,6 @@ function printTemplateList(rows: IngestionTemplateRow[]): void {
       )}  ${chalk.gray(t.slug)}  ${chalk.gray(t.source_type)}`,
     );
   }
-}
-
-export async function listCommand(options: {
-  json?: boolean;
-}): Promise<void> {
-  const cfg = requireLogin();
-  let rows: IngestionTemplateRow[];
-  try {
-    rows = await listIngestionTemplates(cfg);
-  } catch (err) {
-    handleError(err);
-  }
-  if (options.json) {
-    console.log(JSON.stringify(rows, null, 2));
-    return;
-  }
-  printTemplateList(rows);
 }
 
 export async function adminListCommand(options: {

@@ -68,12 +68,24 @@ export const LensTab: React.FC<LensTabProps> = ({
     revertLens(lens.id);
   };
 
+  // Build the screen-reader label up front so the badge count reads
+  // separated from the lens name. Without an explicit aria-label the
+  // browser concatenates the inner text ("Errors" + the badge's "5")
+  // into a single string "Errors5" — fine visually because the badge
+  // is offset with margin, broken for screen readers and any DOM-text
+  // consumer (test assertions, analytics).
+  const ariaLabel =
+    errorCount > 0
+      ? `${lens.name}, ${errorCount} error${errorCount === 1 ? "" : "s"}`
+      : undefined;
+
   const trigger = (
     <Tabs.Trigger
       value={lens.id}
       paddingX={2}
       minWidth="auto"
       gap={1}
+      aria-label={ariaLabel}
       display={hidden ? "none" : undefined}
       onDoubleClick={handleDoubleClick}
     >
@@ -167,10 +179,17 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
             <PopoverTrigger asChild>
               <Box
                 as="button"
-                width="6px"
-                height="6px"
+                // Bumped 6px → 8px + ring. Original was easy to miss
+                // (especially against busy backgrounds), and missing it
+                // meant a stale draft filter loaded from localStorage
+                // could silently scope the table to a previous session's
+                // query without the user realising. The ring gives the
+                // dot some "halo" so it pops at a glance.
+                width="8px"
+                height="8px"
                 borderRadius="full"
                 backgroundColor="orange.solid"
+                boxShadow="0 0 0 2px var(--chakra-colors-orange-subtle)"
                 display="inline-block"
                 flexShrink={0}
                 cursor="pointer"
@@ -234,6 +253,13 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
 };
 
 const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
+  // The lens-tab error count is the only aggregate "how bad is it right now"
+  // signal on the trace explorer — every other surface (row tint, in-drawer
+  // exception accordion) is per-trace. It needs to read at a glance from
+  // across the room, so it's the only place we use a `solid` red badge
+  // instead of the subtle/muted treatment the rest of the tabs use. The
+  // count is bound to the user's currently-selected time range so it
+  // matches the window every other panel is querying.
   <Box
     as="span"
     display="inline-flex"
@@ -243,17 +269,16 @@ const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
     paddingX={1.5}
     paddingY="1px"
     borderRadius="full"
-    bg="red.subtle"
-    color="red.fg"
-    borderWidth="1px"
-    borderColor="red.muted"
-    fontSize="2xs"
-    fontWeight="semibold"
+    bg="red.solid"
+    color="red.contrast"
+    fontSize="xs"
+    fontWeight="bold"
     lineHeight="1"
-    minWidth="18px"
-    height="16px"
+    minWidth="20px"
+    height="18px"
     justifyContent="center"
     fontVariantNumeric="tabular-nums"
+    boxShadow="0 1px 2px rgba(220,38,38,0.25)"
   >
     {count > 99 ? "99+" : count}
   </Box>

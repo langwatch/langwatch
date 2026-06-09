@@ -8,7 +8,7 @@ import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 type VenvSpec = {
-  name: "langevals" | "langwatch_nlp";
+  name: "langevals";
   projectDir: string;
   lockFile: string;
   extras?: string[];
@@ -60,14 +60,10 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
+function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
-  // langwatch_nlp's uv venv is only built when ctx.nlpMode === "python"
-  // (the legacy escape hatch). The default `go` mode runs nlpgo from the
-  // aigateway monobinary and the langwatch_nlp Python project still ships
-  // in the npm tarball for the source-of-truth runner.py codeblock
-  // harness, but its uvicorn dependencies are skipped to save 100MB+
-  // and ~30s of cold-install time.
+  // langevals is the only Python venv we build — nlpgo runs from the
+  // aigateway monobinary and needs no uv environment.
   const specs: VenvSpec[] = [
     {
       name: "langevals",
@@ -85,19 +81,11 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       // evaluator request 404s, langwatch app's runEvaluation throws
       // `404 {"detail":"Not Found"}`, and the experiments workbench column
       // shows 'Internal error' for every row. We install all extras so the
-      // evaluator dispatch from langwatch_nlp + the legacy-eval REST route
-      // can reach a real evaluator implementation.
+      // evaluator dispatch + the legacy-eval REST route can reach a real
+      // evaluator implementation.
       extras: ["all"],
     },
   ];
-
-  if (ctx.nlpMode === "python") {
-    specs.push({
-      name: "langwatch_nlp",
-      projectDir: join(root, "langwatch_nlp"),
-      lockFile: join(root, "langwatch_nlp", "uv.lock"),
-    });
-  }
 
   return specs;
 }

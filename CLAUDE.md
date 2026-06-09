@@ -20,7 +20,7 @@ If no feature file exists for your task, create one before writing code.
 ```bash
 make quickstart                        # Interactive preset picker
 make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)
-make quickstart all-local-nlp          # all-local + langwatch_nlp + langevals
+make quickstart all-local-nlp          # all-local + nlpgo + langevals
 make quickstart dev-storage            # Local DBs + workers, stored-objects -> dev S3 (runtime-storage-dev)
 make quickstart dev-infra              # Local app + redis + workers compose; shared dev for PG/CH/NLP/S3
 make quickstart frontend-only          # No compose, fastest — UI / design work
@@ -82,8 +82,8 @@ When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — 
 
 ```
 langwatch/           # Next.js app (main product)
-langwatch_nlp/       # Python NLP service
 langwatch_server/    # Python server
+services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
 charts/gateway/      # Helm sub-chart for the gateway
 python-sdk/          # Python SDK

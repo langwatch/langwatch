@@ -39,10 +39,9 @@ function isUnderNodeModules(p: string): boolean {
  * dies on the first `pnpm clickhouse:migrate` boot. Moving the tree to
  * ~/.langwatch/app/ takes the source out of any node_modules ancestry.
  *
- * Copies langwatch/, langwatch_nlp/, langevals/, python-sdk/, services/,
- * etc. as siblings — preserves the relative `editable+../python-sdk`
- * references that langwatch_nlp's pyproject and langevals/ts-integration's
- * generators rely on.
+ * Copies langwatch/, langevals/, python-sdk/, services/, etc. as siblings —
+ * preserves the relative `editable+../python-sdk` references that
+ * langevals/ts-integration's generators rely on.
  *
  * Skips node_modules subtrees: those are reinstalled by ensureLangwatchDeps
  * directly in the relocated dir. Idempotent via a .installed-version

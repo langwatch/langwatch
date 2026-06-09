@@ -60,14 +60,14 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("Persona 3 — project-only LLMOps (must not regress)", () => {
-    it("returns /<projectSlug>/messages when user has project but no personal VK", () => {
+    it("returns /<projectSlug> when user has project but no personal VK", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         hasApplicationTraces: true,
         firstProjectSlug: "team-prod",
       });
       expect(result.persona).toBe("project_only");
-      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).toBe("/team-prod");
     });
 
     it("regression invariant — org admin on Enterprise but no governance state stays project_only", () => {
@@ -84,7 +84,7 @@ describe("resolvePersonaHome", () => {
         firstProjectSlug: "team-prod",
       });
       expect(result.persona).toBe("project_only");
-      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).toBe("/team-prod");
       expect(result.destination).not.toBe("/governance");
     });
   });
@@ -137,11 +137,11 @@ describe("resolvePersonaHome", () => {
     it("returns userLastHomePath when set, regardless of persona", () => {
       const result = resolvePersonaHome({
         ...baseInput,
-        userLastHomePath: "/team-prod/messages",
+        userLastHomePath: "/team-prod",
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: "team-prod",
       });
-      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).toBe("/team-prod");
       expect(result.isOverride).toBe(true);
       // Persona is still detected even when overridden
       expect(result.persona).toBe("mixed");
@@ -160,7 +160,7 @@ describe("resolvePersonaHome", () => {
       // flag-gated and 404s, so the destination falls back to the project
       // home — this is the impersonated-customer case.
       expect(result.persona).toBe("mixed");
-      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).toBe("/team-prod");
       expect(result.governanceUiEnabled).toBe(false);
     });
 
@@ -173,7 +173,7 @@ describe("resolvePersonaHome", () => {
         setupState: { ...baseInput.setupState, hasIngestionSources: true },
         firstProjectSlug: "team-prod",
       });
-      expect(result.destination).toBe("/team-prod/messages");
+      expect(result.destination).toBe("/team-prod");
       expect(result.destination).not.toBe("/governance");
     });
 
@@ -221,7 +221,7 @@ describe("resolvePersonaHomeSafe", () => {
       firstProjectSlug: "team-prod",
     });
     expect(result.persona).toBe("project_only");
-    expect(result.destination).toBe("/team-prod/messages");
+    expect(result.destination).toBe("/team-prod");
   });
 
   it("falls back to onboarding when partial input has no project slug and no governance UI", () => {
@@ -248,7 +248,7 @@ describe("resolvePersonaHomeSafe", () => {
       // Everything else defaulted to false / null — simulates a stale
       // setupState response
     });
-    expect(result.destination).toBe("/team-prod/messages");
+    expect(result.destination).toBe("/team-prod");
     expect(result.destination).not.toBe("/governance");
     expect(result.destination).not.toBe("/me");
   });

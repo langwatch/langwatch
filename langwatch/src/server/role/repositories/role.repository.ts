@@ -158,6 +158,18 @@ export class RoleRepository {
     apiKeyId: string;
   }) {
     if (roleIds.length === 0) return;
+    // Drop this api key's CUSTOM bindings that point at these roles FIRST.
+    // The customRoleId FK is ON DELETE SET NULL, but the
+    // RoleBinding_custom_role_check constraint forbids a CUSTOM binding with a
+    // null customRoleId, so deleting the role while its binding still exists
+    // throws. Once the binding is gone the role can be deleted cleanly (and an
+    // exclusive role is left with zero bindings, which `every` matches
+    // vacuously). Bindings of a revoked key are void anyway — the key row
+    // survives (revokedAt) as the audit record. Shared roles (bindings from
+    // other keys remain) fail the `every` guard and are correctly kept.
+    await this.prisma.roleBinding.deleteMany({
+      where: { apiKeyId, customRoleId: { in: roleIds } },
+    });
     await this.prisma.customRole.deleteMany({
       where: {
         id: { in: roleIds },

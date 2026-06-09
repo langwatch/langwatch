@@ -1,6 +1,4 @@
 export { StorageMeterService } from "./metering/storageMeter.service";
-export { OrphanSweepRepository } from "./orphan-sweep/orphanSweep.repository";
-export { OrphanSweepService } from "./orphan-sweep/orphanSweep.service";
 export { PinnedTraceRepository } from "./pinning/pinnedTrace.repository";
 export { PinnedTraceService } from "./pinning/pinnedTrace.service";
 export { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repository";

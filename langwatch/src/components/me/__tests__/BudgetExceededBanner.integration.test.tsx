@@ -85,6 +85,36 @@ describe("BudgetExceededBanner", () => {
     });
   });
 
+  describe("when adminEmail is actually a URL (free-text supportContact)", () => {
+    it("renders the URL as a link with target=_blank", () => {
+      renderBanner({ adminEmail: "https://acme.test/help" });
+
+      const link = screen.getByRole("link", { name: "https://acme.test/help" });
+      expect(link.getAttribute("href")).toBe("https://acme.test/help");
+      expect(link.getAttribute("target")).toBe("_blank");
+    });
+  });
+
+  describe("when adminEmail is plain text (free-text supportContact)", () => {
+    it("renders the text without a link", () => {
+      renderBanner({ adminEmail: "ping @platform on Slack" });
+
+      expect(screen.getByText("ping @platform on Slack")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /ping @platform on Slack/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when adminEmail already has a mailto: prefix", () => {
+    it("does not double-prefix the href", () => {
+      renderBanner({ adminEmail: "mailto:ops@acme.test" });
+
+      const link = screen.getByRole("link", { name: "mailto:ops@acme.test" });
+      expect(link.getAttribute("href")).toBe("mailto:ops@acme.test");
+    });
+  });
+
   describe("when neither requestIncreaseUrl nor adminEmail is provided", () => {
     it("renders only the title + main message (no CTA row)", () => {
       renderBanner({ requestIncreaseUrl: null, adminEmail: null });

@@ -2,12 +2,12 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   As an end user managing my own LangWatch credentials across machines
   I want a single inventory of every active session and device-bound
   credential I have — including web sign-ins, CLI device logins, and
-  binding tokens minted from /me Trace Ingest — with a clear revoke
+  ingestion keys minted from /me Trace Ingest — with a clear revoke
   affordance and a label that tells me which laptop / process it belongs to
   And as an org admin enforcing a maximum session lifetime
   I want a per-organization `maxSessionDurationDays` policy that applies
   uniformly to every credential type — short-lived web cookies, long-lived
-  CLI device tokens, and never-expiring binding tokens — so compliance
+  CLI device tokens, and never-expiring ingestion keys — so compliance
   with SOC2 / ISO27001 session-lifetime requirements is enforced at
   infrastructure level, not relying on per-user discipline
 
@@ -15,10 +15,11 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     Three credential classes share one inventory:
       • web session — short-lived cookie + refresh
       • CLI device session — `langwatch login --device` against ~/.langwatch
-      • binding token — `ik-lw-<base32>` minted from /me Trace Ingest
+      • ingestion key — `sk-lw-<...>` (write-only, ingest-only ApiKey) minted
+        from /me Trace Ingest
 
-  Per ingestion-templates-catalog.feature + user-ingestion-binding-lifecycle.feature:
-    Binding tokens are TODAY surfaced ONLY at /me Trace Ingest tile-grid
+  Per ingestion-templates-catalog.feature + ingestion-key-lifecycle.feature:
+    Ingestion keys are TODAY surfaced ONLY at /me Trace Ingest tile-grid
     (per-template). They MUST also appear in the unified /me/sessions
     inventory so users can revoke + admins can apply max-session-duration.
 
@@ -30,8 +31,8 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       | session class    | label                       | last used   |
       | web session      | "MacBook Pro — Chrome"      | 2 hours ago |
       | CLI device       | "MacBook Pro — claude-code"  | 1 day ago   |
-      | binding token    | "claude_code template"       | 3 hours ago |
-      | binding token    | "cursor template"            | 12 days ago |
+      | ingestion key    | "claude_code template"       | 3 hours ago |
+      | ingestion key    | "cursor template"            | 12 days ago |
 
   # ---------------------------------------------------------------------------
   # User-facing inventory at /me/sessions
@@ -44,22 +45,22 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       | label                       | class            | revoke affordance |
       | "MacBook Pro — Chrome"      | web              | "Revoke session"  |
       | "MacBook Pro — claude-code" | cli              | "Revoke device"   |
-      | "claude_code template"      | binding          | "Rotate / Revoke" |
-      | "cursor template"           | binding          | "Rotate / Revoke" |
+      | "claude_code template"      | ingest_key       | "Rotate / Revoke" |
+      | "cursor template"           | ingest_key       | "Rotate / Revoke" |
     And each card displays: class icon + human-readable label + last-used
         relative time + first-issued absolute time
     And there is a "Revoke all sessions" button at the top of the page
 
   @bdd @sessions-and-devices @inventory @binding-tokens-included
-  Scenario: Binding tokens appear in /me/sessions alongside CLI sessions
-    Given jane has only one credential — a binding token for claude_code
+  Scenario: Ingestion keys appear in /me/sessions alongside CLI sessions
+    Given jane has only one credential — an ingestion key for claude_code
     When jane navigates to "/me/sessions"
-    Then she sees ONE card for the claude_code binding
-    And the card class label is "Binding · claude_code"
-    And the card last-used reflects `UserIngestionBinding.lastSeenAt`
+    Then she sees ONE card for the claude_code ingestion key
+    And the card class label is "Ingestion key · claude_code"
+    And the card last-used reflects the ingestion key's `lastUsedAt`
     # The /me/sessions inventory is the authoritative single-pane-of-glass
     # for every active credential. No credential type is invisible from this
-    # page (defense against losing track of long-lived tokens).
+    # page (defense against losing track of long-lived keys).
 
   # ---------------------------------------------------------------------------
   # Single-card revoke
@@ -74,10 +75,10 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     And an audit row "<audit kind>" is emitted
 
     Examples:
-      | class    | label                       | audit kind                                      |
-      | web      | "MacBook Pro — Chrome"      | gateway.web_session.revoked                     |
-      | cli      | "MacBook Pro — claude-code" | gateway.cli_device.revoked                      |
-      | binding  | "claude_code template"      | gateway.user_ingestion_binding.uninstalled      |
+      | class      | label                       | audit kind                                      |
+      | web        | "MacBook Pro — Chrome"      | gateway.web_session.revoked                     |
+      | cli        | "MacBook Pro — claude-code" | gateway.cli_device.revoked                      |
+      | ingest_key | "claude_code template"      | gateway.ingestion_key.revoked                   |
 
   # ---------------------------------------------------------------------------
   # Bulk revoke — security-relevant signal
@@ -112,25 +113,25 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     Then the credential "<outcome>"
 
     Examples:
-      | class    | age      | outcome                                                |
-      | web      | 25 days  | succeeds (within window)                               |
-      | web      | 31 days  | rejected with 401 + redirect to /auth/signin           |
-      | cli      | 28 days  | succeeds (within window)                               |
-      | cli      | 35 days  | rejected with 401 + CLI prompts re-login                |
-      | binding  | 29 days  | succeeds (within window)                                |
-      | binding  | 45 days  | rejected with 401 — tile shows "Token expired — rotate" |
+      | class      | age      | outcome                                                |
+      | web        | 25 days  | succeeds (within window)                               |
+      | web        | 31 days  | rejected with 401 + redirect to /auth/signin           |
+      | cli        | 28 days  | succeeds (within window)                               |
+      | cli        | 35 days  | rejected with 401 + CLI prompts re-login                |
+      | ingest_key | 29 days  | succeeds (within window)                                |
+      | ingest_key | 45 days  | rejected with 401 — tile shows "Key expired — rotate"   |
 
   @bdd @sessions-and-devices @max-duration @policy-change-applies-going-forward
   Scenario: Tightening maxSessionDurationDays revokes sessions older than the new cap
     Given the org's `maxSessionDurationDays` was 90 and is being changed to 30
-    And jane has a binding token issued 60 days ago (was within old cap, exceeds new cap)
+    And jane has an ingestion key issued 60 days ago (was within old cap, exceeds new cap)
     When carol commits the policy change to 30 days
-    Then jane's 60-day-old binding token is invalidated immediately
-        (next use returns 401 with "Token expired — rotate")
-    And an audit row `gateway.user_ingestion_binding.expired_by_policy` is emitted
-        with payload { bindingId, previousMaxDays: 90, newMaxDays: 30 }
+    Then jane's 60-day-old ingestion key is invalidated immediately
+        (next use returns 401 with "Key expired — rotate")
+    And an audit row `gateway.ingestion_key.expired_by_policy` is emitted
+        with payload { apiKeyId, previousMaxDays: 90, newMaxDays: 30 }
     # Policy tightening MUST apply retroactively — that's the point of the
-    # policy. Loosening (e.g. 30 → 90) does NOT extend already-revoked tokens.
+    # policy. Loosening (e.g. 30 → 90) does NOT extend already-revoked keys.
 
   # ---------------------------------------------------------------------------
   # Admin oversight surface
@@ -153,9 +154,9 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   @bdd @sessions-and-devices @cross-org-isolation
   Scenario: Org-level policies do NOT bleed across orgs
     Given two orgs "acme" (maxSessionDurationDays=30) and "beta-corp" (maxSessionDurationDays=null)
-    And user "lisa@beta-corp.com" has a 60-day-old binding token under beta-corp
+    And user "lisa@beta-corp.com" has a 60-day-old ingestion key under beta-corp
     When the policy applies
-    Then lisa's beta-corp binding stays valid (her org's policy is null)
+    Then lisa's beta-corp ingestion key stays valid (her org's policy is null)
     And acme's policy does not affect any beta-corp credential
 
   # ---------------------------------------------------------------------------

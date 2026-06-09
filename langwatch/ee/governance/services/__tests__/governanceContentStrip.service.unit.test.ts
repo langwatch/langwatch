@@ -121,13 +121,21 @@ describe("GovernanceContentStripService.governanceTargetOrgId", () => {
     });
   });
 
-  describe("when origin is 'binding' and organization_id is set", () => {
-    // Closes ralph-loop gap #5 — UserIngestionBinding-routed traces
-    // (ik-lw-*) need to participate in the org's no-spy / strip-IO policy.
-    // See bindingProvenance.utils.ts:BINDING_ORIGIN_VALUE.
-    it("returns the organization id (binding traces are subject to the policy)", () => {
+  describe("when origin is an ingest-key origin and organization_id is set", () => {
+    // Ingestion-key-routed traces (sk-lw- ingest keys) need to participate
+    // in the org's no-spy / strip-IO policy. See ingestKeyProvenance.utils.ts:
+    // CODING_AGENT_ORIGIN_VALUE / AI_TOOL_ORIGIN_VALUE.
+    it("returns the organization id for a coding_agent trace", () => {
       const orgId = GovernanceContentStripService.governanceTargetOrgId({
-        "langwatch.origin": "binding",
+        "langwatch.origin": "coding_agent",
+        "langwatch.organization_id": "org-acme",
+      });
+      expect(orgId).toBe("org-acme");
+    });
+
+    it("returns the organization id for an ai_tool trace", () => {
+      const orgId = GovernanceContentStripService.governanceTargetOrgId({
+        "langwatch.origin": "ai_tool",
         "langwatch.organization_id": "org-acme",
       });
       expect(orgId).toBe("org-acme");

@@ -28,8 +28,8 @@ import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   ScopeChipPicker,
-  type ScopeChipPickerEntry,
-  type ScopeChipPickerScopeType,
+  type ScopeTriadEntry,
+  type ScopeTriadType,
 } from "~/components/settings/ScopeChipPicker";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { Dialog } from "~/components/ui/dialog";
@@ -63,7 +63,7 @@ const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   experiments: "Experiments",
 };
 
-const SCOPE_ICON: Record<ScopeChipPickerScopeType, typeof Building2> = {
+const SCOPE_ICON: Record<ScopeTriadType, typeof Building2> = {
   ORGANIZATION: Building2,
   TEAM: Users,
   PROJECT: Folder,
@@ -71,7 +71,7 @@ const SCOPE_ICON: Record<ScopeChipPickerScopeType, typeof Building2> = {
 
 // Retention is always stored in days, but the picker speaks human time. All
 // units round-trip through whole weeks so the resulting day count is always
-// a valid 7-multiple — 1 month = 4 weeks (28 days), 1 year = 52 weeks (364
+// a valid 7-multiple - 1 month = 4 weeks (28 days), 1 year = 52 weeks (364
 // days). This is the same calendar arithmetic ClickHouse partition pruning
 // expects.
 const DAYS_PER_UNIT = { weeks: 7, months: 28, years: 364 } as const;
@@ -102,7 +102,7 @@ const RETENTION_PRESETS: Array<{ value: string; label: string; days: number }> =
 
 const CUSTOM_PRESET_VALUE = "custom";
 
-/** The "keep forever" option's select value — the stringified indefinite
+/** The "keep forever" option's select value - the stringified indefinite
  *  sentinel. Only offered to platform admins (see AddOverrideDrawer); the
  *  mutation route authorizes it independently. */
 const INDEFINITE_PRESET_VALUE = String(INDEFINITE_RETENTION_DAYS);
@@ -120,7 +120,7 @@ function formatDays(days: number): string {
 }
 
 type RetentionRuleRow = {
-  scopeType: ScopeChipPickerScopeType;
+  scopeType: ScopeTriadType;
   scopeId: string;
   name: string;
   category: RetentionCategory;
@@ -128,7 +128,7 @@ type RetentionRuleRow = {
 };
 
 type RetentionScopeGroup = {
-  scopeType: ScopeChipPickerScopeType;
+  scopeType: ScopeTriadType;
   scopeId: string;
   name: string;
   byCategory: Partial<Record<RetentionCategory, number>>;
@@ -137,7 +137,7 @@ type RetentionScopeGroup = {
 
 /** Groups override rows by (scopeType, scopeId), preserving first-seen order.
  *  We collapse the three category rows per scope into a single logical group
- *  so the Scope|Policy table renders one row per scope — categories almost
+ *  so the Scope|Policy table renders one row per scope - categories almost
  *  always share the same value in practice. */
 function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGroup[] {
   const groups: RetentionScopeGroup[] = [];
@@ -163,7 +163,7 @@ function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGroup[] {
   return groups;
 }
 
-const SCOPE_TIER_ORDER: Record<ScopeChipPickerScopeType, number> = {
+const SCOPE_TIER_ORDER: Record<ScopeTriadType, number> = {
   ORGANIZATION: 0,
   TEAM: 1,
   PROJECT: 2,
@@ -178,7 +178,7 @@ function renderPolicyValue(
   const present = RETENTION_CATEGORIES.filter(
     (c) => byCategory[c] !== undefined,
   );
-  if (present.length === 0) return "—";
+  if (present.length === 0) return "-";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);
   if (allSame && present.length === RETENTION_CATEGORIES.length) {
@@ -199,7 +199,7 @@ function renderPolicySummary(
   const present = RETENTION_CATEGORIES.filter(
     (c) => byCategory[c] !== undefined,
   );
-  if (present.length === 0) return "—";
+  if (present.length === 0) return "-";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);
   if (allSame && present.length === RETENTION_CATEGORIES.length) {
@@ -266,7 +266,7 @@ function DataRetentionPage({
   const invalidate = () =>
     utils.dataRetention.getRules.invalidate({ projectId });
 
-  // Per-call toasts are intentionally omitted — the Add-policy drawer fans
+  // Per-call toasts are intentionally omitted - the Add-policy drawer fans
   // out one setForScope per (scope × category) pair and stacks the toaster
   // column with identical "saved" messages. The drawer's onSave emits a
   // single aggregated toast after the batch resolves.
@@ -280,7 +280,7 @@ function DataRetentionPage({
   // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
   // effective retention. We don't know the stored _retention_days values
   // without an extra query (they could still be the migration default), so we
-  // always route through the confirm dialog before mutating CH — the action is
+  // always route through the confirm dialog before mutating CH - the action is
   // irreversible if it contracts.
   const [pendingConfirm, setPendingConfirm] = useState<{
     retentionDays: number;
@@ -306,7 +306,7 @@ function DataRetentionPage({
     setPollMs(activeMutations.length > 0 ? 3000 : false);
   }, [activeMutations.length]);
 
-  // Per-call toasts intentionally omitted — the drawer flow fans this out one
+  // Per-call toasts intentionally omitted - the drawer flow fans this out one
   // call per category. Call sites emit a single aggregated toast.
   const triggerUpdate = api.dataRetention.triggerRetroactiveUpdate.useMutation({
     onSuccess: () => {
@@ -344,7 +344,7 @@ function DataRetentionPage({
   const snapshot = rulesQuery.data;
   const available = snapshot?.available;
   const canConfigureRetention = !!snapshot?.canConfigureRetention;
-  // Configurable retention is a paid-plan feature — even an org admin on
+  // Configurable retention is a paid-plan feature - even an org admin on
   // the free plan can't add overrides. Both gates must pass.
   const canWrite =
     canConfigureRetention &&
@@ -500,7 +500,7 @@ function DataRetentionPage({
           snapshot &&
           scopeGroups.length > 0 && (
             <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
+              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
                 <Table.Root variant="line" size="md" width="full">
                   <Table.Header>
                     <Table.Row>
@@ -828,7 +828,7 @@ function ApplyToExistingConfirmDialog({
               {pending.retentionDays === INDEFINITE_RETENTION_DAYS ? (
                 <Text>
                   We will rewrite <strong>this project's</strong> existing data
-                  to be kept indefinitely. No rows are deleted — this removes
+                  to be kept indefinitely. No rows are deleted - this removes
                   the retention limit from already-stored data.
                 </Text>
               ) : (
@@ -922,7 +922,7 @@ function RetentionAndUsageCard({
                   <Text>
                     {effective[category] !== undefined
                       ? formatDays(effective[category]!)
-                      : "—"}
+                      : "-"}
                   </Text>
                 </HStack>
               ))}
@@ -975,12 +975,12 @@ function AddOverrideDrawer({
   isPlatformAdmin: boolean;
   isSaving: boolean;
   onSave: (
-    scopes: ScopeChipPickerEntry[],
+    scopes: ScopeTriadEntry[],
     retentionDays: number,
     applyToExisting: boolean,
   ) => void;
 }) {
-  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
   const [preset, setPreset] = useState<string>(String(DEFAULT_RETENTION_DAYS));
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
@@ -1134,7 +1134,7 @@ function AddOverrideDrawer({
               )}
               <Field.HelperText>
                 {preset === INDEFINITE_PRESET_VALUE
-                  ? "Data will be kept indefinitely — exempt from automatic deletion."
+                  ? "Data will be kept indefinitely - exempt from automatic deletion."
                   : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
                     ? `Stored as ${resolvedDays} days.`
                     : preset === CUSTOM_PRESET_VALUE &&

@@ -65,7 +65,10 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
-import { TraceListService } from "./traces/trace-list.service";
+import {
+  setDiscoverBroadcaster,
+  TraceListService,
+} from "./traces/trace-list.service";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -129,14 +132,6 @@ import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.rep
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
-import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
-import {
-  InMemoryOrphanCursorStore,
-  RedisOrphanCursorStore,
-} from "../data-retention/orphan-sweep/orphanSweepCursor.store";
-import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
-import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
@@ -220,6 +215,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const blobStore = new BlobStore(createS3Client, clickhouseEnabled ? resolveClickHouseClient : undefined);
   const ioExtractionService = new TraceIOExtractionService();
 
+  // Wire the discover-cache → SSE bridge. Module-level setter keeps
+  // the TraceListService constructor lean (the null/test preset below
+  // doesn't need a broadcaster — refreshes that never get an SSE push
+  // still hydrate the cache successfully).
+  setDiscoverBroadcaster((tenantId) => {
+    // Broadcast.event payload is a string by contract — sender + SSE
+    // bridge both deserialise it on the client. Keep it tiny: timestamp
+    // is enough for the client to confirm freshness; the actual payload
+    // ships through the discover query they re-fire on receipt.
+    const payload = JSON.stringify({
+      event: "discover_updated",
+      tenantId,
+      timestamp: Date.now(),
+    });
+    void broadcast.broadcastToTenantRateLimited(
+      tenantId,
+      payload,
+      "discover_updated",
+    );
+  });
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
@@ -400,29 +415,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const storageMeterService = new StorageMeterService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const orphanSweepRepo = new OrphanSweepRepository(prisma);
-  // Persist sweep cursors in Redis when available; fall back to the in-memory
-  // store otherwise. The cursor lets the sweep resume across runs instead of
-  // restarting at page 0 every hour and starving the tail.
-  const orphanCursorStore = redis
-    ? new RedisOrphanCursorStore(redis)
-    : new InMemoryOrphanCursorStore();
-  const orphanSweepService = new OrphanSweepService(
-    orphanSweepRepo,
-    clickhouseEnabled ? resolveClickHouseClient : null,
-    orphanCursorStore,
-  );
-  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
-    retentionPolicyCache,
-    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
-  });
-
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
     retroactive: retroactiveUpdateService,
     metering: storageMeterService,
-    orphanSweep: orphanSweepService,
   };
 
   const share = traced(
@@ -512,7 +509,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
-    retentionOrphanSweepReactor,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -715,6 +711,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     new PinnedTraceRepository(testPrisma),
   );
   const noop = async () => { };
+  // Clear the module-global discover broadcaster so a test app built
+  // after `initializeDefaultApp` doesn't inherit the production
+  // broadcaster's closure (which captured the production
+  // BroadcastService and would fire SSE pushes out of tests). The
+  // null repository's no-op refresh path can still reach the
+  // broadcaster, so leaving the prod callback wired would leak
+  // cross-app callbacks. Tests that want their own broadcaster can
+  // re-register one after `createTestApp` returns.
+  setDiscoverBroadcaster(null);
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
@@ -847,7 +852,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
-      orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

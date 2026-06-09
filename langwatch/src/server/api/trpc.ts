@@ -7,6 +7,12 @@
  * need to use are documented accordingly near the end.
  */
 
+import {
+  trace as otelTrace,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+} from "@opentelemetry/api";
 import type { inferParser } from "@trpc/server";
 import {
   initTRPC,
@@ -16,30 +22,31 @@ import {
   TRPCError,
 } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
 interface CreateNextContextOptions {
   req: any;
   res: any;
 }
+
+import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { DomainError } from "~/server/app-layer/domain-error";
+import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { DomainError } from "~/server/app-layer/domain-error";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
-import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import type { OrganizationUserRole } from "@prisma/client";
-import type { PermissionMiddleware } from "./rbac";
-import type { OpsScope } from "./rbac";
+import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -175,8 +182,7 @@ export function errorFormatterForTesting({
     ...shape,
     data: {
       ...shape.data,
-      zodError:
-        error.cause instanceof ZodError ? error.cause.flatten() : null,
+      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause: missingModelCause ?? aiCallFailedCause ?? limitInfo,
       domainError,
     },
@@ -365,9 +371,7 @@ const auditLogMutations = t.middleware(
 
     let result = await next();
 
-    const target = result.ok
-      ? deriveAuditTarget(path, result.data)
-      : {};
+    const target = result.ok ? deriveAuditTarget(path, result.data) : {};
 
     await auditLog({
       userId: ctx.session.user.id,
@@ -391,49 +395,59 @@ const auditLogMutations = t.middleware(
   },
 );
 
-export const tracerMiddleware = t.middleware(
-  async ({ path, type, next }) => {
-    const { trace, SpanKind, SpanStatusCode } = await import(
-      "@opentelemetry/api"
-    );
+function spanAttributes(path: string, type: string) {
+  return {
+    "rpc.system": "trpc",
+    "rpc.method": path,
+    "rpc.type": type,
+  } as const;
+}
 
-    const tracer = trace.getTracer("langwatch:trpc");
-    const spanName = `trpc.${path}`;
+function recordSpanError(span: Span, error: unknown): void {
+  const e = error instanceof Error ? error : new Error(String(error));
+  span.recordException(e);
+  span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
+}
 
-    return tracer.startActiveSpan(
-      spanName,
-      {
-        kind: SpanKind.SERVER,
-        attributes: {
-          "rpc.system": "trpc",
-          "rpc.method": path,
-          "rpc.type": type,
-        },
-      },
-      async (span) => {
-        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-        // returned as { ok: false, error } result objects — NOT thrown.
-        const result = await next();
+export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
+  const tracer = otelTrace.getTracer("langwatch:trpc");
+  const spanName = `trpc.${path}`;
 
-        if (!result.ok) {
-          const err = result.error;
-          span.recordException(err instanceof Error ? err : new Error(String(err)));
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err instanceof Error ? err.message : String(err),
-          });
-        }
+  // For silenced routes (presence heartbeats, SSE subscription
+  // messages) we want zero spans on the happy path — they otherwise
+  // drown out the trace surface — but failures still need a span so
+  // real errors stay visible. Capture the start time before `next()`
+  // so the error span's duration matches the actual call.
+  if (isSilencedCall(path, type)) {
+    const startTime = Date.now();
+    const result = await next();
+    if (result.ok) return result;
 
-        span.end();
-        return result;
-      },
-    );
-  },
-);
+    const span = tracer.startSpan(spanName, {
+      kind: SpanKind.SERVER,
+      startTime,
+      attributes: spanAttributes(path, type),
+    });
+    recordSpanError(span, result.error);
+    span.end();
+    return result;
+  }
 
-function domainErrorToTRPCCode(
-  error: DomainError,
-): TRPCError["code"] {
+  return tracer.startActiveSpan(
+    spanName,
+    { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+    async (span) => {
+      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+      // returned as { ok: false, error } result objects — NOT thrown.
+      const result = await next();
+      if (!result.ok) recordSpanError(span, result.error);
+      span.end();
+      return result;
+    },
+  );
+});
+
+function domainErrorToTRPCCode(error: DomainError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
@@ -528,7 +542,10 @@ export function handleTrpcCallLogging({
     logData.statusCode = resolvedStatus;
 
     // Include domain error kind in log data for structured filtering
-    if (result.error instanceof TRPCError && result.error.cause instanceof DomainError) {
+    if (
+      result.error instanceof TRPCError &&
+      result.error.cause instanceof DomainError
+    ) {
       logData.domainErrorKind = result.error.cause.kind;
     }
 
@@ -544,11 +561,36 @@ export function handleTrpcCallLogging({
   }
 }
 
+/**
+ * Routers whose calls flood the request log without being useful for
+ * debugging: presence (peer cursor / drawer presence heartbeats fire
+ * every few seconds per open tab). Logging + tracing them buries the
+ * signal in noise. Errors are still reported by the middlewares below.
+ */
+const SILENCED_LOG_PATH_PREFIXES = ["presence."] as const;
+
+/**
+ * tRPC call types whose volume is unbounded — SSE subscriptions emit
+ * a "trpc call" log line per delivered message. Silencing the
+ * subscription type as a whole keeps the dev log readable without
+ * sprinkling per-router opt-outs across the codebase.
+ */
+const SILENCED_LOG_TYPES = new Set(["subscription"]);
+
+function isSilencedPath(path: string): boolean {
+  return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function isSilencedCall(path: string, type: string): boolean {
+  return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);
@@ -560,6 +602,13 @@ export const loggerMiddleware = t.middleware(
       // objects. Use result.ok to detect errors — NOT try/catch.
       const result = await next();
       const duration = Date.now() - start;
+
+      // Silence happy-path logs for high-frequency, low-signal routes
+      // (presence heartbeats) — still log errors so real failures are
+      // visible.
+      if (isSilencedCall(path, type) && result.ok) {
+        return result;
+      }
 
       handleTrpcCallLogging({
         result,

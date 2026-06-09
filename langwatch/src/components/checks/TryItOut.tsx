@@ -23,11 +23,11 @@ import { toaster } from "../../components/ui/toaster";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
-import type {
-  Evaluators,
-  SingleEvaluationResult,
+import {
+  evaluatorsSchema,
+  type Evaluators,
+  type SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";

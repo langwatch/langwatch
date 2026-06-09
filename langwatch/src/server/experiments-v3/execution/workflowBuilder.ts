@@ -211,23 +211,26 @@ const buildTargetNode = (
         loadedData.prompt?.name ??
         targetConfig.id;
       return {
-        targetNode: buildSignatureNodeFromLocalConfig(
-          targetNodeId,
+        targetNode: buildSignatureNodeFromLocalConfig({
+          nodeId: targetNodeId,
           name,
-          targetConfig.localPromptConfig,
+          localConfig: targetConfig.localPromptConfig,
           targetConfig,
           cell,
-        ),
+          // The base prompt this draft started from (may be undefined for a
+          // brand-new local prompt with no saved base).
+          basePrompt: loadedData.prompt,
+        }),
         targetNodeId,
       };
     } else if (loadedData.prompt) {
       return {
-        targetNode: buildSignatureNodeFromPrompt(
-          targetNodeId,
-          loadedData.prompt,
+        targetNode: buildSignatureNodeFromPrompt({
+          nodeId: targetNodeId,
+          prompt: loadedData.prompt,
           targetConfig,
           cell,
-        ),
+        }),
         targetNodeId,
       };
     } else {
@@ -360,12 +363,17 @@ export const buildEvaluatorTargetNode = (
 /**
  * Builds a signature node from a VersionedPrompt (database prompt).
  */
-export const buildSignatureNodeFromPrompt = (
-  nodeId: string,
-  prompt: VersionedPrompt,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): Node<Signature> => {
+export const buildSignatureNodeFromPrompt = ({
+  nodeId,
+  prompt,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  prompt: VersionedPrompt;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): Node<Signature> => {
   const inputs = (prompt.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],
@@ -404,6 +412,20 @@ export const buildSignatureNodeFromPrompt = (
     position: { x: 200, y: 0 },
     data: {
       name: prompt.handle ?? prompt.name ?? "Prompt",
+      // Forward the prompt's identity so nlpgo emits the
+      // PromptApiService.get + Prompt.compile spans that let the trace
+      // drawer's "Open in Prompts" resume this exact (handle, version,
+      // variables) in the playground. Without configId, nlpgo treats the
+      // node as an inline prompt and emits no prompt ancestry.
+      // (services/nlpgo/app/engine/dsl/types.go reads configId / handle /
+      // versionMetadata; signatureComponentSchema mirrors the shape.)
+      ...buildPromptIdentity({
+        configId: prompt.id,
+        handle: prompt.handle,
+        versionId: prompt.versionId,
+        versionNumber: prompt.version,
+        versionCreatedAt: prompt.versionCreatedAt,
+      }),
       inputs,
       outputs,
       parameters: [
@@ -428,15 +450,77 @@ export const buildSignatureNodeFromPrompt = (
 };
 
 /**
+ * Builds the prompt-identity fields (configId / handle / versionMetadata)
+ * that nlpgo reads to emit PromptApiService.get + Prompt.compile spans.
+ * Mirrors signatureComponentSchema in optimization_studio/types/dsl.ts and
+ * the Go-side dsl.Component (PromptConfigID / PromptHandle / VersionMetadata).
+ *
+ * Returns an empty object when there is no configId, so non-prompt targets
+ * (agents, inline edits with no saved base) stay free of prompt ancestry.
+ */
+const buildPromptIdentity = (identity: {
+  configId?: string | null;
+  handle?: string | null;
+  versionId?: string | null;
+  versionNumber?: number | null;
+  versionCreatedAt?: Date | string | null;
+}): Partial<{
+  configId: string;
+  handle: string | null;
+  versionMetadata: {
+    versionId: string;
+    versionNumber: number;
+    versionCreatedAt: string;
+  };
+}> => {
+  if (!identity.configId) return {};
+
+  const base: { configId: string; handle: string | null } = {
+    configId: identity.configId,
+    handle: identity.handle ?? null,
+  };
+
+  // versionMetadata requires all three fields; only emit it when complete.
+  if (
+    identity.versionId &&
+    identity.versionNumber != null &&
+    identity.versionCreatedAt != null
+  ) {
+    return {
+      ...base,
+      versionMetadata: {
+        versionId: identity.versionId,
+        versionNumber: identity.versionNumber,
+        versionCreatedAt:
+          identity.versionCreatedAt instanceof Date
+            ? identity.versionCreatedAt.toISOString()
+            : identity.versionCreatedAt,
+      },
+    };
+  }
+
+  return base;
+};
+
+/**
  * Builds a signature node from LocalPromptConfig (unsaved local changes).
  */
-export const buildSignatureNodeFromLocalConfig = (
-  nodeId: string,
-  name: string,
-  localConfig: LocalPromptConfig,
-  targetConfig: TargetConfig,
-  cell: ExecutionCell,
-): Node<Signature> => {
+export const buildSignatureNodeFromLocalConfig = ({
+  nodeId,
+  name,
+  localConfig,
+  targetConfig,
+  cell,
+  basePrompt,
+}: {
+  nodeId: string;
+  name: string;
+  localConfig: LocalPromptConfig;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+  /** The saved prompt this draft started from, if any. */
+  basePrompt?: VersionedPrompt;
+}): Node<Signature> => {
   const inputs = localConfig.inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],
@@ -477,6 +561,25 @@ export const buildSignatureNodeFromLocalConfig = (
     position: { x: 200, y: 0 },
     data: {
       name,
+      // Inline-edited draft: keep the BASE prompt's identity so the trace
+      // drawer can still resume "Open <handle>:<version>", and flag
+      // promptDraft so nlpgo stamps langwatch.prompt.draft=true (the
+      // "(unsaved edits)" label). When there's no saved base (a brand-new
+      // local prompt) we forward nothing, so no prompt ancestry is emitted.
+      // (specs/nlp-go/prompt-spans-unsaved-version.feature — wire format
+      // locked on the channel.)
+      ...(basePrompt
+        ? {
+            ...buildPromptIdentity({
+              configId: basePrompt.id,
+              handle: basePrompt.handle,
+              versionId: basePrompt.versionId,
+              versionNumber: basePrompt.version,
+              versionCreatedAt: basePrompt.versionCreatedAt,
+            }),
+            promptDraft: true,
+          }
+        : {}),
       inputs,
       outputs,
       parameters: [

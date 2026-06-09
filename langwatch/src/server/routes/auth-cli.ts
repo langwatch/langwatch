@@ -38,7 +38,7 @@ import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rb
 import type { Permission } from "~/server/api/rbac";
 import {
   PersonalVirtualKeyService,
-  NoDefaultRoutingPolicyError,
+  NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
@@ -49,6 +49,8 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -58,6 +60,7 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -877,17 +880,6 @@ function requestIncreaseUrl(opts: {
   return `${base.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-async function resolveOrgAdminEmail(
-  organizationId: string,
-): Promise<string | null> {
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  return admin?.user.email ?? null;
-}
-
 secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
@@ -941,7 +933,10 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   // Pick the most-restrictive blocker. The check() result orders by
   // strictness; first entry is the binding one.
   const blocker = decision.blockedBy[0]!;
-  const adminEmail = await resolveOrgAdminEmail(tokenRecord.organization_id);
+  const adminEmail = await resolveSupportContact({
+    prisma,
+    organizationId: tokenRecord.organization_id,
+  });
 
   return c.json(
     {
@@ -1240,6 +1235,135 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// Ingestion templates + ingestion keys — device-session adapters.
+// ---------------------------------------------------------------------------
+// `langwatch <tool>` wrapper-mode (typescript-sdk/.../wrapper-mode.ts) calls
+// these from a device-session context (Bearer lw_at_*). The public REST at
+// /api/governance/ingestion-templates is mounted under createProjectApp and
+// rejects device tokens with 401; these adapter routes resolve
+// organizationId+userId from the validated access token and delegate to the
+// same services. Wire shape matches what cli-api.ts expects (snake_case
+// ingestion_templates), distinct from the project-API-key REST's
+// { data: [...] } shape.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get(
+  "/governance/ingestion-templates",
+  async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const service = IngestionTemplateService.create(prisma);
+    const rows = await service.listForUser({
+      organizationId: tokenRecord.organization_id,
+    });
+    return c.json({
+      ingestion_templates: rows.map((t) => ({
+        id: t.id,
+        organization_id: t.organizationId,
+        slug: t.slug,
+        source_type: t.sourceType,
+        display_name: t.displayName,
+        description: t.description,
+        icon_asset: t.iconAsset,
+        credential_schema: t.credentialSchema,
+        ottl_rules: t.ottlRules,
+        platform_published: t.platformPublished,
+        enabled: t.enabled,
+      })),
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/governance/ingestion-key
+// ---------------------------------------------------------------------------
+// Mints (rotating in place) a personal-project ingestion key for the
+// device-session caller, replacing the retired binding install/rotate
+// adapters. The unified `langwatch <tool>` CLI Path B calls this to obtain a
+// write-only `sk-lw-` token + the OTLP endpoint, then points the tool's OTLP
+// exporter at it. `source_type` carries the tool slug stamped as
+// `langwatch.source` provenance. Body: { source_type }. Returns
+// { token, prefix, endpoint } where endpoint = `${baseUrl}/api/otel`.
+// ---------------------------------------------------------------------------
+const mintIngestionKeySchema = z.object({
+  source_type: z.string().min(1),
+});
+
+secured.access(CLI_POLICY).post(
+  "/governance/ingestion-key",
+  async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: parsed.error.message,
+        },
+        400,
+      );
+    }
+    const service = IngestionKeyService.create(prisma);
+    try {
+      const result = await service.ensureForPersonalProject({
+        userId: tokenRecord.user_id,
+        organizationId: tokenRecord.organization_id,
+        sourceType: parsed.data.source_type,
+        // Snapshot which device minted the key so the API-keys settings page
+        // can attribute it. Falls back to the hostname when the CLI sent no
+        // explicit label; null for CLIs that predate device metadata.
+        createdByDeviceLabel:
+          tokenRecord.client_info?.device_label ??
+          tokenRecord.client_info?.hostname ??
+          null,
+      });
+      return c.json(
+        {
+          token: result.token,
+          prefix: result.prefix,
+          endpoint: `${controlPlaneBaseUrl()}/api/otel`,
+        },
+        201,
+      );
+    } catch (err) {
+      // No personal project for the caller yet — surface as a precondition
+      // so the CLI can prompt the user to finish workspace setup.
+      return c.json(
+        {
+          error: "precondition_failed",
+          error_description:
+            err instanceof Error ? err.message : "Could not mint ingestion key",
+        },
+        412,
+      );
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
 // ---------------------------------------------------------------------------
 // Used by the browser-side approval page to surface the device-code
@@ -1477,24 +1601,24 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
     });
   } catch (err) {
     if (
-      err instanceof NoDefaultRoutingPolicyError ||
+      err instanceof NoEligibleProvidersError ||
       err instanceof RoutingPolicyHasNoProvidersError
     ) {
-      // Fresh signup / dogfood account / org that hasn't published a
-      // default RoutingPolicy (or whose policy has no providers bound):
-      // log the user in with a device session anyway. The CLI wrapper
-      // mints a personal VK lazily on the first gateway call, surfacing
-      // an actionable error at that point ("no model provider configured
-      // yet, add one at /me Model Providers"). Failing the entire
-      // approve flow here blocked solo devs from ever reaching the
-      // setup screens.
+      // Fresh signup / dogfood account / org with no accessible
+      // providers (or with an explicitly-pinned empty policy): log the
+      // user in with a device session anyway. The /me Model Providers
+      // tile surfaces the actionable "add a provider" CTA; failing the
+      // entire approve flow here blocked solo devs from ever reaching
+      // the setup screens. Post-fix to the no-default-policy graceful
+      // fallback, this branch fires only when there are truly zero
+      // eligible providers via scope cascade.
       logger.info(
         {
           user_code,
           organization_id,
           reason:
-            err instanceof NoDefaultRoutingPolicyError
-              ? "no_default_routing_policy"
+            err instanceof NoEligibleProvidersError
+              ? "no_eligible_providers"
               : "routing_policy_has_no_providers",
         },
         "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",

@@ -75,11 +75,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
-              "agent-simulations/overview",
               "agent-simulations/getting-started",
-              "agent-simulations/set-overview",
-              "agent-simulations/batch-runs",
-              "agent-simulations/individual-run"
+              "agent-simulations/voice-agents",
+              "agent-simulations/red-teaming"
             ]
           },
           {
@@ -681,7 +679,7 @@
             "group": "Dashboards",
             "pages": [
               "ai-governance/governance-dashboard",
-              "ai-governance/cost-centers"
+              "ai-governance/departments"
             ]
           },
           {
@@ -1209,7 +1207,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1780404443",
+      "source": "/ci/cache/busted/1780902672",
       "destination": "/"
     },
     {
@@ -1285,24 +1283,40 @@
       "destination": "/self-hosting/docker-compose"
     },
     {
+      "source": "/agent-simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/overview"
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
     },
     {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
-    },
-    {
-      "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/set-overview"
-    },
-    {
-      "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/batch-runs"
-    },
-    {
-      "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/individual-run"
     },
     {
       "source": "/simulations/introduction",

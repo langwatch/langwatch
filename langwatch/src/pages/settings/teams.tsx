@@ -20,11 +20,11 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { CostCenterPicker } from "../../components/settings/CostCenterPicker";
+import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import {
-  useCostCenterColumn,
-  type CostCenterOption,
-} from "../../components/settings/useCostCenterColumn";
+  useDepartmentColumn,
+  type DepartmentOption,
+} from "../../components/settings/useDepartmentColumn";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -398,13 +398,13 @@ function ProjectSection({
   access,
   organizationId,
   canManage,
-  costCenter,
+  department,
 }: {
   project: { id: string; name: string };
   access: ProjectAccessEntry[];
   organizationId: string;
   canManage: boolean;
-  costCenter: ReturnType<typeof useCostCenterColumn>;
+  department: ReturnType<typeof useDepartmentColumn>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
@@ -453,14 +453,14 @@ function ProjectSection({
           <Text fontSize="xs" color="gray.500">
             {access.length} with access
           </Text>
-          {costCenter.show && canManage && (
-            <InlineCostCenter
+          {department.show && canManage && (
+            <InlineDepartment
               organizationId={organizationId}
               kind="project"
               entityId={project.id}
-              value={costCenter.byProject.get(project.id) ?? null}
-              costCenters={costCenter.costCenters}
-              onAssigned={costCenter.refetch}
+              value={department.byProject.get(project.id) ?? null}
+              departments={department.departments}
+              onAssigned={department.refetch}
             />
           )}
         </HStack>
@@ -622,22 +622,22 @@ function ProjectSection({
 
 // ── Team card ─────────────────────────────────────────────────────────────────
 
-// Inline cost-center picker for team and project rows. Reads as one more meta
-// item next to "N projects · M members": a leading dot, a normal-case "Cost
-// center" caption, then a compact select.
-function InlineCostCenter({
+// Inline department picker for team and project rows. Reads as one more meta
+// item next to "N projects · M members": a leading dot, a normal-case
+// "Department" caption, then a compact select.
+function InlineDepartment({
   organizationId,
   kind,
   entityId,
   value,
-  costCenters,
+  departments,
   onAssigned,
 }: {
   organizationId: string;
   kind: "team" | "project";
   entityId: string;
   value: string | null;
-  costCenters: CostCenterOption[];
+  departments: DepartmentOption[];
   onAssigned: () => Promise<unknown> | void;
 }) {
   return (
@@ -649,13 +649,13 @@ function InlineCostCenter({
       onClick={(e) => e.stopPropagation()}
     >
       <Text>·</Text>
-      <Text>Cost center</Text>
-      <CostCenterPicker
+      <Text>Department</Text>
+      <DepartmentPicker
         organizationId={organizationId}
         kind={kind}
         entityId={entityId}
         value={value}
-        costCenters={costCenters}
+        departments={departments}
         onAssigned={onAssigned}
         width="130px"
       />
@@ -677,7 +677,7 @@ function TeamCard({
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
-  const costCenter = useCostCenterColumn(organizationId);
+  const department = useDepartmentColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -722,14 +722,14 @@ function TeamCard({
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
-          {costCenter.show && canManage && (
-            <InlineCostCenter
+          {department.show && canManage && (
+            <InlineDepartment
               organizationId={organizationId}
               kind="team"
               entityId={team.id}
-              value={costCenter.byTeam.get(team.id) ?? null}
-              costCenters={costCenter.costCenters}
-              onAssigned={costCenter.refetch}
+              value={department.byTeam.get(team.id) ?? null}
+              departments={department.departments}
+              onAssigned={department.refetch}
             />
           )}
           {canManage && (
@@ -939,7 +939,7 @@ function TeamCard({
                     access={team.projectAccess[proj.id] ?? []}
                     organizationId={organizationId}
                     canManage={canManage}
-                    costCenter={costCenter}
+                    department={department}
                   />
                 ))
               )}

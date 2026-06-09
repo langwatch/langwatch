@@ -35,6 +35,7 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.001,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
     totalCompletionTokenCount: 50,

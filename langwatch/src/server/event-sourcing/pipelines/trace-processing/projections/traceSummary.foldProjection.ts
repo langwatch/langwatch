@@ -40,6 +40,7 @@ import {
   SpanTimingService,
   SpanStatusService,
   SpanCostService,
+  NON_BILLABLE_ATTR,
   TraceOriginService,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
@@ -47,6 +48,7 @@ import {
   TraceNameResolutionService,
   shouldOverrideOutput,
   extractIOFromLogRecord,
+  liftCanonicalAttributesFromLogRecord,
   OUTPUT_SOURCE,
 } from "./services";
 
@@ -86,6 +88,52 @@ const traceNameResolutionService = new TraceNameResolutionService();
  */
 export const MAX_PROCESSED_SPANS = 512;
 
+/**
+ * Reserved trace-summary attribute keys holding cache / reasoning token
+ * SUMS across the whole trace. The per-span `gen_ai.usage.cache_*` numbers
+ * never reach the trace-level attribute map (the accumulation allowlist
+ * only carries identity/metadata keys), so the drawer popover had nothing
+ * to read and "Cache write" stayed permanently hidden. We fold the sums in
+ * here under reserved keys — same transport the log/output bookkeeping
+ * already uses — instead of adding three CH columns for what is display
+ * detail. The drawer reads these first and falls back to the raw per-span
+ * key for traces folded before this landed.
+ */
+export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+export const RESERVED_CACHE_CREATION_TOKENS =
+  "langwatch.reserved.cache_creation_tokens";
+export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
+
+/**
+ * Merge the models seen on one span (or log turn) into the running list,
+ * most-recently-used FIRST. `models[0]` is therefore always the last model
+ * the trace actually used — the conversational/primary model — rather than
+ * an alphabetical pick (which surfaced the title-generation haiku call over
+ * the opus turn it belonged to) or the first-touched model. Every consumer
+ * that reads `models[0]` as "the model" gets the right one, and the surplus
+ * spills into the "+N" badge in encounter-recency order.
+ */
+export function mergeModelsMostRecentFirst(
+  existing: string[],
+  incoming: string[],
+): string[] {
+  const fresh = [...new Set(incoming)].filter((m) => m.length > 0);
+  if (fresh.length === 0) return existing;
+  const rest = existing.filter((m) => !fresh.includes(m));
+  return [...fresh, ...rest];
+}
+
+/** Add a positive per-span delta onto a reserved running-sum attribute. */
+function addReservedTokenSum(
+  attributes: Record<string, string>,
+  key: string,
+  delta: number,
+): void {
+  if (delta <= 0) return;
+  const prior = Number(attributes[key] ?? "0");
+  attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+}
+
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
   state,
@@ -119,11 +167,29 @@ export function applySpanToSummary({
     outputIsFallback: io.outputIsFallback,
   });
 
+  // Roll the per-span cache / reasoning token counts into trace-level sums.
+  // The merged attribute map only carries identity/metadata keys, so the
+  // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
+  // in under reserved keys the popover reads directly.
+  const cacheTokens = spanCostService.extractCacheTokens(span);
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_READ_TOKENS,
+    cacheTokens.cacheReadTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_CREATION_TOKENS,
+    cacheTokens.cacheCreationTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_REASONING_TOKENS,
+    cacheTokens.reasoningTokens,
+  );
+
   const newModels = spanCostService.extractModelsFromSpan(span);
-  const models =
-    newModels.length > 0
-      ? [...new Set([...state.models, ...newModels])].sort()
-      : state.models;
+  const models = mergeModelsMostRecentFirst(state.models, newModels);
 
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
@@ -218,6 +284,7 @@ export class TraceSummaryFoldProjection
       errorMessage: null,
       models: [],
       totalCost: null,
+      nonBilledCost: null,
       tokensEstimated: false,
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
@@ -300,6 +367,17 @@ export class TraceSummaryFoldProjection
     event: LogRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Standalone OTLP logs (e.g. Claude Code's OTEL_LOGS_EXPORTER without a
+    // traces exporter) carry no trace context. The wire-level fix accepts
+    // them and the map projection persists them to stored_log_records, but
+    // folding them here would aggregate every context-less log per tenant
+    // under the same empty aggregateId — surfacing a single nameless
+    // "trace" in the messages list that grows unboundedly. Skip the fold;
+    // the log row still lands in CH and remains queryable directly.
+    if (!event.data.traceId || !event.data.spanId) {
+      return state;
+    }
+
     const mergedAttributes = { ...state.attributes };
     const logCount = parseInt(
       mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
@@ -350,6 +428,62 @@ export class TraceSummaryFoldProjection
       }
     }
 
+    // Run the canonical extractor registry against this log record.
+    // Each extractor (ClaudeCode, Codex, GenAI, SpringAI) claims its
+    // own scope/event-name surface and lifts model / cost / tokens /
+    // cache / thread.id onto canonical langwatch.* keys. Adding a new
+    // platform tool is a one-line addition to the registry plus a new
+    // extractor class under canonicalisation/extractors/. The lifts
+    // are merged into mergedAttributes here so reserved + log_count
+    // keys set above remain intact.
+    const liftedAttrs = liftCanonicalAttributesFromLogRecord(event.data);
+    for (const [key, value] of Object.entries(liftedAttrs)) {
+      mergedAttributes[key] = value as string;
+    }
+
+    // Mirror the canonical langwatch.* attrs lifted from this log
+    // record onto the top-level TraceSummary columns the v2 drawer +
+    // /traces list read directly (Models / TotalCost /
+    // TotalPromptTokenCount / TotalCompletionTokenCount). Without this
+    // mirror a Path B log-only trace ends up with the right strings on
+    // state.attributes but trace.totalCost still NULL, so the drawer
+    // chip and the cost column on /traces both render empty even
+    // though the data is sitting in CH.
+    //
+    // Each api_request event is its OWN turn. Cost + tokens are
+    // additive across turns; models are a deduped set. Reading from
+    // liftedAttrs (this event's contribution) rather than
+    // mergedAttributes (the cumulative latest snapshot) is critical
+    // for cost so we don't double-count across replays.
+    let models = state.models;
+    let totalCost = state.totalCost;
+    let nonBilledCost = state.nonBilledCost;
+    let totalPromptTokenCount = state.totalPromptTokenCount;
+    let totalCompletionTokenCount = state.totalCompletionTokenCount;
+    const liftedModel = liftedAttrs["langwatch.model"];
+    if (typeof liftedModel === "string" && liftedModel.length > 0) {
+      models = mergeModelsMostRecentFirst(models, [liftedModel]);
+    }
+    const liftedCost = Number(liftedAttrs["langwatch.cost.usd"]);
+    if (Number.isFinite(liftedCost) && liftedCost > 0) {
+      totalCost = (totalCost ?? 0) + liftedCost;
+      // A log-only emitter has no per-span markers; the receiver stamps the
+      // bundled flag on the log record's resource, so classify the whole
+      // increment by that.
+      const resAttr = event.data.resourceAttributes?.[NON_BILLABLE_ATTR];
+      if (resAttr === "true") {
+        nonBilledCost = (nonBilledCost ?? 0) + liftedCost;
+      }
+    }
+    const liftedIn = Number(liftedAttrs["langwatch.input_tokens"]);
+    if (Number.isFinite(liftedIn) && liftedIn > 0) {
+      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + liftedIn;
+    }
+    const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
+    if (Number.isFinite(liftedOut) && liftedOut > 0) {
+      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
+    }
+
     return {
       ...state,
       traceId: state.traceId || event.data.traceId,
@@ -357,6 +491,11 @@ export class TraceSummaryFoldProjection
       computedOutput,
       outputSpanEndTimeMs,
       attributes: mergedAttributes,
+      models,
+      totalCost,
+      nonBilledCost,
+      totalPromptTokenCount,
+      totalCompletionTokenCount,
     };
   }
 
@@ -364,6 +503,15 @@ export class TraceSummaryFoldProjection
     event: MetricRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Standalone OTLP metrics (gauges/sums without exemplar trace context)
+    // are common from Claude Code's OTEL_METRICS_EXPORTER. The map
+    // projection persists them to stored_metric_records; skip the fold to
+    // avoid folding every context-less data point into an empty-id ghost
+    // summary. Mirrors handleTraceLogRecordReceived.
+    if (!event.data.traceId || !event.data.spanId) {
+      return state;
+    }
+
     let timeToFirstTokenMs = state.timeToFirstTokenMs;
     if (event.data.metricName === "gen_ai.server.time_to_first_token") {
       const ttftMs = event.data.value * 1000;

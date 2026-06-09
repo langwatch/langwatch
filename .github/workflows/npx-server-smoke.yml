@@ -1,8 +1,8 @@
 # Smoke job for `npx @langwatch/server`. Builds the workspace package as a
 # tarball, then runs it from a fresh sandbox dir on every supported platform.
-# Asserts the full stack (postgres + redis + clickhouse + langwatch_nlp +
-# langevals + ai-gateway + langwatch app) reaches healthy state and that the
-# critical user paths — workflow execution, evaluator run — return 200.
+# Asserts the full stack (postgres + redis + clickhouse + nlpgo + langevals
+# + ai-gateway + langwatch app) reaches healthy state and that the critical
+# user paths — workflow execution, evaluator run — return 200.
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
@@ -32,8 +32,6 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "packages/server/**"
-      - "langwatch_nlp/pyproject.toml"
-      - "langwatch_nlp/uv.lock"
       - "langevals/pyproject.toml"
       - "langevals/uv.lock"
       - "services/aigateway/**"
@@ -155,7 +153,7 @@ jobs:
           base=${PORT_BASE}
           # CI runners have nothing cached — predep download (postgres ~80MB,
           # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
-          # for langwatch_nlp + langevals + Go aigateway local-build + pnpm
+          # for langevals + aigateway/nlpgo monobinary download + pnpm
           # install + vite build of the langwatch app together can take 8-12
           # minutes on a cold runner. Be generous so the smoke isn't flaky on
           # the initial provisioning window. Subsequent runs hit the cached

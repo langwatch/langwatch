@@ -1,0 +1,49 @@
+id: no-form-watch-in-child
+valid:
+  # Correct pattern: useWatch({ control, name }) in the child, no form.watch().
+  - |
+    function Child({ control }: Props) {
+      const name = useWatch({ control, name: "name" });
+      return <input value={name} />;
+    }
+  # `form` is the component's OWN form (local var from useForm), not a prop.
+  - |
+    function FormOwner() {
+      const form = useForm<Values>();
+      const name = form.watch("name");
+      return <input value={name} />;
+    }
+  # A prop EXISTS (defaultValues) but .watch() is called on a LOCAL useForm()
+  # var — proves the rule requires the receiver itself to be the prop, not
+  # merely that the component takes some parameter.
+  - |
+    function Child({ defaultValues }: Props) {
+      const form = useForm({ defaultValues });
+      const name = form.watch("name");
+      return <input value={name} />;
+    }
+invalid:
+  # Child receives `form` as a destructured prop and calls form.watch() (zero-arg).
+  - |
+    function Child({ form }: Props) {
+      const all = form.watch();
+      return <input value={all.name} />;
+    }
+  # Child receives `form` as a destructured prop and calls form.watch("name").
+  - |
+    function Child({ form }: Props) {
+      const name = form.watch("name");
+      return <input value={name} />;
+    }
+  # Arrow-function child component with a destructured form prop.
+  - |
+    const Child = ({ form }: Props) => {
+      const name = form.watch("name");
+      return <input value={name} />;
+    };
+  # Named (non-destructured) form parameter, zero-arg watch.
+  - |
+    function Child(form: UseFormReturn<Values>) {
+      const all = form.watch();
+      return <div>{all.name}</div>;
+    }

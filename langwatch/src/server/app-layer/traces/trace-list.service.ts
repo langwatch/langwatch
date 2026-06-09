@@ -2,6 +2,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createLogger } from "~/utils/logger/server";
 import type {
   ExpressionCategoricalDef,
@@ -34,7 +35,10 @@ export interface TraceListItem {
   name: string;
   serviceName: string;
   durationMs: number;
+  /** Grand list-price cost. `nonBilledCost` is the bundled (theoretical)
+   *  portion; billed = totalCost - nonBilledCost. */
   totalCost: number;
+  nonBilledCost: number;
   totalTokens: number;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -106,6 +110,19 @@ interface DiscoverParams {
   timeRange: { from: number; to: number };
 }
 
+export interface DiscoverResult {
+  facets: FacetDescriptor[];
+  /**
+   * True when the cache was cold and a background compute was kicked
+   * off. Callers should treat this as a loading signal — the SSE
+   * `discover_updated` push will land the real values shortly. False
+   * means `facets` is the latest committed payload (possibly stale
+   * within the SWR window, with a background refresh already in
+   * flight).
+   */
+  pending: boolean;
+}
+
 interface FacetValuesParams {
   tenantId: string;
   timeRange: { from: number; to: number };
@@ -163,7 +180,16 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
  * Cache keys are tenant-scoped — see `discoverCacheKey`.
  */
 const DISCOVER_TTL_MS = 30 * 60 * 1000;
-const DISCOVER_REFRESH_AFTER_MS = 2 * 60 * 1000;
+/**
+ * Refresh threshold dropped from 2 min to 1 min so active viewers see
+ * fresh facet values within a minute of new traces arriving. The
+ * heavy ClickHouse cost is still paid at most once per tenant per
+ * refresh window (cross-pod `claim` + per-pod `discoverRefreshing`
+ * Set both keep concurrent compute single-flight), and the SSE push
+ * from `refreshDiscoverInBackground` propagates the new payload to
+ * any open browser without that browser needing to poll.
+ */
+const DISCOVER_REFRESH_AFTER_MS = 60 * 1000;
 
 interface CachedDiscover {
   value: FacetDescriptor[];
@@ -175,11 +201,97 @@ const DISCOVER_CACHE = new TtlCache<CachedDiscover>(
   "tracesV2:discover:",
 );
 
+/**
+ * Cross-pod refresh lock — separate cache because the leadership lease
+ * needs a SHORT TTL (60s) so a crashed refresher self-recovers quickly,
+ * while the value cache itself keeps a long TTL (30 min). If we reused
+ * the value cache for locks the failure mode would be 30 min of stale
+ * data after a refresher crash.
+ */
+const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(
+  60_000,
+  "tracesV2:discover:refresh-lock:",
+);
+
+/**
+ * Optional sink for "discover finished refreshing" SSE pushes. Set
+ * once at app bootstrap via `setDiscoverBroadcaster` so the service
+ * can fire-and-forget into the broadcast layer when a background
+ * refresh lands a fresher payload in the shared cache. The setter
+ * pattern avoids threading BroadcastService through the constructor
+ * (which is shared with the null repo / test factories that don't
+ * want the dependency); production callers register the live one.
+ */
+type DiscoverBroadcaster = (tenantId: string) => void;
+let discoverBroadcaster: DiscoverBroadcaster | null = null;
+
+export function setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
+  discoverBroadcaster = fn;
+}
+
 /** Bucket size for live-range time params so the cache key stabilises across rapid refetches. */
 const CACHE_TIME_BUCKET_MS = 60_000;
 
 function bucketTime(ts: number): number {
   return Math.floor(ts / CACHE_TIME_BUCKET_MS) * CACHE_TIME_BUCKET_MS;
+}
+
+/**
+ * Canonical window presets the cache snaps `discover` requests to. Two users
+ * looking at "last hour" within seconds of each other previously paid the
+ * full compute twice because their (from, to) timestamps differed by
+ * sub-minute drift — even after the 1-min bucket on the boundaries, the
+ * window spans were unique per render. Snapping arbitrary windows to the
+ * nearest canonical preset means every viewer of "the last day" on a
+ * given tenant hits the same cache slot.
+ *
+ * Ordered by ascending duration. Each entry is the bucket size that
+ * windows shorter than `maxSpanMs` snap to.
+ */
+const DISCOVER_WINDOW_PRESETS: ReadonlyArray<{
+  /** Window spans up to this size snap to `bucketMs`. */
+  maxSpanMs: number;
+  /** Bucket the `to` timestamp to a multiple of this size. */
+  bucketMs: number;
+  /** Stable label that goes into the cache key. */
+  label: string;
+}> = [
+  { maxSpanMs: 65 * 60_000, bucketMs: 60_000, label: "1h" }, // up to 1h: 1-min bucket
+  { maxSpanMs: 6 * 3_600_000, bucketMs: 5 * 60_000, label: "6h" }, // up to 6h: 5-min bucket
+  { maxSpanMs: 25 * 3_600_000, bucketMs: 30 * 60_000, label: "24h" }, // up to 24h: 30-min bucket
+  { maxSpanMs: 8 * 86_400_000, bucketMs: 3_600_000, label: "7d" }, // up to 7d: 1h bucket
+  {
+    maxSpanMs: 32 * 86_400_000,
+    bucketMs: 6 * 3_600_000,
+    label: "30d",
+  }, // up to 30d: 6h bucket
+  {
+    maxSpanMs: Number.POSITIVE_INFINITY,
+    bucketMs: 86_400_000,
+    label: "all",
+  }, // beyond: 1d bucket
+];
+
+/**
+ * Snap an arbitrary time range to the canonical bucket for its span.
+ * Returns the rounded boundaries plus a stable label that doubles as the
+ * cache slot identifier. Callers use the label in the cache key so two
+ * requests for the "same" window hit the same slot regardless of which
+ * sub-minute timestamp the client computed.
+ */
+function snapToWindowPreset(timeRange: {
+  from: number;
+  to: number;
+}): { from: number; to: number; label: string } {
+  const span = Math.max(0, timeRange.to - timeRange.from);
+  const preset =
+    DISCOVER_WINDOW_PRESETS.find((p) => span <= p.maxSpanMs) ??
+    DISCOVER_WINDOW_PRESETS[DISCOVER_WINDOW_PRESETS.length - 1]!;
+  const to = Math.ceil(timeRange.to / preset.bucketMs) * preset.bucketMs;
+  // Reconstruct `from` from the snapped span so the cache key reflects
+  // the canonical window, not the original (drifty) boundaries.
+  const from = to - Math.round(span / preset.bucketMs) * preset.bucketMs;
+  return { from, to, label: preset.label };
 }
 
 function facetValuesCacheKey(params: FacetValuesParams): string {
@@ -196,12 +308,17 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-function discoverCacheKey(params: DiscoverParams): string {
-  return [
-    params.tenantId,
-    bucketTime(params.timeRange.from),
-    bucketTime(params.timeRange.to),
-  ].join("|");
+function discoverCacheKey(
+  tenantId: string,
+  snapped: ReturnType<typeof snapToWindowPreset>,
+): string {
+  // Include the snapped `from` alongside `to` so two requests with
+  // different actual spans that happen to land in the same preset
+  // label (e.g. a 15-minute window and a 1-hour window both classify
+  // as "1h") don't collide on a single cache slot. Without `from` we'd
+  // serve the first-computed payload to both viewers; the second
+  // viewer's facets would be for a window they aren't looking at.
+  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
 interface CategoricalFacetDescriptor {
@@ -424,40 +541,98 @@ export class TraceListService {
   /** Per-pod dedup of in-flight background refreshes. */
   private readonly discoverRefreshing = new Set<string>();
 
-  async getDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
-    const cacheKey = discoverCacheKey(params);
+  async getDiscover(params: DiscoverParams): Promise<DiscoverResult> {
+    // Snap the requested window to a canonical preset BEFORE the cache
+    // lookup so two users on the same tenant + window share a slot even
+    // when their (from, to) timestamps differ by sub-minute drift. The
+    // computeDiscover call below also uses the snapped range so cache
+    // content always matches its key.
+    const snapped = snapToWindowPreset(params.timeRange);
+    const snappedParams: DiscoverParams = {
+      tenantId: params.tenantId,
+      timeRange: { from: snapped.from, to: snapped.to },
+    };
+    const cacheKey = discoverCacheKey(params.tenantId, snapped);
     const cached = await DISCOVER_CACHE.get(cacheKey);
 
     if (cached) {
+      // Stale-while-revalidate: hand back the cached payload and kick
+      // off a background refresh when it's older than the 1-min
+      // threshold. The refresh broadcasts `discover_updated` on
+      // completion so any open browser invalidates and re-reads from
+      // the now-warm cache.
       if (Date.now() - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
-        this.refreshDiscoverInBackground(params, cacheKey);
+        this.refreshDiscoverInBackground(snappedParams, cacheKey);
       }
-      return cached.value;
+      return { facets: cached.value, pending: false };
     }
 
-    const result = await this.computeDiscover(params);
-    await DISCOVER_CACHE.set(cacheKey, {
-      value: result,
-      timestamp: Date.now(),
-    });
-    return result;
+    // Cold miss: return `pending: true` with an empty facet list + start
+    // an async compute that will hydrate the cache and SSE-broadcast
+    // when done. Caller (`tracesV2.discover` → React Query →
+    // `useTraceFacets`) treats `pending` as a loading signal so the
+    // synthetic FACET_DEFAULTS skeleton renders while we wait, instead
+    // of an empty sidebar. Trade-off: first viewer sees the curated
+    // skeleton for ~1-2s instead of real values; subsequent viewers
+    // within the TTL hit the warm cache. The discover_updated SSE push
+    // flips `pending` to false without the user having to refresh.
+    this.refreshDiscoverInBackground(snappedParams, cacheKey);
+    return { facets: [], pending: true };
   }
 
   private refreshDiscoverInBackground(
     params: DiscoverParams,
     cacheKey: string,
   ): void {
+    // Per-pod dedup: avoid stacking redundant background refreshes on
+    // the same key inside this process. Cross-pod dedup uses
+    // `DISCOVER_CACHE.claim()` (a Redis SET NX EX leadership lease) so
+    // only one pod in the fleet pays the compute cost per refresh
+    // window. If we don't win the claim, another pod is already on it
+    // and its result will land in the shared cache for us shortly.
     if (this.discoverRefreshing.has(cacheKey)) return;
     this.discoverRefreshing.add(cacheKey);
 
-    void this.computeDiscover(params)
-      .then((fresh) =>
-        DISCOVER_CACHE.set(cacheKey, {
+    void (async () => {
+      try {
+        // 60s lease (set on the dedicated lock cache) is enough for any
+        // single compute (timings cap around 5-8s on the slowest
+        // tenants) and self-clears on pod crash. We claim once per
+        // refresh attempt — if we lose the claim, another pod is
+        // already on it and its write will hydrate the value cache for
+        // every reader.
+        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
+          cacheKey,
+          Date.now(),
+        );
+        if (!claimed) return;
+
+        const fresh = await this.computeDiscover(params);
+        await DISCOVER_CACHE.set(cacheKey, {
           value: fresh,
           timestamp: Date.now(),
-        }),
-      )
-      .catch((err) => {
+        });
+        // SSE push to any browser subscribed for this tenant. Empty
+        // payload — the client refetches via tRPC and hits the warm
+        // cache. We swallow throws because broadcast errors should
+        // never bubble up into the user-facing path (the cache write
+        // already succeeded).
+        try {
+          discoverBroadcaster?.(params.tenantId);
+        } catch (broadcastErr) {
+          discoverLogger.warn(
+            {
+              tenantId: params.tenantId,
+              cacheKey,
+              error:
+                broadcastErr instanceof Error
+                  ? broadcastErr.message
+                  : String(broadcastErr),
+            },
+            "discover_updated broadcast failed; clients will see new payload on next read",
+          );
+        }
+      } catch (err) {
         discoverLogger.warn(
           {
             cacheKey,
@@ -465,10 +640,10 @@ export class TraceListService {
           },
           "Background discover refresh failed; cached value still served",
         );
-      })
-      .finally(() => {
+      } finally {
         this.discoverRefreshing.delete(cacheKey);
-      });
+      }
+    })();
   }
 
   private async computeDiscover(
@@ -907,6 +1082,11 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,
     totalCost: row.totalCost ?? 0,
+    nonBilledCost: resolveNonBilledCost({
+      foldedNonBilledCost: row.nonBilledCost,
+      totalCost: row.totalCost,
+      attributes: row.attributes,
+    }),
     totalTokens,
     inputTokens: row.totalPromptTokenCount,
     outputTokens: row.totalCompletionTokenCount,

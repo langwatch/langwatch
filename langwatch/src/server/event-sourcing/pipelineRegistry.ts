@@ -8,7 +8,6 @@ import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { ReactorDefinition } from "./reactors/reactor.types";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -52,7 +51,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
-import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
+import type { RecordSpanCommandData } from "./pipelines/trace-processing/schemas/commands";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
 import {
@@ -108,6 +107,7 @@ import {
   type DeferredOriginPayload,
 } from "./pipelines/trace-processing/reactors/originGate.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
+import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { AppendStore } from "./projections/mapProjection.types";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
@@ -204,7 +204,6 @@ export interface PipelineRegistryDeps {
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
-  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -342,6 +341,9 @@ export class PipelineRegistry {
     const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
     const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>("scheduleDeferred");
     const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("simComputeRunMetrics");
+    // recordSpan is a command of the trace pipeline itself, so the claude
+    // span-sync reactor that dispatches it is wired after registration.
+    const recordSpanDispatch = new Deferred<CommandDispatcher<RecordSpanCommandData>>("recordSpan");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -370,6 +372,15 @@ export class PipelineRegistry {
     const spanStorageBroadcastReactor = createSpanStorageBroadcastReactor({
       broadcast: this.deps.broadcast,
       hasRedis: !!this.deps.eventSourcing.redisConnection,
+    });
+
+    const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
+      getMarkedClaudeCodeLogs: (tenantId, traceId) =>
+        this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
+          tenantId,
+          traceId,
+        ),
+      recordSpan: recordSpanDispatch.fn,
     });
 
     const projectMetadataReactor = createProjectMetadataReactor({
@@ -415,8 +426,6 @@ export class PipelineRegistry {
       ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
       : undefined;
 
-    const retentionOrphanSweepReactor = this.deps.retentionOrphanSweepReactor;
-
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -432,19 +441,20 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
+        claudeCodeSpanSyncReactor,
         gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
-        retentionOrphanSweepReactor,
       }),
     );
 
-    // Resolve self-referencing command now that the pipeline is registered
+    // Resolve self-referencing commands now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
+    recordSpanDispatch.resolve(traceCommands.recordSpan);
 
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.

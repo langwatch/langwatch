@@ -1,6 +1,6 @@
 ---
 title: Ingestion Templates
-description: Connect Claude Code, Cursor, and other tool-specific telemetry to your personal LangWatch workspace, no API key required, traces auto-shaped via platform-published OTTL transforms.
+description: Connect Claude Code, Cursor, and other tool-specific telemetry to your personal LangWatch workspace with a write-only ingestion key, traces auto-shaped via platform-published OTTL transforms.
 ---
 
 
@@ -12,9 +12,12 @@ LangWatch's **Ingestion Templates** let you connect tool-specific telemetry sour
 (Claude Code on Anthropic 20x, Cursor, Claude cowork, …) to your **personal workspace**
 without LangWatch ever participating in the upstream tool's authentication.
 
-You install a template, paste a binding token into your tool's OTLP exporter, and traces
-land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost, tokens, and
-model populated automatically.
+You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
+traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
+tokens, and model populated automatically. An ingestion key is just an
+[API key](/platform/api-keys) (`sk-lw-…`) scoped to one project with a write-only,
+ingest-only role: it can create traces and nothing else, so it's safe to spray into an
+agent's environment.
 
 ---
 
@@ -32,8 +35,8 @@ But many tools don't fit that path:
   emit OpenTelemetry traces locally; what they need is a place to ship them.
 
 For these, the user holds the upstream credential locally; LangWatch only needs to know
-**where to send the OTLP** and **which template the user is binding** so the trace gets
-the right `langwatch.source` provenance and lands in the right personal project.
+**where to send the OTLP** and **which template the trace references** so it gets the
+right `langwatch.source` provenance and lands in the right personal project.
 
 That's an Ingestion Template:
 
@@ -48,10 +51,11 @@ That's an Ingestion Template:
   admins click **Clone to customise** which calls
   `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
   row to refine the rules.
-- **User side:** a binding token (`ik-lw-…`) scoped to your personal project. You paste
-  that token into your tool's OTLP exporter; the tool ships, the receiver attributes
-  + applies the resolved template's OTTL (empty for platform defaults, admin-authored
-  for org forks).
+- **User side:** an ingestion key (`sk-lw-…`) scoped to your personal project with a
+  write-only, ingest-only role. You paste that key into your tool's OTLP exporter; the
+  tool ships, the receiver verifies the key, ceilings it to ingest-only, lands the trace
+  in the key's bound project, and applies the referenced template's OTTL (empty for
+  platform defaults, admin-authored for org forks) when the key carries a `templateId`.
 
 Credential is scope. Payload is advisory. The receiver attribution path is identical to
 gateway-VK ingest; the source-shape OTTL is org-customizable for admins who need it.
@@ -92,13 +96,13 @@ gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."
 The drawer shows:
 
 - **OTLP endpoint**: read-only, copyable.
-- **Binding token**: `ik-lw-…` issued one-time, with a Show/Hide toggle. Copy it
-  while it's visible; after you dismiss the drawer it's masked to its first 9
+- **Ingestion key**: `sk-lw-…` issued one-time, with a Show/Hide toggle. Copy it
+  while it's visible; after you dismiss the drawer it's masked to its first
   characters.
 - **Snippet preview**: pre-wired environment variables for Claude Code:
   ```bash
   export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
-  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<your-token>"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-<your-key>"
   ```
   (Self-hosted: replace the host with your LangWatch base URL. The drawer always
   shows the correct endpoint for your instance.)
@@ -107,8 +111,8 @@ Copy the snippet, then click **Mark installed**. The tile flips to a green-check
 with a **View traces →** deep-link.
 
 <Note>
-The token is shown one-time. If you lose it, **rotate** the binding from the tile to mint
-a new one. The previous token is invalidated immediately when you rotate (hard-cut v1).
+The key is shown one-time. If you lose it, **rotate** the ingestion key from the tile to
+mint a new one. The previous key is revoked immediately when you rotate (hard-cut v1).
 </Note>
 
 ### Step 3: fire your first Claude Code action
@@ -133,8 +137,10 @@ Open the trace. You should see:
 - `langwatch.cost.usd`, derived by the receiver's `canonicalCostExtractor` from the
   upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
-  `langwatch.user_ingestion_binding.id`, `langwatch.source = "claude_code"`, all
-  receiver-stamped post-auth (authoritative attribution + template provenance).
+  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all receiver-stamped
+  post-auth (authoritative attribution + template provenance), with
+  `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
+  assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
 
 That's it. From here, every Claude Code action you run flows into your personal workspace
 shaped correctly, same as if you'd been running through the gateway VK path.
@@ -150,7 +156,7 @@ trust model and the request flow. End users can skip ahead to [Raw OTLP fallback
 
 An `IngestionTemplate` row has:
 
-- `slug` (e.g. `claude_code`), referenced by user bindings.
+- `slug` (e.g. `claude_code`), referenced by an ingestion key via its `templateId`.
 - `sourceType` (e.g. `claude_code`), which upstream tool this template parses.
 - `credentialSchema` (closed enum, v1: `null`, `static_api_key`, `agent_id`), what
   fields the install drawer captures from the user.
@@ -169,11 +175,11 @@ An `IngestionTemplate` row has:
 
 ### credentialSchema shapes
 
-| schema           | what the install drawer captures              | covers v1                          |
-|------------------|-----------------------------------------------|------------------------------------|
-| `null`           | nothing, drawer auto-issues the binding token | claude_code, cursor, claude_cowork, raw_otlp_advanced |
-| `static_api_key` | one labeled API key field                     | (deferred to v1.1+)                |
-| `agent_id`       | a labeled agent-identifier text input         | (deferred to v1.1+)                |
+| schema           | what the install drawer captures               | covers v1                          |
+|------------------|------------------------------------------------|------------------------------------|
+| `null`           | nothing, drawer auto-mints the ingestion key   | claude_code, cursor, claude_cowork, raw_otlp_advanced |
+| `static_api_key` | one labeled API key field                      | (deferred to v1.1+)                |
+| `agent_id`       | a labeled agent-identifier text input          | (deferred to v1.1+)                |
 
 `oauth_redirect` and `s3_bucket` are reserved for a future iteration, those require
 upstream OAuth refresh, polling, watermark infrastructure that isn't in the v1 push-only
@@ -181,40 +187,48 @@ shape.
 
 ### Receiver resolution flow
 
-When your tool emits an OTLP payload with `Authorization: Bearer ik-lw-<token>`, the
+When your tool emits an OTLP payload with `Authorization: Bearer sk-lw-<key>`, the
 receiver:
 
-1. **Prefix-discriminates** the bearer, `ik-lw-*` → UserIngestionBinding lookup.
-2. **Hashes** the token (SHA256) and looks up the binding by
-   `bindingAccessTokenHash` (B-tree indexed; sub-millisecond on PG).
-3. **Defense-in-depth re-verifies** that the binding's project is personal AND its
-   team's owner is the binding's user. (This catches row-level integrity-violation
-   scenarios where the binding row has been tampered out-of-band.)
-4. **Sets `tenantId`** to `binding.personalProjectId`, token-as-scope. This is
+1. **Prefix-discriminates** the bearer, `sk-lw-*` → ApiKey verification path.
+2. **Verifies** the key (HMAC + pepper) and resolves the `ApiKey` row, the same path
+   any SDK or management key takes.
+3. **Ceilings to ingest-only.** An ingestion key carries a write-only, ingest-only role
+   that grants `traces:create` and nothing else, so the receiver rejects any non-ingest
+   operation regardless of what the payload claims.
+4. **Sets `tenantId`** to the key's bound project, credential-as-scope. This is
    authoritative.
-5. **Applies `template.ottlRules`** under a snapshot+restore principal-field guard.
-   For platform-default templates the rules are empty so this step is a no-op; for
-   org-authored forks the admin's OTTL runs here under the protection lists below.
-6. **Post-auth re-stamps** the 19 closed `protectedTemplateAttributeKeys` (and, for
+5. **Applies `template.ottlRules`** under a snapshot+restore principal-field guard, but
+   only when the ingestion key carries a `templateId`. For platform-default templates
+   the rules are empty so this step is a no-op; for org-authored forks the admin's OTTL
+   runs here under the protection lists below. A key with no `templateId` skips OTTL
+   entirely and lands raw.
+6. **Post-auth re-stamps** the closed `protectedTemplateAttributeKeys` (and, for
    org-authored OTTL, the tier-of-trust additions covering cost, tokens, model) as
-   receiver-authoritative. If the OTTL tried to write any of those keys, the original
-   value is restored and an audit row `gateway.template_ottl_protected_field_attempt`
-   fires with the rejected-key list.
+   receiver-authoritative, including `langwatch.api_key.id` and
+   `langwatch.origin` provenance (derived from the key's source: `coding_agent`
+   for a CLI assistant, `ai_tool` otherwise). If the OTTL tried to write any of those
+   keys, the original value is restored and an audit row
+   `gateway.template_ottl_protected_field_attempt` fires with the rejected-key list.
 7. **Hands off** to the trace pipeline, same path as every other ingest source from
    here.
 
-The principal-field guard at step 6 is the load-bearing security primitive.
+The ingest-only ceiling at step 3 and the principal-field guard at step 6 are the
+load-bearing security primitives.
 
 ### What the principal-field guard protects
 
-The `protectedTemplateAttributeKeys` closed list (19 keys, v1):
+The `protectedTemplateAttributeKeys` closed list:
 
-- The 16 `protectedAttributeKeys` from the base OTTL guard (B6), all attribution
+- The `protectedAttributeKeys` from the base OTTL guard (B6), all attribution
   shapes: `langwatch.user.id`, `langwatch.team.id`, `langwatch.organization.id`,
   `langwatch.project.id`, `langwatch.tenant.id`, virtual-key shapes,
   ingestion-source shapes, governance shapes.
 - `langwatch.template.id`, receiver-stamped provenance.
-- `langwatch.user_ingestion_binding.id`, receiver-stamped provenance.
+- `langwatch.api_key.id`, receiver-stamped provenance (the ingestion key that landed
+  the trace).
+- `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
+  assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
   `/me/traces`).
 
@@ -271,14 +285,17 @@ For security reviewers evaluating the feature.
 
 ### Trust boundary
 
-- **Token = scope.** The `ik-lw-*` binding token authoritatively determines which
-  personal project a trace lands in. Payload-level claims about user, team, org, project
-  attribution are advisory and re-stamped post-OTTL.
-- **Cross-bind guard at install** is structural: `bindingService.install` does not accept
-  `personalProjectId` as input. The server resolves the user's personal project via
-  `getPersonalProjectForUser(userId)`. Cross-user binding is unrepresentable.
-- **Cross-bind guard at receive** is the post-OTTL principal-field re-stamp. Forge attempts
-  emit `gateway.template_ottl_protected_field_attempt` audit rows.
+- **Credential = scope.** The `sk-lw-*` ingestion key authoritatively determines which
+  project a trace lands in, and its write-only ingest-only role caps it to
+  `traces:create`. Payload-level claims about user, team, org, project attribution are
+  advisory and re-stamped post-OTTL.
+- **Cross-project guard at mint** is structural: the install drawer (and the
+  `langwatch <tool>` CLI) mints the key against the user's resolved personal project;
+  the caller never picks the target project. Minting a key into someone else's project
+  is unrepresentable.
+- **Cross-project guard at receive** is the ingest-only ceiling plus the post-OTTL
+  principal-field re-stamp. Forge attempts emit
+  `gateway.template_ottl_protected_field_attempt` audit rows.
 
 ### Trust boundary: two tiers
 
@@ -300,7 +317,7 @@ admin who clicks "Save & validate" is accepting within-org responsibility for th
 transform's correctness. Three protection layers prevent admin OTTL from being
 weaponized against the org or other orgs:
 
-1. The 19-key `protectedTemplateAttributeKeys` guard at receive time (attribution +
+1. The `protectedTemplateAttributeKeys` guard at receive time (attribution +
    provenance, admin OTTL cannot rewrite who/where/which-template a trace came from).
 2. A tier-2 superset that adds `langwatch.cost.usd*`, `gen_ai.usage.*`, and
    `gen_ai.response.model` to the protected set so admin OTTL cannot forge cost-
@@ -315,31 +332,31 @@ re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org
 Concretely, before each tile flips to green-checked we run a **two-track dogfood
 discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
 `scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against both the
-19-key and tier-2 protected lists, and (b) a real-user track, admin publishes via
+base and tier-2 protected lists, and (b) a real-user track, admin publishes via
 `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
 tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
 Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
 
 ### What is audited
 
-State-change rows only, per-trace activity is tracked via `lastSeenAt` on the binding
-row, not via audit volume.
+State-change rows only, per-trace activity is tracked via the ingestion key's
+`lastUsedAt`, not via audit volume.
 
 | Event                                                       | When fires                                                |
 |-------------------------------------------------------------|-----------------------------------------------------------|
-| `gateway.user_ingestion_binding.installed`                  | User installs a template via the catalog tile             |
-| `gateway.user_ingestion_binding.uninstalled`                | User uninstalls a binding                                 |
-| `gateway.user_ingestion_binding.integrity_violation`        | Defense-in-depth re-verify fails (row-level tamper)       |
-| `gateway.template_ottl_protected_field_attempt`             | Template OTTL tried to rewrite a 19-key protected field   |
+| `gateway.ingestion_key.minted`                              | User installs a template (mints an ingestion key) via the catalog tile |
+| `gateway.ingestion_key.revoked`                             | User uninstalls / rotates an ingestion key                |
+| `gateway.template_ottl_protected_field_attempt`             | Template OTTL tried to rewrite a protected attribution / provenance field |
 | `gateway.ingestion_template.updated`                        | (v2 surface) Admin edits a template's OTTL                |
 
-All four state-change rows mirror to the `governance_ocsf_events` ClickHouse table for
+All state-change rows mirror to the `governance_ocsf_events` ClickHouse table for
 SOC2, ISO27001 evidence collection.
 
 ### What is not audited
 
-- Per-trace landings (volume reasons; `lastSeenAt` carries the activity signal)
-- Token rotation (the new token's installed/uninstalled lifecycle is the audit signal)
+- Per-trace landings (volume reasons; the ingestion key's `lastUsedAt` carries the
+  activity signal)
+- Key rotation content (the new key's minted/revoked lifecycle is the audit signal)
 - Credential-content edits on `static_api_key`, `agent_id` templates (PII boundary,
   matches the existing API-key edit pattern)
 
@@ -350,13 +367,13 @@ SOC2, ISO27001 evidence collection.
 ### Does LangWatch see my Anthropic OAuth token?
 
 No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
-in that flow. The only credential LangWatch holds is the binding token (`ik-lw-…`) we
-issue you, which is scoped to your personal project.
+in that flow. The only credential LangWatch holds is the ingestion key (`sk-lw-…`) we
+mint for you, which is scoped to your personal project and write-only.
 
-### What happens if I rotate the binding token?
+### What happens if I rotate the ingestion key?
 
-Hard-cut v1: the previous token is invalidated immediately. Update your tool's
-`OTEL_EXPORTER_OTLP_HEADERS` with the new token before continuing. (A grace-period
+Hard-cut v1: the previous key is revoked immediately. Update your tool's
+`OTEL_EXPORTER_OTLP_HEADERS` with the new key before continuing. (A grace-period
 rotation lands in a future iteration if SOC2 review requests.)
 
 ### Can my org admin see my personal-workspace traces?

@@ -64,7 +64,15 @@ const traceHeaderSchema = z.object({
   input: z.string().nullish(),
   output: z.string().nullish(),
   models: z.array(z.string()),
+  /**
+   * Grand list-price cost of the trace (sum of span costs). LangWatch bills
+   * per captured event, not per token — `totalCost` is the customer's
+   * provider-side spend. `nonBilledCost` is the bundled (theoretical) portion
+   * of it (non-zero only when the trace's tool runs on a bundled plan); the
+   * amount actually billed per token is `totalCost - nonBilledCost`.
+   */
   totalCost: z.number().nullable(),
+  nonBilledCost: z.number().default(0),
   totalTokens: z.number(),
   inputTokens: z.number().nullable(),
   outputTokens: z.number().nullable(),
@@ -107,6 +115,13 @@ const spanTreeNodeSchema = z.object({
   durationMs: z.number(),
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
+  /**
+   * USD cost from `gen_ai.usage.cost` — null when the span had none.
+   * `.nullish()` so older clients (or sample fixtures) that don't set
+   * the field at all stay compatible; readers should treat `undefined`
+   * and `null` identically.
+   */
+  cost: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;

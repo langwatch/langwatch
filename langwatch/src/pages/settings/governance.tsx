@@ -36,12 +36,12 @@ import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 /**
- * Org-admin overview of AI governance state — spend, users, anomalies,
+ * Org-admin overview of AI governance state - spend, users, anomalies,
  * IngestionSource health. Wires the api.activityMonitor.* procedures
  * (Sergey Option B) for live reads off gateway_activity_events.
  *
  * When no traffic has been ingested yet, the page shows a setup
- * checklist instead of empty zeroes — a "configure your first source"
+ * checklist instead of empty zeroes - a "configure your first source"
  * onboarding rather than an empty wasteland.
  *
  * Spec: specs/ai-gateway/governance/admin-oversight.feature
@@ -51,16 +51,16 @@ type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
-type SpendByCostCenter =
-  RouterOutputs["activityMonitor"]["spendByCostCenter"][number];
+type SpendByDepartment =
+  RouterOutputs["activityMonitor"]["spendByDepartment"][number];
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
 
 const fmtRelative = (date: Date | string | null): string => {
-  if (!date) return "—";
+  if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   const diffMs = Date.now() - d.getTime();
   // Future-dated sources (clock skew between LangWatch and the
   // reporting source, or seed scripts that drift past `now`) would
@@ -94,6 +94,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const catalogQuery = api.aiTools.adminList.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -106,7 +110,7 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, limit: 50 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-  const costCentersQuery = api.activityMonitor.spendByCostCenter.useQuery(
+  const departmentsQuery = api.activityMonitor.spendByDepartment.useQuery(
     { organizationId: orgId, windowDays: 30 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
@@ -129,14 +133,16 @@ function GovernanceOverviewPage() {
   const summary = summaryQuery.data;
   const users = usersQuery.data ?? [];
   const teams = teamsQuery.data ?? [];
-  const costCenters = costCentersQuery.data ?? [];
+  const departments = departmentsQuery.data ?? [];
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
   const anomalyRules = anomalyRulesQuery.data ?? [];
+  const catalogTiles = catalogQuery.data ?? [];
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
   const hasAnomalyRules = anomalyRules.length > 0;
+  const hasCatalogTiles = catalogTiles.length > 0;
   const hasTraffic =
     !!summary &&
     (summary.spentThisWindowUsd > 0 ||
@@ -185,6 +191,17 @@ function GovernanceOverviewPage() {
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
+              <SetupItem
+                done={hasCatalogTiles}
+                title="Add tools to the catalog"
+                description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
+                href="/settings/governance/tool-catalog"
+                ctaLabel={
+                  hasCatalogTiles
+                    ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
+                    : "Add tools to the catalog"
+                }
+              />
               <SetupItem
                 done={hasPolicies}
                 title="Define a routing policy"
@@ -272,7 +289,7 @@ function GovernanceOverviewPage() {
         )}
 
         {/*
-         * Monitoring sections lead the page when populated — admin's
+         * Monitoring sections lead the page when populated - admin's
          * daily-driver answer to "what happened, where, who" without
          * scrolling past config knobs. Config (CLI session TTL +
          * content-logging mode) lives below as occasional-touch
@@ -364,30 +381,30 @@ function GovernanceOverviewPage() {
         </SectionCard>
 
         <SectionCard
-          title="Spend by cost center"
-          subline="Spend grouped by cost center across every project in the org, including personal AI use (last 30 days)."
+          title="Spend by department"
+          subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
           actions={
             <Link
-              href="/settings/governance/cost-centers"
+              href="/settings/governance/departments"
               color="blue.600"
               fontSize="sm"
             >
-              Manage cost centers →
+              Manage departments →
             </Link>
           }
         >
-          {costCenters.length === 0 ? (
+          {departments.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
               No spend to attribute this window. Assign people, teams, and
-              projects to cost centers to compare spend across the org.
+              projects to departments to compare spend across the org.
             </Text>
           ) : (
             <VStack align="stretch" gap={0}>
-              <CostCenterRowHeader />
-              {costCenters.map((c) => (
-                <CostCenterRow
-                  key={c.costCenterId ?? "unassigned"}
-                  costCenter={c}
+              <DepartmentRowHeader />
+              {departments.map((c) => (
+                <DepartmentRow
+                  key={c.departmentId ?? "unassigned"}
+                  department={c}
                 />
               ))}
             </VStack>
@@ -402,7 +419,7 @@ function GovernanceOverviewPage() {
           {anomalies.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
               {hasTraffic
-                ? "All quiet — no active alerts."
+                ? "All quiet - no active alerts."
                 : "Available when the detection backend ships."}
             </Text>
           ) : (
@@ -551,7 +568,7 @@ const CONTENT_MODE_COPY: Record<ContentMode, { title: string; helper: string }> 
   strip_io: {
     title: "Strip prompts & completions",
     helper:
-      "Drop user prompts and assistant completions before write — keep tokens, cost, model name, latency, and span shape intact for cost & ops dashboards. System messages still flow.",
+      "Drop user prompts and assistant completions before write - keep tokens, cost, model name, latency, and span shape intact for cost & ops dashboards. System messages still flow.",
   },
   strip_all: {
     title: "Strip everything",
@@ -585,7 +602,7 @@ function ContentModeSection({ organizationId }: { organizationId: string }) {
   return (
     <SectionCard
       title="Content logging mode"
-      subline="Controls whether gen_ai prompt/completion/system payloads from gateway-origin spans are persisted to ClickHouse. The receiver strips before write — content never lands at rest, even briefly."
+      subline="Controls whether gen_ai prompt/completion/system payloads from gateway-origin spans are persisted to ClickHouse. The receiver strips before write - content never lands at rest, even briefly."
     >
       <VStack align="stretch" gap={2}>
         {(Object.keys(CONTENT_MODE_COPY) as ContentMode[]).map((mode) => {
@@ -639,7 +656,7 @@ function ContentModeSection({ organizationId }: { organizationId: string }) {
         })}
         <Text fontSize="xs" color="fg.muted">
           Mode flips apply to new spans only. Spans already in ClickHouse are
-          NOT retroactively scrubbed — change before the data starts flowing
+          NOT retroactively scrubbed - change before the data starts flowing
           if you need a guarantee.
         </Text>
       </VStack>
@@ -974,7 +991,7 @@ function TeamRowHeader() {
   );
 }
 
-function CostCenterRowHeader() {
+function DepartmentRowHeader() {
   return (
     <HStack
       paddingY={2}
@@ -987,18 +1004,18 @@ function CostCenterRowHeader() {
       textTransform="uppercase"
       letterSpacing="wider"
     >
-      <Box flex={3}>Cost center</Box>
+      <Box flex={3}>Department</Box>
       <Box flex={2}>Spend</Box>
       <Box flex={2}>Requests</Box>
     </HStack>
   );
 }
 
-function CostCenterRow({ costCenter }: { costCenter: SpendByCostCenter }) {
-  const isUnassigned = costCenter.costCenterId === null;
+function DepartmentRow({ department }: { department: SpendByDepartment }) {
+  const isUnassigned = department.departmentId === null;
   const dotColor = isUnassigned
     ? "#94a3b8"
-    : getHexColorForString(costCenter.costCenterName);
+    : getHexColorForString(department.departmentName);
   return (
     <HStack
       paddingY={2}
@@ -1020,20 +1037,20 @@ function CostCenterRow({ costCenter }: { costCenter: SpendByCostCenter }) {
             fontWeight="medium"
             color={isUnassigned ? "fg.muted" : "fg"}
           >
-            {costCenter.costCenterName}
+            {department.departmentName}
           </Text>
         </HStack>
       </Box>
-      <Box flex={2}>{fmtUsd(costCenter.spendUsd)}</Box>
-      <Box flex={2}>{numeral(costCenter.requestCount).format("0,0")}</Box>
+      <Box flex={2}>{fmtUsd(department.spendUsd)}</Box>
+      <Box flex={2}>{numeral(department.requestCount).format("0,0")}</Box>
     </HStack>
   );
 }
 
 /**
- * Trend cell rendering — three states:
+ * Trend cell rendering - three states:
  *   1. No prior baseline (first window of activity, or seed without
- *      prior-window distribution): render '—' muted. Avoids the
+ *      prior-window distribution): render '-' muted. Avoids the
  *      misleading +100% on every brand-new team / fresh customer.
  *   2. |delta| > 25%: orange (anomalous spike) or blue (sharp drop).
  *      Threshold matches `summary.windowOverPreviousPct` palette.
@@ -1042,7 +1059,7 @@ function CostCenterRow({ costCenter }: { costCenter: SpendByCostCenter }) {
 /**
  * Cap absurd display values caused by tiny prior baselines (e.g.
  * prior=$0.0001, current=$1 → +999900%). Above 1000% we just show
- * ">1000%" — the actual number is uninformative noise. Below 1% we
+ * ">1000%" - the actual number is uninformative noise. Below 1% we
  * show "+0%" / "-0%" rather than "+0.0034%" pixel grit. The tone
  * threshold uses the raw value so a real 5000% growth still flags
  * orange-amber even though we display ">1000%".
@@ -1064,7 +1081,7 @@ function TrendCell({
   if (!hasBaseline) {
     return (
       <Box flex={2} color="fg.muted">
-        —
+        -
       </Box>
     );
   }
@@ -1106,7 +1123,7 @@ function TeamRow({ team }: { team: SpendByTeam }) {
             </Text>
             {isOrgWide && (
               <Text fontSize="xs" color="fg.subtle">
-                synthetic — sources without a team
+                synthetic - sources without a team
               </Text>
             )}
           </VStack>

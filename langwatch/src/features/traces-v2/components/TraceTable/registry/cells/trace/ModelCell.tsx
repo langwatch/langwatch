@@ -59,6 +59,28 @@ function inferProvider(model: string): ProviderKey | null {
 }
 
 /**
+ * Provider icons that are flat monochrome marks — they ship with a
+ * hardcoded near-black fill (or with no `fill` at all, so they
+ * inherit `currentColor` which is `fg.muted` in our table cell).
+ * On the dark theme that lands as dark-grey-on-dark, near-invisible.
+ *
+ * The fix: invert these icons in dark mode via a CSS filter. This is
+ * a wrapper-level fix because the SVG components are shared with
+ * other surfaces (the model picker, the docs site) that we don't want
+ * to touch — only the trace-cell consumer needs the dark adapt.
+ *
+ * Coloured-brand icons (Groq orange, AWS yellow, GoogleCloud
+ * primaries, Cerebras orange) are left alone — they're brand-coloured
+ * marks that read well in both modes already.
+ */
+const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
+  "openai",
+  "anthropic",
+  "voyage",
+  "custom",
+]);
+
+/**
  * Tiny provider mark rendered before the model name in the table cell.
  * Smaller than the model selector's `MODEL_ICON_SIZE` (which targets a
  * touch-friendly dropdown row) — the trace table row is dense, so the
@@ -77,6 +99,7 @@ function ProviderIcon({
   const icon = modelProviderIcons[provider];
   if (!icon) return null;
   const px = size === "comfortable" ? "14px" : "12px";
+  const isMonochrome = MONOCHROME_PROVIDER_ICONS.has(provider);
   return (
     <Box
       width={px}
@@ -86,8 +109,22 @@ function ProviderIcon({
       alignItems="center"
       justifyContent="center"
       // Provider SVGs ship as currentColor-ish marks at native size; the
-      // wrapper Box constrains them via children width/height.
+      // wrapper Box constrains them via children width/height. The
+      // _dark filter inverts the monochrome marks so OpenAI's all-black
+      // sigil + Anthropic's `#181818` glyph become near-white on the
+      // dark canvas. Coloured marks (GoogleCloud, Groq, AWS) get no
+      // filter — inverting them would mangle their brand colours.
       css={{ "& > svg": { width: "100%", height: "100%" } }}
+      _dark={
+        // Pure invert(1) — the monochrome marks are flat black on
+        // transparent; rotating hue afterwards would tint the result
+        // away from neutral. We want neutral white-ish, so just
+        // invert. brightness(0.92) tones the result to off-white so
+        // it doesn't hard-burn against the dark surface.
+        isMonochrome
+          ? { filter: "invert(1) brightness(0.92)" }
+          : undefined
+      }
       aria-hidden="true"
     >
       {icon as React.ReactNode}
@@ -95,7 +132,7 @@ function ProviderIcon({
   );
 }
 
-function ExtraModelsBadge({
+export function ExtraModelsBadge({
   models,
   size,
 }: {

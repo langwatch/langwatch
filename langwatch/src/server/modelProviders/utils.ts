@@ -69,13 +69,11 @@ export const getVercelAIModel = async (
     ]),
   );
 
-  // FF-gated: Go playground proxy when release_nlp_go_engine_enabled is
-  // on, legacy LiteLLM proxy otherwise. Same wire shape (x-litellm-*
-  // headers + OpenAI body) — the Go side reads x-litellm-* via the
-  // gatewayproxy package and dispatches in-process; the Python side
-  // does what it did before.
-  const baseURL = await nlpgoProxyBaseURL({
-    projectId,
+  // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
+  // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
+  // side reads x-litellm-* via the gatewayproxy package and dispatches
+  // in-process.
+  const baseURL = nlpgoProxyBaseURL({
     baseURL: env.LANGWATCH_NLP_SERVICE!,
   });
   const vercelProvider = createOpenAICompatible({

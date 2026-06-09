@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { EvaluatorConfig, TargetConfig } from "~/experiments-v3/types";
+import type {
+  EvaluatorConfig,
+  LocalPromptConfig,
+  TargetConfig,
+} from "~/experiments-v3/types";
 import type {
   HttpComponentConfig,
+  LlmPromptConfigComponent,
   SignatureComponentConfig,
 } from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell } from "../types";
 import {
   buildCodeNodeFromAgent,
@@ -12,6 +18,8 @@ import {
   buildEvaluatorTargetNode,
   buildHttpNodeFromAgent,
   buildSignatureNodeFromAgent,
+  buildSignatureNodeFromLocalConfig,
+  buildSignatureNodeFromPrompt,
 } from "../workflowBuilder";
 
 describe("buildEvaluatorNode", () => {
@@ -732,4 +740,183 @@ describe("buildEvaluatorTargetNode", () => {
     expect(node.data.name).toBe("target-eval-1");
   });
 
+});
+
+// Prompt-identity forwarding is what lets nlpgo emit the
+// PromptApiService.get + Prompt.compile spans (the engine emits them only
+// when the signature node carries data.configId — see
+// services/nlpgo/app/engine/prompt_spans_emit_test.go and
+// specs/nlp-go/prompt-spans-eval-v3.feature). Without these fields the
+// eval-v3 target prompt has no prompt ancestry in the trace and the
+// drawer's "Open in Prompts" resume is hidden.
+describe("buildSignatureNodeFromPrompt", () => {
+  const createVersionedPrompt = (): VersionedPrompt => ({
+    id: "prompt_supportrouter_xyz",
+    name: "support-router",
+    handle: "support-router",
+    scope: "PROJECT",
+    version: 6,
+    versionId: "prompt_version_supportrouter_v6",
+    versionCreatedAt: new Date("2026-01-15T10:00:00.000Z"),
+    model: "openai/gpt-5-mini",
+    prompt: "You are a support router.",
+    projectId: "project-1",
+    organizationId: "org-1",
+    messages: [{ role: "user", content: "{{input}}" }],
+    authorId: null,
+    createdAt: new Date("2026-01-15T10:00:00.000Z"),
+    updatedAt: new Date("2026-01-15T10:00:00.000Z"),
+    tags: [],
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+  });
+
+  const createPromptTargetConfig = (): TargetConfig => ({
+    id: "target-1",
+    type: "prompt",
+    promptId: "prompt_supportrouter_xyz",
+    promptVersionNumber: 6,
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {
+      "dataset-1": {
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
+      },
+    },
+  });
+
+  const createCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-1",
+    targetConfig: createPromptTargetConfig(),
+    evaluatorConfigs: [],
+    datasetEntry: { _datasetId: "dataset-1", question: "I want a refund" },
+  });
+
+  describe("given a target backed by a saved prompt", () => {
+    describe("when building the signature node", () => {
+      const buildNode = () =>
+        buildSignatureNodeFromPrompt({
+          nodeId: "target-1",
+          prompt: createVersionedPrompt(),
+          targetConfig: createPromptTargetConfig(),
+          cell: createCell(),
+        });
+
+      it("forwards configId, handle and versionMetadata from the saved prompt", () => {
+        const data = buildNode().data as LlmPromptConfigComponent;
+
+        expect(data.configId).toBe("prompt_supportrouter_xyz");
+        expect(data.handle).toBe("support-router");
+        expect(data.versionMetadata).toEqual({
+          versionId: "prompt_version_supportrouter_v6",
+          versionNumber: 6,
+          versionCreatedAt: "2026-01-15T10:00:00.000Z",
+        });
+      });
+
+      it("does not flag a saved prompt as a draft", () => {
+        const data = buildNode().data as LlmPromptConfigComponent;
+
+        expect(data.promptDraft).toBeUndefined();
+      });
+    });
+  });
+});
+
+describe("buildSignatureNodeFromLocalConfig", () => {
+  const createBasePrompt = (): VersionedPrompt => ({
+    id: "prompt_supportrouter_xyz",
+    name: "support-router",
+    handle: "support-router",
+    scope: "PROJECT",
+    version: 6,
+    versionId: "prompt_version_supportrouter_v6",
+    versionCreatedAt: new Date("2026-01-15T10:00:00.000Z"),
+    model: "openai/gpt-5-mini",
+    prompt: "You are a support router.",
+    projectId: "project-1",
+    organizationId: "org-1",
+    messages: [{ role: "user", content: "{{input}}" }],
+    authorId: null,
+    createdAt: new Date("2026-01-15T10:00:00.000Z"),
+    updatedAt: new Date("2026-01-15T10:00:00.000Z"),
+    tags: [],
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+  });
+
+  const createLocalPromptConfig = (): LocalPromptConfig => ({
+    llm: { model: "openai/gpt-5-mini", temperature: 0 },
+    messages: [
+      { role: "system", content: "You are terse." },
+      { role: "user", content: "{{input}}" },
+    ],
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+  });
+
+  const createTargetConfig = (): TargetConfig => ({
+    id: "target-1",
+    type: "prompt",
+    promptId: "prompt_supportrouter_xyz",
+    promptVersionNumber: 6,
+    localPromptConfig: createLocalPromptConfig(),
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {},
+  });
+
+  const createCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-1",
+    targetConfig: createTargetConfig(),
+    evaluatorConfigs: [],
+    datasetEntry: { _datasetId: "dataset-1", question: "I want a refund" },
+  });
+
+  describe("given a local prompt edited from a saved base", () => {
+    describe("when building the signature node", () => {
+      it("keeps the base prompt identity and flags promptDraft", () => {
+        const node = buildSignatureNodeFromLocalConfig({
+          nodeId: "target-1",
+          name: "support-router",
+          localConfig: createLocalPromptConfig(),
+          targetConfig: createTargetConfig(),
+          cell: createCell(),
+          basePrompt: createBasePrompt(),
+        });
+        const data = node.data as LlmPromptConfigComponent;
+
+        expect(data.configId).toBe("prompt_supportrouter_xyz");
+        expect(data.handle).toBe("support-router");
+        expect(data.versionMetadata?.versionNumber).toBe(6);
+        expect(data.promptDraft).toBe(true);
+      });
+    });
+  });
+
+  describe("given a brand-new local prompt with no saved base", () => {
+    describe("when building the signature node", () => {
+      it("forwards no prompt identity", () => {
+        const node = buildSignatureNodeFromLocalConfig({
+          nodeId: "target-1",
+          name: "draft",
+          localConfig: createLocalPromptConfig(),
+          targetConfig: createTargetConfig(),
+          cell: createCell(),
+          basePrompt: undefined,
+        });
+        const data = node.data as LlmPromptConfigComponent;
+
+        expect(data.configId).toBeUndefined();
+        expect(data.promptDraft).toBeUndefined();
+      });
+    });
+  });
 });

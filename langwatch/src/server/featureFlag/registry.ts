@@ -116,17 +116,6 @@ export const FEATURE_FLAGS = [
   },
 
   // ----- PRODUCT -----
-  // Hot-ish per-project gate, but only checked on workflow execution
-  // paths (post_event, runWorkflow, playground, topic clustering, model
-  // provider routing), not on /api/collector. PostHog targeting still
-  // useful for per-project rollouts.
-  {
-    key: "release_nlp_go_engine_enabled",
-    scope: "PRODUCT",
-    defaultValue: true,
-    description:
-      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service. Default flipped to on: the legacy Python langwatch_nlp pipeline is now the opt-out path (set a PostHog rule or operator-store row to disable per project).",
-  },
   {
     key: "release_ui_sdk_radar_banner_card_enabled",
     scope: "PRODUCT",

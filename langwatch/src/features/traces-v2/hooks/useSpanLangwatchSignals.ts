@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
+import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /**
@@ -12,6 +13,12 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  */
 export function useSpanLangwatchSignals() {
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  // SSE-aware polling (see `useSpanTree` for the rationale): poll only
+  // when `useTraceFreshness`'s SSE subscription isn't keeping the cache
+  // fresh via invalidations.
+  const sseConnected = useSseStatusStore(
+    (s) => s.sseConnectionState === "connected",
+  );
 
   const query = api.tracesV2.spanLangwatchSignals.useQuery(queryArgs, {
     enabled: isReady,
@@ -19,7 +26,7 @@ export function useSpanLangwatchSignals() {
     cacheTime: 1_800_000,
     keepPreviousData: true,
     refetchOnWindowFocus: true,
-    refetchInterval: isLive ? LIVE_REFETCH_MS : false,
+    refetchInterval: isLive && !sseConnected ? LIVE_REFETCH_MS : false,
   });
 
   const signalsBySpanId = useMemo(() => {

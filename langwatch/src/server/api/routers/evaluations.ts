@@ -15,9 +15,9 @@ import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

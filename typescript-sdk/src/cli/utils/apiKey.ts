@@ -4,7 +4,7 @@ import { getEndpoint } from "./endpoint";
 
 export const checkApiKey = (): void => {
   // Load environment variables from .env file
-  config();
+  config({ quiet: true });
 
   const apiKey = process.env.LANGWATCH_API_KEY;
 

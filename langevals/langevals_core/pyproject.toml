@@ -18,7 +18,7 @@ dependencies = [
     "google-cloud-aiplatform>=1.133.0",
     "boto3>=1.34.34",
     # Enforce versions due to security issues
-    "transformers>=4.49.0",
+    "transformers>=5.0.0",
     "anyio>=4.8.0",
     "zipp>=3.23.0",
 ]

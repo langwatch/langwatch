@@ -314,6 +314,7 @@ function RegistryRowComponent<TRow>({
         ref={ref}
         data-index={dataIndex}
         style={style}
+        variant={variant}
         onClick={onSelect}
         traceId={rowDomId}
         isNew={isNew}

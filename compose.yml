@@ -51,6 +51,9 @@ services:
         condition: service_healthy
     restart: always
 
+  # nlpgo — the Go NLP engine. langwatch/langwatch_nlp is now a static Go
+  # binary (Dockerfile.langwatch_nlp); it still binds :5561 and reads
+  # LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks.
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     env_file:

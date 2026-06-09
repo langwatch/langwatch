@@ -35,6 +35,8 @@ function makeScenario(overrides: Partial<Scenario> & { id: string; name: string 
     situation: "test situation",
     criteria: [],
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     lastUpdatedById: null,
     archivedAt: null,
     createdAt: now,

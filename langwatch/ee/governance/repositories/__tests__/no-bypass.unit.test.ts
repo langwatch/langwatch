@@ -3,9 +3,9 @@
  *
  * Codifies the umbrella spec @no-bypass invariant as a CI-enforced
  * regression check: services + routes + UI must NOT call
- * `prisma.ingestionTemplate.*` / `prisma.userIngestionBinding.*` /
- * `prisma.auditLog.*` directly. Every persistence touch routes through
- * the repositories at ee/governance/repositories/.
+ * `prisma.ingestionTemplate.*` / `prisma.auditLog.*` directly. Every
+ * persistence touch routes through the repositories at
+ * ee/governance/repositories/.
  *
  * If a future PR adds a direct `prisma.<governance-table>.*` call to a
  * file outside this allowlist, this test fails and the PR has to either
@@ -41,28 +41,14 @@ const ALLOWED_FILE_PATTERNS = [
   "scripts/dogfood/",
   "src/app/api/governance/__tests__/",
   "src/mcp/__tests__/",
-  // Token resolvers (pat + api-key) are hot-path auth-resolution paths that
-  // look up bindings by hashed-token primary key. They don't write through
-  // the governance service contract (no audit needed for a read), so they
-  // bypass the repo layer by design.
-  "src/server/pat/token-resolver.ts",
-  "src/server/api-key/token-resolver.ts",
-  // One-off backfill task (`pnpm task encryptIngestionCredentials`) that
-  // re-encrypts credentials already landed in dogfood / S0. Like the
-  // platform seeder, it's a maintenance data-migration over the table, not
-  // a production request path that needs the audit-emitting service
-  // contract — routing a single throwaway sweep through the repo would
-  // only shuffle the call site.
-  "src/tasks/encryptIngestionCredentials.ts",
 ];
 
 const GATED_TABLE_PATTERNS = [
-  // These patterns assert that no production code path outside the
+  // This pattern asserts that no production code path outside the
   // allowlist invokes the table directly. The trailing dot is important —
   // it matches a method call like `.findMany(`, NOT a comment that
   // happens to mention the table name.
   String.raw`prisma\.ingestionTemplate\.`,
-  String.raw`prisma\.userIngestionBinding\.`,
 ];
 
 function grepRepo(pattern: string): string[] {
@@ -92,9 +78,7 @@ function isMethodCall(line: string): boolean {
   // name (`prisma.ingestionTemplate.*` inside a comment) — only assert
   // on actual method invocations like `.findMany(` / `.create({` / etc.
   // Matches: `prisma.foo.bar(` or `tx.foo.bar(`.
-  return /\b(prisma|tx|client)\.(ingestionTemplate|userIngestionBinding)\.[a-zA-Z]+\(/.test(
-    line,
-  );
+  return /\b(prisma|tx|client)\.ingestionTemplate\.[a-zA-Z]+\(/.test(line);
 }
 
 describe("no-bypass invariant: governance tables route through repositories", () => {
@@ -136,13 +120,8 @@ describe("no-bypass invariant: governance tables route through repositories", ()
     ).concat(
       grepRepo(String.raw`client\.ingestionTemplate\.`),
     );
-    const bindingMatches = grepRepo(
-      String.raw`prisma\.userIngestionBinding\.`,
-    ).concat(
-      grepRepo(String.raw`client\.userIngestionBinding\.`),
-    );
-    const repoMatches = [...ingestionMatches, ...bindingMatches].filter(
-      (line) => line.includes("ee/governance/repositories/"),
+    const repoMatches = ingestionMatches.filter((line) =>
+      line.includes("ee/governance/repositories/"),
     );
     expect(repoMatches.length).toBeGreaterThan(0);
   });

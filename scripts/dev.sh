@@ -4,7 +4,7 @@
 # Usage:
 #   scripts/dev.sh                # interactive preset picker
 #   scripts/dev.sh all-local      # local CH+PG+Redis+app, no NLP
-#   scripts/dev.sh all-local-nlp  # all-local + langwatch_nlp + langevals
+#   scripts/dev.sh all-local-nlp  # all-local + nlpgo + langevals
 #   scripts/dev.sh dev-storage    # local CH+PG+Redis, stored-objects -> dev S3
 #   scripts/dev.sh dev-infra      # local redis + workers + app, everything else against shared dev
 #   scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
@@ -31,7 +31,7 @@ Presets — pass as the first arg or pick interactively:
                   No NLP. Stored-objects fall back to local-FS. Fast iteration
                   default.
 
-  all-local-nlp   all-local + langwatch_nlp + langevals containers.
+  all-local-nlp   all-local + nlpgo (Go NLP engine) + langevals containers.
 
   dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
                   dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
@@ -106,11 +106,6 @@ check_env_files() {
   if [ ! -f "langwatch/.env" ]; then
     echo "WARNING: langwatch/.env not found"
     echo "  → cp langwatch/.env.example langwatch/.env"
-    missing=1
-  fi
-  if [ ! -f "langwatch_nlp/.env" ]; then
-    echo "WARNING: langwatch_nlp/.env not found (needed for all-local-nlp / full-local presets)"
-    echo "  → cp langwatch_nlp/.env.example langwatch_nlp/.env"
     missing=1
   fi
   if [ $missing -eq 1 ]; then
@@ -285,7 +280,7 @@ run_all_local_nlp() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local-nlp
-  echo "Starting: backend + workers + langwatch_nlp + langevals (preset=all-local-nlp)"
+  echo "Starting: backend + workers + nlpgo + langevals (preset=all-local-nlp)"
   # `nlp` profile starts NLP/langevals; `workers` profile starts the worker
   # container. Both profiles must be passed — compose unions them.
   $COMPOSE --profile nlp --profile workers up
@@ -476,7 +471,7 @@ cat <<'EOF'
 Pick a preset:
 
   1) all-local       Local CH + PG + Redis + app + workers. No NLP. Fast iteration.
-  2) all-local-nlp   all-local + langwatch_nlp + langevals.
+  2) all-local-nlp   all-local + nlpgo + langevals.
   3) dev-storage     Local DBs + workers, stored-objects -> runtime-storage-dev (real AWS S3).
   4) dev-infra       Local app + Redis + workers, shared dev infra for PG/CH/NLP/S3. Most faithful e2e.
   5) frontend-only   No compose. UI / design / static iteration.

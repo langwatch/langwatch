@@ -9,7 +9,10 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
-import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import {
+  RecordSpanCommand,
+  RECORD_SPAN_DEDUPLICATION,
+} from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
@@ -34,6 +37,7 @@ export interface TraceProcessingPipelineDeps {
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   /**
@@ -43,8 +47,8 @@ export interface TraceProcessingPipelineDeps {
    */
   blobStore?: BlobStore;
   governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -78,7 +82,8 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
     .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
+    .withReactor("logRecordStorage", "claudeCodeSpanSync", deps.claudeCodeSpanSyncReactor);
 
   if (deps.customerIoTraceSyncReactor) {
     builder = builder.withReactor(
@@ -123,14 +128,18 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands
   // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
-  // (no spool support) when blobStore is absent.
+  // (no spool support) when blobStore is absent. Either way the recordSpan
+  // command carries the dedup config from main.
   const recordSpanBuilder = deps.blobStore
     ? builder.withCommandInstance(
         "recordSpan",
         RecordSpanCommand,
         new RecordSpanCommand({ blobStore: deps.blobStore }),
+        { deduplication: RECORD_SPAN_DEDUPLICATION },
       )
-    : builder.withCommand("recordSpan", RecordSpanCommand);
+    : builder.withCommand("recordSpan", RecordSpanCommand, {
+        deduplication: RECORD_SPAN_DEDUPLICATION,
+      });
 
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)

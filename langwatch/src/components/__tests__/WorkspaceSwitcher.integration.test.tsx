@@ -472,6 +472,78 @@ describe("WorkspaceSwitcher", () => {
   });
 
   // -------------------------------------------------------------------
+  // Org-scoped routes (/settings/*, /governance) render the switcher with
+  // the organization as the current chip so the user can jump back into a
+  // project, and multi-org users can switch org in place.
+  // Spec: specs/ai-gateway/governance/workspace-switcher.feature
+  // -------------------------------------------------------------------
+  describe("when the current context is an organization", () => {
+    const orgAcme = { orgId: "org_acme", orgName: "Acme", orgSlug: "acme" };
+    const orgGlobex = {
+      orgId: "org_globex",
+      orgName: "Globex",
+      orgSlug: "globex",
+    };
+
+    /** @scenario On an org-scoped route the switcher shows the organization as the current chip */
+    it("shows the organization name in the trigger", () => {
+      renderSwitcher({
+        personal,
+        teams: [],
+        projects: [],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+      });
+
+      expect(
+        screen.getByRole("button", {
+          name: /switch workspace \(current: Acme\)/i,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
+    it("calls onSwitchOrganization when a different org is picked", async () => {
+      const user = userEvent.setup();
+      const onSwitchOrganization = vi.fn();
+      renderSwitcher({
+        personal,
+        teams: [],
+        projects: [],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+        organizations: [orgAcme, orgGlobex],
+        onSwitchOrganization,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      await user.click(await screen.findByText("Globex"));
+
+      expect(onSwitchOrganization).toHaveBeenCalledWith("org_globex");
+    });
+
+    it("does not render an org-switch group for a single-org user", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+        organizations: [orgAcme],
+        onSwitchOrganization: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The personal + project entries are reachable, but there is no
+      // "Organizations" switch group when the user belongs to one org.
+      await screen.findByText("Foo Project");
+      expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------
   // Multi-org disambiguation: a user belonging to two orgs that each
   // have a "Default Team" should see them grouped under their org name,
   // not as visually-identical adjacent rows.

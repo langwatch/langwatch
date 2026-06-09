@@ -279,7 +279,6 @@ export async function runSeedPersonas(
           organizationId: org.id,
           scopeType: "PRINCIPAL",
           scopeId: user.id,
-          principalUserId: user.id,
           createdById: user.id,
           name: `Personal Budget — ${args.email}`,
           description: "Auto-seeded by seed-personas.ts --mint-vk",

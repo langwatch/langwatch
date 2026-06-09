@@ -47,7 +47,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { api, type RouterOutputs } from "~/utils/api";
 
 /**
- * Per-source detail page — health metrics + recent events with raw vs
+ * Per-source detail page - health metrics + recent events with raw vs
  * normalised side-by-side. Wired to api.activityMonitor.eventsForSource +
  * sourceHealthMetrics (Sergey f2cb9de7a).
  *
@@ -77,7 +77,7 @@ const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
 
 const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const diffMs = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
@@ -327,7 +327,7 @@ function StaleTimestampCallout({
   // events across 24h/7d/30d but the events list has rows, the user
   // most likely sent test events with stale `startTimeUnixNano`. CH
   // health queries filter by EventTimestamp, the events list does not
-  // — they appear contradictory. Surface a callout that names the
+  // - they appear contradictory. Surface a callout that names the
   // diagnosis + the fix (use Date.now() at the moment you fire the
   // event).
   if (!health) return null;
@@ -384,7 +384,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         source&apos;s origin tag, viewable in the trace viewer. If
         you are sending agent traces from your own LangWatch SDK,
         use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-        project API key — different auth, same trace store. See{" "}
+        project API key - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -394,7 +394,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         .
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above —
+        Lost the secret? Click <strong>Rotate secret</strong> above -
         the new bearer is shown once with a copy-paste curl example, and
         the prior secret stays valid for 24h while you roll the new
         value through every upstream client.
@@ -629,19 +629,37 @@ function SecretRevealModal({
   const usesWebhookUrl = sourceType === "workato";
   const isClaudeCode = sourceType === "claude_code";
 
-  // Claude Code's monitoring-usage doc requires both
-  // CLAUDE_CODE_ENABLE_TELEMETRY=1 and the standard OTEL_*_EXPORTER
-  // env vars before any signals are emitted. Pre-build the shell
-  // export block so admins paste once instead of stitching six lines
-  // off the docs page. SDK suffixes /v1/logs + /v1/metrics off the
-  // base endpoint (Ariana's 2026-05-06 capture confirmed the
-  // SDK-side suffixing — admins paste the bare base).
+  // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
+  // plus the standard OTEL_*_EXPORTER env vars before any signals are emitted.
+  // We also recommend OTEL_TRACES_EXPORTER=otlp so any spans Claude Code does
+  // instrument propagate to LangWatch and any logs/metrics emitted INSIDE a
+  // span get correlated. Standalone records still arrive without trace context
+  // (logs emitted outside spans always will, per OTLP proto v1.0.0 where
+  // trace_id/span_id are optional on LogRecord), but the receiver synthesizes
+  // a stable trace id from service.name + service.instance.id so each session
+  // surfaces as one named trace in the listing. Pre-build the shell export
+  // block so admins paste once instead of stitching seven lines off the docs
+  // page.
+  // Plus the four content-unlock knobs (USER_PROMPTS + TOOL_DETAILS +
+  // TOOL_CONTENT + RAW_API_BODIES). Without these, the OTel wire is
+  // metadata-only: tokens, cost, durations, tool sizes-in-bytes - but
+  // no user prompt text, no assistant response text, no tool I/O
+  // content. With them on, langwatch.input + langwatch.output lift
+  // verbatim from claude's api_request + api_response_body events.
+  // Payload risk is bounded: claude caps api_request_body +
+  // api_response_body at 60KB INLINE per event; the langwatch receiver
+  // adds a defense-in-depth content cap on top.
   const claudeCodeEnvBlock = isClaudeCode
     ? [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+        `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
         `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_LOG_USER_PROMPTS=1`,
+        `export OTEL_LOG_TOOL_DETAILS=1`,
+        `export OTEL_LOG_TOOL_CONTENT=1`,
+        `export OTEL_LOG_RAW_API_BODIES=1`,
         `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
         `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
       ].join("\n")
@@ -664,7 +682,7 @@ function SecretRevealModal({
           <DialogTitle>
             <HStack gap={2}>
               <KeyRound size={16} />
-              <Text>New secret minted — old valid for 24h</Text>
+              <Text>New secret minted - old valid for 24h</Text>
             </HStack>
           </DialogTitle>
         </DialogHeader>
@@ -716,7 +734,7 @@ function SecretRevealModal({
                     <Code fontSize="xs" backgroundColor="transparent">
                       OTEL_EXPORTER_OTLP_ENDPOINT
                     </Code>
-                    {" "}— Claude Code&apos;s SDK appends
+                    {" "}- Claude Code&apos;s SDK appends
                     {" "}
                     <Code fontSize="xs" backgroundColor="transparent">
                       /v1/logs
@@ -759,13 +777,14 @@ function SecretRevealModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     claude
                   </Code>
-                  . To attribute spend to a specific team or cost center,
-                  also export{" "}
+                  . To attribute spend to a specific team, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…
                   </Code>
-                  {" "}— those land as resource attributes and slot into
+                  {" "}- it lands as a resource attribute and slots into
                   /governance&apos;s spendByTeam without further config.
+                  Department attribution is resolved from the project&apos;s
+                  assignment at read time, not from an OTEL attribute.
                 </Text>
               </VStack>
             )}

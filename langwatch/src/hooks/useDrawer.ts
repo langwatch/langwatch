@@ -1,12 +1,14 @@
-import Router, { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
-import {
-  type DrawerCallbacks,
-  type DrawerProps,
-  type DrawerType,
+import Router, { useRouter } from "~/utils/compat/next-router";
+import type {
+  DrawerCallbacks,
+  DrawerProps,
+  DrawerType,
 } from "../components/drawerRegistry";
+import { getTracesV2Preferred } from "../features/traces-v2/hooks/useTracesV2Preference";
 import { createLogger } from "../utils/logger";
+import { routeTraceDrawerForV2 } from "./traceDrawerV2Routing";
 
 const logger = createLogger("useDrawer");
 
@@ -164,10 +166,15 @@ export const useUpdateDrawerParams = () => {
         comma: true,
         allowEmptyArrays: true,
       }) as Record<string, unknown>;
-      const drawer = ((parsed.drawer as Record<string, unknown>) ?? {}) as Record<
-        string,
-        unknown
-      >;
+      // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
+      // query like `?drawer=foo` it's a string, not the object we mutate below.
+      // Guard the shape so the mutation loop can't throw at runtime.
+      const drawer =
+        parsed.drawer &&
+        typeof parsed.drawer === "object" &&
+        !Array.isArray(parsed.drawer)
+          ? (parsed.drawer as Record<string, unknown>)
+          : {};
       for (const [key, value] of Object.entries(updates)) {
         if (value === undefined) delete drawer[key];
         else drawer[key] = value;
@@ -386,12 +393,23 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
+      // Traces V2 opt-in (transitional during rollout): route any trace open
+      // to the new explorer when this device opted in, so every entry point
+      // honors the choice — not only the call sites that go through
+      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
+      const { drawer: effectiveDrawer, props: effectiveProps } =
+        routeTraceDrawerForV2(
+          drawer,
+          props as Record<string, unknown> | undefined,
+          getTracesV2Preferred(),
+        );
+
       // Extract urlParams and merge with props
-      const { urlParams, ...drawerProps } = props ?? {};
-      const allParams = { ...drawerProps, ...urlParams } as Record<
-        string,
-        unknown
-      >;
+      const { urlParams, ...drawerProps } = effectiveProps ?? {};
+      const allParams = {
+        ...drawerProps,
+        ...(urlParams as Record<string, string> | undefined),
+      } as Record<string, unknown>;
 
       // Read currentDrawer from router.query directly to get latest value
       const currentDrawerNow = router.query["drawer.open"] as
@@ -399,20 +417,20 @@ export const useDrawer = () => {
         | undefined;
 
       // If the same drawer is already open, just update the URL params without modifying the stack
-      if (currentDrawerNow === drawer) {
-        updateDrawerUrl(drawer, allParams, { replace: true });
+      if (currentDrawerNow === effectiveDrawer) {
+        updateDrawerUrl(effectiveDrawer, allParams, { replace: true });
         return;
       }
 
       // Manage drawer stack for navigation history
       if (resetStack || !currentDrawerNow) {
         // Reset stack - fresh start with no back navigation
-        drawerStack = [{ drawer, params: allParams }];
+        drawerStack = [{ drawer: effectiveDrawer, params: allParams }];
       } else if (replaceCurrentInStack && drawerStack.length > 0) {
         // Replace the current entry in the stack (useful for flow callbacks)
         // This makes "back" skip the replaced drawer
         drawerStack.pop();
-        drawerStack.push({ drawer, params: allParams });
+        drawerStack.push({ drawer: effectiveDrawer, params: allParams });
       } else {
         // A drawer is already open - navigating forward, push to stack
         // If stack is empty but currentDrawer exists (e.g., opened via direct URL),
@@ -434,7 +452,7 @@ export const useDrawer = () => {
           topEntry.params = currentUrlParams;
         }
 
-        drawerStack.push({ drawer, params: allParams });
+        drawerStack.push({ drawer: effectiveDrawer, params: allParams });
       }
 
       const badKeys = Object.entries(allParams)
@@ -442,14 +460,14 @@ export const useDrawer = () => {
         .map(([k]) => k);
       if (badKeys.length > 0) {
         logger.warn(
-          `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(
+          `Non-serializable props passed to drawer "${effectiveDrawer}": ${badKeys.join(
             ", ",
           )}. ` +
             `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
         );
       }
 
-      updateDrawerUrl(drawer, allParams, { replace });
+      updateDrawerUrl(effectiveDrawer, allParams, { replace });
     },
     [router.query, updateDrawerUrl],
   );

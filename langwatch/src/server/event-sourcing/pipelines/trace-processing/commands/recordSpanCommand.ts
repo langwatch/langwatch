@@ -31,6 +31,27 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { PrismaClient } from "@prisma/client";
 
 /**
+ * Deduplication options for the `recordSpan` command at the GroupQueue layer.
+ *
+ * Same `(tenantId, traceId, spanId)` dispatched within the TTL window is
+ * squashed into the existing staged job (`extend + replace`) instead of
+ * accumulating new HSET fields in the group `:data` hash. Without this,
+ * a re-firing reactor (e.g. `claudeCodeSpanSync`) or a customer retry storm
+ * grows the hash unboundedly until Redis runs out of memory.
+ *
+ * Exported so the dedup-coverage integration test can import the exact same
+ * shape rather than reproducing it inline — keeps production and the test
+ * registered against a single source of truth.
+ */
+export const RECORD_SPAN_DEDUPLICATION = {
+  makeId: (payload: RecordSpanCommandData) =>
+    `${payload.tenantId}:${payload.span.traceId}:${payload.span.spanId}`,
+  ttlMs: 30_000,
+  extend: true,
+  replace: true,
+} as const;
+
+/**
  * Dependencies for RecordSpanCommand that can be injected for testing.
  */
 export interface RecordSpanCommandDependencies {

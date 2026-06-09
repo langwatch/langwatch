@@ -34,7 +34,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import {
   ScopeChipPicker,
-  type ScopeChipPickerEntry,
+  type ScopeTriadEntry,
 } from "~/components/settings/ScopeChipPicker";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -127,8 +127,8 @@ function RoutingPoliciesPage() {
     return map;
   }, [organization?.teams]);
   const resolveScopeEntriesWithNames = (
-    scopes: ScopeChipPickerEntry[],
-  ): ScopeChipPickerEntry[] =>
+    scopes: ScopeTriadEntry[],
+  ): ScopeTriadEntry[] =>
     scopes.map((s) => ({
       scopeType: s.scopeType,
       scopeId: s.scopeId,
@@ -144,7 +144,7 @@ function RoutingPoliciesPage() {
   const refetch = () =>
     utils.routingPolicy.list.invalidate({ organizationId: orgId });
 
-  // G82 — surface tRPC errors INSIDE the drawer in addition to the toast.
+  // G82 - surface tRPC errors INSIDE the drawer in addition to the toast.
   // The toast was racing the drawer's own scrim/overlay z-index on some
   // viewport heights and silently failed to render, leaving "Create
   // policy" looking like a no-op. Inline alert is the durable signal.
@@ -238,7 +238,7 @@ function RoutingPoliciesPage() {
   ) => {
     setDrawerError(null);
     setEditingId("new");
-    const seedType = scope.toUpperCase() as ScopeChipPickerEntry["scopeType"];
+    const seedType = scope.toUpperCase() as ScopeTriadEntry["scopeType"];
     const seedId =
       seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
     setComposer({
@@ -259,8 +259,8 @@ function RoutingPoliciesPage() {
   const startEdit = (p: Policy) => {
     setDrawerError(null);
     setEditingId(p.id);
-    const scopes: ScopeChipPickerEntry[] = p.scopes.map((s) => ({
-      scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+    const scopes: ScopeTriadEntry[] = p.scopes.map((s) => ({
+      scopeType: s.scopeType as ScopeTriadEntry["scopeType"],
       scopeId: s.scopeId,
     }));
     const aliasesObj = ((p as any).modelAliases ?? {}) as Record<
@@ -376,14 +376,17 @@ function RoutingPoliciesPage() {
                     : "Publish a default policy to unblock end-user keys"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Without an applicable default, {`'langwatch login'`} (and
-                  every personal-key issue path) returns 409{" "}
+                  When at least one model provider is reachable from a
+                  user's personal team, personal keys still mint
+                  without a default and the gateway picks providers in {" "}
                   <Text as="span" fontFamily="mono">
-                    no_default_routing_policy
-                  </Text>
-                  . Start with an Organization default that points at
-                  whichever model providers your team should use, then
-                  override per-team or per-project as needed.
+                    fallbackPriorityGlobal
+                  </Text>{" "}
+                  order. Orgs with zero accessible providers still hit
+                  a 409 at issue time; configure a model provider first.
+                  Publish an explicit default to pin a deterministic
+                  chain at the organization level, then override
+                  per-team or per-project as needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
                   <Button
@@ -527,7 +530,7 @@ function RoutingPoliciesPage() {
         }
         message={
           policyToDelete?.isDefault
-            ? "This is the default policy at this scope. Personal-key issue paths and 'langwatch login' will return 409 no_default_routing_policy until another default is published. Virtual keys that resolved through this policy will fail closed at the next request."
+            ? "This is the default policy at this scope. NEW personal-key issuance falls back to fallbackPriorityGlobal ordering across scope-eligible providers until another default is published. Existing VKs that already reference this policy keep the persisted routingPolicyId and will fail closed on the next request until you re-bind them to another policy."
             : "Virtual keys that explicitly reference this policy will lose the reference and fail closed at the next request. Re-publish or pick another policy on the affected VKs to restore routing."
         }
         confirmLabel="Delete policy"
@@ -561,8 +564,8 @@ function PolicyRow({
   isPendingSetDefault: boolean;
   isPendingDelete: boolean;
   resolveScopeEntriesWithNames: (
-    scopes: ScopeChipPickerEntry[],
-  ) => ScopeChipPickerEntry[];
+    scopes: ScopeTriadEntry[],
+  ) => ScopeTriadEntry[];
 }) {
   const allowCount = Array.isArray(policy.modelAllowlist)
     ? (policy.modelAllowlist as string[]).length
@@ -570,8 +573,8 @@ function PolicyRow({
   const providerCount = Array.isArray(policy.modelProviderIds)
     ? (policy.modelProviderIds as string[]).length
     : 0;
-  const scopeEntries: ScopeChipPickerEntry[] = policy.scopes.map((s) => ({
-    scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+  const scopeEntries: ScopeTriadEntry[] = policy.scopes.map((s) => ({
+    scopeType: s.scopeType as ScopeTriadEntry["scopeType"],
     scopeId: s.scopeId,
   }));
 
@@ -643,7 +646,7 @@ type AliasPair = { from: string; to: string };
 type PolicyDim = "tools" | "mcp" | "urls" | "models";
 
 type ComposerState = {
-  scopes: ScopeChipPickerEntry[];
+  scopes: ScopeTriadEntry[];
   name: string;
   description: string;
   strategy: Strategy;
@@ -884,7 +887,7 @@ type ProviderCredentialOption = {
 
 /**
  * Structured ordered multi-select for model providers. Replaces
- * the prior free-text ChipListEditor (G19) — the input expected raw
+ * the prior free-text ChipListEditor (G19) - the input expected raw
  * GatewayProviderCredential CUIDs and the placeholder hinted at slugs
  * like `mp_anthropic`, so admins typed slugs and got a 403 rejection
  * (G82). Now: dropdown of the org's configured credentials by name +
@@ -909,7 +912,7 @@ function ProviderCredentialPicker({
     return map;
   }, [available]);
 
-  // G86 — disabled credentials never appear as new pick options. They
+  // G86 - disabled credentials never appear as new pick options. They
   // can stay in the selected list (an existing policy may already
   // reference one), but the dropdown only offers active ones so an
   // admin doesn't pick a credential that will fail the moment a VK
@@ -1056,7 +1059,7 @@ function ProviderCredentialPicker({
                   </Text>
                   {option?.disabledAt && (
                     <Text fontSize="xs" color="orange.600">
-                      Disabled — requests will skip this credential
+                      Disabled - requests will skip this credential
                     </Text>
                   )}
                 </VStack>
@@ -1108,7 +1111,7 @@ function ProviderCredentialPicker({
             {remaining.map((option) => (
               <option key={option.id} value={option.id}>
                 {formatLabel(option)}
-                {option.disabledAt ? " — disabled" : ""}
+                {option.disabledAt ? " - disabled" : ""}
               </option>
             ))}
           </NativeSelect.Field>
@@ -1158,8 +1161,8 @@ function RoutingPolicyDrawer({
   availableTeams: Array<{ id: string; name: string }>;
   availableProjects: Array<{ id: string; name: string; teamId?: string }>;
   resolveScopeEntriesWithNames: (
-    scopes: ScopeChipPickerEntry[],
-  ) => ScopeChipPickerEntry[];
+    scopes: ScopeTriadEntry[],
+  ) => ScopeTriadEntry[];
 }) {
   const submitDisabled =
     !composer ||

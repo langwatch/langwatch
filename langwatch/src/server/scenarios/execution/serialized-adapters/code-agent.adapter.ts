@@ -5,7 +5,7 @@
  * database access. Designed to run in isolated worker threads.
  *
  * Executes Python code by building a minimal DSL workflow (entry -> code -> end)
- * and sending it to the langwatch_nlp service's /studio/execute_sync endpoint
+ * and sending it to the nlpgo service's /go/studio/execute_sync endpoint
  * as an execute_flow event.
  */
 
@@ -206,7 +206,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   }
 
   /**
-   * Execute the workflow via the NLP service's /studio/execute_sync endpoint.
+   * Execute the workflow via the NLP service's /go/studio/execute_sync endpoint.
    *
    * Uses execute_flow (not execute_component) because /execute_sync only
    * monitors ExecutionStateChange events, which are emitted by execute_flow.
@@ -233,7 +233,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       },
     };
 
-    const url = `${this.nlpServiceUrl}/studio/execute_sync`;
+    const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",

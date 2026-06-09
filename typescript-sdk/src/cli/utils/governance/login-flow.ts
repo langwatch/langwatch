@@ -84,7 +84,21 @@ export async function runUnifiedLoginFlow(
 
   await openInBrowser(verifyURL, opts.browser);
 
-  const spinner = ora("Waiting for you to approve in the browser").start();
+  // discardStdin:false is load-bearing. ora's default (true) flips stdin to
+  // raw mode while the spinner runs, so Ctrl+C arrives as a raw 0x03 byte that
+  // ora swallows instead of a SIGINT — the wait becomes unkillable. Keeping
+  // stdin cooked lets the terminal deliver SIGINT; the handler stops the
+  // spinner and exits cleanly so the user can always abort the login wait.
+  const spinner = ora({
+    text: "Waiting for you to approve in the browser",
+    discardStdin: false,
+  }).start();
+  const onSigint = () => {
+    spinner.stop();
+    console.log(chalk.gray("\nLogin cancelled."));
+    process.exit(130);
+  };
+  process.once("SIGINT", onSigint);
   try {
     const result = await pollUntilDone({ baseUrl }, dc);
     if (result.kind === "device_session") {
@@ -96,7 +110,7 @@ export async function runUnifiedLoginFlow(
 
       // Pick up the server's authoritative gateway URL. Without this,
       // self-hosted CLI users would see the SaaS default
-      // (https://gateway.langwatch.com) on whoami / login output even
+      // (https://gateway.langwatch.ai) on whoami / login output even
       // though the actual gateway is on localhost:5563. The server's
       // `gatewayUrl` reflects `LW_GATEWAY_BASE_URL` or the IS_SAAS-
       // aware fallback. Backwards-compatible: older servers (without
@@ -106,10 +120,20 @@ export async function runUnifiedLoginFlow(
         saveConfig(cfg);
       }
 
+      // Cache the org's per-tool path policy so the `langwatch <tool>`
+      // wrapper gates path selection on the admin's choices offline.
+      // Older servers omit the field; the wrapper then falls back to
+      // the hardcoded defaults.
+      if (bootstrap?.toolPolicies) {
+        cfg.tool_policies = bootstrap.toolPolicies;
+        saveConfig(cfg);
+      }
+
       console.log();
       const ceremonyLines = formatLoginCeremony({
         email: cfg.user?.email ?? result.user.email,
         organizationName: cfg.organization?.name,
+        tools: bootstrap?.tools,
         providers: bootstrap?.providers,
         budget:
           bootstrap?.budget?.monthlyLimitUsd != null
@@ -124,8 +148,8 @@ export async function runUnifiedLoginFlow(
         console.log(line);
       }
       console.log();
-      console.log(chalk.gray(`  Gateway:   ${cfg.gateway_url}`));
       console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+
       return cfg;
     }
 
@@ -168,6 +192,8 @@ export async function runUnifiedLoginFlow(
       }
     }
     throw err;
+  } finally {
+    process.removeListener("SIGINT", onSigint);
   }
 }
 
@@ -268,6 +294,13 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
     // browser failure shouldn't break login — user can paste manually
   }
 }
+
+// The post-login shell-rc persist offer was removed when `langwatch
+// login` became auth-only: the device session in config.json is
+// already authoritative, so login never edits the shell rc. The
+// persist offer now lives in the `langwatch <tool>` wrapper and fires
+// only in ingestion mode (maybeOfferIngestionShellRcPersist in
+// shell-rc.ts), framed as installing telemetry.
 
 // Type-only re-exports so callers can import the shapes from this
 // module without reaching into device-flow.ts.

@@ -6,13 +6,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Monaco } from "@monaco-editor/react";
 import dynamic from "~/utils/compat/next-dynamic";
 import { useCallback, useRef, useState } from "react";
+import { useColorMode } from "~/components/ui/color-mode";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
   type FilterField,
   sanitizeTriggerFilters,
@@ -83,6 +82,7 @@ function parseCodeFilters(value: string): ParsedCodeFilters {
 
 export function EditAutomationFilterDrawer({ automationId }: { automationId?: string }) {
   const { project } = useOrganizationTeamProject();
+  const { colorMode } = useColorMode();
 
   const updateTriggerFilters = api.automation.updateTriggerFilters.useMutation();
 
@@ -318,25 +318,17 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
                 </Text>
                 <Box
                   border="1px solid"
-                  borderColor={codeError ? "red.500" : "gray.700"}
+                  borderColor={codeError ? "red.500" : "border"}
                   borderRadius="md"
                   overflow="hidden"
                   height="400px"
-                  background="#272822"
+                  background={colorMode === "dark" ? "#1E1E1E" : "#FFFFFF"}
                 >
                   <MonacoEditor
                     height="100%"
                     language="json"
                     defaultValue={codeValue}
-                    theme="monokai"
-                    beforeMount={(monaco: Monaco) => {
-                      monaco.editor.defineTheme(
-                        "monokai",
-                        monokaiTheme as Parameters<
-                          typeof monaco.editor.defineTheme
-                        >[1],
-                      );
-                    }}
+                    theme={colorMode === "dark" ? "vs-dark" : "vs"}
                     onChange={(value: any) => {
                       const newValue = value ?? "{}";
                       setCodeValue(newValue);

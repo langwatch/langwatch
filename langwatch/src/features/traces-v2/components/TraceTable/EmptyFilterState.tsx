@@ -14,6 +14,7 @@ import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
+import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (
   <Box
@@ -214,6 +215,13 @@ export const EmptyFilterState: React.FC = () => {
             ))}
           </HStack>
         )}
+
+        {/* Query breakdown chips — only render when the empty state is
+            driven by an active filter (otherwise there's nothing to
+            break down). Lets the user drop individual predicates
+            without retyping the whole query, and flags accidental
+            non-ASCII glyphs the parser otherwise renders silently. */}
+        {hasFilters && <QueryBreakdownChips />}
 
         {showRewatchIntro && (
           <Button

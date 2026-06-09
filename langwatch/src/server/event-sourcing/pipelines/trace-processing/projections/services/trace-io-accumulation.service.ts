@@ -1,3 +1,7 @@
+import {
+  extractAssistantTextFromResponseBody,
+  isConversationalQuerySource,
+} from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -19,7 +23,16 @@ export const CLAUDE_CODE_SCOPE_NAMES = new Set([
 ]);
 
 /**
- * Priority: root > explicit > last-finishing.
+ * Codex's instrumentation scope varies across versions (codex_exec
+ * service.name in 0.131, just `codex` in some 0.13x builds), so we
+ * gate on the event.name prefix instead — every cost-bearing event
+ * codex emits is named `codex.<thing>` and that's stable across
+ * builds.
+ */
+const CODEX_EVENT_NAME_PREFIX = "codex.";
+
+/**
+ * Priority: root (latest-finishing among roots) > explicit > last-finishing.
  * @internal Exported for unit testing
  */
 export function shouldOverrideOutput({
@@ -37,7 +50,14 @@ export function shouldOverrideOutput({
   endTime: number;
   currentEndTime: number;
 }): boolean {
-  if (isRoot) return true;
+  // A parentless span is "root". A claude_code Path B turn synthesizes MANY
+  // parentless spans under one trace (one per model call), so "root" is not
+  // unique here: among roots the latest-finishing reply wins, so the trace
+  // output is deterministic by end time instead of last-folded-wins (the real
+  // reply often sits on a middle call, with utility calls finishing after it).
+  // A root still beats a non-root child that set the output. For a conventional
+  // single-root trace this is a no-op — there is only ever one root.
+  if (isRoot) return !outputFromRoot || endTime >= currentEndTime;
   if (outputFromRoot) return false;
   if (isExplicit && !currentIsExplicit) return true;
   if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
@@ -63,14 +83,72 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
   }
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
-    const prompt = data.attributes.prompt;
-    if (prompt && typeof prompt === "string") {
-      return { input: prompt, output: null };
+    // Gate on event.name === "user_prompt" specifically. Without this
+    // gate ANY claude_code log record with a `prompt` attribute wins,
+    // including internal subagent calls (e.g. a Bash tool subagent
+    // emitting `prompt:"env"`) which pollute the trace input with the
+    // shell command instead of the user's real prompt. The
+    // OTEL_LOG_USER_PROMPTS=1 env (set by the langwatch wrapper) is
+    // what gets the user prompt onto the wire — and it lands on the
+    // user_prompt event, never on tool/subagent events.
+    if (data.attributes["event.name"] === "user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (prompt && typeof prompt === "string") {
+        return { input: prompt, output: null };
+      }
+    }
+    // OTEL_LOG_RAW_API_BODIES=1 emits a `claude_code.api_response_body`
+    // log record per turn carrying the FULL anthropic /v1/messages
+    // response body. The assistant's reply text lives in
+    // `body.content[]` where `type === "text"`. We extract the
+    // concatenated text and return it as ComputedOutput so trace
+    // summaries render real assistant replies instead of NULL.
+    //
+    // Gate on query_source: claude emits api_response_body for its
+    // non-conversational utility calls too (prompt_suggestion autosuggest,
+    // generate_session_title), whose text is NOT the assistant's reply.
+    // Because ComputedOutput is last-write-wins, an unfiltered title or
+    // autosuggest clobbers the real reply — so only lift from genuine
+    // conversation turns. This mirrors the gate in claudeCode.ts's
+    // liftApiResponseBody (the canonical span path); both reuse the same
+    // isConversationalQuerySource allowlist so the two output paths agree.
+    if (
+      data.attributes["event.name"] === "api_response_body" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
+      const responseText = extractAssistantTextFromResponseBody(
+        data.attributes.body,
+      );
+      if (responseText !== null) {
+        return { input: null, output: responseText };
+      }
+    }
+  }
+
+  // Codex emits the user's text on a separate codex.user_prompt event.
+  // Cost-bearing codex.sse_event events carry no prompt — input lift
+  // happens here so the fold can pair it with the model/token lift
+  // from extractCodexSseEventMetrics on the same trace.
+  const codexEventName = data.attributes["event.name"];
+  if (
+    typeof codexEventName === "string" &&
+    codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX)
+  ) {
+    if (codexEventName === "codex.user_prompt") {
+      const prompt = data.attributes.prompt;
+      if (typeof prompt === "string" && prompt.length > 0) {
+        return { input: prompt, output: null };
+      }
     }
   }
 
   return { input: null, output: null };
 }
+
 
 /**
  * Accumulates computed input/output across spans using priority rules:
@@ -127,7 +205,29 @@ export class TraceIOAccumulationService {
       }
     }
 
-    if (spanType === "evaluation" || spanType === "guardrail") {
+    // Claude Code utility model calls (prompt_suggestion autosuggest,
+    // generate_session_title) are not the conversation — their reply is now
+    // attached to the span (so the span detail shows it) but must NOT become
+    // the trace's headline I/O. Like tool spans, they're parentless (= root),
+    // so without this skip a utility reply could win the headline by end-time.
+    // Mirrors the log-path gate in extractIOFromLogRecord so both agree.
+    const claudeQuerySource = span.spanAttributes["claude_code.query_source"];
+    const isClaudeUtilitySpan =
+      typeof claudeQuerySource === "string" &&
+      !isConversationalQuerySource(claudeQuerySource);
+
+    // Tool spans never define the trace's headline I/O: they are
+    // sub-operations (a Bash run, an Edit), not the conversation. This is
+    // load-bearing for synthesized claude_code tool spans, which are
+    // parentless (= root) so their langwatch.input would otherwise hijack the
+    // trace input. Skipping them lets a tool span carry its own input/output
+    // for the span detail without polluting the trace summary.
+    if (
+      spanType === "evaluation" ||
+      spanType === "guardrail" ||
+      spanType === "tool" ||
+      isClaudeUtilitySpan
+    ) {
       return {
         computedInput,
         computedOutput,

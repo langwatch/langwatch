@@ -440,6 +440,16 @@ export function PaneLayout({
   // the body Panel of the ctx-body group. Explicit 100% works in both
   // contexts (Flex parent in the no-ctx branch, plain Panel parent in
   // the ctx branch).
+  // After the trace-view redesign the SpanDetail pane only mounts when
+  // a span is selected. With no selection the waterfall takes the full
+  // pane width — the user gets a clean, distraction-free trace view
+  // until they ask for a specific span. Clicking any span flips
+  // `selectedSpanId`, which re-mounts the PanelGroup with the detail
+  // half attached. `react-resizable-panels` recreates its sizing state
+  // on every children-shape change, so we vary `autoSaveId` between
+  // the two shapes to keep saved sizes separate for each mode and
+  // avoid silently inheriting widths from one into the other.
+  const hasSpanSelection = selectedSpanId != null;
   const vizDetailGroup = (
     <Box
       ref={vizDetailGroupRef}
@@ -451,66 +461,75 @@ export function PaneLayout({
         display: "flex",
       }}
     >
-      <PanelGroup
-        direction={layout === "horizontal" ? "horizontal" : "vertical"}
-        autoSaveId={vizDetailGroupId}
-        style={{ flex: 1, minHeight: 0, minWidth: 0 }}
-      >
-        <Panel
-          id="viz"
-          order={1}
-          defaultSize={layout === "horizontal" ? 55 : 50}
-          minSize={15}
+      {hasSpanSelection ? (
+        <PanelGroup
+          direction={layout === "horizontal" ? "horizontal" : "vertical"}
+          autoSaveId={vizDetailGroupId}
+          style={{ flex: 1, minHeight: 0, minWidth: 0 }}
         >
+          <Panel
+            id="viz"
+            order={1}
+            defaultSize={layout === "horizontal" ? 55 : 50}
+            minSize={15}
+          >
+            {vizPanel}
+          </Panel>
+          <PanelResizeHandle
+            // `hitAreaMargins` extends the library's own pointer
+            // hit-area (and cursor coverage) past the visible handle.
+            // Using the library's mechanism instead of our own overlay
+            // ensures one cursor across the whole drag zone — our old
+            // overlay used `col-resize`/`row-resize` while the library
+            // forces `*{cursor: ew-resize !important}` globally inside
+            // its hit area, which read as two different cursors in
+            // adjacent slivers.
+            hitAreaMargins={{ coarse: 15, fine: 8 }}
+          >
+            <PaneResizeBar orientation={layout} />
+          </PanelResizeHandle>
+          <Panel
+            ref={detailPanelRef}
+            id="detail"
+            order={2}
+            defaultSize={layout === "horizontal" ? 45 : 50}
+            // Horizontal split: 200px pixel floor converted to a
+            // percentage of the current group width (see the measure
+            // effect). Vertical split: nominal 5pct minimum.
+            minSize={detailMinSize}
+            collapsible
+            // Computed from the group's measured size so the collapsed
+            // state lands exactly on the SpanTabBar height — no trailing
+            // empty band below the tab row.
+            collapsedSize={detailCollapsedSize}
+            // Library-driven collapse/expand mirrors the store so a
+            // drag past `minSize` is the SAME state as clicking the
+            // "Hide details" button: the pane disappears AND the
+            // "Show details" affordance on the viz tab row appears.
+            // Without these the chevron / button wouldn't show because
+            // the store still thought the pane was expanded.
+            onCollapse={() => {
+              if (!useDrawerStore.getState().paneState.spanDetail.collapsed) {
+                togglePaneCollapsed("spanDetail");
+              }
+            }}
+            onExpand={() => {
+              if (useDrawerStore.getState().paneState.spanDetail.collapsed) {
+                togglePaneCollapsed("spanDetail");
+              }
+            }}
+          >
+            {detailPanel}
+          </Panel>
+        </PanelGroup>
+      ) : (
+        // No selection — full-width viz. We render the same VizPlaceholder
+        // (just without a sibling resize handle) so its internal scroll /
+        // height / tab strip behave identically.
+        <Box style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}>
           {vizPanel}
-        </Panel>
-        <PanelResizeHandle
-          // `hitAreaMargins` extends the library's own pointer
-          // hit-area (and cursor coverage) past the visible handle.
-          // Using the library's mechanism instead of our own overlay
-          // ensures one cursor across the whole drag zone — our old
-          // overlay used `col-resize`/`row-resize` while the library
-          // forces `*{cursor: ew-resize !important}` globally inside
-          // its hit area, which read as two different cursors in
-          // adjacent slivers.
-          hitAreaMargins={{ coarse: 15, fine: 8 }}
-        >
-          <PaneResizeBar orientation={layout} />
-        </PanelResizeHandle>
-        <Panel
-          ref={detailPanelRef}
-          id="detail"
-          order={2}
-          defaultSize={layout === "horizontal" ? 45 : 50}
-          // Horizontal split: 200px pixel floor converted to a
-          // percentage of the current group width (see the measure
-          // effect). Vertical split: nominal 5pct minimum.
-          minSize={detailMinSize}
-          collapsible
-          // Computed from the group's measured size so the collapsed
-          // state lands exactly on the SpanTabBar height — no trailing
-          // empty band below the tab row.
-          collapsedSize={detailCollapsedSize}
-          // Library-driven collapse/expand mirrors the store so a
-          // drag past `minSize` is the SAME state as clicking the
-          // "Hide details" button: the pane disappears AND the
-          // "Show details" affordance on the viz tab row appears.
-          // Without these the chevron / button wouldn't show because
-          // the store still thought the pane was expanded.
-          onCollapse={() => {
-            if (!useDrawerStore.getState().paneState.spanDetail.collapsed) {
-              togglePaneCollapsed("spanDetail");
-            }
-          }}
-          onExpand={() => {
-            if (useDrawerStore.getState().paneState.spanDetail.collapsed) {
-              togglePaneCollapsed("spanDetail");
-            }
-          }}
-        >
-          {detailPanel}
-        </Panel>
-      </PanelGroup>
+        </Box>
+      )}
     </Box>
   );
 

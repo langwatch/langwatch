@@ -211,6 +211,30 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     And the personal row does NOT carry the checkmark
 
   # ---------------------------------------------------------------------------
+  # Org-scoped routes (/settings/*, /governance) carry no project context. The
+  # old chrome showed a static org-name chip with no way back to a project -
+  # rchaves's regression report. The switcher now renders there with the org as
+  # the current chip, exposing the full personal/team/project list (so the user
+  # can jump back into a workspace) plus, for multi-org users, an in-place org
+  # switch.
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @workspace-switcher @org-scope @integration
+  Scenario: On an org-scoped route the switcher shows the organization as the current chip
+    Given the URL is an org-scoped route ("/settings", "/governance")
+    And the consumer renders <WorkspaceSwitcher current={{ kind: "organization", ... }} />
+    Then the trigger label is the organization's display name
+    And opening the dropdown lists the personal / team / project entries to switch to
+
+  @bdd @ui @workspace-switcher @org-scope @integration
+  Scenario: A multi-org user switches organization in place from the org-scoped switcher
+    Given the user belongs to more than one organization
+    And the switcher is rendered with the organization as the current context
+    When the user opens the dropdown and picks a different organization
+    Then onSwitchOrganization is invoked with that organization's id
+    And the consumer writes selectedOrganizationId and navigates to "/settings"
+
+  # ---------------------------------------------------------------------------
   # DashboardLayout consolidation (Stage 2c — replace legacy ProjectSelector)
   # ---------------------------------------------------------------------------
   #

@@ -284,19 +284,15 @@ describe("cli-api — request shape", () => {
   });
 
   describe("getCliBootstrap", () => {
-    it("hits /api/auth/cli/bootstrap and returns the {providers, budget} payload", async () => {
+    it("hits /api/auth/cli/bootstrap and returns the {tools, providers, budget} payload", async () => {
       const fixture = {
+        tools: [
+          { slug: "claude", displayName: "Claude Code" },
+          { slug: "codex", displayName: "Codex" },
+        ],
         providers: [
-          {
-            name: "anthropic",
-            displayName: "Anthropic",
-            models: ["claude-sonnet-4", "claude-haiku-4-5"],
-          },
-          {
-            name: "openai",
-            displayName: "OpenAI",
-            models: ["gpt-5", "gpt-5-mini"],
-          },
+          { name: "anthropic", displayName: "Anthropic", configured: true },
+          { name: "openai", displayName: "OpenAI", configured: false },
         ],
         budget: {
           monthlyLimitUsd: 500,

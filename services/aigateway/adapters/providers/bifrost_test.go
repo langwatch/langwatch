@@ -344,6 +344,69 @@ func TestParseGeminiPassthroughUsage_CacheRead(t *testing.T) {
 	}
 }
 
+// Regression: opencode (Vercel AI SDK Anthropic provider) Zod-rejected
+// the OpenAI-shape `delta.choices` chunks Bifrost's ChatCompletionStream
+// emitted for /v1/messages with `No matching discriminator on 'type'`,
+// because Anthropic's wire protocol uses content_block_delta /
+// message_start / message_delta / message_stop event shapes. Fix routes
+// /v1/messages streaming through PassthroughStream so the provider's
+// native SSE frames reach the client unchanged; usage telemetry is
+// extracted via parseAnthropicPassthroughUsage from those raw bytes.
+func TestParseAnthropicPassthroughUsage_MessageStartCarriesPromptAndCacheTokens(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-haiku-4-5","stop_reason":null,` +
+		`"usage":{"input_tokens":462,"cache_creation_input_tokens":34434,` +
+		`"cache_read_input_tokens":23759,"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.PromptTokens != 462 {
+		t.Fatalf("PromptTokens: want 462, got %d", u.PromptTokens)
+	}
+	// Cache tokens kept distinct — a silent swap would inflate billed
+	// input by ~12× since cache_creation costs ~1.25× input and
+	// cache_read costs ~0.1× input. Same regression guard sergey
+	// codified at the receiver-side fold extractor in 81012a19e.
+	if u.CacheCreationTokens != 34434 {
+		t.Fatalf("CacheCreationTokens: want 34434, got %d", u.CacheCreationTokens)
+	}
+	if u.CacheReadTokens != 23759 {
+		t.Fatalf("CacheReadTokens: want 23759, got %d", u.CacheReadTokens)
+	}
+	if u.CacheCreationTokens == u.CacheReadTokens {
+		t.Fatalf("cache_creation must stay distinct from cache_read")
+	}
+}
+
+func TestParseAnthropicPassthroughUsage_MessageDeltaUpdatesCompletionTokens(t *testing.T) {
+	body := []byte("event: message_delta\n" +
+		`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},` +
+		`"usage":{"output_tokens":42}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_delta usage to parse")
+	}
+	if u.CompletionTokens != 42 {
+		t.Fatalf("CompletionTokens: want 42, got %d", u.CompletionTokens)
+	}
+	// message_delta carries no input-side counters; the iterator's
+	// merge logic keeps the last-seen message_start values for those.
+	if u.PromptTokens != 0 {
+		t.Fatalf("PromptTokens: want 0 (only message_start carries it), got %d", u.PromptTokens)
+	}
+}
+
+func TestParseAnthropicPassthroughUsage_IgnoresUnrelatedEvents(t *testing.T) {
+	body := []byte("event: content_block_delta\n" +
+		`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"PONG"}}` + "\n\n")
+	_, ok := parseAnthropicPassthroughUsage(body)
+	if ok {
+		t.Fatalf("content_block_delta carries no usage; parser must return (Usage{}, false)")
+	}
+}
+
 // given a Bedrock credential carrying the litellm aws_* key names (the shape
 // the gatewayproxy /go/proxy route produces, vs the canonical names the
 // dispatcheradapter produces)

@@ -39,7 +39,7 @@ Feature: Provider Deletion
     And I click "Delete Provider"
     Then I see a confirmation dialog
     And the dialog title is "Delete openai?"
-    And the dialog shows "This provider will no longer be available for use."
+    And the dialog warns that the provider and its stored API keys are permanently deleted
 
   @integration @unimplemented
   Scenario: Prevent deletion when provider used for Default Model
@@ -95,7 +95,7 @@ Feature: Provider Deletion
     When I click the menu button for "openai" provider
     And I click "Delete Provider"
     Then I see a confirmation dialog
-    And the dialog shows "This provider will no longer be available for use."
+    And the dialog warns that the provider and its stored API keys are permanently deleted
     And the "Delete" button is enabled
 
   @integration @unimplemented
@@ -125,3 +125,40 @@ Feature: Provider Deletion
     When I navigate to the Model Providers settings page
     Then the menu button for providers is disabled
     And a tooltip explains I need model provider manage permissions
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Scope-aware deletion. The provider list shows credentials granted at the
+  # organization, team, or sibling-project scope, but deletion used to look
+  # the row up with a PROJECT-only scope filter — so an org-scoped provider
+  # (e.g. a second "OpenAI" shown with a "LangWatch" org scope chip) 404'd
+  # with "Model provider not found for this project". Deletion now resolves
+  # the row by id within the caller's organization, gated by the existing
+  # manage-all-scopes authz, and hard-deletes the row + its encrypted keys.
+  # ───────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Delete an organization-scoped provider from a project settings view
+    Given an organization-scoped model provider in my organization
+    And I am viewing model providers from a project in that organization
+    When I delete that provider by id
+    Then the provider row is removed
+    And its scope grants are removed with it
+
+  @integration
+  Scenario: Delete a provider scoped only to a sibling project in the same org
+    Given a model provider scoped only to a sibling project in my organization
+    When I delete that provider by id from another project in the same org
+    Then the provider row is removed
+
+  @integration
+  Scenario: Deleting a provider from a different organization is not found
+    Given a model provider that belongs to a different organization
+    When I attempt to delete it by id from my project
+    Then the deletion is rejected as not found
+    And the provider remains in the database
+
+  @integration
+  Scenario: Deleting a provider removes its stored credentials
+    Given a model provider with stored API keys
+    When I delete that provider
+    Then no row with that provider id remains in the database

@@ -1,6 +1,6 @@
 import { Box, IconButton } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
-import { Highlight, Prism } from "prism-react-renderer";
+import { Highlight, Prism, type PrismTheme } from "prism-react-renderer";
 import { toaster } from "../ui/toaster";
 import { monokaiTheme } from "./monokaiTheme";
 
@@ -16,10 +16,17 @@ export const RenderCode = ({
   code,
   language,
   style: propsStyle = {},
+  theme = monokaiTheme,
 }: {
   code: string;
   language: string;
   style?: React.CSSProperties;
+  /**
+   * Override the prism theme. Defaults to monokai (dark) for backwards
+   * compatibility with existing call sites; pass an explicit theme to follow
+   * the user's color mode.
+   */
+  theme?: PrismTheme;
 }) => {
   const handleCopy = () => {
     navigator.clipboard
@@ -52,12 +59,7 @@ export const RenderCode = ({
           opacity: 1,
         }}
       />
-      <Highlight
-        prism={Prism}
-        theme={monokaiTheme}
-        code={code}
-        language={language}
-      >
+      <Highlight prism={Prism} theme={theme} code={code} language={language}>
         {({ style, tokens, getLineProps, getTokenProps }) => (
           <pre style={{ ...style, whiteSpace: "pre-wrap", ...propsStyle }}>
             {tokens.map((line, i) => (

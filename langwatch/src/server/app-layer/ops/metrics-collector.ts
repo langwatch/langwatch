@@ -202,7 +202,7 @@ export function buildPipelineTree({
   return tree;
 }
 
-class OpsMetricsCollector {
+export class OpsMetricsCollector {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
@@ -356,7 +356,7 @@ class OpsMetricsCollector {
     this.emitter.removeAllListeners();
   }
 
-  private async discoverQueues(): Promise<void> {
+  async discoverQueues(): Promise<void> {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
     } catch (err) {
@@ -611,36 +611,16 @@ class OpsMetricsCollector {
     if (newCompleted > 0 || !this.hasBaseline) {
       const latencyPipeline = this.redis.pipeline();
       for (const name of this.groupQueueNames) {
-        latencyPipeline.zrange(`${name}:completed`, 0, 24, "REV");
+        latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
       }
       const latencyResults = await latencyPipeline.exec();
 
       if (latencyResults) {
-        const jobIdPipeline = this.redis.pipeline();
-        const jobKeys: string[] = [];
-        for (let i = 0; i < this.groupQueueNames.length; i++) {
-          const jobIds = (latencyResults[i]?.[1] as string[]) ?? [];
-          const name = this.groupQueueNames[i]!;
-          for (const jobId of jobIds) {
-            jobIdPipeline.hmget(
-              `${name}:${jobId}`,
-              "processedOn",
-              "finishedOn",
-            );
-            jobKeys.push(`${name}:${jobId}`);
-          }
-        }
-        if (jobKeys.length > 0) {
-          const jobResults = await jobIdPipeline.exec();
-          if (jobResults) {
-            for (const [, result] of jobResults) {
-              const fields = result as [string | null, string | null];
-              const processedOn = fields?.[0] ? Number(fields[0]) : 0;
-              const finishedOn = fields?.[1] ? Number(fields[1]) : 0;
-              if (processedOn > 0 && finishedOn > processedOn) {
-                latencies.push(finishedOn - processedOn);
-              }
-            }
+        for (const [, result] of latencyResults) {
+          if (!Array.isArray(result)) continue;
+          for (const raw of result) {
+            const ms = Number(raw);
+            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
           }
         }
       }
@@ -874,7 +854,7 @@ class OpsMetricsCollector {
     }
   }
 
-  private async collect(): Promise<void> {
+  async collect(): Promise<void> {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
@@ -1045,5 +1025,3 @@ export function getOpsMetricsCollector(params: {
   }
   return singleton;
 }
-
-export type { OpsMetricsCollector };

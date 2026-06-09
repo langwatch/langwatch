@@ -1,10 +1,5 @@
 import type { PrismaClient, Project } from "@prisma/client";
-
-import {
-  BINDING_TOKEN_PREFIX,
-  hashBindingTokenBody,
-  parseBindingToken,
-} from "@ee/governance/services/userIngestionBindingToken.utils";
+import { RoleBindingScopeType } from "@prisma/client";
 
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyService } from "./api-key.service";
@@ -23,17 +18,14 @@ export type ResolvedToken =
       apiKeyId: string;
       userId: string | null;
       organizationId: string;
-      project: Project & { team: { id: string; organizationId: string } };
-    }
-  | {
-      type: "user_ingestion_binding";
-      bindingId: string;
-      templateId: string;
-      /** Template slug (e.g. `claude_code`) — receiver stamps this as
-       *  `langwatch.source` provenance attr on every span. */
-      templateSlug: string;
-      userId: string;
-      organizationId: string;
+      /**
+       * Set when the resolved ApiKey is an ingestion key (a project-scoped,
+       * ingest-only credential). Carries the tool slug the receiver stamps
+       * as `langwatch.source` provenance; null for ordinary API keys.
+       */
+      ingestSourceType: string | null;
+      /** The template this ingestion key was minted for, if any. */
+      ingestionTemplateId: string | null;
       project: Project & { team: { id: string; organizationId: string } };
     };
 
@@ -51,9 +43,9 @@ export type OrgResolvedToken = {
 /**
  * Strategy-based token resolver. Routes tokens to the correct verification
  * path based on prefix and structure:
- *   - ik-lw-*  → UserIngestionBinding hash lookup → personal project
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
- *   - sk-lw-{id}_{secret} → API key lookup (new format)
+ *   - sk-lw-{id}_{secret} → API key lookup (new format; ingestion keys
+ *     are ordinary API keys carrying ingestSourceType)
  *   - sk-lw-* (no underscore) → legacy project key lookup
  */
 export class TokenResolver {
@@ -72,9 +64,9 @@ export class TokenResolver {
    *
    * For legacy project keys, projectId is implicit (from the key itself).
    * For API keys, projectId must be provided separately (from Basic Auth,
-   * X-Project-Id header, or URL).
-   * For UserIngestionBinding tokens, projectId is implicit (the binding
-   * row carries personalProjectId server-resolved at install time).
+   * X-Project-Id header, or URL). Ingestion keys are ordinary API keys —
+   * the caller still supplies the project, and the key carries the
+   * ingestSourceType the receiver stamps as provenance.
    */
   async resolve({
     token,
@@ -83,10 +75,6 @@ export class TokenResolver {
     token: string;
     projectId?: string | null;
   }): Promise<ResolvedToken | null> {
-    if (token.startsWith(BINDING_TOKEN_PREFIX)) {
-      return this.resolveUserIngestionBinding(token);
-    }
-
     const tokenType = getTokenType(token);
 
     switch (tokenType) {
@@ -122,11 +110,34 @@ export class TokenResolver {
     const apiKey = await this.apiKeyService.verify({ token });
     if (!apiKey) return null;
 
-    if (!projectId) return null;
+    // Single-project self-scoping: when the caller supplies no projectId — an
+    // OTLP exporter that sends only the bearer token, or any client that can't
+    // attach an X-Project-Id header — a key scoped to exactly ONE project is
+    // unambiguous, so we resolve to that project. Keys scoped to two or more
+    // projects (or only at org / team scope) stay ambiguous and still require
+    // an explicit projectId. Ingestion keys are the common case (a single
+    // PROJECT-scoped binding), but this holds for any single-project API key.
+    let effectiveProjectId = projectId;
+    if (!effectiveProjectId) {
+      const projectScopeIds = [
+        ...new Set(
+          apiKey.roleBindings
+            .filter(
+              (b) => b.scopeType === RoleBindingScopeType.PROJECT && b.scopeId,
+            )
+            .map((b) => b.scopeId),
+        ),
+      ];
+      if (projectScopeIds.length === 1) {
+        effectiveProjectId = projectScopeIds[0]!;
+      }
+    }
+
+    if (!effectiveProjectId) return null;
 
     // Look up the project and verify it belongs to the API key's organization
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId, archivedAt: null },
+      where: { id: effectiveProjectId, archivedAt: null },
       include: {
         team: { select: { id: true, organizationId: true } },
       },
@@ -142,6 +153,8 @@ export class TokenResolver {
       apiKeyId: apiKey.id,
       userId: apiKey.userId,
       organizationId: apiKey.organizationId,
+      ingestSourceType: apiKey.ingestSourceType,
+      ingestionTemplateId: apiKey.ingestionTemplateId,
       project,
     };
   }
@@ -175,64 +188,5 @@ export class TokenResolver {
    */
   markUsed({ apiKeyId }: { apiKeyId: string }): void {
     this.apiKeyService.markUsed({ id: apiKeyId });
-  }
-
-  /**
-   * Resolves a `ik-lw-<base32>` UserIngestionBinding token. Path:
-   *   1. Strip prefix, hash post-prefix body with SHA-256.
-   *   2. Indexed lookup against `bindingAccessTokenHash`.
-   *   3. Defense-in-depth re-verify: project still personal, owner
-   *      still matches binding userId, binding enabled, neither row
-   *      archived. Mismatches return null (no enumeration vector).
-   *
-   * The personalProjectId on the binding row is server-resolved at
-   * install time — by the time we read it here, it is the authoritative
-   * scope. Cross-bind structural-impossibility is enforced at install,
-   * not here.
-   */
-  private async resolveUserIngestionBinding(
-    token: string,
-  ): Promise<ResolvedToken | null> {
-    const parsed = parseBindingToken(token);
-    if (!parsed) return null;
-    const hash = hashBindingTokenBody(parsed.body);
-
-    const binding = await this.prisma.userIngestionBinding.findUnique({
-      where: { bindingAccessTokenHash: hash },
-      select: {
-        id: true,
-        userId: true,
-        templateId: true,
-        organizationId: true,
-        enabled: true,
-        archivedAt: true,
-        template: { select: { slug: true } },
-        personalProject: {
-          include: {
-            team: { select: { id: true, organizationId: true } },
-          },
-        },
-      },
-    });
-    if (!binding) return null;
-    if (binding.archivedAt || !binding.enabled) return null;
-    if (
-      !binding.personalProject ||
-      binding.personalProject.archivedAt ||
-      !binding.personalProject.isPersonal ||
-      binding.personalProject.ownerUserId !== binding.userId
-    ) {
-      return null;
-    }
-
-    return {
-      type: "user_ingestion_binding",
-      bindingId: binding.id,
-      templateId: binding.templateId,
-      templateSlug: binding.template.slug,
-      userId: binding.userId,
-      organizationId: binding.organizationId,
-      project: binding.personalProject,
-    };
   }
 }

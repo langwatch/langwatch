@@ -1,0 +1,14 @@
+id: no-inline-dynamic-import-ts
+snapshots:
+  async function load() { const mod = await import("./heavy"); return mod; }:
+    labels:
+    - source: import("./heavy")
+      style: primary
+      start: 42
+      end: 59
+  const mod = import("./module");:
+    labels:
+    - source: import("./module")
+      style: primary
+      start: 12
+      end: 30

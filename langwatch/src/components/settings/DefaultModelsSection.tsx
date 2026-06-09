@@ -267,7 +267,7 @@ export function DefaultModelsSection({
       </HStack>
 
       <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingX={0} paddingY={0}>
+        <Card.Body paddingX={0} paddingY={0} overflowX="auto">
           <AllConfigsView
             configs={visibleConfigs}
             allConfigs={data.configs}
@@ -633,7 +633,7 @@ function DefaultModelsTableSkeleton() {
       overflow="hidden"
       data-testid="default-models-table-skeleton"
     >
-      <Card.Body paddingY={0} paddingX={0}>
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>

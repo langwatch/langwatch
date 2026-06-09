@@ -5,26 +5,11 @@ import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 /**
- * The Go-native NLP service (services/nlpgo). Replaces the legacy Python
- * langwatch_nlp uvicorn process for npx-server: same in-binary mono-binary
- * we already download for aigateway, just dispatched as `nlpgo`.
- *
- * Go-only mode (the npx flow):
- *   NLPGO_CHILD_BYPASS=true        — don't spawn a uvicorn child
- *   NLPGO_CHILD_UPSTREAM_URL=""    — no proxy fallback; non-/go/* paths
- *                                    return a self-explaining 502 from
- *                                    proxypassHandler. Force-enable the
- *                                    `release_nlp_go_engine_enabled` FF
- *                                    in the langwatch app so all traffic
- *                                    routes to /go/* (see langwatch.ts).
+ * The Go-native NLP service (services/nlpgo) — the only NLP engine. Reuses
+ * the same in-binary mono-binary we already download for aigateway, just
+ * dispatched as `nlpgo`.
  *
  * Health: /healthz (chi-routed liveness in services/nlpgo/adapters/httpapi).
- *
- * Topic clustering is the only known casualty of Go-only mode — its
- * worker hits non-/go/* directly via lambdaFetch (intentionally not
- * FF-gated; sklearn-only path). It will surface a 502 in worker logs
- * but won't crash the stack. Acceptable for the local-dev npx use case;
- * the cluster is rebuilt on the next Python migration.
  */
 export async function startNlpgo(
   ctx: RuntimeContext,
@@ -50,9 +35,6 @@ export async function startNlpgo(
         ...process.env,
         ...envFromFile,
         SERVER_ADDR: `:${ctx.ports.nlp}`,
-        // Go-only mode: no Python child, no proxy fallback.
-        NLPGO_CHILD_BYPASS: "true",
-        NLPGO_CHILD_UPSTREAM_URL: "",
         // Engine pointer back to the langwatch app for evaluator +
         // agent-workflow callbacks. /api/* routes terminate inside the
         // langwatch process.

@@ -163,8 +163,8 @@ Feature: Telemetry — every span carries the correct origin
   # ============================================================================
 
   @integration @v1 @unimplemented
-  Scenario: topic-clustering worker on Python path tags spans with origin = topic_clustering
-    Given the topic-clustering worker calls /topics/batch_clustering on uvicorn
+  Scenario: topic-clustering worker tags spans with origin = topic_clustering
+    Given the topic-clustering worker calls /topics/batch_clustering on langevals
     When the worker job runs
     Then every gateway HTTP call made by topic clustering carries "X-LangWatch-Origin: topic_clustering"
     And the resulting gateway spans have attribute "langwatch.origin" = "topic_clustering"

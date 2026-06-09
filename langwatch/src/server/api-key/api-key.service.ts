@@ -5,6 +5,7 @@ import { RoleRepository, CUSTOM_ROLE_KIND } from "~/server/role/repositories/rol
 import {
   generateApiKeyToken,
   hashSecret,
+  INGEST_KEY_PREFIX,
   splitApiKeyToken,
   verifySecret,
 } from "./api-key-token.utils";
@@ -92,6 +93,9 @@ export class ApiKeyService {
     permissionMode,
     permissions,
     bindings,
+    ingestSourceType,
+    ingestionTemplateId,
+    createdByDeviceLabel,
   }: {
     name: string;
     description?: string | null;
@@ -102,6 +106,9 @@ export class ApiKeyService {
     permissionMode: string;
     permissions?: string[];
     bindings: RoleBindingInput[];
+    ingestSourceType?: string | null;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
   }): Promise<{ token: string; apiKey: ApiKey }> {
     const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
     const hasPermissions = !!permissions && permissions.length > 0;
@@ -153,7 +160,12 @@ export class ApiKeyService {
       }];
     }
 
-    const { token, lookupId, hashedSecret } = generateApiKeyToken();
+    // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
+    // prefix so they're distinguishable from full-access sk-lw- keys; same
+    // scheme otherwise, so resolution is unaffected.
+    const { token, lookupId, hashedSecret } = generateApiKeyToken(
+      ingestSourceType ? { prefix: INGEST_KEY_PREFIX } : undefined,
+    );
 
     const apiKey = await this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
@@ -179,6 +191,9 @@ export class ApiKeyService {
         createdByUserId,
         organizationId,
         expiresAt,
+        ingestSourceType,
+        ingestionTemplateId,
+        createdByDeviceLabel,
       });
 
       if (sortedPermissions) {

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Any, Literal, Optional
 from langevals_core.base_evaluator import (
@@ -15,6 +16,15 @@ import spacy.cli
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_analyzer.nlp_engine import SpacyNlpEngine
+
+# Presidio's analyzer emits a WARNING for every requested entity that has
+# no recognizer in the active language. Our entity list intentionally
+# includes language-region specific types (SG_NRIC_FIN, AU_ABN, IN_PAN,
+# ...) that are absent from en, so each English call produced ~30 warning
+# lines. At lambda invocation volumes this was producing 13+ GB/day of
+# CloudWatch noise with no signal value: the "missing recognizer" facts
+# are static, not per-request, and known at configuration time.
+logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
 
 
 class PresidioPIIDetectionEntry(EvaluatorEntry):

@@ -8,11 +8,10 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { InstallCliCard } from "./InstallCliCard";
+import { GovernanceGettingStartedBanner } from "./GovernanceGettingStartedBanner";
 import { CodingAssistantTile } from "./tiles/CodingAssistantTile";
 import { ExternalToolTile } from "./tiles/ExternalToolTile";
 import { ModelProviderTile } from "./tiles/ModelProviderTile";
@@ -103,42 +102,31 @@ export function AiToolsPortal() {
   }
 
   if (totalEnabled === 0) {
+    // Admins get the getting-started hero pointing at the tool catalog;
+    // members (who cannot publish tools) get a plain "nothing here yet" note.
+    if (canManageCatalog) {
+      return <GovernanceGettingStartedBanner />;
+    }
     return (
-      <VStack align="stretch" gap={4} width="full">
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={6}
-          backgroundColor="bg.subtle"
-        >
-          <VStack align="start" gap={2}>
-            <Heading as="h3" size="md">
-              Your AI tools portal
-            </Heading>
-            {canManageCatalog ? (
-              <Text fontSize="sm" color="fg.muted">
-                No tools published to your org yet. Visit{" "}
-                <Link
-                  href="/settings/governance/tool-catalog"
-                  color="orange.600"
-                >
-                  Settings → Tool Catalog
-                </Link>{" "}
-                to import the starter pack or add tiles individually. The
-                LangWatch CLI below will work for any admin or member.
-              </Text>
-            ) : (
-              <Text fontSize="sm" color="fg.muted">
-                Your admin hasn&apos;t added any AI tools to your portal yet.
-                In the meantime, install the LangWatch CLI below to get
-                started with a coding assistant of your choice.
-              </Text>
-            )}
-          </VStack>
-        </Box>
-        <InstallCliCard />
-      </VStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        padding={6}
+        backgroundColor="bg.subtle"
+        width="full"
+      >
+        <VStack align="start" gap={2}>
+          <Heading as="h3" size="md">
+            Your AI tools portal
+          </Heading>
+          <Text fontSize="sm" color="fg.muted">
+            Your admin hasn&apos;t added any AI tools to your portal yet. Check
+            back once they publish your team&apos;s coding assistants and model
+            providers.
+          </Text>
+        </VStack>
+      </Box>
     );
   }
 
@@ -186,7 +174,6 @@ function RenderTile({
           config={entry.config as CodingAssistantConfig}
           iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
-          slug={entry.slug}
         />
       );
     case "model_provider": {

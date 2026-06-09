@@ -6,13 +6,13 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
 /**
- * Single-template personal-ingestion binding flow, shared by the /me
- * Trace Ingest grid and the AI Tools portal Claude Code tile. Encapsulates
- * the templates + bindings lookup, install / rotate mutations, the
- * "shown once" token result, and the resolved personal OTLP endpoint
- * (`{BASE_HOST}/api/otel`, the receiver that auto-shapes the spans into
- * canonical gen_ai.* cost + tokens). Feed the returned values straight
- * into IngestionTemplateInstallDrawer.
+ * Single-template personal-ingestion flow, shared by the /me Trace Ingest
+ * grid and the AI Tools portal Claude Code tile. Encapsulates the templates +
+ * ingestion-keys lookup, mint / rotate mutations, the "shown once" token
+ * result, and the resolved personal OTLP endpoint (`{BASE_HOST}/api/otel`,
+ * the receiver that auto-shapes the spans into canonical gen_ai.* cost +
+ * tokens). Feed the returned values straight into
+ * IngestionTemplateInstallDrawer.
  *
  * Returns `template: null` when the org has no enabled template for the
  * given slug, so callers can gate their entry point on availability.
@@ -32,15 +32,15 @@ export function usePersonalIngestionBinding({
     { organizationId },
     { enabled: ready, refetchOnWindowFocus: false },
   );
-  const bindingsQuery = api.userIngestionBindings.list.useQuery(
+  const keysQuery = api.ingestionKey.list.useQuery(
     { organizationId },
     { enabled: ready, refetchOnWindowFocus: false },
   );
 
   const utils = api.useUtils();
-  const installMutation = api.userIngestionBindings.install.useMutation({
+  const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
-      void utils.userIngestionBindings.list.invalidate();
+      void utils.ingestionKey.list.invalidate();
     },
     onError: (err) => {
       toaster.create({
@@ -50,9 +50,9 @@ export function usePersonalIngestionBinding({
       });
     },
   });
-  const rotateMutation = api.userIngestionBindings.rotateToken.useMutation({
+  const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
-      void utils.userIngestionBindings.list.invalidate();
+      void utils.ingestionKey.list.invalidate();
     },
     onError: (err) => {
       toaster.create({
@@ -72,12 +72,13 @@ export function usePersonalIngestionBinding({
     () => templatesQuery.data?.find((t) => t.slug === slug) ?? null,
     [templatesQuery.data, slug],
   );
-  const binding = useMemo(
+  const existingKey = useMemo(
     () =>
       template
-        ? bindingsQuery.data?.find((b) => b.templateId === template.id) ?? null
+        ? keysQuery.data?.find((k) => k.sourceType === template.sourceType) ??
+          null
         : null,
-    [bindingsQuery.data, template],
+    [keysQuery.data, template],
   );
 
   const [installResult, setInstallResult] =
@@ -88,6 +89,7 @@ export function usePersonalIngestionBinding({
     try {
       const result = await installMutation.mutateAsync({
         organizationId,
+        sourceType: template.sourceType,
         templateId: template.id,
       });
       setInstallResult({ token: result.token, endpoint });
@@ -97,11 +99,12 @@ export function usePersonalIngestionBinding({
   };
 
   const rotate = async () => {
-    if (!binding) return;
+    if (!template) return;
     try {
       const result = await rotateMutation.mutateAsync({
         organizationId,
-        bindingId: binding.id,
+        sourceType: template.sourceType,
+        templateId: template.id,
       });
       setInstallResult({ token: result.token, endpoint });
     } catch {
@@ -111,13 +114,13 @@ export function usePersonalIngestionBinding({
 
   return {
     template,
-    hasExistingBinding: !!binding,
+    hasExistingKey: !!existingKey,
     installResult,
     isInstalling: installMutation.isPending || rotateMutation.isPending,
     installError:
       installMutation.error?.message ?? rotateMutation.error?.message ?? null,
     endpoint,
-    isLoading: templatesQuery.isLoading || bindingsQuery.isLoading,
+    isLoading: templatesQuery.isLoading || keysQuery.isLoading,
     install,
     rotate,
     clearResult: () => setInstallResult(null),

@@ -63,8 +63,8 @@ workers:
 langwatch_nlp:
   replicaCount: 2
   resources:
-    requests: { cpu: 1, memory: 2Gi }
-    limits:   { cpu: 2, memory: 4Gi }
+    requests: { cpu: 250m, memory: 256Mi }
+    limits:   { cpu: 1, memory: 1Gi }
 
 langevals:
   replicaCount: 2

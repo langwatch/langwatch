@@ -28,6 +28,44 @@ Feature: Unified API Keys
       | PERMISSIONS | All          |
     And the row has an edit icon button and a revoke icon button
 
+  # ── Ingestion keys vs API keys split ───────────────────────────
+  # An ingestion key is an ApiKey row with ingestSourceType set non-null: a
+  # project-scoped, ingest-only write credential the `langwatch <tool>` CLI
+  # mints. Regular API / service keys have ingestSourceType == null. The page
+  # renders the two kinds in two labeled sections, Datadog-style.
+
+  Scenario: Ingestion keys render in their own labeled section
+    Given the organization has an ingestion key with source "claude_code"
+    And I have a regular API key named "CI Pipeline"
+    When I navigate to Settings > API Keys
+    Then I see an "Ingestion keys" section heading
+    And the ingestion key row shows its source "claude_code"
+    And the ingestion key row has a revoke button but no permissions editor
+    And I see an "API keys" section heading containing "CI Pipeline"
+
+  Scenario: No ingestion section when no ingestion keys exist
+    Given the organization has only regular API keys
+    When I navigate to Settings > API Keys
+    Then I do not see an "Ingestion keys" section heading
+    And the regular API keys render exactly as before
+
+  Scenario: API keys render above ingestion keys
+    Given the organization has an ingestion key with source "claude_code"
+    And I have a regular API key named "CI Pipeline"
+    When I navigate to Settings > API Keys
+    Then the "API keys" section renders above the "Ingestion keys" section
+
+  Scenario: Legacy project key row names its project
+    Given the project has a legacy per-project service key
+    When I navigate to Settings > API Keys
+    Then the legacy "Project API Key" row's scope names the project
+
+  Scenario: Ingestion key names the device session that minted it
+    Given the organization has an ingestion key minted from "Rogerio's MacBook Pro"
+    When I navigate to Settings > API Keys
+    Then the ingestion key row shows the device label "Rogerio's MacBook Pro"
+    And an ingestion key with no captured device falls back to "Unknown device"
+
   @unimplemented
   Scenario: Legacy project key row displays in table
     When I navigate to Settings > API Keys

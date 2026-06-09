@@ -203,9 +203,8 @@ jobs:
             "package/langwatch/package.json"
             "package/langwatch/dist/client/index.html"
             "package/langwatch/dist/scenario-child-process.js"
-            "package/langwatch_nlp/pyproject.toml"
             "package/langevals/pyproject.toml"
-            # langwatch_nlp pins the python SDK via `editable = "../python-sdk"`
+            # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship python-sdk/pyproject.toml + src/.
             "package/python-sdk/pyproject.toml"
             "package/python-sdk/src"
@@ -217,7 +216,6 @@ jobs:
           )
           forbidden=(
             "package/langwatch/node_modules"
-            "package/langwatch_nlp/.venv"
             "package/langwatch/.next/cache"
             "package/.env"
           )

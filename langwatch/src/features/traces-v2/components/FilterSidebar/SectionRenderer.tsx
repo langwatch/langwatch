@@ -38,6 +38,10 @@ interface SectionRendererProps {
   setRange: (field: string, from: string, to: string) => void;
   removeRange: (field: string) => void;
   onShiftToggle: (nextOpen: boolean) => void;
+  /** Called when the user clicks the X to remove this section from
+   * the sidebar. Threaded into the section components which surface
+   * the affordance in their headers. */
+  onHide?: () => void;
 }
 
 export const SectionRenderer: React.FC<SectionRendererProps> = ({
@@ -49,6 +53,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
   setRange,
   removeRange,
   onShiftToggle,
+  onHide,
   orGroupId,
   orPeers,
   orMemberValues,
@@ -74,6 +79,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         getValueState={valueStateGetters.get(section.key)!}
         onToggle={toggleFacet}
         onShiftToggle={onShiftToggle}
+        onHide={onHide}
         noneRow={noneRow}
         orGroupId={orGroupId}
         orPeers={orPeers}
@@ -97,6 +103,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onChange={(from, to) => setRange(section.key, String(from), String(to))}
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
+        onHide={onHide}
         orGroupId={orGroupId}
         orPeers={orPeers}
       />
@@ -125,6 +132,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       }
       onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
     />
   );
 };

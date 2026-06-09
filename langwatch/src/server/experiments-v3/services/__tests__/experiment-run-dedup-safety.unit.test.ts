@@ -44,4 +44,29 @@ describe("clickhouse-experiment-run.service dedup OOM safety", () => {
       );
     });
   });
+
+  describe("single-run getRun latest-version read", () => {
+    // getRun fetches ONE run, so it resolves the latest version with a scalar
+    // `UpdatedAt = (SELECT max(UpdatedAt) ...)` subquery rather than the
+    // `(..., UpdatedAt) IN (max-subquery)` tuple form. The scalar equality is
+    // PREWHERE-able, so the heavy columns are materialized for only the
+    // surviving version instead of across every version of the run. The
+    // IN-tuple form stays correct for the multi-run list reads.
+    it("uses a scalar max(UpdatedAt) subquery for the single run fetch", () => {
+      expect(source).toMatch(
+        /UpdatedAt = \(\s*SELECT max\(UpdatedAt\)\s*FROM experiment_runs/,
+      );
+    });
+
+    it("does not read a single run via an experiment_runs UpdatedAt IN-tuple", () => {
+      // Order-insensitive over the three key columns, and bare (non-aliased)
+      // columns only: the legitimate multi-run listRuns dedup uses `t.`-prefixed
+      // columns (`(t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN`), so a
+      // getRun regression back to a bare key+UpdatedAt IN-tuple is caught in any
+      // key order without flagging listRuns.
+      expect(source).not.toMatch(
+        /\(\s*(?:(?:TenantId|ExperimentId|RunId)\s*,\s*){3}UpdatedAt\s*\)\s*IN/,
+      );
+    });
+  });
 });

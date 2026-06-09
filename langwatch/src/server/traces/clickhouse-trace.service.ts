@@ -66,6 +66,25 @@ interface ClickHouseScrollCursor {
 }
 
 /**
+ * Upper bound on distinct field names (span names, metadata keys) returned for
+ * the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
+ * in healthy projects (hundreds), so this only guards against pathological
+ * cardinality (e.g. dynamic IDs baked into span names) flooding the response.
+ * Set well above any real project so every name is offered for mapping rather
+ * than alphabetically truncated.
+ */
+const DISTINCT_FIELD_NAMES_LIMIT = 10_000;
+
+/**
+ * Upper bound on spans returned per trace by the spans-join read path. The REST
+ * collector no longer caps spans per trace (#4629), so this read cap must be
+ * high enough not to truncate real agentic traces while still protecting the
+ * read path from a pathologically large trace's full span payload. A trace that
+ * actually reaches this many spans is logged as a potential truncation.
+ */
+const MAX_SPANS_PER_TRACE = 10_000;
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -1197,7 +1216,7 @@ export class ClickHouseTraceService {
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
               ORDER BY SpanName ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1225,7 +1244,7 @@ export class ClickHouseTraceService {
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1244,7 +1263,42 @@ export class ClickHouseTraceService {
             label: row.key,
           }));
 
-          return { spanNames, metadataKeys };
+          // Get distinct evaluator names from evaluation_runs. Dedupe by
+          // evaluator id (an evaluator can be renamed over time) and keep the
+          // most recent name. The dropdown maps the id and shows the name.
+          const evalResult = await clickHouseClient.query({
+            query: `
+              SELECT
+                EvaluatorId AS id,
+                argMax(EvaluatorName, ScheduledAt) AS name
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND EvaluatorId != ''
+              GROUP BY EvaluatorId
+              ORDER BY name ASC
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
+            `,
+            query_params: {
+              tenantId: projectId,
+              startDate,
+              endDate,
+            },
+            format: "JSONEachRow",
+          });
+
+          const evalRows = (await evalResult.json()) as Array<{
+            id: string;
+            name: string | null;
+          }>;
+
+          const evaluationNames = evalRows.map((row) => ({
+            key: row.id,
+            label: row.name ?? row.id,
+          }));
+
+          return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
           this.logger.error(
             {
@@ -1488,6 +1542,7 @@ export class ClickHouseTraceService {
             ts.ErrorMessage AS ts_ErrorMessage,
             ts.Models AS ts_Models,
             ts.TotalCost AS ts_TotalCost,
+            ts.NonBilledCost AS ts_NonBilledCost,
             ts.TokensEstimated AS ts_TokensEstimated,
             ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
             ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -1652,6 +1707,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -1855,6 +1911,7 @@ export class ClickHouseTraceService {
           ErrorMessage AS ts_ErrorMessage,
           Models AS ts_Models,
           TotalCost AS ts_TotalCost,
+          NonBilledCost AS ts_NonBilledCost,
           TokensEstimated AS ts_TokensEstimated,
           TotalPromptTokenCount AS ts_TotalPromptTokenCount,
           TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -1953,7 +2010,7 @@ export class ClickHouseTraceService {
             GROUP BY TenantId, TraceId, SpanId
           )
         ORDER BY t.TraceId, t.StartTime ASC
-        LIMIT 200 BY t.TraceId
+        LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds, ...spanTimeParams },
             format: "JSONEachRow",
@@ -1994,6 +2051,17 @@ export class ClickHouseTraceService {
           const spans = spansByTrace.get(row.TraceId) ?? [];
           spans.push(this.mapSpanRow(row, projectId));
           spansByTrace.set(row.TraceId, spans);
+        }
+
+        // Surface (rather than silently swallow) traces large enough to hit the
+        // per-trace span cap — their span list may be truncated.
+        for (const [traceId, spans] of spansByTrace) {
+          if (spans.length >= MAX_SPANS_PER_TRACE) {
+            this.logger.warn(
+              { projectId, traceId, spanCount: spans.length, cap: MAX_SPANS_PER_TRACE },
+              "Trace reached the per-trace span cap; span list may be truncated",
+            );
+          }
         }
 
         // Build the tracesMap by combining summaries + spans
@@ -2038,6 +2106,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -2264,6 +2333,7 @@ interface TraceSummaryRow {
   ts_ErrorMessage: string | null;
   ts_Models: string[];
   ts_TotalCost: number | null;
+  ts_NonBilledCost: number | null;
   ts_TokensEstimated: boolean;
   ts_TotalPromptTokenCount: number | null;
   ts_TotalCompletionTokenCount: number | null;

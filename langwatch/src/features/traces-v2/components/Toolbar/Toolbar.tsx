@@ -1,4 +1,4 @@
-import { Button, Flex, Icon, IconButton } from "@chakra-ui/react";
+import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
 import { Bookmark, Compass, Download, Search, Tent } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -102,10 +102,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
           </Button>
         </Tooltip>
         <LiveIndicator />
+        {/* Vertical separator clusters the toolbar into:
+              [Save · Tour · Live] · [Time] · [Display: cols, group, density]
+              · [Tools: find, export, automate] · [Help]
+            Previously these were a flat row of 10 controls with no
+            visual hierarchy — auditor pain was "I don't know what
+            each icon does, and they all blur together". */}
+        <ToolbarDivider />
         <TimeRangePicker />
+        <ToolbarDivider />
         <ColumnsDropdown />
         <GroupingSelector />
         <DensityToggle />
+        <ToolbarDivider />
         <Tooltip
           content="Search within currently loaded traces"
           positioning={{ placement: "bottom" }}
@@ -140,8 +149,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
           </Tooltip>
         )}
         <AutomateButton />
+        <ToolbarDivider />
         <KeyboardShortcutsButton />
       </Flex>
     </Flex>
   );
 };
+
+/** Thin vertical hairline used to cluster the toolbar into role-based
+ *  groups (time / display / tools / help). Kept as a tiny presentational
+ *  component to avoid repeating the same height + colour + margin
+ *  inline four times. */
+const ToolbarDivider: React.FC = () => (
+  <Box
+    width="1px"
+    height="14px"
+    bg="border.muted"
+    marginX={0.5}
+    aria-hidden="true"
+  />
+);

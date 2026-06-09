@@ -14,7 +14,7 @@
 # Presets (passed as $1):
 #   all-local         Local CH+PG+Redis, no NLP, local-FS for stored-objects.
 #                     The fast-iteration default.
-#   all-local-nlp     all-local + langwatch_nlp + langevals containers.
+#   all-local-nlp     all-local + nlpgo (Go NLP engine) + langevals containers.
 #                     For NLP-touching work.
 #   dev-storage       Local CH+PG+Redis, NLP off, stored-objects -> dev S3
 #                     (runtime-storage-dev in lw-dev). Real AWS S3 driver

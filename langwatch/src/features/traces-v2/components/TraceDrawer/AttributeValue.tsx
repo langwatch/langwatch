@@ -74,7 +74,14 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
   return (
     <HStack flex={1} minWidth={0} paddingX={3} paddingY={1} gap={2}>
       <FormatPill format={detected} />
-      <Popover.Root positioning={{ placement: "right-start" }}>
+      {/* lazyMount + unmountOnExit — one of these renders per pinned
+          attribute row. With 10+ pins in the auto-pin sidebar that's a
+          lot of invisible floating layers on every drawer open. */}
+      <Popover.Root
+        positioning={{ placement: "right-start" }}
+        lazyMount
+        unmountOnExit
+      >
         <Popover.Trigger asChild>
           <Button
             type="button"

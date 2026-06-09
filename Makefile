@@ -10,7 +10,7 @@ help:
 	@echo "  Primary (Docker dev environment):"
 	@echo "    make quickstart                     interactive preset picker"
 	@echo "    make quickstart all-local           local CH+PG+Redis+app+workers, no NLP (fast iteration default)"
-	@echo "    make quickstart all-local-nlp       all-local + langwatch_nlp + langevals"
+	@echo "    make quickstart all-local-nlp       all-local + nlpgo + langevals"
 	@echo "    make quickstart dev-storage         local DBs+workers, stored-objects -> dev S3 (runtime-storage-dev)"
 	@echo "    make refresh-dev-s3                 rotate AWS SSO creds in .env (run before dev-storage)"
 	@echo "    make quickstart dev-infra           local app + redis + workers compose; shared dev for PG/CH/NLP/S3"
@@ -161,10 +161,18 @@ clean:
 
 install:
 	cd langwatch && pnpm install
-	cd langwatch_nlp && make install
 
+# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
+# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
+# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
+# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
+# → http://localhost:5561) and doesn't collide with langevals on :5562.
+# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
+# the local app.
 start:
-	cd langwatch && pnpm concurrently --kill-others 'pnpm dev' 'cd ../langwatch_nlp && make start'
+	cd langwatch && pnpm concurrently --kill-others \
+		'pnpm dev' \
+		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
 
 start/postgres:
 	@echo "Starting Postgres..."

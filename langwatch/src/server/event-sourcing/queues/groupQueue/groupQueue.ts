@@ -684,6 +684,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
+      // Feed the ops dashboard P50/P99 tiles. Capped circular buffer; the
+      // collector LRANGE's it every 2s. Fire-and-forget so an instrumentation
+      // hiccup never bubbles into the worker pipeline.
+      this.redisConnection
+        .multi()
+        .lpush(
+          `${this.queueName}:gq:stats:latencies-ms`,
+          String(Math.round(jobDurationMs)),
+        )
+        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
+        .exec()
+        .catch(() => {});
     }
   }
 

@@ -50,7 +50,6 @@ import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
 import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
-import { startOrphanSweepChainWorker } from "./workers/orphanSweepChainWorker";
 import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
 import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
 
@@ -169,10 +168,6 @@ export const start = async (
     const usageStatsWorker = startUsageStatsWorker();
     const anomalyDetectionWorker = startAnomalyDetectionWorker();
     void scheduleAnomalyDetection();
-    // Per-tenant orphan-sweep chain. No tick to register — the chain is
-    // event-driven: the ingestion reactor seeds it; the worker re-enqueues
-    // itself with a 24h delay via its `completed` listener.
-    const orphanSweepChainWorker = startOrphanSweepChainWorker();
     const ingestionPullerWorker = startIngestionPullerWorker();
     void scheduleIngestionPullers();
     const metricsServer = startMetricsServer();
@@ -183,9 +178,6 @@ export const start = async (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("anomalyDetection", anomalyDetectionWorker);
-    if (orphanSweepChainWorker) {
-      registerCloseable("orphanSweepChain", orphanSweepChainWorker);
-    }
     if (ingestionPullerWorker) {
       registerCloseable("ingestionPuller", ingestionPullerWorker);
     }
