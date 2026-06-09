@@ -39,7 +39,7 @@ Concretely:
 
 ## Walkthrough
 
-```
+```text
 EDGE — OTLP collector
   receive OTLP request → for each span:
     compute serialized-command-payload bytes
