@@ -10,27 +10,26 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CLAUDE_CODE_KIND_ATTR } from "../../claude-code-log-to-span";
-import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { CLAUDE_CODE_KIND_ATTR } from "../../claude-code-log-to-span";
+import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
 
 let ch: ClickHouseClient;
 let repo: LogRecordStorageClickHouseRepository;
 const tag = nanoid();
 
-// A fixed turn time, so the assertions don't couple the container clock
-// (now64) to the host clock (Date.now): both the inserted TimeUnixMs and the
-// hint are derived from this constant.
-const TURN_MS = 1_700_000_000_000;
-
+// Insert at server `now64(3)` minus a few seconds so the rows stay inside the
+// short retention floor (a fixed past date would be GC'd by the _retention_days
+// TTL). The +/-2-day hint window dwarfs any host-vs-container clock skew, so the
+// host-side Date.now() hint reliably covers the container-side insert time.
 async function insertMarkedLog(
   tenantId: string,
   traceId: string,
   spanId: string,
-  timeMs: number,
+  agoSec: number,
   marked: boolean,
 ) {
   await ch.command({
@@ -41,7 +40,7 @@ async function insertMarkedLog(
          ScopeVersion, CreatedAt, UpdatedAt, _retention_days)
       VALUES
         ({pid:String}, {tenantId:String}, {traceId:String}, {spanId:String},
-         fromUnixTimestamp64Milli(toInt64({timeMs:String})), 9, 'INFO', '{}',
+         now64(3) - {agoSec:UInt32}, 9, 'INFO', '{}',
          ${marked ? `map('${CLAUDE_CODE_KIND_ATTR}', 'model')` : `map()`},
          map(), 'com.anthropic.claude_code.events', NULL, now64(3), now64(3), 30)
     `,
@@ -50,7 +49,7 @@ async function insertMarkedLog(
       tenantId,
       traceId,
       spanId,
-      timeMs: String(timeMs),
+      agoSec,
     },
   });
 }
@@ -64,8 +63,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query: `ALTER TABLE stored_log_records DELETE WHERE startsWith(ProjectionId, {tag:String})`,
-      query_params: { tag },
+      query: `ALTER TABLE stored_log_records DELETE WHERE TenantId = {tenantId:String} AND startsWith(ProjectionId, {tag:String})`,
+      query_params: { tenantId: `${tag}-project`, tag },
     });
   }
   await stopTestContainers();
@@ -76,24 +75,19 @@ describe("getMarkedClaudeCodeLogsByTrace partition hint", () => {
   const traceId = `${tag}-trace`;
 
   beforeAll(async () => {
-    await insertMarkedLog(tenantId, traceId, `${tag}-a`, TURN_MS - 10_000, true);
-    await insertMarkedLog(tenantId, traceId, `${tag}-b`, TURN_MS - 5_000, true);
+    await insertMarkedLog(tenantId, traceId, `${tag}-a`, 10, true);
+    await insertMarkedLog(tenantId, traceId, `${tag}-b`, 5, true);
     // An unmarked log for the same trace must never be returned.
-    await insertMarkedLog(tenantId, traceId, `${tag}-c`, TURN_MS - 5_000, false);
+    await insertMarkedLog(tenantId, traceId, `${tag}-c`, 5, false);
   });
 
   describe("when a TimeUnixMs hint around the turn is supplied", () => {
     it("returns exactly the marked logs, ordered by time", async () => {
-      const unbounded = await repo.getMarkedClaudeCodeLogsByTrace(tenantId, traceId);
-      // eslint-disable-next-line no-console
-      console.error("DBG_UNBOUNDED_TIMES", JSON.stringify(unbounded.map(r => ({s: r.spanId, t: r.timeUnixMs}))));
       const rows = await repo.getMarkedClaudeCodeLogsByTrace(
         tenantId,
         traceId,
-        TURN_MS,
+        Date.now(),
       );
-      // eslint-disable-next-line no-console
-      console.error("DBG_HINTED", JSON.stringify(rows.map(r => r.spanId)), "TURN_MS", TURN_MS);
 
       expect(rows.map((r) => r.spanId)).toEqual([`${tag}-a`, `${tag}-b`]);
     });
