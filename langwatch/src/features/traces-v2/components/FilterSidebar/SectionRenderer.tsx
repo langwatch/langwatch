@@ -1,5 +1,8 @@
+import { Box } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
+import { memo } from "react";
 import {
   getFacetValueState,
   getRangeValue,
@@ -55,7 +58,7 @@ interface SectionRendererProps {
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-export const SectionRenderer: React.FC<SectionRendererProps> = ({
+const SectionRendererInner: React.FC<SectionRendererProps> = ({
   section,
   ast,
   facetItemsByKey,
@@ -101,6 +104,89 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
             ) : null
         : undefined;
 
+    // INACTIVE evaluator rows also get a drilldown affordance: a small
+    // chevron expand toggle appears so users can browse verdict/score
+    // options before committing to the evaluator filter. When they pick
+    // a verdict or score range, the evaluator toggle fires first so the
+    // selected criteria applies correctly.
+    const renderInactiveRowExtras =
+      section.key === "evaluator"
+        ? (
+            item: FacetItem,
+            isExpanded: boolean,
+            onToggleExpand: () => void,
+          ) => {
+            if (!item.aggregates) return null;
+            // Wrap toggleFacet so picking a verdict/score on an inactive
+            // evaluator also enables the evaluator filter in the same action.
+            const toggleFacetAndActivate = ({
+              field,
+              value,
+              isModifierKey,
+            }: {
+              field: string;
+              value: string;
+              isModifierKey?: boolean;
+            }) => {
+              // Activate the evaluator first (if not already active).
+              if (
+                getFacetValueState(ast, "evaluator", item.value) !== "include"
+              ) {
+                toggleFacet({ field: "evaluator", value: item.value });
+              }
+              toggleFacet({ field, value, isModifierKey });
+            };
+            return (
+              <Box>
+                <Box
+                  as="button"
+                  display="flex"
+                  alignItems="center"
+                  gap={0.5}
+                  paddingLeft="20px"
+                  paddingY={0.5}
+                  cursor="pointer"
+                  color="fg.subtle"
+                  textStyle="2xs"
+                  onClick={onToggleExpand}
+                  _hover={{ color: "fg.muted" }}
+                  background="transparent"
+                  border="none"
+                  width="full"
+                  textAlign="left"
+                >
+                  <Box
+                    as={isExpanded ? ChevronDown : ChevronRight}
+                    width="10px"
+                    height="10px"
+                    flexShrink={0}
+                  />
+                </Box>
+                {isExpanded && (
+                  <EvaluatorDrilldown
+                    item={item}
+                    ast={ast}
+                    toggleFacet={toggleFacetAndActivate}
+                    setRange={({ field, from, to }) => {
+                      if (
+                        getFacetValueState(
+                          ast,
+                          "evaluator",
+                          item.value,
+                        ) !== "include"
+                      ) {
+                        toggleFacet({ field: "evaluator", value: item.value });
+                      }
+                      setRange({ field, from, to });
+                    }}
+                    removeRange={removeRange}
+                  />
+                )}
+              </Box>
+            );
+          }
+        : undefined;
+
     return (
       <FacetSection
         title={section.label}
@@ -119,6 +205,8 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         orPeers={orPeers}
         orMemberValues={orMemberValues}
         renderActiveRowExtras={renderActiveRowExtras}
+        renderInactiveRowExtras={renderInactiveRowExtras}
+        synthetic={section.synthetic}
       />
     );
   }
@@ -144,6 +232,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         dragHandleProps={dragHandleProps}
         orGroupId={orGroupId}
         orPeers={orPeers}
+        synthetic={section.synthetic}
       />
     );
   }
@@ -181,3 +270,5 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
     />
   );
 };
+
+export const SectionRenderer = memo(SectionRendererInner);

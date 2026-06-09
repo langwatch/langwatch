@@ -3,6 +3,7 @@ import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
@@ -21,9 +22,22 @@ import { TimeRangePicker } from "./TimeRangePicker";
 
 interface ToolbarProps {
   onExportAll?: () => void;
+  /**
+   * When true, the "See sample data" toggle is rendered fully
+   * transparent (kept in the layout so the toolbar spacing doesn't
+   * jump but invisible to the user). IntegratePane uses this because
+   * the larger hero "See sample data" button alongside the page title
+   * is the canonical entry point in the empty-trace state — having
+   * two visible affordances for the same action splits the user's
+   * attention.
+   */
+  hideSampleDataAction?: boolean;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({
+  onExportAll,
+  hideSampleDataAction = false,
+}) => {
   // Tour entry point — kept for backwards compatibility. The journey
   // state machine (Phase 2) may still use onLaunchTour / onEndTour
   // internally. For Phase 1 the toolbar button exclusively toggles
@@ -34,6 +48,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   const setShowSamplePreview = useOnboardingStore(
     (s) => s.setShowSamplePreview,
   );
+  // Sample data is an onboarding affordance — once the project has its
+  // own real traces (`Project.firstMessage = true`, set by the
+  // projectMetadata reactor on first non-sample ingest), the toggle is
+  // noise. We gate visibility on `hasAnyTraces === false` rather than
+  // `!== true` so the button stays put during the brief window where
+  // `firstMessage` is still unknown (avoids a flicker on first load).
+  // Note: this only filters out *real* traces — seeded sample traces
+  // continue to leave `firstMessage` false, so the toggle remains
+  // available during sample-data exploration.
+  const { hasAnyTraces } = useProjectHasTraces();
+  const showSampleDataToggle = hasAnyTraces === false;
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore(
@@ -43,12 +68,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   const handleSamplePreviewToggle = useCallback(() => {
     if (showSamplePreview) {
       setShowSamplePreview(false);
+      // Sample data + spotlights ride together — switching samples off
+      // dismisses any spotlight tour that was running over them so the
+      // page returns to a clean state in one click.
+      setSpotlightsActive(false);
+      setCurrentSpotlightId(null);
+      writeSpotlightFragment(null);
       // If the legacy journey was somehow also active, end it cleanly.
       onEndTour();
     } else {
       setShowSamplePreview(true);
+      // Auto-start spotlights when the user opts into sample data — the
+      // whole point of "See sample data" is to give the user a tour of
+      // what the trace explorer looks like with content in it, which
+      // pairs naturally with contextual callouts that explain what each
+      // surface does. They can dismiss the spotlights from any step
+      // without turning samples off.
+      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+      const firstId = first?.id ?? null;
+      setCurrentSpotlightId(firstId);
+      setSpotlightsActive(true);
+      writeSpotlightFragment(firstId);
     }
-  }, [showSamplePreview, setShowSamplePreview, onEndTour]);
+  }, [
+    showSamplePreview,
+    setShowSamplePreview,
+    onEndTour,
+    setSpotlightsActive,
+    setCurrentSpotlightId,
+  ]);
 
   const handleShowMeAround = useCallback(() => {
     if (spotlightsActive) {
@@ -94,26 +142,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       flexShrink={0}
       minHeight="36px"
     >
-      <LensTabs />
-      <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
-        {activeLensIsDraft && !hasParseError && (
-          <LensNamePopover
-            defaultName={`${activeLensName} (copy)`}
-            onSubmit={(name) => createLens(name)}
-          >
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="orange"
-              aria-label="Save current view as a new lens"
-            >
-              <Icon boxSize={3.5}>
-                <Bookmark />
-              </Icon>
-              Save the result as a lens
-            </Button>
-          </LensNamePopover>
-        )}
+      {/* Sample-data toggle sits at the front of the toolbar (before
+          the lens tabs) so it reads as a top-level "what am I looking
+          at?" affordance rather than a buried row in the right cluster.
+          The previous layout put it between Save-lens and Show-me-around,
+          which made the Save button feel orphaned from the rest of the
+          right-side actions. When `hideSampleDataAction` is set (the
+          IntegratePane case), the button is fully absent — no phantom
+          gap — because the inert chrome doesn't need to match the live
+          toolbar's exact pixel layout. */}
+      {!hideSampleDataAction && showSampleDataToggle && (
         <Tooltip
           content={
             showSamplePreview
@@ -132,9 +170,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             }
             aria-pressed={showSamplePreview}
           >
-            {/* Brighter orange in light mode (matches the orange
-                indicator dot on the "All" lens tab) — `orange.fg` was
-                rendering as muted brown on the white toolbar surface. */}
             <Icon
               boxSize={3.5}
               color={{ base: "orange.500", _dark: "orange.fg" }}
@@ -144,6 +179,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             {showSamplePreview ? "Hide sample data" : "See sample data"}
           </Button>
         </Tooltip>
+      )}
+      <LensTabs />
+      <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
+        {activeLensIsDraft && !hasParseError && (
+          <LensNamePopover
+            defaultName={`${activeLensName} (copy)`}
+            onSubmit={(name) => createLens(name)}
+          >
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="orange"
+              aria-label="Save current filtered view as a new lens"
+            >
+              <Icon boxSize={3.5}>
+                <Bookmark />
+              </Icon>
+              Save current filtered view
+            </Button>
+          </LensNamePopover>
+        )}
         <Tooltip
           content={
             spotlightsActive

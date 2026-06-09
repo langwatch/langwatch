@@ -43,10 +43,18 @@ export interface Spotlight {
 export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
   {
     id: "search-bar",
-    anchor: "search-bar",
-    title: "Search",
-    body: "Type a filter expression to narrow the table. Press ⌘I (or Ctrl+I) to describe what you want in plain English.",
-    placement: "bottom",
+    // Anchor on the Ask AI chip rather than the whole search bar. The
+    // chip is the load-bearing piece of this callout (the tour is
+    // selling the natural-language input, not the typed expression
+    // language), and a popover next to a small target reads as "this
+    // thing here" instead of looping the eye around the entire row.
+    // The chip carries its own red "AI" glow, so we anchor outside
+    // the existing visual treatment — orange ring on the chip, copy
+    // floats to the right.
+    anchor: "ask-ai-chip",
+    title: "Find anything, fast",
+    body: "Type a filter, or hit Ask AI (⌘I) and describe what you want — \"errors from the checkout agent in the last hour, slowest first\". The query language is full-featured; the AI lane is the fastest path to a useful view.",
+    placement: "right",
   },
   {
     id: "facets",

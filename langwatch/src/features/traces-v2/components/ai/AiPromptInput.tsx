@@ -1,18 +1,8 @@
-import {
-  Box,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Flex, IconButton, Input, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { AlertCircle, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
@@ -159,7 +149,6 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   onSubmit,
   onClose,
   isPending,
-  error,
   placeholderExamples = DEFAULT_PLACEHOLDER_EXAMPLES,
   thinkingVerbs = DEFAULT_THINKING_VERBS,
 }) => {
@@ -265,7 +254,6 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           minWidth={0}
         />
       )}
-      {error && <ErrorBadge error={error} />}
       <Tooltip
         content={isPending ? "Cancel (Esc)" : "Exit AI mode (Esc)"}
         openDelay={200}
@@ -284,127 +272,3 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   );
 };
 
-/**
- * Compact red pill that renders the curated error headline next to the
- * AI input. Tapping the pill opens a popover with the structured detail
- * fields (provider, model, http status, raw reason). When the server
- * couldn't extract anything beyond the headline (rare — wrapped tRPC
- * errors), the popover degrades gracefully to just the message.
- *
- * Fixed maxWidth in px (not %) because this badge sits inside a Flex
- * row that, in `FloatingAiBar`, is itself fixed-positioned; a % maxWidth
- * resolves against the floating bar's width rather than the input row's,
- * eating roughly half the composer on a long error string.
- */
-const ErrorBadge: React.FC<{ error: AiActionError }> = ({ error }) => {
-  const hasDetails = Boolean(
-    error.details &&
-      (error.details.provider ||
-        error.details.model ||
-        error.details.httpStatus ||
-        error.details.reason ||
-        error.details.lastQuery),
-  );
-  const badge = (
-    <HStack
-      as={hasDetails ? "button" : "div"}
-      gap={1}
-      paddingX={2}
-      paddingY={0.5}
-      borderRadius="sm"
-      bg="red.subtle"
-      color="red.fg"
-      flexShrink={0}
-      maxWidth="280px"
-      minWidth={0}
-      cursor={hasDetails ? "pointer" : "help"}
-      type={hasDetails ? "button" : undefined}
-    >
-      <Icon boxSize="12px" flexShrink={0}>
-        <AlertCircle />
-      </Icon>
-      <Text textStyle="2xs" fontWeight="600" truncate>
-        {error.message}
-      </Text>
-    </HStack>
-  );
-  if (!hasDetails) {
-    return (
-      <Tooltip content={error.message} openDelay={100}>
-        {badge}
-      </Tooltip>
-    );
-  }
-  return (
-    <Popover.Root positioning={{ placement: "bottom-end" }}>
-      <Popover.Trigger asChild>{badge}</Popover.Trigger>
-      <Popover.Content maxWidth="360px">
-        <Popover.Body padding={3}>
-          <VStack align="stretch" gap={2}>
-            <Text textStyle="xs" fontWeight="600" color="fg">
-              {error.message}
-            </Text>
-            <VStack align="stretch" gap={0.5}>
-              {error.details?.httpStatus !== undefined && (
-                <DetailRow
-                  label="Status"
-                  value={String(error.details.httpStatus)}
-                />
-              )}
-              {error.details?.provider && (
-                <DetailRow label="Provider" value={error.details.provider} />
-              )}
-              {error.details?.model && (
-                <DetailRow label="Model" value={error.details.model} />
-              )}
-              {error.details?.reason && (
-                <DetailRow
-                  label="Reason"
-                  value={error.details.reason}
-                  multiline
-                />
-              )}
-              {error.details?.lastQuery && (
-                <DetailRow
-                  label="Last query"
-                  value={error.details.lastQuery}
-                  multiline
-                />
-              )}
-            </VStack>
-          </VStack>
-        </Popover.Body>
-      </Popover.Content>
-    </Popover.Root>
-  );
-};
-
-const DetailRow: React.FC<{
-  label: string;
-  value: string;
-  multiline?: boolean;
-}> = ({ label, value, multiline }) => (
-  <HStack align="flex-start" gap={2}>
-    <Text
-      textStyle="2xs"
-      color="fg.muted"
-      flexShrink={0}
-      minWidth="60px"
-      textTransform="uppercase"
-      letterSpacing="0.04em"
-      fontWeight="600"
-      paddingTop={0.5}
-    >
-      {label}
-    </Text>
-    <Text
-      textStyle="xs"
-      color="fg"
-      fontFamily="mono"
-      wordBreak="break-word"
-      whiteSpace={multiline ? "pre-wrap" : "normal"}
-    >
-      {value}
-    </Text>
-  </HStack>
-);

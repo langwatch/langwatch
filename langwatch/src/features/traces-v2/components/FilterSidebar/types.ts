@@ -80,12 +80,25 @@ export interface CategoricalSection extends SectionBase {
      */
     aggregates?: FacetItemAggregates;
   }[];
+  /**
+   * True when this section was synthesised from FACET_DEFAULTS before the
+   * discover response arrived (or when the project has no traces yet).
+   * Used to show a "No values yet" placeholder instead of an empty list.
+   */
+  synthetic?: boolean;
 }
 
 export interface RangeSectionData extends SectionBase {
   kind: "range";
   min: number;
   max: number;
+  /**
+   * True when this descriptor was synthesised from RANGE_DEFAULTS before
+   * discover responded. The range section renders a placeholder caption
+   * instead of an interactive slider so the user knows the filter will
+   * populate once traces arrive.
+   */
+  synthetic?: boolean;
 }
 
 export interface AttributesSectionData extends SectionBase {

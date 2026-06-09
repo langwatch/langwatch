@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
@@ -18,6 +18,7 @@ import { useURLSync } from "../../hooks/useURLSync";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
+import { useFirstTraceSpotlightTrigger } from "../../onboarding/hooks/useFirstTraceSpotlightTrigger";
 import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
@@ -131,6 +132,16 @@ export const TracesPage: React.FC = () => {
   const showIntegratePane =
     !showEmptyState && hasAnyTraces === false && !showSamplePreview;
 
+  // First-real-trace one-shot: when `hasAnyTraces` flips false → true
+  // for this project AND we haven't auto-fired the spotlight tour for
+  // it yet, kick off spotlights so the user gets a contextual tour of
+  // their own data the moment it arrives. Persisted per-project so a
+  // refresh / second project doesn't re-trigger.
+  useFirstTraceSpotlightTrigger({
+    projectId: project?.id ?? null,
+    hasAnyTraces,
+  });
+
   return (
     <DensityProvider>
       {/* OnboardingHost lazy-mounts the body stage attribute + the
@@ -148,14 +159,21 @@ export const TracesPage: React.FC = () => {
           aria-label="Trace explorer"
           position="relative"
         >
-          <Box
-            role="search"
-            aria-label="Trace search"
-            width="full"
-            {...(dimChrome ? (DIMMED_PROPS as Record<string, unknown>) : {})}
-          >
-            <SearchBar />
-          </Box>
+          {/* Hide the SearchBar on the no-traces view — there's nothing
+              to search for yet, and a search input sitting above the
+              integration guide competes for attention without paying
+              for itself. Re-appears the moment the IntegratePane is
+              gone (real traces arrive or user opts into sample data). */}
+          {!showIntegratePane && (
+            <Box
+              role="search"
+              aria-label="Trace search"
+              width="full"
+              {...(dimChrome ? (DIMMED_PROPS as Record<string, unknown>) : {})}
+            >
+              <SearchBar />
+            </Box>
+          )}
 
           <HStack
             flex={1}
@@ -191,16 +209,32 @@ export const TracesPage: React.FC = () => {
                 <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
               </Box>
             )}
-            {showIntegratePane ? (
-              // No-traces + no sample preview → show the integration hero.
-              <IntegratePane />
-            ) : showEmptyState ? (
-              // Legacy journey (tourActive) — dormant for new users.
-              <EmptyResultsPane />
-            ) : (
-              // Real traces, or no-traces with sample preview active.
-              <ResultsPane />
-            )}
+            {/* Cross-fade between the three main pane modes. `mode="wait"`
+                lets the IntegratePane finish its exit (0.32s) before the
+                ResultsPane mounts and fades in (0.36s with a short
+                delay) — that one beat is enough to hide the heavy mount
+                (TraceTable virtualizer, FilterSidebar facets, aurora
+                SVG) behind the fade rather than letting users watch a
+                janky pop-in. Without orchestration the swap was
+                instant + laggy; with it the swap reads as deliberate. */}
+            <AnimatePresence mode="wait" initial={false}>
+              {showIntegratePane ? (
+                // No-traces + no sample preview → show the integration hero.
+                <PaneFader key="integrate">
+                  <IntegratePane />
+                </PaneFader>
+              ) : showEmptyState ? (
+                // Legacy journey (tourActive) — dormant for new users.
+                <PaneFader key="empty">
+                  <EmptyResultsPane />
+                </PaneFader>
+              ) : (
+                // Real traces, or no-traces with sample preview active.
+                <PaneFader key="results" delayIn={0.04}>
+                  <ResultsPane />
+                </PaneFader>
+              )}
+            </AnimatePresence>
           </HStack>
           <PageKeyboardShortcuts />
           <TraceDrawerMount />
@@ -213,6 +247,29 @@ export const TracesPage: React.FC = () => {
     </DensityProvider>
   );
 };
+
+/**
+ * Cross-fade wrapper for the three main pane modes (IntegratePane /
+ * EmptyResultsPane / ResultsPane). `mode="wait"` on the parent
+ * AnimatePresence + a tiny enter delay on the incoming child gives
+ * the outgoing pane time to actually leave the DOM before the
+ * heavy mount (table virtualizer, aurora SVG, facet sidebar) starts
+ * — the user reads the swap as deliberate motion rather than a
+ * dropped frame.
+ */
+const PaneFader: React.FC<{
+  children: React.ReactNode;
+  delayIn?: number;
+}> = ({ children, delayIn = 0 }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1, transition: { duration: 0.36, delay: delayIn, ease: "easeOut" } }}
+    exit={{ opacity: 0, transition: { duration: 0.24, ease: "easeIn" } }}
+    style={{ display: "flex", flex: 1, minWidth: 0, height: "100%" }}
+  >
+    {children}
+  </motion.div>
+);
 
 /**
  * Optimistic drawer mount. Reads `traceId` straight from the drawer
@@ -237,6 +294,7 @@ const FilterAside: React.FC<{
   const persistSidebarLayout = useUIStore((s) => s.persistSidebarLayout);
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   const { hasAnyTraces } = useProjectHasTraces();
+  const isSamplePreview = usePreviewTracesActive();
   // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
   // viewport, leaving the actual trace table unreadable. Force the
   // collapsed rail on small screens regardless of the persisted preference,
@@ -266,11 +324,12 @@ const FilterAside: React.FC<{
   // No real traces yet — the discover endpoint won't return any field
   // descriptors, so the filter facets have nothing to show. Hide the
   // sidebar entirely until real data arrives so we don't present an
-  // empty chrome rail with "Getting filters ready…" that never populates.
-  // `FilterSidebar` also checks this independently but we gate here too
-  // so the outer `Box` wrapper (which has explicit `width`) isn't left
-  // as a silent whitespace column.
-  if (hasAnyTraces === false) return null;
+  // empty chrome rail with "Getting filters ready…" that never
+  // populates. Exception: if the user is in sample-preview mode,
+  // `useTraceFacets` swaps the empty discover response for a
+  // hardcoded set derived from the sample fixtures, so the sidebar
+  // has real facets to show even with `hasAnyTraces === false`.
+  if (hasAnyTraces === false && !isSamplePreview) return null;
 
   const autoExpandedWidth =
     SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
@@ -344,9 +403,47 @@ const ResultsPane: React.FC = React.memo(() => {
   // sample preview (see IntegratePane / TracesPage routing), so always showing
   // the banner here is safe and honest.
   const showSampleBanner = isPreviewActive;
-  // Show the aurora once when the user first enters sample preview without real
-  // traces — the marquee moment that makes the sample data feel like an "arrival."
-  const showAurora = isPreviewActive && hasAnyTraces === false;
+  // Aurora ribbon is a *one-shot* arrival moment. Two ways to arm it,
+  // both purely mount-scoped (no persistence — if you're not on the
+  // page when it happens, it's gone):
+  //
+  //   1. Sample-preview just flipped on for a no-traces project —
+  //      the user opted into "show me what this looks like" and the
+  //      ribbon punctuates that opt-in.
+  //   2. While the page is mounted, `hasAnyTraces` transitions from
+  //      false to true — the project's first real trace just landed,
+  //      and the aurora bridges the IntegratePane → ResultsPane swap
+  //      with a wash that announces "your data is here". Tracked via
+  //      a simple ref of the previous value, so refreshes and tab
+  //      switches naturally skip the replay (the user wasn't watching
+  //      anyway), and we don't need a persisted flag.
+  //
+  // Either trigger arms the aurora for ~3.6s — long enough for one
+  // full curtain cycle — then closes even if the underlying condition
+  // is still true. Sample preview re-arms on every toggle.
+  const auroraArmedSample = isPreviewActive && hasAnyTraces === false;
+  const prevHasAnyTracesRef = useRef<boolean | undefined>(undefined);
+  const [auroraArmedFirstReal, setAuroraArmedFirstReal] = useState(false);
+  useEffect(() => {
+    const prev = prevHasAnyTracesRef.current;
+    prevHasAnyTracesRef.current = hasAnyTraces;
+    if (prev === false && hasAnyTraces === true) {
+      setAuroraArmedFirstReal(true);
+    }
+  }, [hasAnyTraces]);
+  const [showAurora, setShowAurora] = useState(false);
+  useEffect(() => {
+    if (!auroraArmedSample && !auroraArmedFirstReal) {
+      setShowAurora(false);
+      return;
+    }
+    setShowAurora(true);
+    const t = setTimeout(() => {
+      setShowAurora(false);
+      setAuroraArmedFirstReal(false);
+    }, 3600);
+    return () => clearTimeout(t);
+  }, [auroraArmedSample, auroraArmedFirstReal]);
 
   const isSelectedExport =
     selectionMode === "all-matching" || explicitCount > 0;
@@ -454,7 +551,14 @@ const AuroraOverlay: React.FC = () => (
       key="aurora-sample-preview"
       aria-hidden="true"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      // Cap the peak opacity well below 1 — the SVG inside has its own
+      // per-curtain opacity keyframe that already peaks at 1.0, so a
+      // wrapper opacity of 0.45 lands the visible intensity in
+      // "ribbon, not headlight" territory. Earlier full-opacity reads
+      // as someone shouting; the marquee moment should announce, not
+      // shout. Fade-out runs longer than fade-in so the dismissal
+      // feels more like the wash receding than a hard cut.
+      animate={{ opacity: 0.45 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.7, ease: "easeOut" }}
       style={{

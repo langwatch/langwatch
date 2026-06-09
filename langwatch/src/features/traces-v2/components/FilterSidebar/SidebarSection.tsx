@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, GripVertical, Search } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
 
 interface SidebarSectionProps {
@@ -83,7 +83,7 @@ interface SidebarSectionProps {
 const DRAG_HANDLE_HIT_AREA = "16px";
 const DRAG_HANDLE_GLYPH = "12px";
 
-export const SidebarSection: React.FC<SidebarSectionProps> = ({
+const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
   title,
   icon: SectionIcon,
   open,
@@ -392,3 +392,5 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     </Collapsible.Root>
   );
 };
+
+export const SidebarSection = memo(SidebarSectionInner);

@@ -5,6 +5,7 @@ import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import {
   type LiveUpdatesMode,
   useSseStatusStore,
@@ -43,6 +44,12 @@ export const LiveIndicator: React.FC = () => {
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
   const { refresh, isRefreshing } = useTraceListRefresh();
+  // Sample-preview rows are a hardcoded fixture — they don't change
+  // server-side, so a click on Refresh wouldn't fetch anything new and
+  // would just flash the spin icon (and trigger the no-op aurora flash
+  // downstream). Disable it with a tooltip that names the reason
+  // instead of letting the user wonder why nothing happened.
+  const isSamplePreview = usePreviewTracesActive();
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
   // exist) but the user is in charge of when to pull them in. In `live`
@@ -94,7 +101,13 @@ export const LiveIndicator: React.FC = () => {
       </Tooltip>
 
       <Tooltip
-        content={isRefreshing ? "Refreshing…" : "Refresh traces"}
+        content={
+          isSamplePreview
+            ? "Refresh is disabled — sample data doesn't change."
+            : isRefreshing
+              ? "Refreshing…"
+              : "Refresh traces"
+        }
         positioning={{ placement: "bottom" }}
       >
         <IconButton
@@ -109,11 +122,15 @@ export const LiveIndicator: React.FC = () => {
           colorPalette={isRefreshing ? "blue" : undefined}
           size="xs"
           onClick={refresh}
-          // We don't actually disable the button — `useTraceListRefresh`
-          // debounces internally and cancels prior in-flight calls, so
-          // a mid-fetch click is a no-op that costs nothing. Disabling
-          // would also kill the affordance for someone who *wants* to
-          // re-kick a stalled fetch.
+          disabled={isSamplePreview}
+          // We don't actually disable the button during a normal fetch
+          // — `useTraceListRefresh` debounces internally and cancels
+          // prior in-flight calls, so a mid-fetch click is a no-op
+          // that costs nothing, and disabling would kill the
+          // affordance for someone who *wants* to re-kick a stalled
+          // fetch. Sample-preview is the exception: there's literally
+          // nothing on the server to refresh, so clicking would just
+          // flash the spinner for no reason. The tooltip explains.
           css={isRefreshing ? REFRESH_SPIN_CSS : undefined}
         >
           <RefreshCw size={12} />

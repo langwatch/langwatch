@@ -287,45 +287,62 @@ function SpotlightPopover({
         </Box>
       )}
 
-      {/* Footer navigation */}
+      {/* Footer navigation. `Skip tour` sits on the left so it reads as
+          an escape hatch rather than competing with Next for the
+          primary action role on the right. We can't force users
+          through the tour — making the exit always visible (in
+          addition to the header ✕) means anyone who's already
+          oriented can leave with one click without hunting for the
+          close glyph. */}
       <Flex
         align="center"
-        justify="flex-end"
+        justify="space-between"
         gap={2}
         paddingX={3}
         paddingBottom={3}
       >
-        {hasPrev && (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onBack}
-            aria-label="Previous spotlight"
-          >
-            Back
-          </Button>
-        )}
-        {hasNext ? (
-          <Button
-            size="xs"
-            variant="solid"
-            colorPalette="blue"
-            onClick={onNext}
-            aria-label="Next spotlight"
-          >
-            Next
-          </Button>
-        ) : (
-          <Button
-            size="xs"
-            variant="solid"
-            colorPalette="blue"
-            onClick={onDismiss}
-            aria-label="Finish tour"
-          >
-            Done
-          </Button>
-        )}
+        <Button
+          size="xs"
+          variant="ghost"
+          color="fg.subtle"
+          onClick={onDismiss}
+          aria-label="Skip tour"
+        >
+          Skip tour
+        </Button>
+        <Flex align="center" gap={2}>
+          {hasPrev && (
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={onBack}
+              aria-label="Previous spotlight"
+            >
+              Back
+            </Button>
+          )}
+          {hasNext ? (
+            <Button
+              size="xs"
+              variant="solid"
+              colorPalette="blue"
+              onClick={onNext}
+              aria-label="Next spotlight"
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              size="xs"
+              variant="solid"
+              colorPalette="blue"
+              onClick={onDismiss}
+              aria-label="Finish tour"
+            >
+              Done
+            </Button>
+          )}
+        </Flex>
       </Flex>
     </Box>
   );
@@ -341,20 +358,31 @@ function HighlightRing({
 }: {
   anchorRect: AnchorRect;
 }): React.ReactElement {
+  // Soft orange focus, not a blue aurora.
+  //
+  // Design rule: BLUE is reserved on this screen for "you need to act"
+  // affordances (the Next/Done buttons in the popover footer, primary
+  // action chips, etc.). Using it as a passive "look here" indicator
+  // around an arbitrary anchor steals semantic weight from those real
+  // CTAs — and on elements that already carry their own treatment
+  // (e.g. the search bar's red Ask-AI glow) the blue ring stacks
+  // visually for no benefit. A 1px orange outline at low opacity plus
+  // a very soft glow is enough to draw the eye without fighting any
+  // existing chrome.
   return (
     <Box
       data-testid="spotlight-highlight"
       position="fixed"
-      top={`${anchorRect.top - 3}px`}
-      left={`${anchorRect.left - 3}px`}
-      width={`${anchorRect.width + 6}px`}
-      height={`${anchorRect.height + 6}px`}
+      top={`${anchorRect.top - 2}px`}
+      left={`${anchorRect.left - 2}px`}
+      width={`${anchorRect.width + 4}px`}
+      height={`${anchorRect.height + 4}px`}
       borderRadius="md"
-      borderWidth="2px"
-      borderColor="blue.500"
+      borderWidth="1px"
+      borderColor="orange.muted"
       pointerEvents="none"
       zIndex={1499}
-      boxShadow="0 0 0 4px var(--chakra-colors-blue-100)"
+      boxShadow="0 0 0 3px color-mix(in oklab, var(--chakra-colors-orange-solid) 14%, transparent)"
     />
   );
 }

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Icon, IconButton, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, IconButton, SegmentGroup, Text } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -41,6 +41,19 @@ import { useViewStore } from "../../stores/viewStore";
 // else falls through to the end alphabetically.
 const SECTION_ORDER = ["Standard", "Trace fields", "Evaluations", "Events"];
 
+// Mutually-exclusive time-display options surfaced as a SegmentGroup
+// at the top of the dropdown. Switching swaps one column for another
+// in `columnOrder` while keeping its slot — the trio reads the same
+// underlying `row.timestamp` field; the only difference is how the
+// cell renders it, which is the kind of "I'd like a different lens
+// on this data" decision the user makes mid-investigation.
+const TIME_VARIANT_IDS = ["time", "since", "timestamp"] as const;
+const TIME_VARIANT_LABELS: Record<(typeof TIME_VARIANT_IDS)[number], string> = {
+  time: "Time (4m)",
+  since: "Since (4m ago)",
+  timestamp: "Timestamp (ISO)",
+};
+
 const SECTION_LABEL_CSS = {
   "& [data-scope=menu][data-part=item-group-label]": {
     fontSize: "2xs",
@@ -56,7 +69,36 @@ export const ColumnsDropdown: React.FC = () => {
   const columnOrder = useViewStore((s) => s.columnOrder);
   const toggleColumn = useViewStore((s) => s.toggleColumn);
   const reorderColumns = useViewStore((s) => s.reorderColumns);
+  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
   const grouping = useViewStore((s) => s.grouping);
+
+  // First time variant currently visible (if any). Multiple should
+  // never be on simultaneously — this segment group is the only path
+  // that adds one — but the find-first guards against a stale state
+  // where two ended up on through a manual toggle.
+  const activeTimeVariant = columnOrder.find((id) =>
+    (TIME_VARIANT_IDS as readonly string[]).includes(id),
+  ) as (typeof TIME_VARIANT_IDS)[number] | undefined;
+
+  const swapTimeVariant = (next: (typeof TIME_VARIANT_IDS)[number]) => {
+    const cleared = columnOrder.filter(
+      (id) => !(TIME_VARIANT_IDS as readonly string[]).includes(id),
+    );
+    // Preserve the position of the previously-active variant so the
+    // user's column-order layout doesn't reshuffle on every swap. If
+    // none was visible (user is enabling time display fresh), drop the
+    // new variant at the front — that's where the time column would
+    // naturally live in the standard lens.
+    const previousIdx = activeTimeVariant
+      ? columnOrder.indexOf(activeTimeVariant)
+      : 0;
+    const insertAt = Math.min(previousIdx, cleared.length);
+    setVisibleColumns([
+      ...cleared.slice(0, insertAt),
+      next,
+      ...cleared.slice(insertAt),
+    ]);
+  };
 
   // Source columns from the active grouping's capability — not the
   // flat-trace constant. Each grouping has its own column registry
@@ -140,6 +182,58 @@ export const ColumnsDropdown: React.FC = () => {
           >
             Columns
           </Text>
+        </Box>
+        {/* Time-display variant picker — Time/Since/Timestamp are three
+            views of the same underlying timestamp, so a SegmentGroup
+            is the right control: at most one on at a time, swapping
+            keeps the column slot stable, and the user doesn't have to
+            uncheck-then-check across the section list to flip modes. */}
+        <Box
+          paddingX={3}
+          paddingY={2}
+          borderBottomWidth="1px"
+          borderColor="border.subtle"
+        >
+          <Text
+            textStyle="2xs"
+            color="fg.muted"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+            paddingBottom={1.5}
+          >
+            Time display
+          </Text>
+          <SegmentGroup.Root
+            size="xs"
+            value={activeTimeVariant ?? ""}
+            onValueChange={(e) => {
+              const next = e.value as (typeof TIME_VARIANT_IDS)[number] | "";
+              if (next) swapTimeVariant(next);
+            }}
+            background="bg.subtle"
+            borderRadius="md"
+            padding="2px"
+            width="full"
+            css={{
+              "& [data-part='item']": {
+                borderRadius: "sm",
+                paddingY: "1",
+                paddingX: "2",
+                flex: 1,
+                justifyContent: "center",
+              },
+              "& [data-part='item-text']": { fontSize: "2xs" },
+              "& [data-part='indicator']": { borderRadius: "sm" },
+            }}
+          >
+            <SegmentGroup.Indicator />
+            <SegmentGroup.Items
+              items={TIME_VARIANT_IDS.map((id) => ({
+                value: id,
+                label: TIME_VARIANT_LABELS[id],
+              }))}
+            />
+          </SegmentGroup.Root>
         </Box>
         {orderedVisibleColumns.length > 1 && (
           // Reorder strip — drag the grip handle, or use the up/down

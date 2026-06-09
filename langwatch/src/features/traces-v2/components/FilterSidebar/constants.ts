@@ -98,7 +98,27 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   annotation: ["annotated", "unannotated"],
   containsAi: ["yes", "no"],
   tokensEstimated: ["estimated", "actual"],
+  // Open-ended categoricals: seed with empty values so the sidebar renders
+  // the section immediately. Values populate once discover responds.
+  model: [],
+  service: [],
+  user: [],
+  conversation: [],
+  errorMessage: [],
+  evaluator: [],
 };
+
+/**
+ * Range keys that should appear in the sidebar immediately — even before
+ * discover responds — as synthetic placeholder sections. Rendered with
+ * a disabled state (min === max === 0, flagged synthetic) so users can
+ * see the affordance without being able to interact with a zero-span range.
+ */
+export const RANGE_DEFAULTS: readonly string[] = [
+  "duration",
+  "cost",
+  "tokens",
+];
 
 /**
  * Fields whose colour palette is curated. Other categoricals get hashed

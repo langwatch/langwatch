@@ -25,11 +25,10 @@ import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
  * switch columns to see "how long ago" vs "wall-clock" vs "ISO for log
  * queries":
  *
- *   - Verbose relative ("3 days ago")
- *   - Local time with the viewer's tz abbreviation
- *   - UTC ("…UTC" suffix; matches what server logs render)
- *   - ISO 8601 (copy-pasteable)
- *   - Day of week + IANA zone footer
+ *   - Verbose relative ("3 days ago") — dominant headline
+ *   - Local / UTC / ISO as a tidy horizontal label→value grid
+ *   - Day of week + IANA zone footer (supporting metadata)
+ *   - In-card toggle for relative vs absolute column display mode
  *
  * Modelled on `TracePreviewHoverCard` so it inherits the same open/close
  * delay + portal/positioner contract. Children render as the trigger;
@@ -66,11 +65,12 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
       <Portal>
         <HoverCard.Positioner>
           <HoverCard.Content
-            width="320px"
-            padding={3}
+            width="296px"
+            padding={0}
             borderRadius="lg"
             background="bg.panel"
             boxShadow="lg"
+            overflow="hidden"
             // Trap clicks/mousedown inside the popover so toggling the
             // time-column mode (or selecting timestamp text to copy)
             // doesn't bubble up to the row's click handler and open the
@@ -90,11 +90,14 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
 };
 
 /**
- * Body content. The verbose-relative header re-renders precisely at
- * the next minute / hour / day boundary via `useVerboseRelativeTime`
- * — no 1Hz polling. A footer toggles the source time column between
- * "Since" (relative) and "Sum" (absolute) display modes so the user
- * doesn't have to leave the popover to change how the column reads.
+ * Body content. Hierarchy:
+ *   1. Relative time — the dominant headline (why the user opened this)
+ *   2. Local / UTC / ISO label→value grid (reference, secondary)
+ *   3. Day-of-week + zone footer (quiet supporting metadata)
+ *   4. Column display-mode toggle (utility, visually settled)
+ *
+ * The verbose-relative header re-renders precisely at the next minute /
+ * hour / day boundary via `useVerboseRelativeTime` — no 1Hz polling.
  */
 const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const viewerZone = resolveViewerTimeZone();
@@ -108,87 +111,147 @@ const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const setMode = useTimeColumnModeStore((s) => s.setMode);
 
   return (
-    <VStack align="stretch" gap={2}>
-      <Text textStyle="md" fontWeight="semibold" color="fg">
-        {relative}
-      </Text>
-      <Row label="Local" value={local} />
-      <Row label="UTC" value={utc} />
-      <Row label="ISO" value={iso} mono />
-      <HStack
-        gap={2}
-        paddingTop={1}
+    <VStack align="stretch" gap={0}>
+      {/* ── 1. Relative time headline ─────────────────────────────── */}
+      <Box paddingX={3} paddingTop={3} paddingBottom={2.5}>
+        <Text
+          textStyle="lg"
+          fontWeight="semibold"
+          color="fg"
+          lineHeight="1.2"
+          letterSpacing="-0.015em"
+        >
+          {relative}
+        </Text>
+      </Box>
+
+      {/* ── 2. Label → value grid ─────────────────────────────────── */}
+      <VStack
+        align="stretch"
+        gap={0}
         borderTopWidth="1px"
         borderColor="border.subtle"
+        paddingX={3}
+        paddingY={2.5}
       >
-        <Text textStyle="2xs" color="fg.muted">
-          {dayOfWeek}
-        </Text>
+        <Row label="Local" value={local} />
+        <Row label="UTC" value={utc} />
+        <Row label="ISO" value={iso} mono />
+      </VStack>
+
+      {/* ── 3. Day-of-week + zone footer ──────────────────────────── */}
+      <HStack
+        gap={1.5}
+        paddingX={3}
+        paddingY={1.5}
+        borderTopWidth="1px"
+        borderColor="border.subtle"
+        bg="bg.subtle"
+      >
         {dayOfWeek && (
-          <Box width="1px" height="10px" bg="border.muted" aria-hidden="true" />
+          <Text textStyle="2xs" color="fg.subtle">
+            {dayOfWeek}
+          </Text>
+        )}
+        {dayOfWeek && (
+          <Box
+            width="1px"
+            height="9px"
+            bg="border.muted"
+            flexShrink={0}
+            aria-hidden="true"
+          />
         )}
         <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
           {viewerZone}
         </Text>
       </HStack>
-      {/* In-popover toggle for the column's display mode. The "Since"
-          column shows relative time ("4m"); the "Sum" column shows the
-          absolute timestamp ("Jun 4 18:32"). Audit feedback was that
-          users didn't realise this was a column choice — surfacing the
-          switch right under the timestamps they're looking at gives
-          them the click without having to dig into Columns settings.
-          Persisted to localStorage so the choice survives reloads. */}
-      <VStack
-        align="stretch"
-        gap={1}
-        paddingTop={2}
+
+      {/* ── 4. Column display-mode toggle ─────────────────────────── */}
+      {/* Surfacing the switch right under the timestamps saves a trip to
+          Columns settings. Persisted to localStorage so the choice
+          survives reloads. The subtle bg strip visually "grounds" the
+          toggle so it reads as a permanent control, not an afterthought. */}
+      <Box
+        paddingX={3}
+        paddingY={2.5}
         borderTopWidth="1px"
         borderColor="border.subtle"
       >
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          Column shows
-        </Text>
         <SegmentGroup.Root
           size="xs"
           value={mode}
           onValueChange={(e) =>
             setMode(e.value === "absolute" ? "absolute" : "relative")
           }
+          background="bg.subtle"
+          borderRadius="md"
+          padding="2px"
+          width="full"
+          css={{
+            "& [data-part='item']": {
+              borderRadius: "sm",
+              paddingY: "1",
+              paddingX: "2",
+              flex: 1,
+              justifyContent: "center",
+            },
+            "& [data-part='item-text']": {
+              fontSize: "2xs",
+            },
+            "& [data-part='indicator']": {
+              borderRadius: "sm",
+            },
+          }}
         >
           <SegmentGroup.Indicator />
           <SegmentGroup.Items
             items={[
-              { value: "relative", label: "Since (4m ago)" },
-              { value: "absolute", label: "Sum (Jun 4 18:32)" },
+              { value: "relative", label: "Relative (4m ago)" },
+              { value: "absolute", label: "Absolute (Jun 4)" },
             ]}
           />
         </SegmentGroup.Root>
-      </VStack>
+      </Box>
     </VStack>
   );
 };
 
+/**
+ * Single label→value row in the timestamp grid. The label sits in a
+ * fixed-width column so all values left-align cleanly — this is the key
+ * change from the old stacked-vertically style, which repeated the
+ * ALL-CAPS micro-label treatment three times in a row and made the block
+ * feel noisy. Horizontal alignment reads as a table, which is exactly
+ * what it is.
+ */
 const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({
   label,
   value,
   mono,
 }) => (
-  <VStack align="stretch" gap={0.5}>
+  <HStack
+    align="baseline"
+    gap={3}
+    paddingY={0.5}
+    _notLast={{ borderBottomWidth: "1px", borderColor: "border.subtle" }}
+  >
     <Text
       textStyle="2xs"
       color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="0.06em"
+      fontWeight="500"
+      width="32px"
+      flexShrink={0}
     >
       {label}
     </Text>
-    <Text textStyle="xs" color="fg" fontFamily={mono ? "mono" : undefined}>
+    <Text
+      textStyle="xs"
+      color="fg"
+      fontFamily={mono ? "mono" : undefined}
+      lineHeight="1.6"
+    >
       {value}
     </Text>
-  </VStack>
+  </HStack>
 );

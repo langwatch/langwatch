@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type React from "react";
+import { useMemo } from "react";
 
 interface SortableSectionProps {
   /** Sortable id — convention is the section's facet key. */
@@ -16,6 +17,12 @@ interface SortableSectionProps {
   children: (
     dragHandleProps: React.HTMLAttributes<HTMLDivElement>,
   ) => React.ReactNode;
+  /**
+   * True while any item in the list is being dragged. Used to make the
+   * dragged source row invisible (opacity:0) so the DragOverlay ghost is
+   * the only thing moving — avoids the "double section" effect.
+   */
+  isAnyDragging?: boolean;
 }
 
 /**
@@ -30,6 +37,7 @@ interface SortableSectionProps {
 export const SortableSection: React.FC<SortableSectionProps> = ({
   id,
   children,
+  isAnyDragging = false,
 }) => {
   const {
     attributes,
@@ -40,23 +48,40 @@ export const SortableSection: React.FC<SortableSectionProps> = ({
     isDragging,
   } = useSortable({ id });
 
-  const dragHandleProps = {
-    ...attributes,
-    ...(listeners ?? {}),
-  } as React.HTMLAttributes<HTMLDivElement>;
+  // Stabilise the drag-handle props reference: @dnd-kit returns fresh
+  // `attributes`/`listeners` objects on every render. Memoising by
+  // `isDragging` (the only state that changes their effective content)
+  // keeps the child render-prop receiving a stable reference, which lets
+  // React.memo on child components skip re-renders for non-moving rows.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dragHandleProps = useMemo(
+    () =>
+      ({
+        ...attributes,
+        ...(listeners ?? {}),
+      }) as React.HTMLAttributes<HTMLDivElement>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDragging],
+  );
 
   return (
     <Box
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        // CSS.Translate skips scale — we only need positional offset during
+        // drag, which avoids the layout jank a full Transform can produce.
+        // willChange is set only while this node is actually being moved so
+        // we don't burn GPU layers for every item in the list.
+        transform: CSS.Translate.toString(transform),
         transition,
+        willChange: isDragging ? "transform" : undefined,
+        contain: "layout paint",
       }}
       position="relative"
-      opacity={isDragging ? 0.6 : 1}
-      // Raise above siblings so the dragged section paints over its
-      // neighbours during the gesture. The same trick FacetGroupHeader
-      // used.
+      // Make the source row fully invisible while a DragOverlay ghost is
+      // rendering it — without this users see both the dragging ghost AND
+      // the original row at 0.6 opacity.
+      opacity={isDragging && isAnyDragging ? 0 : 1}
       zIndex={isDragging ? 1 : undefined}
     >
       {children(dragHandleProps)}

@@ -101,6 +101,15 @@ interface OnboardingState {
    * is true and this is null, the overlay starts from the first entry.
    */
   currentSpotlightId: string | null;
+  /**
+   * Per-project flag: has the spotlight tour been auto-started for
+   * this project's first real trace yet? Flipped to true the moment
+   * `hasAnyTraces` transitions false → true so the user gets a
+   * contextual tour of their freshly-arrived data. Persisted so a
+   * page refresh during the tour doesn't replay it from the top, and
+   * so dismissing it stays dismissed.
+   */
+  firstTraceSpotlightFiredByProject: Record<string, boolean>;
 
   setStage: (stage: StageId) => void;
   goBack: () => void;
@@ -120,6 +129,14 @@ interface OnboardingState {
   setShowSamplePreview: (show: boolean) => void;
   setSpotlightsActive: (active: boolean) => void;
   setCurrentSpotlightId: (id: string | null) => void;
+  /**
+   * One-shot per-project: call when `hasAnyTraces` transitions
+   * false → true so we can auto-start the spotlight tour on the
+   * user's first real trace. Idempotent — re-calling is safe; the
+   * consumer should still gate on the current map state to avoid
+   * re-triggering the overlay every render.
+   */
+  markFirstTraceSpotlightFired: (projectId: string) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:onboarding:state:v1";
@@ -135,11 +152,13 @@ const LEGACY_UI_STORE_KEY = "langwatch:traces-v2:ui";
 interface PersistedShape {
   setupDismissedByProject: Record<string, boolean>;
   integrationCtaDismissedAtByProject: Record<string, number>;
+  firstTraceSpotlightFiredByProject: Record<string, boolean>;
 }
 
 const DEFAULT_PERSISTED: PersistedShape = {
   setupDismissedByProject: {},
   integrationCtaDismissedAtByProject: {},
+  firstTraceSpotlightFiredByProject: {},
 };
 
 function loadPersisted(): PersistedShape {
@@ -160,6 +179,11 @@ function loadPersisted(): PersistedShape {
             typeof parsed.integrationCtaDismissedAtByProject === "object"
               ? parsed.integrationCtaDismissedAtByProject
               : {},
+          firstTraceSpotlightFiredByProject:
+            parsed.firstTraceSpotlightFiredByProject &&
+            typeof parsed.firstTraceSpotlightFiredByProject === "object"
+              ? parsed.firstTraceSpotlightFiredByProject
+              : {},
         };
       }
     }
@@ -177,6 +201,7 @@ function loadPersisted(): PersistedShape {
         return {
           setupDismissedByProject: parsed.setupDismissedByProject,
           integrationCtaDismissedAtByProject: {},
+          firstTraceSpotlightFiredByProject: {},
         };
       }
     }
@@ -186,12 +211,20 @@ function loadPersisted(): PersistedShape {
   return DEFAULT_PERSISTED;
 }
 
-function persist({ setupDismissedByProject, integrationCtaDismissedAtByProject }: PersistedShape): void {
+function persist({
+  setupDismissedByProject,
+  integrationCtaDismissedAtByProject,
+  firstTraceSpotlightFiredByProject,
+}: PersistedShape): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ setupDismissedByProject, integrationCtaDismissedAtByProject }),
+      JSON.stringify({
+        setupDismissedByProject,
+        integrationCtaDismissedAtByProject,
+        firstTraceSpotlightFiredByProject,
+      }),
     );
   } catch {
     // storage may be full / disabled
@@ -213,6 +246,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   showSamplePreview: false,
   spotlightsActive: false,
   currentSpotlightId: null,
+  firstTraceSpotlightFiredByProject:
+    initial.firstTraceSpotlightFiredByProject,
 
   setStage: (stage) =>
     set((s) =>
@@ -264,6 +299,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       setupDismissedByProject: next,
       integrationCtaDismissedAtByProject:
         get().integrationCtaDismissedAtByProject,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
     });
   },
 
@@ -274,20 +311,43 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setIntegrationCtaDismissedAt: (projectId, ts) => {
     const next = { ...get().integrationCtaDismissedAtByProject, [projectId]: ts };
     set({ integrationCtaDismissedAtByProject: next });
-    persist({ setupDismissedByProject: get().setupDismissedByProject, integrationCtaDismissedAtByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject: next,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+    });
   },
 
   clearIntegrationCtaDismissed: (projectId) => {
     const next = { ...get().integrationCtaDismissedAtByProject };
     delete next[projectId];
     set({ integrationCtaDismissedAtByProject: next });
-    persist({ setupDismissedByProject: get().setupDismissedByProject, integrationCtaDismissedAtByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject: next,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+    });
   },
 
   setShowSamplePreview: (show) => set({ showSamplePreview: show }),
 
   setSpotlightsActive: (active) => set({ spotlightsActive: active }),
   setCurrentSpotlightId: (id) => set({ currentSpotlightId: id }),
+
+  markFirstTraceSpotlightFired: (projectId) => {
+    const current = get().firstTraceSpotlightFiredByProject;
+    if (current[projectId]) return;
+    const next = { ...current, [projectId]: true };
+    set({ firstTraceSpotlightFiredByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject:
+        get().integrationCtaDismissedAtByProject,
+      firstTraceSpotlightFiredByProject: next,
+    });
+  },
 }));
 
 // ---------------------------------------------------------------------------

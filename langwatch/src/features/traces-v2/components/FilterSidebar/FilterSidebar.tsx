@@ -302,6 +302,11 @@ export const FilterSidebar: React.FC = () => {
           the top of the trace table, so the two bars sit on the same
           horizontal grid across the page. Border-bottom delineates the
           bar from the scrolling section list. */}
+      {/* Header bar: the hide-sidebar toggle anchors on the LEFT so its
+          horizontal position is rock-stable across renders — count of
+          right-side affordances can change (Configure popover may grow,
+          expand-all toggle, etc.) without the close button drifting.
+          Other actions cluster on the right. */}
       <HStack
         flexShrink={0}
         minHeight="36px"
@@ -311,41 +316,8 @@ export const FilterSidebar: React.FC = () => {
         bg={{ base: "bg.subtle", _dark: "bg.surface" }}
         gap={1}
         align="center"
-        justify="flex-end"
+        justify="space-between"
       >
-        <FacetManagerPopover
-          orderedKeysAll={orderedKeysAll}
-          sectionByKey={sectionByKey}
-          isVisible={isSectionVisibleForDensity}
-          onShow={showFacet}
-          onHide={hideFacet}
-          onResetAll={resetAllFacets}
-          open={facetManagerOpen}
-          onOpenChange={setFacetManagerOpen}
-          triggerLabel="Configure"
-        />
-        <Tooltip
-          positioning={{ placement: "bottom" }}
-          content={
-            allExpanded ? "Collapse all sections" : "Expand all sections"
-          }
-        >
-          <IconButton
-            aria-label={
-              allExpanded ? "Collapse all sections" : "Expand all sections"
-            }
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            onClick={handleToggleAll}
-          >
-            {allExpanded ? (
-              <ChevronsDownUp size={14} />
-            ) : (
-              <ChevronsUpDown size={14} />
-            )}
-          </IconButton>
-        </Tooltip>
         <Tooltip
           positioning={{ placement: "bottom" }}
           content={
@@ -365,6 +337,41 @@ export const FilterSidebar: React.FC = () => {
             <PanelLeftClose size={14} />
           </IconButton>
         </Tooltip>
+        <HStack gap={1} align="center">
+          <FacetManagerPopover
+            orderedKeysAll={orderedKeysAll}
+            sectionByKey={sectionByKey}
+            isVisible={isSectionVisibleForDensity}
+            onShow={showFacet}
+            onHide={hideFacet}
+            onResetAll={resetAllFacets}
+            open={facetManagerOpen}
+            onOpenChange={setFacetManagerOpen}
+            triggerLabel="Configure"
+          />
+          <Tooltip
+            positioning={{ placement: "bottom" }}
+            content={
+              allExpanded ? "Collapse all sections" : "Expand all sections"
+            }
+          >
+            <IconButton
+              aria-label={
+                allExpanded ? "Collapse all sections" : "Expand all sections"
+              }
+              size="2xs"
+              variant="ghost"
+              color="fg.subtle"
+              onClick={handleToggleAll}
+            >
+              {allExpanded ? (
+                <ChevronsDownUp size={14} />
+              ) : (
+                <ChevronsUpDown size={14} />
+              )}
+            </IconButton>
+          </Tooltip>
+        </HStack>
       </HStack>
       <div
         ref={scrollAreaRef}

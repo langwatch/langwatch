@@ -48,6 +48,16 @@ interface AskAiButtonProps {
    * not entirely missing, so the feature stays discoverable.
    */
   needsProviderPrimer?: boolean;
+  /**
+   * When set, the button is fully gated: click is a no-op and the
+   * tooltip surfaces this reason instead of the usual "tell us what
+   * you want" copy. Used by sample-preview mode — Ask AI hits the
+   * real LLM and our sample fixtures don't exist server-side, so a
+   * click would either error or invent answers. Keeping the button
+   * visible (just dimmed) preserves the affordance so the user
+   * knows it'll be available on their real data.
+   */
+  disabledReason?: string;
 }
 
 /**
@@ -63,14 +73,22 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   ariaLabel = "Enter AI mode",
   showLabel = true,
   needsProviderPrimer = false,
+  disabledReason,
 }) => {
   const reduceMotion = useReducedMotion();
+  const isGated = needsProviderPrimer || !!disabledReason;
   const button = (
     <Button
       aria-label={ariaLabel}
+      aria-disabled={disabledReason ? "true" : undefined}
+      // Spotlight anchor used by the trace-explorer tour — the search
+      // callout points here rather than the whole search bar so the
+      // floating popover orbits a small, named target instead of the
+      // entire input row. See `TRACE_EXPLORER_SPOTLIGHTS[0]`.
+      data-spotlight="ask-ai-chip"
       size="2xs"
       flexShrink={0}
-      onClick={needsProviderPrimer ? undefined : onClick}
+      onClick={isGated ? undefined : onClick}
       color="white"
       fontWeight="600"
       position="relative"
@@ -78,18 +96,23 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       bg="transparent"
       boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
       _dark={{ boxShadow: "0 1px 4px rgba(168,85,247,0.18)" }}
-      // Live "AI breathing" halo — only when motion is allowed. The
-      // reduced-motion variant keeps the static shadow above so the
-      // button still reads as a brand surface without the pulse.
+      // Live "AI breathing" halo — only when motion is allowed. Skipped
+      // when fully gated by `disabledReason` (sample mode) — a pulsing
+      // halo on an inert button reads as broken animation. Provider-
+      // primer mode still pulses so the affordance pulls the eye to
+      // "set me up to use AI."
       animation={
-        reduceMotion ? undefined : `${aiGlowPulse} 6s ease-in-out infinite`
+        reduceMotion || disabledReason
+          ? undefined
+          : `${aiGlowPulse} 6s ease-in-out infinite`
       }
-      _hover={{ filter: "brightness(1.08)" }}
+      _hover={isGated ? undefined : { filter: "brightness(1.08)" }}
+      cursor={disabledReason ? "not-allowed" : undefined}
       // The popover trigger handles activation via aria-expanded — disabling
       // the button would block the popover from opening on click. Instead
       // we lower the visual gain so it reads as gated.
-      opacity={needsProviderPrimer ? 0.7 : 1}
-      filter={needsProviderPrimer ? "saturate(0.7)" : undefined}
+      opacity={isGated ? 0.7 : 1}
+      filter={isGated ? "saturate(0.7)" : undefined}
     >
       <Box
         position="absolute"
@@ -115,6 +138,14 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       </HStack>
     </Button>
   );
+
+  if (disabledReason) {
+    return (
+      <Tooltip content={<Text>{disabledReason}</Text>} openDelay={150}>
+        {button}
+      </Tooltip>
+    );
+  }
 
   if (needsProviderPrimer) {
     return <ProviderPrimerPopover trigger={button} />;

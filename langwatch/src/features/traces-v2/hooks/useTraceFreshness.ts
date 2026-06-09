@@ -4,7 +4,9 @@ import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
+import { useRowPulseStore } from "../stores/rowPulseStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useVisibleTraceIds } from "./useVisibleTraceIds";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list
 // (~1.2s vs ~0.1s in our perf capture) and they only change when a *new*
@@ -17,7 +19,12 @@ const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
  * Coordinator hook that bridges SSE trace events into TanStack Query
  * cache invalidation. Mounted once in TracesPage.
  *
- * On trace_summary_updated: invalidates list, facets, newCount.
+ * On trace_summary_updated:
+ *   - Visible rows: pulse in-place via rowPulseStore; no list invalidation.
+ *   - New trace on page 1: cancel + invalidate list.
+ *   - Off-screen / wrong page: cancel + invalidate newCount only.
+ *   - In all cases: invalidate newCount so the pill stays accurate.
+ *
  * If the drawer is open for an affected trace, also invalidates
  * header, spanSummary, and evals.
  *
@@ -35,6 +42,8 @@ export function useTraceFreshness() {
   const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const pulse = useRowPulseStore((s) => s.pulse);
+  const visibleTraceIds = useVisibleTraceIds();
 
   useEffect(() => {
     return () => {
@@ -48,43 +57,60 @@ export function useTraceFreshness() {
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
-      // The refresh pulse (top-of-page aurora) used to fire on every
-      // SSE trace_summary_updated event in "live" mode. For high-
-      // throughput projects that's a constant flash — users called it
-      // out as visual noise that didn't seem to correspond to anything
-      // appearing in the table. We now keep the pulse for two cases
-      // only:
-      //
-      //   1. User-initiated refresh — handled implicitly via
-      //      `useTraceListRefresh.refresh()` and lens/tab/refresh
-      //      switches that flip TanStack's `isFetching`.
-      //   2. An incoming trace that's about to land in the visible
-      //      window — handled in `useTraceNewCount` (it watches the
-      //      newCount response and pulses when count rises above zero
-      //      in live mode, just before the list refetch lands the new
-      //      rows under the user's cursor).
-      //
-      // The bare SSE event no longer fires the pulse. The (N new) pill
-      // remains the per-event surface — it stays accurate because we
-      // still invalidate `newCount` below.
-
-      // Refresh the new-count query in BOTH live and ask modes so the
-      // floating "(N new)" pill stays in sync. In `ask` we deliberately
-      // skip the list refetch so the table doesn't jump under the
-      // cursor — the operator clicks the pill to commit the merge,
-      // which calls `acknowledge()` and pulls the new rows.
+      // newCount is always kept current so the "(N new)" pill stays in
+      // sync across all modes (live, ask, paused). Cancel before
+      // invalidate so in-flight stale responses don't race a fresh one.
+      void trpcUtils.tracesV2.newCount.cancel();
       void trpcUtils.tracesV2.newCount.invalidate();
-      if (mode === "live") {
+
+      // Partition incoming trace IDs into three buckets:
+      //   1. visible  — already rendered in the current page → pulse only
+      //   2. new      — not visible AND page === 1 → need a list refresh
+      //   3. off-screen — not visible AND page > 1  → drop (pagination
+      //                   will fetch fresh data when the user navigates)
+      const { ids: visibleIds, page } = visibleTraceIds;
+
+      let hasNewTrace = false;
+      for (const traceId of traceIds) {
+        if (visibleIds.has(traceId)) {
+          // In-place update — animate the row, skip network round-trip.
+          // The pulse fires in every mode (live / ask / paused): `ask`
+          // gates *new trace prepends*, not updates to rows the user is
+          // already looking at. Suppressing the pulse in ask mode would
+          // mean a row visibly changes its underlying data without any
+          // signal — worse UX than the pulse itself.
+          pulse(traceId);
+        } else if (page === 1) {
+          // New trace that belongs on page 1 (highest priority view).
+          hasNewTrace = true;
+        }
+        // Off-screen updates (page > 1) are silently dropped — the
+        // user isn't looking at those rows, and paginating will fetch
+        // the freshest data when they arrive.
+      }
+
+      if (mode === "live" && hasNewTrace) {
+        // Only `live` mode auto-merges new traces. `ask` mode keeps the
+        // pill count fresh (via newCount above) but waits for the user
+        // to opt in by clicking it. Cancel any in-flight list fetch
+        // before kicking a new one so a slow previous round-trip can't
+        // race the fresh one and overwrite the view with stale data.
+        void trpcUtils.tracesV2.list.cancel();
         void trpcUtils.tracesV2.list.invalidate();
       }
-      // Discover (facets) is heavy. Coalesce into a 30s window so a steady
-      // trace stream doesn't keep it permanently refetching. Skipped in
-      // `ask` mode for the same reason — wait for the user to ask.
-      if (mode === "live" && !discoverInvalidateTimer.current) {
-        discoverInvalidateTimer.current = setTimeout(() => {
-          discoverInvalidateTimer.current = null;
-          void trpcUtils.tracesV2.discover.invalidate();
-        }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
+
+      if (mode === "live") {
+        // Discover (facets) is heavy. Coalesce into a 30s window so a
+        // steady trace stream doesn't keep it permanently refetching.
+        // `ask` / `paused` modes skip discover entirely — the user
+        // explicitly opted out of background churn.
+        if (!discoverInvalidateTimer.current) {
+          discoverInvalidateTimer.current = setTimeout(() => {
+            discoverInvalidateTimer.current = null;
+            void trpcUtils.tracesV2.discover.cancel();
+            void trpcUtils.tracesV2.discover.invalidate();
+          }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
+        }
       }
 
       // Reset adaptive polling to fast interval
@@ -113,7 +139,7 @@ export function useTraceFreshness() {
         });
       }
     },
-    [trpcUtils, requestFastPoll, project?.id],
+    [trpcUtils, requestFastPoll, project?.id, visibleTraceIds, pulse],
   );
 
   const onSpanStored = useCallback(

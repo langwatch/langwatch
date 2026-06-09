@@ -100,12 +100,18 @@ const EDITOR_PATHS: EditorPath[] = [
 ];
 
 function glassCard(): Record<string, unknown> {
+  // No `backdropFilter` here: these cards sit on the same surface as
+  // their parent (the integration content area is `bg.surface`, the
+  // cards are `bg.panel` over it — same colour family). A backdrop
+  // blur over identical content is invisible work, and these cards
+  // render N-per-grid, so the blur cost multiplies for no visual gain.
+  // Brand blur stays where it actually has something to filter
+  // through — drawers, dialogs, the top toolbar.
   return {
     borderRadius: "xl",
     border: "1px solid",
     borderColor: "border.subtle",
     bg: "bg.panel/70",
-    backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: "sm",
     transition: "all 0.17s ease",
     _hover: {
@@ -201,32 +207,38 @@ function SkillRow({
         >
           {skill.label}
         </Text>
-        <HStack
-          asChild
-          gap={1}
-          align="center"
-          flexShrink={0}
-          color="orange.fg"
-          cursor="pointer"
-          _hover={{ opacity: 0.7 }}
-          transition="opacity 0.15s ease"
+        <Tooltip
+          content={`Click to copy ${skill.slashCommand}`}
+          positioning={{ placement: "top" }}
+          showArrow
+          openDelay={300}
         >
-          <button
-            type="button"
-            aria-label={`Copy ${skill.slashCommand}`}
-            onClick={() => {
-              void copyToClipboard({
-                text: skill.slashCommand,
-                successMessage: `${skill.slashCommand} copied to clipboard`,
-              });
-            }}
+          <HStack
+            asChild
+            gap={1}
+            align="center"
+            flexShrink={0}
+            color="orange.fg"
+            cursor="pointer"
+            _hover={{ opacity: 0.7 }}
+            transition="opacity 0.15s ease"
           >
-            <Text fontSize="xs" fontFamily="mono" fontWeight="semibold">
-              {skill.slashCommand}
-            </Text>
-            <Clipboard size={10} />
-          </button>
-        </HStack>
+            <button
+              type="button"
+              aria-label={`Copy ${skill.slashCommand}`}
+              onClick={() => {
+                void copyToClipboard({
+                  text: skill.slashCommand,
+                  successMessage: `${skill.slashCommand} copied to clipboard`,
+                });
+              }}
+            >
+              <Text fontSize="xs" fontFamily="mono" fontWeight="semibold">
+                {skill.slashCommand}
+              </Text>
+            </button>
+          </HStack>
+        </Tooltip>
       </HStack>
       <Tooltip
         content="Click to copy the install command"
@@ -395,7 +407,6 @@ function McpTab({
         border="1px solid"
         borderColor="border.subtle"
         bg="bg.panel/70"
-        backdropFilter="blur(20px) saturate(1.3)"
         boxShadow="xs"
         transition="all 0.17s ease"
         _hover={{
@@ -555,7 +566,6 @@ export function ViaClaudeCodeScreen({
           border="1px solid"
           borderColor="border.subtle"
           bg="bg.panel/70"
-          backdropFilter="blur(20px) saturate(1.3)"
           boxShadow="sm"
         >
           <TabButton

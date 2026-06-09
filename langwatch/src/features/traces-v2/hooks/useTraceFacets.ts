@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sampleDescriptors";
+import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
 import { useFilterStore } from "../stores/filterStore";
 import {
   type DiscoverDescriptors,
@@ -18,6 +20,14 @@ export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const trpcUtils = api.useContext();
+  // Sample-preview rows are a client-side fixture with no ClickHouse
+  // footprint, so the real `discover` query returns nothing useful.
+  // Hand the sidebar a hardcoded descriptor set derived from the
+  // fixtures themselves so users get real facets to play with on
+  // first visit. The shape matches the live discover output so the
+  // rest of `useFilterSidebarData` is identical regardless of source.
+  const isSamplePreview = usePreviewTracesActive();
 
   // Backoff counter for the cold-miss polling fallback below. Ref because
   // refetchInterval is read by React Query's scheduler outside React's
@@ -153,6 +163,10 @@ export function useTraceFacets() {
   const isLoading = haveUsableData
     ? false
     : query.isLoading || isFromOtherProject || result.pending;
+
+  if (isSamplePreview) {
+    return { data: SAMPLE_DISCOVER_DESCRIPTORS, isLoading: false };
+  }
 
   return {
     data: result.facets,

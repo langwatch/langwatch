@@ -1,6 +1,6 @@
 import { Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { AttributeKeyRow } from "./AttributeKeyRow";
 import { SEARCHABLE_VALUE_THRESHOLD } from "./constants";
 import { SidebarSection } from "./SidebarSection";
@@ -31,7 +31,7 @@ interface AttributesSectionProps {
   onHide?: () => void;
 }
 
-export const AttributesSection: React.FC<AttributesSectionProps> = ({
+const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
   title,
   keys,
   icon,
@@ -93,3 +93,5 @@ export const AttributesSection: React.FC<AttributesSectionProps> = ({
     </SidebarSection>
   );
 };
+
+export const AttributesSection = memo(AttributesSectionInner);

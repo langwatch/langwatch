@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import {
@@ -34,6 +34,12 @@ interface FacetSectionProps {
   orPeers?: readonly string[];
   orMemberValues?: ReadonlySet<string>;
   /**
+   * True when this section was synthesised before traces arrive. When
+   * `items.length === 0` and this is set, renders a "No values yet"
+   * placeholder instead of an empty section.
+   */
+  synthetic?: boolean;
+  /**
    * Optional per-row extras renderer. Invoked for any row whose value
    * is currently active (i.e. surfaced via `pinnedContent`). The
    * returned node is rendered immediately below the active row so the
@@ -43,9 +49,24 @@ interface FacetSectionProps {
    * server query. Returns `null` to skip extras for a given item.
    */
   renderActiveRowExtras?: (item: FacetItem) => React.ReactNode;
+  /**
+   * Optional extras renderer for INACTIVE rows. Invoked for each
+   * inactive item in the visible window. Receives the item, whether
+   * this row is currently expanded, and a callback to toggle the
+   * expansion. Returns `null` to skip extras for that item.
+   *
+   * FacetSection owns the `expandedInactiveRows` Set so the state is
+   * automatically reset whenever the section unmounts or the sidebar
+   * is closed — no external persistence needed.
+   */
+  renderInactiveRowExtras?: (
+    item: FacetItem,
+    isExpanded: boolean,
+    onToggleExpand: () => void,
+  ) => React.ReactNode;
 }
 
-export const FacetSection: React.FC<FacetSectionProps> = ({
+const FacetSectionInner: React.FC<FacetSectionProps> = ({
   title,
   icon,
   field,
@@ -60,7 +81,23 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   orPeers,
   orMemberValues,
   renderActiveRowExtras,
+  renderInactiveRowExtras,
+  synthetic,
 }) => {
+  const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleInactiveExpand = useCallback((value: string) => {
+    setExpandedInactiveRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return next;
+    });
+  }, []);
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
@@ -211,17 +248,40 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       }
     >
       <VStack gap={0.5} align="stretch">
-        {facetWindow.visible.map((item) => (
-          <FacetRow
-            key={item.value}
-            item={item}
-            state={getValueState(item.value)}
-            maxCount={maxCount}
-            onToggle={handleToggle}
-            orGroupId={orMemberValues?.has(item.value) ? orGroupId : undefined}
-            field={field}
-          />
-        ))}
+        {/* Placeholder row for sections that exist but have no values yet
+            (synthetic state — project has no traces, or discover is loading). */}
+        {items.length === 0 && synthetic && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            paddingX={1}
+            paddingY={1}
+          >
+            No values yet
+          </Text>
+        )}
+        {facetWindow.visible.map((item) => {
+          const inactiveExtras = renderInactiveRowExtras?.(
+            item,
+            expandedInactiveRows.has(item.value),
+            () => toggleInactiveExpand(item.value),
+          );
+          return (
+            <Box key={item.value}>
+              <FacetRow
+                item={item}
+                state={getValueState(item.value)}
+                maxCount={maxCount}
+                onToggle={handleToggle}
+                orGroupId={
+                  orMemberValues?.has(item.value) ? orGroupId : undefined
+                }
+                field={field}
+              />
+              {inactiveExtras}
+            </Box>
+          );
+        })}
 
         {noneRow && !searchQuery && (
           <NoneFacetRow active={noneRow.active} onToggle={noneRow.onToggle} />
@@ -307,6 +367,8 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
     </SidebarSection>
   );
 };
+
+export const FacetSection = memo(FacetSectionInner);
 
 function filterAndSortItems({
   items,

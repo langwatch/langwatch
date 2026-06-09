@@ -8,6 +8,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import {
   abbreviateModel,
   formatCost,
@@ -61,6 +62,10 @@ export function TreeRow({
   onHoverEnd: () => void;
 }) {
   const { span, depth } = node;
+  // Subscribe just to *this* row's pulse state — the selector returns a
+  // boolean so only the row whose pulse flips actually re-renders, the
+  // rest of the virtualized list stays untouched.
+  const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
   const isError = span.status === "error";
   const color =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
@@ -137,7 +142,37 @@ export function TreeRow({
 
   return (
     <Tooltip content={tooltipContent} positioning={{ placement: "right" }}>
-      <Box>
+      <Box position="relative">
+        {/* Pulse layer: a one-shot orange wash that fades over 1.2s when
+            a new span arrives via SSE. Sits absolutely above the row's
+            existing background so selection / hover state continues to
+            show through underneath as the pulse fades out. Pointer
+            events off so the click target on the row stays the row. */}
+        {isPulsing && (
+          <Box
+            position="absolute"
+            inset={0}
+            pointerEvents="none"
+            zIndex={1}
+            css={{
+              animation: "lw-span-pulse 1.2s ease-out forwards",
+              "@keyframes lw-span-pulse": {
+                "0%": {
+                  backgroundColor: "var(--chakra-colors-orange-subtle)",
+                  boxShadow: "inset 2px 0 0 var(--chakra-colors-orange-solid)",
+                },
+                "100%": {
+                  backgroundColor: "transparent",
+                  boxShadow: "inset 2px 0 0 transparent",
+                },
+              },
+              "@media (prefers-reduced-motion: reduce)": {
+                animation: "none",
+                backgroundColor: "transparent",
+              },
+            }}
+          />
+        )}
         <HStack
           height={`${rowH}px`}
           gap={0}

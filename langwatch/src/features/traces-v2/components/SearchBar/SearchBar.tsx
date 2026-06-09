@@ -10,6 +10,7 @@ import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
@@ -113,6 +114,17 @@ export const SearchBar: React.FC = () => {
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
   const askAiNeedsProviderPrimer = !isLoadingProviders && !hasEnabledProviders;
+  // Ask AI hits a real LLM against the user's real traces. In sample
+  // mode the rows are hardcoded client-side fixtures with no server
+  // footprint, so any AI query would either error or hallucinate.
+  // Surface the button as gated with a one-line tooltip so the user
+  // knows the affordance is real, just unavailable here. The ⌘I /
+  // ⌘+⏎ shortcuts also bail in this mode so we don't dump them into
+  // a composer they can't submit from.
+  const isSamplePreview = usePreviewTracesActive();
+  const askAiSampleDisabledReason = isSamplePreview
+    ? "Ask AI works on your real traces — not on the sample data."
+    : undefined;
 
   // Defer TipTap mount until the user actually focuses the search bar — the
   // ProseMirror init reflow used to dominate LCP.
@@ -219,8 +231,9 @@ export const SearchBar: React.FC = () => {
   // the gradient activation feels identical from key or click.
   const handleAiShortcut = useCallback(() => {
     if (askAiNeedsProviderPrimer) return;
+    if (isSamplePreview) return;
     setAiMode(true);
-  }, [askAiNeedsProviderPrimer]);
+  }, [askAiNeedsProviderPrimer, isSamplePreview]);
   useGlobalAiShortcut(handleAiShortcut);
 
   // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text into AI
@@ -230,13 +243,14 @@ export const SearchBar: React.FC = () => {
   const handleEditorAiShortcut = useCallback(
     (currentText: string) => {
       if (askAiNeedsProviderPrimer) return;
+      if (isSamplePreview) return;
       const trimmed = currentText.trim();
       // Empty input still opens the composer (parity with the button),
       // it just doesn't auto-submit a blank prompt.
       setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
       setAiMode(true);
     },
-    [askAiNeedsProviderPrimer],
+    [askAiNeedsProviderPrimer, isSamplePreview],
   );
 
   const handleAiBarClose = useCallback(() => {
@@ -345,6 +359,7 @@ export const SearchBar: React.FC = () => {
             <AskAiButton
               onClick={() => setAiMode(true)}
               needsProviderPrimer={askAiNeedsProviderPrimer}
+              disabledReason={askAiSampleDisabledReason}
             />
             <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
               <Search />

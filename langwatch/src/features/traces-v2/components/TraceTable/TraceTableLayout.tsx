@@ -1,4 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
+import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
@@ -20,12 +21,19 @@ interface TraceTableLayoutProps {
    * matches the eventual layout exactly.
    */
   isLoading?: boolean;
+  /**
+   * True when the lens body has no rows (data is empty or skeleton is
+   * filling the slot). Used to crossfade between the data and empty
+   * states without remounting per-row aurora animations.
+   */
+  isEmpty?: boolean;
 }
 
 export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   totalHits,
   children,
   isLoading = false,
+  isEmpty = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const ownedElRef = useRef<HTMLDivElement | null>(null);
@@ -64,10 +72,19 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
         ref={setRef}
         flex={1}
         overflow="auto"
-        opacity={isReplacingData ? 0.55 : 1}
+        opacity={isReplacingData ? 0.6 : 1}
         transition="opacity 150ms ease-out"
+        pointerEvents={isReplacingData ? "none" : "auto"}
+        aria-busy={isReplacingData ? true : undefined}
       >
-        {children}
+        <motion.div
+          key={isEmpty ? "empty" : "data"}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: "easeInOut" }}
+        >
+          {children}
+        </motion.div>
       </Box>
       <RefreshProgressBar />
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />

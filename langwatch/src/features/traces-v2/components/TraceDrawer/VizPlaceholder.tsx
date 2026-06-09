@@ -50,7 +50,6 @@ import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { FlameView } from "./flameView/FlameView";
-import { NewSpanFlash } from "./NewSpanFlash";
 import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
 import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
 import { WaterfallView } from "./waterfallView";
@@ -597,10 +596,6 @@ export function VizPlaceholder({
             position="relative"
             style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
-            <NewSpanFlash
-              spanCount={spans.length}
-              resetKey={trace?.traceId ?? null}
-            />
             {isLoading && spans.length === 0 ? (
               <VizSkeleton vizTab={vizTab} />
             ) : spans.length === 0 ? (

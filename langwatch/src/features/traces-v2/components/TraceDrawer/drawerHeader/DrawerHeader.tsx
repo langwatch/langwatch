@@ -1253,6 +1253,16 @@ export const DrawerHeader = memo(function DrawerHeader({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           hasConversation={!!trace.conversationId}
+          // `useConversationContext` returns `isLoading: true` while the
+          // turns are in flight; combined with `turns.length === 0` it
+          // means the conversation hasn't resolved yet. We only want the
+          // "loading" gate when a conversationId is declared — otherwise
+          // the tab is permanently disabled with a different reason.
+          conversationLoading={
+            !!trace.conversationId &&
+            conversationContext.isLoading &&
+            conversationContext.turns.length === 0
+          }
           traceId={trace.traceId}
           endSlot={
             <HStack gap={2}>

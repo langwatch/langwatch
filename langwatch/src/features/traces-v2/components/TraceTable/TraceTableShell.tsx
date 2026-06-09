@@ -107,6 +107,13 @@ export function TraceTableShell<T>({
   return (
     <TableEl
       width="full"
+      // Anchor the table's underlying surface so alpha-blended row tints
+      // (red.fg/8, yellow.fg/8) composite over a known base. Without
+      // this, transparent body cells inherit from whichever ancestor
+      // paints next (page bg, drawer bg) and the sticky-first-cell
+      // color-mix below ends up mixing against a different base than
+      // the body cells — the row reads as two horizontal bands.
+      bg="bg.surface"
       css={{
         // `separate` + `border-spacing: 0` keeps the visual look of a
         // single-pixel grid (no gaps between cells) while letting each
@@ -166,19 +173,19 @@ export function TraceTableShell<T>({
             // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
             // as part of the same red surface the rest of the row paints.
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-panel))",
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='warning'] > tr > td:first-child": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-panel))",
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='error']:hover > tr > td:first-child": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-panel))",
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='warning']:hover > tr > td:first-child": {
             backgroundColor:
-              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-panel))",
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-surface))",
           },
         }),
       }}
@@ -487,7 +494,16 @@ function HeaderCell<T>({
           </Icon>
         </Box>
       )}
-      <Box flex={1} minWidth={0}>
+      {/* Reserve room for the (hover-revealed) drag grip on reorderable
+          columns so the first character of the label never sits under
+          the grip. The previous "label owns full width, grip overlays"
+          rule clipped letters like the "D" of "DURATION" the instant
+          the user hovered. Trade-off: the label starts ~16px from the
+          left edge always, even when the grip is invisible — minor
+          indent for guaranteed legibility, no hover-shift jitter, and
+          ellipsis still handles the right side cleanly on narrow
+          columns. */}
+      <Box flex={1} minWidth={0} paddingLeft={reorderable ? "16px" : 0}>
         {canSort ? (
           <SortableHeaderButton
             align={align}
