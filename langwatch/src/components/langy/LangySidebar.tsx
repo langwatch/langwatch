@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Circle,
+  Flex,
   HStack,
   IconButton,
   Separator,
@@ -25,7 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
@@ -39,6 +40,16 @@ import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/use
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { api } from "~/utils/api";
+import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { isLangyManagedVk } from "~/components/gateway/langyVk";
+
+// The same feature key Langy's chat route resolves against. Used to seed the
+// composer's model picker with whatever's actually resolving today — opening
+// Langy on a project that already has a configured default model lands on
+// THAT model, not on an unrelated branch-primary pick.
+const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 import {
   useLangyConversations,
   type LangyConversationSummary,
@@ -403,10 +414,16 @@ function LangyPanel({
   proposalHandlers?: ProposalHandlers;
   experimentSlug?: string;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
+  const organizationId = organization?.id;
 
   const [input, setInput] = useState("");
+  // Per-session model override for the next send. Empty string = "use whatever
+  // the project DEFAULT resolves to" — i.e. don't pass modelOverride. The
+  // composer's picker writes here, and `send()` reads + forwards it as the
+  // body's `modelOverride` field for the chat route to honor.
+  const [modelOverride, setModelOverride] = useState<string>("");
   const [appliedOutcomes, setAppliedOutcomes] = useState<
     Record<string, { href?: string; label?: string; onOpen?: () => void }>
   >({});
@@ -422,6 +439,74 @@ function LangyPanel({
     () => new DefaultChatTransport({ api: "/api/langy/chat" }),
     [],
   );
+
+  // Seed the picker with the model the gate currently resolves to. Once the
+  // user picks something different, we don't overwrite — they're explicitly
+  // choosing per-session. Only seed on first valid response.
+  const resolvedDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: LANGY_GATE_FEATURE_KEY },
+    { enabled: !!projectId },
+  );
+
+  // The project's Langy VK carries an optional `modelsAllowed` allowlist
+  // (configured in the VK editor). When set, the composer's picker is
+  // narrowed to exactly those models; when null/empty it falls back to all
+  // of the project's provider models. VKs are org-scoped, so we list the
+  // org's keys and pick the auto-managed Langy VK scoped to THIS project.
+  const virtualKeysQuery = api.virtualKeys.list.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId },
+  );
+  const langyModelsAllowed = useMemo<string[] | null>(() => {
+    const langyVk = virtualKeysQuery.data?.find(
+      (vk) =>
+        isLangyManagedVk(vk) &&
+        vk.scopes.some(
+          (s) => s.scopeType === "PROJECT" && s.scopeId === projectId,
+        ),
+    );
+    const allowed = (langyVk?.config as { modelsAllowed?: string[] | null })
+      ?.modelsAllowed;
+    return allowed && allowed.length > 0 ? allowed : null;
+  }, [virtualKeysQuery.data, projectId]);
+
+  // Options the picker offers. Two-stage filter:
+  //   1. langyModelsAllowed (VK allowlist) narrows the universe to admin-
+  //      approved models when set; null = "no explicit allowlist".
+  //   2. ModelSelector internally further narrows by the project's actually-
+  //      enabled providers (getCustomModels → enabled+mode filter), so even
+  //      when the VK is unconstrained the dropdown shows ONLY models the
+  //      project can run today.
+  // The /langy/chat route mirrors the VK-allowlist check server-side so
+  // tampered clients can't pick something that's been disallowed.
+  const modelOptions = useMemo(
+    () => langyModelsAllowed ?? allModelOptions,
+    [langyModelsAllowed],
+  );
+
+  // Seed the picker with the model the gate resolves to — but keep it inside
+  // the allowlist. If the resolved default isn't allowed, start on the first
+  // allowed model instead.
+  useEffect(() => {
+    if (modelOverride) return;
+    const resolved = resolvedDefaultQuery.data?.model;
+    if (resolved && (!langyModelsAllowed || langyModelsAllowed.includes(resolved))) {
+      setModelOverride(resolved);
+    } else if (langyModelsAllowed) {
+      setModelOverride(langyModelsAllowed[0]!);
+    }
+  }, [resolvedDefaultQuery.data?.model, modelOverride, langyModelsAllowed]);
+
+  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model,
+  // snap to the first allowed model. Safe because under an allowlist the
+  // picker only offers allowed models, so an out-of-list value can only be a
+  // stale seed, never a user choice.
+  useEffect(() => {
+    if (!langyModelsAllowed) return;
+    if (modelOverride && !langyModelsAllowed.includes(modelOverride)) {
+      setModelOverride(langyModelsAllowed[0]!);
+    }
+  }, [langyModelsAllowed, modelOverride]);
   const { messages, sendMessage, stop, status, setMessages } = useChat({
     transport,
     onError: (error) => {
@@ -485,9 +570,18 @@ function LangyPanel({
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
     setInput("");
+    // modelOverride is empty until the resolved-default query lands OR until
+    // the user picks; in either case the chat route falls back to the project
+    // DEFAULT-role resolution when this field is absent.
     await sendMessage(
       { role: "user", parts: [{ type: "text", text }] },
-      { body: { projectId, experimentSlug } },
+      {
+        body: {
+          projectId,
+          experimentSlug,
+          ...(modelOverride ? { modelOverride } : {}),
+        },
+      },
     );
   };
 
@@ -627,6 +721,9 @@ function LangyPanel({
         <Composer
           input={input}
           onInputChange={setInput}
+          model={modelOverride}
+          modelOptions={modelOptions}
+          onModelChange={setModelOverride}
           onSend={() => void send(input)}
           onStop={() => void stop()}
           isBusy={isBusy}
@@ -912,6 +1009,9 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
 function Composer({
   input,
   onInputChange,
+  model,
+  modelOptions,
+  onModelChange,
   onSend,
   onStop,
   isBusy,
@@ -920,6 +1020,11 @@ function Composer({
 }: {
   input: string;
   onInputChange: (v: string) => void;
+  /** The model Langy will use for the next send. "" = let the server pick. */
+  model: string;
+  /** Models the picker may offer (the VK allowlist, or all registry models). */
+  modelOptions: string[];
+  onModelChange: (model: string) => void;
   onSend: () => void;
   onStop: () => void;
   isBusy: boolean;
@@ -927,10 +1032,28 @@ function Composer({
   canSend: boolean;
 }) {
   const filled = input.trim().length > 0;
+  const [pickerExpanded, setPickerExpanded] = useState(false);
+  const [pickerDropdownOpen, setPickerDropdownOpen] = useState(false);
   const typewriterPlaceholder = useTypewriterPlaceholder(
     !filled && !isBusy && !disabled,
     COMPOSER_PLACEHOLDER_EXAMPLES,
   );
+  // Provider icon for the currently-selected model. Used by the collapsed
+  // pill so we render a clean centered logo instead of clipping the full
+  // ModelSelector trigger to 30px (which leaves the model name cut in half).
+  // `null` during the cold-start window (model="" before resolvedDefault
+  // lands) — used as a render gate below so we don't flash an empty pill.
+  const collapsedProviderIcon = useMemo(() => {
+    const providerKey = model.split("/")[0] ?? "";
+    if (!providerKey) return null;
+    return (
+      modelProviderIcons[providerKey as keyof typeof modelProviderIcons] ?? null
+    );
+  }, [model]);
+  const collapsePicker = () => {
+    setPickerExpanded(false);
+    setPickerDropdownOpen(false);
+  };
   return (
     <>
       <Separator />
@@ -941,6 +1064,106 @@ function Composer({
         background="bg.surface"
         flexShrink={0}
       >
+        {/* Per-send model picker. Collapsed to a small bubble showing just
+            the provider logo; on hover/focus the bubble fluidly expands into
+            the full picker. ModelSelector stays mounted — width animation
+            reveals the model label + caret without a remount.
+
+            Hidden via visibility (not unmounted) until the model resolves
+            so we don't flash an empty 30px circle for the 50-300ms cold
+            window before the resolved-default query lands. Reserving the
+            slot keeps the composer from jumping. */}
+        <Flex
+          justifyContent="flex-end"
+          marginBottom={1.5}
+          data-testid="langy-model-picker"
+          data-model={model}
+          visibility={collapsedProviderIcon ? "visible" : "hidden"}
+          aria-hidden={!collapsedProviderIcon}
+          onMouseEnter={() => setPickerExpanded(true)}
+          onMouseLeave={collapsePicker}
+          onFocus={() => setPickerExpanded(true)}
+          // Mirror onFocus: collapse when focus moves OUT of the wrapper —
+          // BUT not when focus is moving into the Select's own portaled
+          // popover (search input, option list). Those live as siblings of
+          // <body>, not inside this wrapper, so the naive "is relatedTarget
+          // a descendant?" check would close the dropdown the instant the
+          // user opens it. Treat anything inside any `[data-scope="select"]`
+          // subtree as still-within-the-picker for blur purposes.
+          //
+          // `relatedTarget` is `EventTarget | null` — narrow with `instanceof`
+          // before calling Node/Element methods, since focus leaving to
+          // browser chrome / another window can yield a non-Element target
+          // that would throw on `.contains()`.
+          onBlur={(e) => {
+            const next = e.relatedTarget;
+            if (!next) {
+              collapsePicker();
+              return;
+            }
+            if (next instanceof Node && e.currentTarget.contains(next)) return;
+            if (
+              next instanceof Element &&
+              next.closest('[data-scope="select"]')
+            )
+              return;
+            collapsePicker();
+          }}
+        >
+          <Box
+            position="relative"
+            width={pickerExpanded ? "180px" : "30px"}
+            height="28px"
+            borderRadius="full"
+            transition="width 220ms ease-out"
+            transformOrigin="right center"
+            _dark={{ "& svg path": { fill: "white" } }}
+            cursor="pointer"
+          >
+            {/* Collapsed view: just the provider logo, centered, sized to
+                match the icon the expanded ModelSelector renders so the
+                logo doesn't visibly grow/shrink across the transition.
+                Crossfade is short so the swap reads as a reveal, not a
+                morph. */}
+            <Flex
+              position="absolute"
+              inset={0}
+              align="center"
+              justify="center"
+              opacity={pickerExpanded ? 0 : 1}
+              transition="opacity 120ms ease-out"
+              pointerEvents={pickerExpanded ? "none" : "auto"}
+              aria-hidden={pickerExpanded}
+            >
+              <Box width="14px" height="14px" lineHeight={0}>
+                {collapsedProviderIcon}
+              </Box>
+            </Flex>
+            {/* Expanded view: full ModelSelector. Controlled open state so
+                mouse-leave can close the dropdown alongside collapsing the
+                pill — otherwise the popover floats orphaned. */}
+            <Box
+              position="absolute"
+              inset={0}
+              overflow="hidden"
+              borderRadius="full"
+              opacity={pickerExpanded ? 1 : 0}
+              transition="opacity 200ms ease-out"
+              pointerEvents={pickerExpanded ? "auto" : "none"}
+              aria-hidden={!pickerExpanded}
+            >
+              <ModelSelector
+                model={model}
+                options={modelOptions}
+                onChange={onModelChange}
+                mode="chat"
+                size="sm"
+                open={pickerDropdownOpen}
+                onOpenChange={setPickerDropdownOpen}
+              />
+            </Box>
+          </Box>
+        </Flex>
         <HStack
           gap={2}
           paddingY={1.5}
@@ -998,8 +1221,8 @@ function Composer({
               aria-label="Send"
               onClick={onSend}
               disabled={!canSend}
-              background={canSend ? "transparent" : "#f5f5f4"}
-              color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
+              background={canSend ? "transparent" : "bg.muted"}
+              color={canSend ? "white" : "fg.muted"}
               shadow={canSend}
               cursor={canSend ? "pointer" : "default"}
               meshOverlay={canSend}

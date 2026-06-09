@@ -55,6 +55,22 @@ const chatRequestSchema = z.object({
   projectId: z.string().min(1),
   conversationId: z.string().nullable().optional(),
   messages: z.array(chatMessageSchema).min(1),
+  /**
+   * Per-send model override coming from the sidebar's ChatGPT-style picker
+   * (LangySidebar Composer). Optional — when absent, the agent falls back
+   * to the project's DEFAULT-role model the gate resolved against.
+   *
+   * Forwarded to the OpenCode agent payload so the agent can pass it to the
+   * gateway as the `model` parameter. Validated here in two layers: this
+   * Zod step enforces provider/model shape; the route then checks the value
+   * against the project's Langy VK `modelsAllowed` allowlist so a malicious
+   * or stale client can't pick a model the project hasn't approved.
+   */
+  modelOverride: z
+    .string()
+    .regex(/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/, "modelOverride must be in 'provider/model' shape")
+    .max(200)
+    .optional(),
 });
 type ChatMessage = z.infer<typeof chatMessageSchema>;
 
@@ -152,6 +168,7 @@ langyRoute().post("/langy/chat", async (c) => {
     messages,
     projectId,
     conversationId: requestedConversationId,
+    modelOverride,
   } = parsedBody.data;
 
   const agentUrl = process.env.OPENCODE_AGENT_URL;
@@ -265,8 +282,8 @@ langyRoute().post("/langy/chat", async (c) => {
   ].join(" ");
 
   let credentials;
+  const credentialService = LangyCredentialService.create(prisma);
   try {
-    const credentialService = LangyCredentialService.create(prisma);
     credentials = await credentialService.getOrProvision({
       projectId,
       actorUserId: session.user.id,
@@ -276,6 +293,35 @@ langyRoute().post("/langy/chat", async (c) => {
       return c.json({ error: error.message }, { status: 409 });
     }
     throw error;
+  }
+
+  // Defense in depth: when a `modelOverride` rides in, enforce the project's
+  // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
+  // has no allowlist (modelsAllowed=null), the gateway is still the final
+  // enforcer; this check only rejects values the project has explicitly NOT
+  // allowed. The org is taken from `credentials` (the resolver already
+  // returned it) so we don't refetch the project — no risk of a TOCTOU race
+  // silently skipping the check between calls.
+  if (modelOverride) {
+    const modelsAllowed = await credentialService.getModelsAllowed(
+      projectId,
+      credentials.organizationId,
+    );
+    if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
+      // Don't log the full allowlist on every reject — it's the project's
+      // configured-model list and travels further than the user's UI does
+      // (SIEM, support tickets). Log shape + count so we still see drift.
+      logger.warn(
+        { projectId, modelOverride, allowedCount: modelsAllowed.length },
+        "modelOverride not in VK allowlist — rejecting",
+      );
+      return c.json(
+        {
+          error: `Model "${modelOverride}" is not allowed for this project's Langy. Pick from the configured models.`,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   const agentResponse = await fetch(`${agentUrl}/chat`, {
@@ -289,6 +335,11 @@ langyRoute().post("/langy/chat", async (c) => {
       prompt: userText,
       system: langyOverride,
       credentials,
+      // Forwarded for the agent to thread through to the gateway as the
+      // `model` parameter when its support lands. Today the agent ignores
+      // unrecognized fields, so this is effectively a wire-up that doesn't
+      // change behavior — but the user's picker choice rides through.
+      ...(modelOverride ? { modelOverride } : {}),
     }),
     signal: AbortSignal.timeout(120_000),
   });
