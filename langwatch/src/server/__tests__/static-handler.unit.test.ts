@@ -1,12 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer, request as httpRequest, type Server } from "http";
-import {
+import fs, {
   mkdtempSync,
   mkdirSync,
   rmSync,
   unlinkSync,
   writeFileSync,
 } from "fs";
+import { Readable } from "stream";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { AddressInfo } from "net";
@@ -186,9 +187,46 @@ describe("serveStaticOrFallback", () => {
         unlinkSync(ephemeralPath);
       });
 
-      it("returns 404 instead of an unhandled 500", async () => {
+      it("returns 404 — openSync fails cleanly, no crash", async () => {
         const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
         expect(res.status).toBe(404);
+      });
+    });
+  });
+
+  describe("given a file whose read stream errors after it opens", () => {
+    describe("when the stream emits 'error' before any bytes are sent", () => {
+      it("responds 500 without crashing the server", async () => {
+        // The atomic openSync+fd design makes a mid-stream error all but
+        // impossible from a deleted file (the held fd keeps the inode alive),
+        // but pipeWithErrorHandling still guards every other I/O error (EIO
+        // etc). Force one to prove it becomes a clean 500 rather than an
+        // unhandled 'error' that would crash the process.
+        const spy = vi
+          .spyOn(fs, "createReadStream")
+          .mockImplementationOnce(((_path: fs.PathLike, options?: unknown) => {
+            // Release the real fd the handler opened so the test leaks nothing.
+            const fd = (options as { fd?: number } | undefined)?.fd;
+            if (typeof fd === "number") {
+              try {
+                fs.closeSync(fd);
+              } catch {
+                // already closed
+              }
+            }
+            const stream = new Readable({ read() {} });
+            // Emit after the handler attaches its 'error' listener and pipes.
+            queueMicrotask(() =>
+              stream.emit("error", new Error("forced stream error")),
+            );
+            return stream as unknown as ReturnType<typeof fs.createReadStream>;
+          }) as typeof fs.createReadStream);
+
+        const res = await fetch(`${baseUrl}/assets/index-abc123.js`);
+
+        expect(res.status).toBe(500);
+        expect(await res.text()).toContain("Internal Server Error");
+        spy.mockRestore();
       });
     });
   });
