@@ -1,6 +1,6 @@
 import fs from "fs";
-import path from "path";
 import type { ServerResponse } from "http";
+import path from "path";
 
 const MIME_TYPES: Record<string, string> = {
   ".js": "application/javascript",
@@ -104,10 +104,7 @@ function tryServeFile({
   }
 
   const ext = path.extname(filePath);
-  res.setHeader(
-    "Content-Type",
-    MIME_TYPES[ext] ?? "application/octet-stream",
-  );
+  res.setHeader("Content-Type", MIME_TYPES[ext] ?? "application/octet-stream");
   if (pathname.startsWith("/assets/")) {
     res.setHeader("Cache-Control", IMMUTABLE_CACHE);
   } else if (ext === ".html") {
