@@ -170,14 +170,13 @@ An `ik-lw-` write-only key (obtainable via the governance REST endpoint) also au
 
 ### The two-file recipe
 
-Commit `.claude/settings.json` with the non-secret flags and keep the bearer token in a gitignored `.claude/settings.local.json`.
+Commit `.claude/settings.json` with the non-secret flags and keep the bearer token **plus the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: the enable flag lives only in the local file, so a fresh clone with just the committed `settings.json` (and no `settings.local.json`) never attempts to export. This matters because the committed flags include `OTEL_LOG_USER_PROMPTS` and `OTEL_LOG_RAW_API_BODIES` (prompt text and raw API bodies) — that content must never ship until the repo owner opts in locally. `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local enable flag combines with the committed flags rather than replacing them.
 
 **`.claude/settings.json`** (commit this):
 
 ```json
 {
   "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
@@ -199,6 +198,7 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
 ```json
 {
   "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer sk-lw-…",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team,enduser.id=you@example.com"
   }
