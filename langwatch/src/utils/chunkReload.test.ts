@@ -1,18 +1,51 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  forceReloadOnce,
+  fetchNewerDeployEntry,
+  handleChunkError,
   isChunkLoadError,
   registerChunkReloadListener,
-  reloadOnChunkError,
+  registerDeployWatcher,
+  reloadForDeploy,
 } from "./chunkReload";
 
-// jsdom locks down window.location (non-configurable, can't be deleted, redefined
-// or spied), and location.reload() is a harmless no-op there. So rather than
-// asserting reload() was called, we assert the observable cooldown sentinel it
-// writes to sessionStorage — which is where the branching logic actually lives.
-const RELOAD_AT = "chunk-reload-at";
-const reloaded = () => sessionStorage.getItem(RELOAD_AT) !== null;
+// reloadForDeploy records the deployed entry it reloaded toward in
+// sessionStorage. jsdom's window.location.reload() is a harmless no-op (and is
+// non-spyable), so — like the rest of this module's recovery — we assert the
+// observable sentinel it writes rather than the reload itself.
+const RELOAD_TARGET = "chunk-reload-target";
+const reloadTarget = () => sessionStorage.getItem(RELOAD_TARGET);
+
+// Install a content-hashed entry <script> so loadedEntry() resolves, mimicking a
+// built index.html. The dev server's entry is /src/main.tsx, which has no hash
+// and disables version detection.
+function setLoadedEntry(path: string | null) {
+  document.head.innerHTML = path
+    ? `<script type="module" src="${path}"></script>`
+    : "";
+}
+
+// Stub the index.html the server serves, advertising the given entry path.
+function mockServedEntry(path: string, ok = true) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok,
+      text: async () => `<script type="module" src="${path}"></script>`,
+    }),
+  );
+}
+
+function setVisibility(state: "visible" | "hidden") {
+  Object.defineProperty(document, "visibilityState", {
+    value: state,
+    configurable: true,
+  });
+}
+
+// Let a fetch().then() recovery chain settle (mock resolves immediately, so one
+// macrotask drains every queued microtask).
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("isChunkLoadError", () => {
   describe("when the message is a Vite dynamic-import failure", () => {
@@ -54,62 +87,161 @@ describe("isChunkLoadError", () => {
   });
 });
 
-describe("forceReloadOnce", () => {
+describe("fetchNewerDeployEntry", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    vi.useFakeTimers();
+    setLoadedEntry("/assets/index-OLD123.js");
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    setLoadedEntry(null);
   });
 
-  describe("when no reload has happened recently", () => {
-    it("reloads once and records the reload time", () => {
-      expect(forceReloadOnce()).toBe(true);
-      expect(reloaded()).toBe(true);
+  describe("when the server serves a different entry", () => {
+    it("returns the newer deployed entry", async () => {
+      mockServedEntry("/assets/index-NEW456.js");
+      await expect(fetchNewerDeployEntry()).resolves.toBe(
+        "/assets/index-NEW456.js",
+      );
     });
   });
 
-  describe("when a reload happened within the cooldown window", () => {
-    it("does not reload again", () => {
-      forceReloadOnce();
-      vi.advanceTimersByTime(5_000); // inside the 10s cooldown
-
-      expect(forceReloadOnce()).toBe(false);
+  describe("when the server serves the same entry this tab booted with", () => {
+    it("returns null", async () => {
+      mockServedEntry("/assets/index-OLD123.js");
+      await expect(fetchNewerDeployEntry()).resolves.toBeNull();
     });
   });
 
-  describe("when the cooldown window has elapsed", () => {
-    it("reloads again", () => {
-      forceReloadOnce();
-      vi.advanceTimersByTime(11_000); // past the 10s cooldown
+  describe("when there is no content-hashed entry (dev server)", () => {
+    it("returns null without fetching", async () => {
+      setLoadedEntry("/src/main.tsx");
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
 
-      expect(forceReloadOnce()).toBe(true);
+      await expect(fetchNewerDeployEntry()).resolves.toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the fetch fails", () => {
+    it("returns null", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+      await expect(fetchNewerDeployEntry()).resolves.toBeNull();
     });
   });
 });
 
-describe("reloadOnChunkError", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
+describe("reloadForDeploy", () => {
+  beforeEach(() => sessionStorage.clear());
 
-  describe("when the error is a chunk error", () => {
-    it("reloads and reports it handled the error", () => {
-      expect(
-        reloadOnChunkError(
-          new Error("Failed to fetch dynamically imported module"),
-        ),
-      ).toBe(true);
-      expect(reloaded()).toBe(true);
+  describe("when reloading toward a newly deployed entry", () => {
+    it("records the target and reports the reload", () => {
+      expect(reloadForDeploy("/assets/index-NEW456.js")).toBe(true);
+      expect(reloadTarget()).toBe("/assets/index-NEW456.js");
     });
   });
 
+  describe("when the same target was already reloaded toward", () => {
+    it("does not reload again (no loop on a build that won't land)", () => {
+      reloadForDeploy("/assets/index-NEW456.js");
+      expect(reloadForDeploy("/assets/index-NEW456.js")).toBe(false);
+    });
+  });
+
+  describe("when a different deploy ships next", () => {
+    it("reloads again", () => {
+      reloadForDeploy("/assets/index-NEW456.js");
+      expect(reloadForDeploy("/assets/index-NEWER789.js")).toBe(true);
+    });
+  });
+});
+
+describe("handleChunkError", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    setLoadedEntry("/assets/index-OLD123.js");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setLoadedEntry(null);
+  });
+
   describe("when the error is not a chunk error", () => {
-    it("does not reload and reports it did not handle the error", () => {
-      expect(reloadOnChunkError(new Error("boom"))).toBe(false);
-      expect(reloaded()).toBe(false);
+    it("returns false and does not check for a deploy", () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+
+      expect(handleChunkError(new Error("boom"))).toBe(false);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a chunk error coincides with a newer deploy", () => {
+    it("reloads for the newer deploy", async () => {
+      mockServedEntry("/assets/index-NEW456.js");
+
+      expect(
+        handleChunkError(
+          new Error("Failed to fetch dynamically imported module"),
+        ),
+      ).toBe(true);
+      await settle();
+
+      expect(reloadTarget()).toBe("/assets/index-NEW456.js");
+    });
+  });
+
+  describe("when a chunk error has no newer deploy (persistent failure)", () => {
+    it("does not reload, leaving the boundary to surface", async () => {
+      mockServedEntry("/assets/index-OLD123.js");
+
+      handleChunkError(
+        new Error("Failed to fetch dynamically imported module"),
+      );
+      await settle();
+
+      expect(reloadTarget()).toBeNull();
+    });
+  });
+});
+
+describe("registerDeployWatcher", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    setLoadedEntry("/assets/index-OLD123.js");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setLoadedEntry(null);
+  });
+
+  describe("when the tab becomes visible and a newer deploy is live", () => {
+    it("reloads for the newer deploy", async () => {
+      mockServedEntry("/assets/index-NEW456.js");
+      registerDeployWatcher();
+
+      setVisibility("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await settle();
+
+      expect(reloadTarget()).toBe("/assets/index-NEW456.js");
+    });
+  });
+
+  describe("when the tab is hidden", () => {
+    it("does not check for a deploy", () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      registerDeployWatcher();
+
+      setVisibility("hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 });
@@ -117,31 +249,23 @@ describe("reloadOnChunkError", () => {
 describe("registerChunkReloadListener", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    setLoadedEntry("/assets/index-OLD123.js");
   });
 
-  describe("when Vite dispatches vite:preloadError for a stale chunk", () => {
-    it("reloads the page once to fetch the new chunk hashes", () => {
-      registerChunkReloadListener();
-
-      const event = new Event("vite:preloadError", { cancelable: true });
-      window.dispatchEvent(event);
-
-      expect(event.defaultPrevented).toBe(true);
-      expect(reloaded()).toBe(true);
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setLoadedEntry(null);
   });
 
-  describe("when a second vite:preloadError fires within the cooldown", () => {
-    it("does not suppress the error so it can reach the error boundary", () => {
-      // Simulate a reload already having happened in this session.
-      sessionStorage.setItem(RELOAD_AT, "9999999999999");
+  describe("when Vite fires vite:preloadError and a newer deploy is live", () => {
+    it("reloads for the newer deploy", async () => {
+      mockServedEntry("/assets/index-NEW456.js");
       registerChunkReloadListener();
 
-      const event = new Event("vite:preloadError", { cancelable: true });
-      window.dispatchEvent(event);
+      window.dispatchEvent(new Event("vite:preloadError"));
+      await settle();
 
-      // No reload scheduled → Vite's error must NOT be preventDefault()'d.
-      expect(event.defaultPrevented).toBe(false);
+      expect(reloadTarget()).toBe("/assets/index-NEW456.js");
     });
   });
 });

@@ -11,7 +11,7 @@ import { Ghost, RotateCcw } from "lucide-react";
 import { useRouteError } from "react-router";
 
 import { Link } from "~/components/ui/link";
-import { isChunkLoadError, RELOAD_AT_KEY } from "~/utils/chunkReload";
+import { isChunkLoadError } from "~/utils/chunkReload";
 
 /**
  * Shared fallback for (a) unknown routes (path="*") and (b) errors thrown
@@ -100,14 +100,7 @@ export default function NotFoundOrErrorPage() {
           {isChunkError && (
             <Button
               colorPalette="orange"
-              onClick={() => {
-                try {
-                  sessionStorage.setItem(RELOAD_AT_KEY, String(Date.now()));
-                } catch {
-                  // sessionStorage may be unavailable
-                }
-                window.location.reload();
-              }}
+              onClick={() => window.location.reload()}
             >
               <RotateCcw size={14} />
               Reload app
