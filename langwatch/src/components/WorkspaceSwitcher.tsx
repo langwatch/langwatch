@@ -313,33 +313,29 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     teams: value.teams,
   }));
 
-  // Personal "My Workspace" entries, keyed by org for the per-org nesting.
-  // More than one governance org → nest each personal under its org header.
-  // A single (or org-less) personal stays a top-level "My Workspace" group so
-  // single-org users keep the simpler, header-free layout.
+  // Personal "My Workspace" entries nest under their org's header so the org
+  // name is always visible above its workspace (the user's mental model: "my
+  // personal usage *within* this org"). This holds for a single governance org
+  // too — the org header renders even when there's just one, so the name does
+  // not disappear. Only a truly org-less personal (orgId null) has no org to
+  // nest under and stays a top-level "My Workspace" group.
   const orgPersonals = personals.filter((p) => p.orgId);
-  const multiPersonal = orgPersonals.length > 1;
-  // Only nest per-org when there are multiple governance orgs; a single (or
-  // org-less) personal stays the top-level entry and must NOT also render under
-  // its org header (that would duplicate the "My Workspace" row).
-  const personalByOrgId = multiPersonal
-    ? new Map(orgPersonals.map((p) => [p.orgId as string, p]))
-    : new Map<string, (typeof personals)[number]>();
-  const topLevelPersonal = multiPersonal ? undefined : personals[0];
+  const personalByOrgId = new Map(
+    orgPersonals.map((p) => [p.orgId as string, p]),
+  );
+  const topLevelPersonal = personals.find((p) => !p.orgId);
 
-  // When nesting per org, include governance orgs the user has a personal in
-  // but no visible team in — otherwise their "My Workspace" row would vanish.
+  // Include governance orgs the user has a personal in but no visible team in —
+  // otherwise their "My Workspace" row (and its org header) would vanish.
   const teamOrgIds = new Set(teamOrgs.map((o) => o.orgId));
-  const personalOnlyOrgs = multiPersonal
-    ? personals
-        .filter((p) => p.orgId && !teamOrgIds.has(p.orgId))
-        .map((p) => ({
-          orgId: p.orgId as string,
-          orgName: p.orgName ?? "Organization",
-          orgSlug: p.orgSlug ?? "",
-          teams: [] as typeof teams,
-        }))
-    : [];
+  const personalOnlyOrgs = personals
+    .filter((p) => p.orgId && !teamOrgIds.has(p.orgId))
+    .map((p) => ({
+      orgId: p.orgId as string,
+      orgName: p.orgName ?? "Organization",
+      orgSlug: p.orgSlug ?? "",
+      teams: [] as typeof teams,
+    }));
   const orgs = [...teamOrgs, ...personalOnlyOrgs].sort((a, b) =>
     a.orgName.localeCompare(b.orgName),
   );
@@ -457,7 +453,16 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                 return (
                 <Group
                   key={org.orgId}
-                  title={multipleOrgs ? orgHeader(org) : undefined}
+                  // Show the org name as a header when the user spans multiple
+                  // orgs, or whenever this org has a personal nested under it
+                  // (governance orgs), so the org name is always visible above
+                  // its "My Workspace". A lone non-governance org stays
+                  // header-free — its org context is implicit.
+                  title={
+                    multipleOrgs || personalByOrgId.has(org.orgId)
+                      ? orgHeader(org)
+                      : undefined
+                  }
                 >
                   {orgPersonal && (
                     <SwitcherItem

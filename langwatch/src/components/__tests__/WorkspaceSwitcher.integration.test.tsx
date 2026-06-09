@@ -673,19 +673,66 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
-  describe("when a user belongs to a single org", () => {
-    it("renders no section header — org context is implicit when there is only one", () => {
+  describe("when a single org has no governance-bound personal", () => {
+    it("renders no org header — the org context is implicit", async () => {
+      const user = userEvent.setup();
       renderSwitcher({
-        personals: [personal],
+        // No personal entry for this org (governance off), so there is no
+        // "My Workspace" to give the org a header to hang under.
         teams: [teamA],
         projects: [projectFoo],
-        current: { kind: "personal" },
+        current: { kind: "project", projectId: "project_foo" },
       });
 
-      screen.getByRole("button", { name: /switch workspace/i }).click();
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
 
+      // The team row is unique to the open dropdown (the trigger shows the
+      // current project), so finding it confirms the menu opened.
+      await screen.findByText("Acme Engineering");
       expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
+      // "Acme" (the org header) is exact-matched; the team "Acme Engineering"
+      // is a different string, so this asserts no org header rendered.
       expect(screen.queryByText("Acme")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a user belongs to a single governance org", () => {
+    const soloPersonal = {
+      kind: "personal" as const,
+      orgId: "org_acme",
+      orgName: "Acme",
+      orgSlug: "acme",
+      href: "/me",
+      label: "My Workspace",
+      subtitle: "Personal usage, personal budget",
+    };
+
+    /** @scenario A single governance organization still shows its name with My Workspace nested under it */
+    it("shows the org name as a header with My Workspace nested under it, not floating at the top", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [soloPersonal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "personal", orgId: "org_acme" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+
+      // The org name renders as a section header even with a single org, so it
+      // never disappears. ("Acme" is the org; the team is "Acme Engineering".)
+      expect(await screen.findByText("Acme")).toBeInTheDocument();
+      // The lone My Workspace nests under that header (one row, linking to /me),
+      // rather than rendering as a separate top-level group above the org.
+      const myWorkspaceHrefs = screen
+        .getAllByText("My Workspace")
+        .map((el) => el.closest("a")?.getAttribute("href"))
+        .filter((href): href is string => href != null);
+      expect(myWorkspaceHrefs).toEqual(["/me"]);
     });
   });
 

@@ -164,6 +164,13 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then that organization's "My Workspace" entry links to "/me" with no "?org" parameter
 
   @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: A single governance organization still shows its name with My Workspace nested under it
+    Given exactly one of the user's organizations enables governance, with one team and one project
+    When the user opens the workspace switcher
+    Then the organization name is shown as a section header
+    And its "My Workspace" entry nests under that header rather than floating at the top of the list
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
   Scenario: With multiple governance organizations, each My Workspace carries its org
     Given organizations "Alpha" and "Beta" both enable governance
     When the user opens the workspace switcher
