@@ -1,4 +1,5 @@
 import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
 import React, { useMemo } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
@@ -19,9 +20,9 @@ import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
 import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
-import { IntegrationCTACard } from "../../onboarding/components/IntegrationCTACard";
 import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
+import { AuroraSvg } from "./AuroraSvg";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
@@ -39,6 +40,7 @@ import { BulkActionBar } from "../Toolbar/BulkActionBar";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
 import { EmptyResultsPane } from "./EmptyResultsPane";
+import { IntegratePane } from "./IntegratePane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
 import {
@@ -100,6 +102,7 @@ export const TracesPage: React.FC = () => {
   );
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const tourActive = useOnboardingStore((s) => s.tourActive);
+  const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
   const setupDismissed = project
     ? !!setupDismissedByProject[project.id]
     : false;
@@ -115,18 +118,18 @@ export const TracesPage: React.FC = () => {
     topLevelOnboardingStage === "serviceSegue" ||
     topLevelOnboardingStage === "facetsReveal" ||
     topLevelOnboardingStage === "outro";
-  // Empty state (old journey takeover) now only shows when `tourActive`
-  // is explicitly set via the legacy journey entry point. No-traces users
-  // see the regular `ResultsPane` with sample data injected via
-  // `usePreviewTracesActive` and an inline integration CTA card.
-  // Phase 2 will replace the journey state machine with contextual
-  // spotlights and this branch will be removed entirely.
+  // Legacy empty-state journey — only fires when `tourActive` is explicitly
+  // set. For no-traces users the new Phase 2 flow takes over: show
+  // `IntegratePane` by default, or `ResultsPane` (with sample data) when
+  // the user opts in via "See sample data".
   const showEmptyState = tourActive && !setupDismissed;
-  // Dim the surrounding chrome only while the card is *active*. The
-  // moment the user clicks any exit action (Load sample / Skip / Learn)
-  // `setupDisengaged` flips and the dim lifts — even if the card itself
-  // is still finishing its post-send countdown animation.
+  // Dim the surrounding chrome only while the legacy journey card is active.
   const dimChrome = showEmptyState && !setupDisengaged;
+  // Phase 2 routing: for no-traces users without the legacy journey running,
+  // show the IntegratePane hero unless they've explicitly opted into sample
+  // preview. Once real traces arrive, always show ResultsPane.
+  const showIntegratePane =
+    !showEmptyState && hasAnyTraces === false && !showSamplePreview;
 
   return (
     <DensityProvider>
@@ -167,7 +170,10 @@ export const TracesPage: React.FC = () => {
               `facetsReveal` we wrap the aside in a soft blue
               animated glow so the user's eye lands on it as the
               copy points at it. */}
-            {(!showEmptyState || sidebarVisibleDuringEmpty) && (
+            {/* Hide the sidebar during the integrate pane (no data →
+                no facets to show) and during the legacy journey except
+                for the facets/outro beats. */}
+            {!showIntegratePane && (!showEmptyState || sidebarVisibleDuringEmpty) && (
               // `height="full"` + `overflow="hidden"` on this wrapper is
               // load-bearing: without it the inner aside expands to its
               // intrinsic content height (1700px+ once every facet group
@@ -185,7 +191,16 @@ export const TracesPage: React.FC = () => {
                 <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
               </Box>
             )}
-            {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
+            {showIntegratePane ? (
+              // No-traces + no sample preview → show the integration hero.
+              <IntegratePane />
+            ) : showEmptyState ? (
+              // Legacy journey (tourActive) — dormant for new users.
+              <EmptyResultsPane />
+            ) : (
+              // Real traces, or no-traces with sample preview active.
+              <ResultsPane />
+            )}
           </HStack>
           <PageKeyboardShortcuts />
           <TraceDrawerMount />
@@ -324,12 +339,14 @@ const ResultsPane: React.FC = React.memo(() => {
 
   const { hasAnyTraces } = useProjectHasTraces();
   const isPreviewActive = usePreviewTracesActive();
-  const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
-  // Only show the "this is sample data" banner when the user has real traces
-  // and explicitly opted in via the toolbar. For no-traces projects the CTA
-  // card already explains that the rows are sample data, so the banner would
-  // be redundant.
-  const showSampleBanner = isPreviewActive && hasAnyTraces === true && showSamplePreview;
+  // Show the sample data banner whenever preview is active — this pane
+  // only renders when the user has real traces OR has explicitly opted into
+  // sample preview (see IntegratePane / TracesPage routing), so always showing
+  // the banner here is safe and honest.
+  const showSampleBanner = isPreviewActive;
+  // Show the aurora once when the user first enters sample preview without real
+  // traces — the marquee moment that makes the sample data feel like an "arrival."
+  const showAurora = isPreviewActive && hasAnyTraces === false;
 
   const isSelectedExport =
     selectionMode === "all-matching" || explicitCount > 0;
@@ -377,12 +394,14 @@ const ResultsPane: React.FC = React.memo(() => {
           overflow="auto"
           bg={{ base: "bg.surface", _dark: "bg.muted" }}
         >
-          {/* Integration CTA card — pinned banner above the trace rows for
-              no-traces projects. Self-gates via useIntegrationCTAVisible so
-              it vanishes once real traces arrive or the user snoozes it. */}
-          <IntegrationCTACard />
           <TraceTable />
         </Box>
+        {/* Aurora ribbon — plays once when the user enters sample-preview
+            mode for a no-traces project. The aurora reads as "sample traces
+            are arriving" — the same marquee moment as the legacy journey, now
+            triggered by the toolbar "See sample data" toggle instead of an
+            auto-play state machine. */}
+        {showAurora && <AuroraOverlay />}
         <FindBar />
         <Box
           position="absolute"
@@ -419,3 +438,43 @@ const ResultsPane: React.FC = React.memo(() => {
   );
 });
 ResultsPane.displayName = "ResultsPane";
+
+/**
+ * Aurora ribbon rendered as an absolute overlay inside the results pane's
+ * `position: relative` Box. Plays once (fade-in, held, fade-out) when the
+ * user first flips to sample preview for a no-traces project — the same
+ * marquee moment as the legacy journey, now triggered by the toolbar toggle.
+ *
+ * The aurora intentionally has pointer-events:none and a high-but-not-
+ * overlay zIndex so table rows remain clickable behind it.
+ */
+const AuroraOverlay: React.FC = () => (
+  <AnimatePresence>
+    <motion.div
+      key="aurora-sample-preview"
+      aria-hidden="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.7, ease: "easeOut" }}
+      style={{
+        position: "absolute",
+        top: "-90px",
+        left: 0,
+        right: 0,
+        height: 200,
+        pointerEvents: "none",
+        zIndex: 2,
+        overflow: "hidden",
+        maskImage:
+          "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
+        maskComposite: "intersect",
+        WebkitMaskComposite: "source-in",
+      }}
+    >
+      <AuroraSvg idSuffix="samplePreview" />
+    </motion.div>
+  </AnimatePresence>
+);

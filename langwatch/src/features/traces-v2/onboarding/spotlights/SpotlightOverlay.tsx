@@ -19,6 +19,7 @@
  *   - On done/dismiss, the fragment is removed.
  */
 import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnboardingStore } from "../store/onboardingStore";
@@ -496,16 +497,37 @@ export function SpotlightOverlay(): React.ReactElement | null {
 
   return (
     <Portal>
-      <HighlightRing anchorRect={anchorRect} />
-      <SpotlightPopover
-        spotlight={resolved}
-        anchorRect={anchorRect}
-        ctx={ctx}
-        currentId={resolved.id}
-        onNext={handleNext}
-        onBack={handleBack}
-        onDismiss={handleDismiss}
-      />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={resolved.id}
+          initial={{ opacity: 0, scale: 0.95, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: -4 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          style={{ pointerEvents: "none", position: "fixed", inset: 0, zIndex: 1498 }}
+        >
+          <HighlightRing anchorRect={anchorRect} />
+        </motion.div>
+      </AnimatePresence>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={resolved.id}
+          initial={{ opacity: 0, scale: 0.95, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: -4 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <SpotlightPopover
+            spotlight={resolved}
+            anchorRect={anchorRect}
+            ctx={ctx}
+            currentId={resolved.id}
+            onNext={handleNext}
+            onBack={handleBack}
+            onDismiss={handleDismiss}
+          />
+        </motion.div>
+      </AnimatePresence>
     </Portal>
   );
 }
