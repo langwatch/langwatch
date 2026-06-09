@@ -1,0 +1,7 @@
+id: no-form-disable-on-isvalid
+valid:
+  - "const C = () => <button disabled={mutation.isPending}>Save</button>;"
+  - "const C = () => <button disabled={isSubmitting}>Save</button>;"
+invalid:
+  - "const C = () => <button disabled={!form.formState.isValid}>Save</button>;"
+  - "const C = () => <button disabled={!isValid}>Save</button>;"

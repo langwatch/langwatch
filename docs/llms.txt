@@ -292,6 +292,8 @@ Always navigate to docs links using the .md extension for better readability.
 - [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
+- [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
+- [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
 
 ## Teams
 
@@ -301,6 +303,25 @@ Always navigate to docs links using the .md extension for better readability.
 - [Get team](https://langwatch.ai/docs/api-reference/teams/get-team.md)
 - [Update team](https://langwatch.ai/docs/api-reference/teams/update-team.md)
 - [Archive team](https://langwatch.ai/docs/api-reference/teams/archive-team.md)
+- [List team members](https://langwatch.ai/docs/api-reference/teams/list-members.md)
+- [Add team member](https://langwatch.ai/docs/api-reference/teams/add-member.md)
+- [Remove team member](https://langwatch.ai/docs/api-reference/teams/remove-member.md)
+- [List team projects](https://langwatch.ai/docs/api-reference/teams/list-projects.md)
+
+## Groups
+
+- [Overview](https://langwatch.ai/docs/api-reference/groups/overview.md): Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.
+- [List groups](https://langwatch.ai/docs/api-reference/groups/list-groups.md)
+- [Create group](https://langwatch.ai/docs/api-reference/groups/create-group.md)
+- [Get group](https://langwatch.ai/docs/api-reference/groups/get-group.md)
+- [Rename group](https://langwatch.ai/docs/api-reference/groups/rename-group.md)
+- [Delete group](https://langwatch.ai/docs/api-reference/groups/delete-group.md)
+- [List group members](https://langwatch.ai/docs/api-reference/groups/list-members.md)
+- [Add group member](https://langwatch.ai/docs/api-reference/groups/add-member.md)
+- [Remove group member](https://langwatch.ai/docs/api-reference/groups/remove-member.md)
+- [List group bindings](https://langwatch.ai/docs/api-reference/groups/list-bindings.md)
+- [Add group binding](https://langwatch.ai/docs/api-reference/groups/add-binding.md)
+- [Remove group binding](https://langwatch.ai/docs/api-reference/groups/remove-binding.md)
 
 ## API Keys
 

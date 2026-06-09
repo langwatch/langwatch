@@ -28,6 +28,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     output: item.output,
     models: item.models,
     totalCost: item.totalCost,
+    nonBilledCost: item.nonBilledCost,
     totalTokens: item.totalTokens,
     inputTokens: item.inputTokens ?? null,
     outputTokens: item.outputTokens ?? null,
@@ -192,15 +193,36 @@ export function useOpenTraceDrawer() {
           }
         }
       }
+      // Kick off the heavier per-trace fetches in parallel with the
+      // route change so the waterfall + header render against real data
+      // by the time the drawer has finished mounting — operator feedback
+      // was that the trace tab sat on the loading skeleton for ~half a
+      // second even though we already had the row data. Prefetch is a
+      // no-op when the query is already cached, and tRPC dedupes the
+      // matching React Query subscription that the drawer mounts.
+      if (project?.id && !isPreviewTraceId(trace.traceId)) {
+        const input = {
+          projectId: project.id,
+          traceId: trace.traceId,
+          occurredAtMs: trace.timestamp,
+        };
+        const opts = { staleTime: 300_000 };
+        void utils.tracesV2.spanTree.prefetch(input, opts);
+        void utils.tracesV2.spanLangwatchSignals.prefetch(input, opts);
+        void utils.tracesV2.traceEvents.prefetch(input, opts);
+        void utils.tracesV2.resourceInfo.prefetch(input, opts);
+      }
       // Push into the store before route change so drawer hooks render
       // with the right traceId/occurredAtMs on the very next frame.
       useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
       // teaches, and the only one we want demos / videos / first
-      // impressions to land on.
+      // impressions to land on. Use the transient setter so this
+      // programmatic override does NOT clobber the operator's
+      // persisted preference for normal traces.
       if (isPreviewTraceId(trace.traceId)) {
-        useDrawerStore.getState().setVizTab("waterfall");
+        useDrawerStore.getState().setVizTabTransient("waterfall");
       }
       openDrawer("traceV2Details", {
         traceId: trace.traceId,

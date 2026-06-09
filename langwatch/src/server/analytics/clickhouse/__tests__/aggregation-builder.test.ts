@@ -53,6 +53,23 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'previous'");
     });
 
+    // A span/event facet filter resolves to a `... FROM stored_spans ...`
+    // subquery. stored_spans is partitioned by toYearWeek(StartTime) and tiered
+    // to S3, so the subquery must carry a StartTime predicate or it cold-scans
+    // every weekly partition. The envelope reuses the query's own date params.
+    it("bounds the stored_spans facet subquery to the date envelope by StartTime", () => {
+      const input = {
+        ...baseInput,
+        filters: { "spans.type": ["llm"] },
+      };
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("FROM stored_spans");
+      // The subquery prunes partitions instead of cold-scanning S3.
+      expect(result.sql).toContain("StartTime >= {previousStart:DateTime64(3)}");
+      expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
+    });
+
     it("includes date truncation for timescale", () => {
       const result = buildTimeseriesQuery(baseInput);
 

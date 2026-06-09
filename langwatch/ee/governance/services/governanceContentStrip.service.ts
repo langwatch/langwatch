@@ -33,6 +33,10 @@ import type { PrismaClient } from "@prisma/client";
 
 import { prisma as defaultPrismaClient } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
+import {
+  AI_TOOL_ORIGIN_VALUE,
+  CODING_AGENT_ORIGIN_VALUE,
+} from "./ingestKeyProvenance.utils";
 
 const logger = createLogger("langwatch:governance-content-strip");
 
@@ -55,15 +59,20 @@ const GATEWAY_ORIGIN_VALUE = "gateway";
  * like the gateway customertracebridge and direct-OTLP from customer
  * apps).
  *
- * `gateway` — LangWatch AI Gateway proxy traces (the original v1 surface)
- * `binding`  — UserIngestionBinding-routed personal-project traces
- *              (closes ralph-loop gap #5; matches BINDING_ORIGIN_VALUE
- *              in bindingProvenance.utils.ts)
+ * `gateway`      — LangWatch AI Gateway proxy traces (the original v1 surface)
+ * `coding_agent` — ingestion-key-routed CLI coding-assistant traces (the
+ *                  unified `langwatch <tool>` Path B).
+ * `ai_tool`      — any other ingestion-key-routed traces (claude_cowork +
+ *                  generic OTLP-push tools / template installs).
+ *
+ * The two ingest-key origins match CODING_AGENT_ORIGIN_VALUE /
+ * AI_TOOL_ORIGIN_VALUE in ingestKeyProvenance.utils.ts. Without them,
+ * ingest-key traces would bypass the org's no-spy setting (compliance hole).
  */
-const BINDING_ORIGIN_VALUE = "binding";
 const GOVERNED_ORIGINS = new Set<string>([
   GATEWAY_ORIGIN_VALUE,
-  BINDING_ORIGIN_VALUE,
+  CODING_AGENT_ORIGIN_VALUE,
+  AI_TOOL_ORIGIN_VALUE,
 ]);
 const ORG_ID_ATTR = "langwatch.organization_id";
 const ORIGIN_ATTR = "langwatch.origin";

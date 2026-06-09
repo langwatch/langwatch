@@ -55,7 +55,7 @@ in that state.
 ──────────────────────────────────────────────────────────────────────
 Once steps 1-3 are done, share the install command with your team:
 
-  npx @langwatch/sdk@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
+  npx langwatch@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
 
 Then in any terminal:
 

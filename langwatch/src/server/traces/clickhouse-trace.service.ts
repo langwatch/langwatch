@@ -28,6 +28,8 @@ import {
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
 import { parsePromptReference } from "./parsePromptReference";
+import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -37,6 +39,16 @@ import type {
   TopicCountsResult,
   TracesForProjectResult,
 } from "./types";
+
+/**
+ * Callback injected from TraceService that resolves offloaded blob refs for
+ * a single trace's normalized spans (ADR-021 decision B: read-time recompute).
+ * When present, called after fetching spans but before mapping to legacy Span.
+ */
+export type ResolveTraceSpansFn = (
+  projectId: string,
+  normalizedSpans: NormalizedSpan[],
+) => Promise<ResolvedTraceSpans>;
 
 /**
  * Cursor structure for keyset pagination.
@@ -54,6 +66,25 @@ interface ClickHouseScrollCursor {
 }
 
 /**
+ * Upper bound on distinct field names (span names, metadata keys) returned for
+ * the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
+ * in healthy projects (hundreds), so this only guards against pathological
+ * cardinality (e.g. dynamic IDs baked into span names) flooding the response.
+ * Set well above any real project so every name is offered for mapping rather
+ * than alphabetically truncated.
+ */
+const DISTINCT_FIELD_NAMES_LIMIT = 10_000;
+
+/**
+ * Upper bound on spans returned per trace by the spans-join read path. The REST
+ * collector no longer caps spans per trace (#4629), so this read cap must be
+ * high enough not to truncate real agentic traces while still protecting the
+ * read path from a pathologically large trace's full span payload. A trace that
+ * actually reaches this many spans is logged as a potential truncation.
+ */
+const MAX_SPANS_PER_TRACE = 10_000;
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -64,7 +95,21 @@ export class ClickHouseTraceService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
-  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Optional callback that resolves offloaded blob refs for a single trace's
+   * normalized spans before they are mapped to legacy Span objects. Injected
+   * from TraceService so blob-resolution deps are owned at a single composition
+   * point. When absent, spans are mapped as-is (preview values remain).
+   */
+  private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
+
+  constructor(
+    private readonly prisma: PrismaClient,
+    resolveTraceSpans?: ResolveTraceSpansFn,
+  ) {
+    this.resolveTraceSpans = resolveTraceSpans;
+  }
 
   /**
    * Resolve the ClickHouse client for a given project.
@@ -80,8 +125,11 @@ export class ClickHouseTraceService {
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
    */
-  static create(prisma: PrismaClient = defaultPrisma): ClickHouseTraceService {
-    return new ClickHouseTraceService(prisma);
+  static create(
+    prisma: PrismaClient = defaultPrisma,
+    resolveTraceSpans?: ResolveTraceSpansFn,
+  ): ClickHouseTraceService {
+    return new ClickHouseTraceService(prisma, resolveTraceSpans);
   }
 
   /**
@@ -131,14 +179,13 @@ export class ClickHouseTraceService {
           // Map to legacy Trace format and apply protections
           const traces: Trace[] = [];
           for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            const mappedSpans = mapNormalizedSpansToSpans(spans);
-            const trace = mapTraceSummaryToTrace(
-              summary,
-              mappedSpans,
+            const trace = await this.resolveAndMerge({
               projectId,
-            );
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
+              summary,
+              spans,
+              protections,
+            });
+            traces.push(trace);
           }
 
           this.logger.debug(
@@ -1169,7 +1216,7 @@ export class ClickHouseTraceService {
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
               ORDER BY SpanName ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1197,7 +1244,7 @@ export class ClickHouseTraceService {
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
-              LIMIT 1000
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
             `,
             query_params: {
               tenantId: projectId,
@@ -1216,7 +1263,42 @@ export class ClickHouseTraceService {
             label: row.key,
           }));
 
-          return { spanNames, metadataKeys };
+          // Get distinct evaluator names from evaluation_runs. Dedupe by
+          // evaluator id (an evaluator can be renamed over time) and keep the
+          // most recent name. The dropdown maps the id and shows the name.
+          const evalResult = await clickHouseClient.query({
+            query: `
+              SELECT
+                EvaluatorId AS id,
+                argMax(EvaluatorName, ScheduledAt) AS name
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND EvaluatorId != ''
+              GROUP BY EvaluatorId
+              ORDER BY name ASC
+              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
+            `,
+            query_params: {
+              tenantId: projectId,
+              startDate,
+              endDate,
+            },
+            format: "JSONEachRow",
+          });
+
+          const evalRows = (await evalResult.json()) as Array<{
+            id: string;
+            name: string | null;
+          }>;
+
+          const evaluationNames = evalRows.map((row) => ({
+            key: row.id,
+            label: row.name ?? row.id,
+          }));
+
+          return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
           this.logger.error(
             {
@@ -1460,6 +1542,7 @@ export class ClickHouseTraceService {
             ts.ErrorMessage AS ts_ErrorMessage,
             ts.Models AS ts_Models,
             ts.TotalCost AS ts_TotalCost,
+            ts.NonBilledCost AS ts_NonBilledCost,
             ts.TokensEstimated AS ts_TokensEstimated,
             ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
             ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -1624,6 +1707,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -1687,6 +1771,61 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve offloaded blob refs (if any), map normalized spans to legacy Span
+   * objects, build the Trace via mapTraceSummaryToTrace, patch recomputed I/O,
+   * and apply field-redaction protections.
+   *
+   * Extracted to remove the duplicated resolve+map+merge block that previously
+   * appeared in both getTracesWithSpans and enrichTracesWithSpans. Both call
+   * sites are now a single line.
+   *
+   * @internal
+   */
+  private async resolveAndMerge({
+    projectId,
+    summary,
+    spans,
+    protections,
+  }: {
+    projectId: string;
+    summary: TraceSummaryData;
+    spans: NormalizedSpan[];
+    protections: Protections;
+  }): Promise<Trace> {
+    let resolvedSpans = spans;
+    let recomputedInput: ExtractedIO | null = null;
+    let recomputedOutput: ExtractedIO | null = null;
+
+    if (this.resolveTraceSpans) {
+      const resolution = await this.resolveTraceSpans(projectId, spans);
+      resolvedSpans = resolution.resolvedSpans;
+      if (resolution.anyResolved) {
+        recomputedInput = resolution.recomputedInput;
+        recomputedOutput = resolution.recomputedOutput;
+      }
+    }
+
+    const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
+    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
+
+    // When blobs were resolved, patch trace.input / trace.output with
+    // the recomputed full values (overwriting the preview from trace_summaries).
+    if (recomputedInput !== null || recomputedOutput !== null) {
+      trace = {
+        ...trace,
+        ...(recomputedInput !== null
+          ? { input: { value: recomputedInput.text } }
+          : {}),
+        ...(recomputedOutput !== null
+          ? { output: { value: recomputedOutput.text } }
+          : {}),
+      };
+    }
+
+    return applyTraceProtections(trace, protections);
+  }
+
+  /**
    * Enrich traces (which have empty spans) with actual span data from ClickHouse.
    *
    * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
@@ -1706,17 +1845,21 @@ export class ClickHouseTraceService {
       traceIds,
     );
 
-    return traces.map((trace) => {
-      const data = tracesWithSpans.get(trace.trace_id);
-      if (!data || data.spans.length === 0) {
-        return trace;
-      }
-      const mappedSpans = mapNormalizedSpansToSpans(data.spans);
-      return applyTraceProtections(
-        mapTraceSummaryToTrace(data.summary, mappedSpans, projectId),
-        protections,
-      );
-    });
+    return Promise.all(
+      traces.map(async (trace) => {
+        const data = tracesWithSpans.get(trace.trace_id);
+        if (!data || data.spans.length === 0) {
+          return trace;
+        }
+
+        return this.resolveAndMerge({
+          projectId,
+          summary: data.summary,
+          spans: data.spans,
+          protections,
+        });
+      }),
+    );
   }
 
   /**
@@ -1768,6 +1911,7 @@ export class ClickHouseTraceService {
           ErrorMessage AS ts_ErrorMessage,
           Models AS ts_Models,
           TotalCost AS ts_TotalCost,
+          NonBilledCost AS ts_NonBilledCost,
           TokensEstimated AS ts_TokensEstimated,
           TotalPromptTokenCount AS ts_TotalPromptTokenCount,
           TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
@@ -1866,7 +2010,7 @@ export class ClickHouseTraceService {
             GROUP BY TenantId, TraceId, SpanId
           )
         ORDER BY t.TraceId, t.StartTime ASC
-        LIMIT 200 BY t.TraceId
+        LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds, ...spanTimeParams },
             format: "JSONEachRow",
@@ -1907,6 +2051,17 @@ export class ClickHouseTraceService {
           const spans = spansByTrace.get(row.TraceId) ?? [];
           spans.push(this.mapSpanRow(row, projectId));
           spansByTrace.set(row.TraceId, spans);
+        }
+
+        // Surface (rather than silently swallow) traces large enough to hit the
+        // per-trace span cap — their span list may be truncated.
+        for (const [traceId, spans] of spansByTrace) {
+          if (spans.length >= MAX_SPANS_PER_TRACE) {
+            this.logger.warn(
+              { projectId, traceId, spanCount: spans.length, cap: MAX_SPANS_PER_TRACE },
+              "Trace reached the per-trace span cap; span list may be truncated",
+            );
+          }
         }
 
         // Build the tracesMap by combining summaries + spans
@@ -1951,6 +2106,7 @@ export class ClickHouseTraceService {
       errorMessage: row.ts_ErrorMessage,
       models: row.ts_Models,
       totalCost: row.ts_TotalCost,
+      nonBilledCost: row.ts_NonBilledCost ?? null,
       tokensEstimated: row.ts_TokensEstimated,
       totalPromptTokenCount: row.ts_TotalPromptTokenCount,
       totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
@@ -2177,6 +2333,7 @@ interface TraceSummaryRow {
   ts_ErrorMessage: string | null;
   ts_Models: string[];
   ts_TotalCost: number | null;
+  ts_NonBilledCost: number | null;
   ts_TokensEstimated: boolean;
   ts_TotalPromptTokenCount: number | null;
   ts_TotalCompletionTokenCount: number | null;

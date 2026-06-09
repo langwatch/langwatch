@@ -40,6 +40,7 @@ function createFoldState(
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.0042,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 120,
     totalCompletionTokenCount: 42,

@@ -711,11 +711,20 @@ export class ClickHouseExperimentRunService {
         );
 
         try {
-          // IN-tuple dedup over the ReplacingMergeTree (see
-          // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT
-          // scans only the sparse key tuple to find max(UpdatedAt), outer
-          // SELECT pulls the heavy run row (Total/Progress/cost rollups) for
-          // that one match.
+          // Latest-version read for a single run over the
+          // ReplacingMergeTree(UpdatedAt). The inner scalar subquery finds the
+          // newest UpdatedAt reading only the light sort-key columns; the outer
+          // `UpdatedAt = (...)` equality is PREWHERE-able, so the heavy columns
+          // (Targets and the full row) are materialized for only the surviving
+          // version.
+          //
+          // The earlier key-plus-version IN-tuple form was not applied as a
+          // PREWHERE on the version, so ClickHouse read the heavy columns across
+          // EVERY version of the run before discarding the stale ones. For a
+          // single-aggregate get the scalar form is preferable; the IN-tuple
+          // form stays the right choice for the multi-run list reads (listRuns)
+          // and for experiment_run_items below. See the sibling
+          // simulation/trace read paths which use the same scalar form.
           const runResult = await clickHouseClient.query({
             query: `
               SELECT *
@@ -723,13 +732,12 @@ export class ClickHouseExperimentRunService {
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
-                AND (TenantId, ExperimentId, RunId, UpdatedAt) IN (
-                  SELECT TenantId, ExperimentId, RunId, max(UpdatedAt)
+                AND UpdatedAt = (
+                  SELECT max(UpdatedAt)
                   FROM experiment_runs
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId = {experimentId:String}
                     AND RunId = {runId:String}
-                  GROUP BY TenantId, ExperimentId, RunId
                 )
               LIMIT 1
             `,

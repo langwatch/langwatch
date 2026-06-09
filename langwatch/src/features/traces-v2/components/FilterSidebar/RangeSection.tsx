@@ -37,6 +37,8 @@ interface RangeSectionProps {
   onClear: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onShiftToggle?: (nextOpen: boolean) => void;
+  /** Remove this section from the sidebar (per-user). */
+  onHide?: () => void;
   orGroupId?: string;
   orPeers?: readonly string[];
 }
@@ -54,6 +56,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
   onClear,
   dragHandleProps,
   onShiftToggle,
+  onHide,
   orGroupId,
   orPeers,
 }) => {
@@ -160,6 +163,8 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      hideLabel={`Hide ${title}`}
       orGroupId={orGroupId}
       orPeers={orPeers}
       hasActive={isActive}

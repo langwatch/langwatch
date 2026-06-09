@@ -26,9 +26,11 @@ import {
   apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import {
-  stampBindingProvenanceOnLogRequest,
-  stampBindingProvenanceOnTraceRequest,
-} from "@ee/governance/services/bindingProvenance.utils";
+  stampIngestKeyProvenanceOnLogRequest,
+  stampIngestKeyProvenanceOnMetricRequest,
+  stampIngestKeyProvenanceOnTraceRequest,
+} from "@ee/governance/services/ingestKeyProvenance.utils";
+import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -61,9 +63,13 @@ type RouteContext = {
 /**
  * Classifies a token by prefix without exposing the value. Mirrors the
  * `tokenType` field emitted by the unified auth middleware so on-call can
- * filter CloudWatch by SDK shape.
+ * filter CloudWatch by SDK shape. Ingestion keys are ordinary `sk-lw-`
+ * API keys, so they classify as `legacy` here — the ingest discriminator
+ * lives on the resolved ApiKey row, not the token prefix.
  */
-export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
+export function classifyTokenType(
+  token: string,
+): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
   if (token.startsWith("sk-lw-")) return "legacy";
   return "unknown";
@@ -109,10 +115,11 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
   }
 
   if (!resolved) {
+    const tokenType = classifyTokenType(credentials.token);
     logger.warn(
       {
         ...diag,
-        tokenType: classifyTokenType(credentials.token),
+        tokenType,
         hasProjectId: !!credentials.projectId,
       },
       "Authentication failed: invalid credentials",
@@ -347,22 +354,29 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      // Receiver-authoritative provenance stamp for UserIngestionBinding
-      // tokens. Overwrites any payload-supplied values for the protected
-      // template attribute keys (langwatch.template.id /
-      // langwatch.user_ingestion_binding.id / langwatch.source) — even
-      // a malicious upstream cannot forge a different template/binding
-      // identity onto its own bound traces.
-      if (resolved.type === "user_ingestion_binding") {
+      // Receiver-authoritative provenance stamp for ingestion-key traces.
+      // Overwrites any payload-supplied provenance keys (langwatch.source /
+      // langwatch.api_key.id / langwatch.origin / langwatch.organization_id
+      // / langwatch.template.id) — even a malicious upstream cannot forge a
+      // different source / key / org identity onto its own traces.
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Whether this tool's direct-OTLP usage is bundled (non-billed per
+        // token). Cached per (org, sourceType); drives the trace summary's
+        // billed-vs-non-billed cost split. Gateway usage never reaches here.
+        const nonBillable = await resolveSourceNonBillable({
+          organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
         // OTLP SDK types and the local stamp helper agree structurally on
         // the slice we mutate (resourceSpans → resource → attributes). The
         // cast bridges nullability differences in deeper fields the helper
         // never reads.
-        stampBindingProvenanceOnTraceRequest(traceRequest as unknown as Parameters<typeof stampBindingProvenanceOnTraceRequest>[0], {
-          bindingId: resolved.bindingId,
-          templateId: resolved.templateId,
-          templateSlug: resolved.templateSlug,
+        stampIngestKeyProvenanceOnTraceRequest(traceRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnTraceRequest>[0], {
+          apiKeyId: resolved.apiKeyId,
+          sourceType: resolved.ingestSourceType,
           organizationId: resolved.organizationId,
+          templateId: resolved.ingestionTemplateId,
+          nonBillable,
         });
       }
 
@@ -443,12 +457,22 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      if (resolved.type === "user_ingestion_binding") {
-        stampBindingProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampBindingProvenanceOnLogRequest>[0], {
-          bindingId: resolved.bindingId,
-          templateId: resolved.templateId,
-          templateSlug: resolved.templateSlug,
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
+        // need the same bundled-vs-billed resolution the trace path does —
+        // without it their cost never gets the non-billable marker and a
+        // bundled coding session reads as real spend. Cached per
+        // (org, sourceType).
+        const nonBillable = await resolveSourceNonBillable({
           organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
+        stampIngestKeyProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0], {
+          apiKeyId: resolved.apiKeyId,
+          sourceType: resolved.ingestSourceType,
+          organizationId: resolved.organizationId,
+          templateId: resolved.ingestionTemplateId,
+          nonBillable,
         });
       }
 
@@ -516,6 +540,19 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
         return c.json({ error: "Failed to parse metrics" }, { status: 400 });
       }
       const metricsRequest = parsed.request;
+
+      // Receiver-authoritative provenance stamp for ingestion-key metrics —
+      // same contract as traces + logs, so the source / key / origin / org
+      // identity rides every OTLP signal and an upstream payload cannot forge
+      // a different one.
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        stampIngestKeyProvenanceOnMetricRequest(metricsRequest as unknown as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0], {
+          apiKeyId: resolved.apiKeyId,
+          sourceType: resolved.ingestSourceType,
+          organizationId: resolved.organizationId,
+          templateId: resolved.ingestionTemplateId,
+        });
+      }
 
       // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {

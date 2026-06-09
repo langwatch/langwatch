@@ -167,14 +167,28 @@ function CommandRow({
         borderRadius="sm"
         backgroundColor="bg.subtle"
       >
+        {/* "$" is a separate, non-selectable, lighter element so copying the
+            command by hand never picks up the prompt. */}
+        <Text
+          as="span"
+          fontFamily="mono"
+          fontSize="sm"
+          color="fg.muted"
+          userSelect="none"
+          flexShrink={0}
+          aria-hidden="true"
+        >
+          $
+        </Text>
         <Code
           flex={1}
+          minWidth={0}
           backgroundColor="transparent"
           fontSize="sm"
           overflowX="auto"
           whiteSpace="nowrap"
         >
-          $ {command}
+          {command}
         </Code>
         <IconButton
           size="xs"

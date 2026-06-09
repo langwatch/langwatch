@@ -18,7 +18,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
     coordinates (line/col) inline.
 
   Per template-ottl-principal-guard.feature:
-    The 19-key `protectedTemplateAttributeKeys` closed list applies to
+    The `protectedTemplateAttributeKeys` closed list applies to
     the OTTL the admin authors. Admin OTTL CANNOT rewrite attribution
     or provenance keys. Forge attempts emit
     `gateway.template_ottl_protected_field_attempt`.
@@ -49,7 +49,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
       | parentTemplateId | (platform-default's id, for provenance)        |
     And the Edit OTTL drawer opens on the new org row with the OttlEditor
         loaded against the cloned starter (admin can refine from there)
-    And acme's existing UserIngestionBindings for slug "claude_code" are
+    And acme's existing ingestion keys referencing slug "claude_code" are
         re-pointed to the new fork on next trace receive (not snapshot —
         runtime-resolved per ingestion-templates-catalog.feature)
 
@@ -103,7 +103,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
     Given carol has authored OTTL containing
         `set(attributes["langwatch.user.id"], "different.user@acme.com")`
     When she clicks "Save & validate"
-    Then the server's static-analysis pass detects the write to a 19-key
+    Then the server's static-analysis pass detects the write to a
         protected attribute and rejects with HTTP 422 + error payload
         `{ rejectedKeys: ["langwatch.user.id"], category: "attribution",
            remediation: "Attribution keys are receiver-stamped post-OTTL.
@@ -131,8 +131,8 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
       | rulesHashAfter  | sha256(new rules)                              |
       | rulesDiffKb    | size of diff in kilobytes (for forensics)      |
     And the audit row mirrors to OCSF via the existing fold pipeline
-    And jane's NEXT trace through her cursor binding picks up the new rule
-        (template-update-propagation per user-ingestion-binding-lifecycle.feature)
+    And jane's NEXT trace through her cursor ingestion key picks up the new rule
+        (template-update-propagation per ingestion-key-lifecycle.feature)
 
   # ---------------------------------------------------------------------------
   # Authorization
@@ -168,10 +168,10 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
   # ---------------------------------------------------------------------------
 
   @bdd @template-ottl-authoring @tier-of-trust
-  Scenario: Org-authored templates carry the 19-key protection AND cost/token/model lockdown
-    Given an org-authored template's OTTL is being applied to a binding-routed trace
+  Scenario: Org-authored templates carry the protected-key guard AND cost/token/model lockdown
+    Given an org-authored template's OTTL is being applied to an ingestion-key-routed trace
     When the receiver applies the OTTL
-    Then the 19-key `protectedTemplateAttributeKeys` guard fires post-OTTL
+    Then the `protectedTemplateAttributeKeys` guard fires post-OTTL
     AND the org-authored-template tier ALSO blocks
         `langwatch.cost.usd*` + `gen_ai.usage.*` + `gen_ai.response.model`
     # Org-authored OTTL is admin-trusted within-org but not platform-team-

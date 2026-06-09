@@ -53,6 +53,7 @@ function makeState(
     errorMessage: null,
     models: [],
     totalCost: null,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,

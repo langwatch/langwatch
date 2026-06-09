@@ -86,4 +86,3 @@ export const LANGY_RETENTION_QUEUE = {
   NAME: makeQueueName("langy_retention"),
   JOB: "langy_retention",
 } as const;
-

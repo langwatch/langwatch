@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.32.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.31.0...typescript-sdk@v0.32.0) (2026-06-08)
+
+
+### Features
+
+* **cli:** unify langwatch claude (gateway + OTLP ingest) ([#4544](https://github.com/langwatch/langwatch/issues/4544)) ([9bfc844](https://github.com/langwatch/langwatch/commit/9bfc844c93ccab9945e00f641420e568b2c7ef4d))
+
+
+### Bug Fixes
+
+* **deps:** bump vitest to &gt;=4.1.0 across the monorepo (closes 9 CRITICAL alerts) ([#4495](https://github.com/langwatch/langwatch/issues/4495)) ([6f90ef4](https://github.com/langwatch/langwatch/commit/6f90ef48ae5b9436742bbda5d4bef21ea904db82))
+* **deps:** consolidated npm security overrides across the monorepo (closes 18 alerts) ([#4650](https://github.com/langwatch/langwatch/issues/4650)) ([3a56a88](https://github.com/langwatch/langwatch/commit/3a56a884826d493c2d9690ae9359068c193a4725))
+* **governance:** SaaS CLI gateway default points at parked .com host ([#4625](https://github.com/langwatch/langwatch/issues/4625)) ([c123c40](https://github.com/langwatch/langwatch/commit/c123c40d0ff2860fc8558e480dccb61c1da2c9d6))
+
+
+### Code Refactoring
+
+* **types:** make zod the single source of truth, remove ts-to-zod ([#4651](https://github.com/langwatch/langwatch/issues/4651)) ([d583fbe](https://github.com/langwatch/langwatch/commit/d583fbe2ed2ca2ef320695323c17f6c362ea4efa))
+
 ## [0.31.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.30.0...typescript-sdk@v0.31.0) (2026-06-01)
 
 

@@ -12,10 +12,10 @@ const baseInput: LoginCeremonyInput = {
 
 describe("formatLoginCeremony", () => {
   describe("when only the user email is known", () => {
-    it("renders the minimum ceremony with header, try-it, and open hint", () => {
+    it("renders the header, the AI tools block, and the open hint", () => {
       const lines = formatLoginCeremony({ email: "jane@acme.com" });
       expect(lines[0]).toBe("✓ Logged in as jane@acme.com");
-      expect(lines).toContain("Try it:");
+      expect(lines).toContain("Your AI tools (run any of these):");
       expect(lines).toContain("Or open the app in your browser:");
     });
 
@@ -25,45 +25,99 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("when providers are supplied", () => {
-    it("emits the provider section between the header and the try-it block", () => {
-      const lines = formatLoginCeremony({
-        ...baseInput,
-        providers: [
-          { name: "anthropic", modelSummary: "Claude — Sonnet, Haiku" },
-          { name: "openai", modelSummary: "GPT-5, GPT-5-mini" },
-          { name: "gemini", modelSummary: "2.5 Pro, 2.5 Flash" },
-        ],
+  describe("AI tools block", () => {
+    describe("when the org publishes coding-assistant tools", () => {
+      it("lists exactly those tools as runnable commands with their names", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          tools: [
+            { slug: "claude", displayName: "Claude Code" },
+            { slug: "codex", displayName: "Codex" },
+          ],
+        });
+        const toolLines = lines.filter(
+          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+        );
+        expect(toolLines).toHaveLength(2);
+        expect(toolLines[0]).toBe("  $ langwatch claude  # Claude Code");
+        expect(toolLines[1]).toBe("  $ langwatch codex   # Codex");
       });
-      expect(lines).toContain("Your AI tools are ready:");
-      const providerLines = lines.filter((l) => l.startsWith("  •"));
-      expect(providerLines).toHaveLength(3);
-      expect(providerLines[0]).toMatch(/anthropic/);
-      expect(providerLines[0]).toMatch(/Claude — Sonnet, Haiku/);
     });
 
-    it("aligns provider names by padding to the longest name", () => {
-      const lines = formatLoginCeremony({
-        ...baseInput,
-        providers: [
-          { name: "openai", modelSummary: "x" },
-          { name: "anthropic", modelSummary: "y" },
-        ],
+    describe("when the org publishes no tools", () => {
+      it("falls back to the built-in default wrappers", () => {
+        const lines = formatLoginCeremony(baseInput);
+        const toolLines = lines.filter(
+          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+        );
+        expect(toolLines).toHaveLength(3);
+        expect(toolLines.find((l) => l.includes("claude"))).toBeDefined();
+        expect(toolLines.find((l) => l.includes("codex"))).toBeDefined();
+        expect(toolLines.find((l) => l.includes("cursor"))).toBeDefined();
       });
-      // "anthropic" is 9 chars; "openai" should be padded to 9 chars too
-      const opening = lines.find((l) => l.includes("openai"));
-      const anthropicLine = lines.find((l) => l.includes("anthropic"));
-      expect(opening).toBeDefined();
-      expect(anthropicLine).toBeDefined();
-      // Both should have the same width before the model summary
-      const openIdx = opening!.indexOf("(x)");
-      const anthIdx = anthropicLine!.indexOf("(y)");
-      expect(openIdx).toBe(anthIdx);
-    });
 
-    it("omits the providers section when the array is empty", () => {
-      const lines = formatLoginCeremony({ ...baseInput, providers: [] });
-      expect(lines).not.toContain("Your AI tools are ready:");
+      it("falls back when an empty tools array is supplied", () => {
+        const lines = formatLoginCeremony({ ...baseInput, tools: [] });
+        const toolLines = lines.filter(
+          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+        );
+        expect(toolLines).toHaveLength(3);
+      });
+    });
+  });
+
+  describe("model providers block", () => {
+    describe("when providers are supplied", () => {
+      it("renders providers under a clearly distinct virtual-key heading", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          providers: [
+            { name: "anthropic", displayName: "Anthropic", configured: true },
+            { name: "openai", displayName: "OpenAI", configured: true },
+          ],
+        });
+        expect(lines).toContain(
+          "Model providers you can issue a virtual key for:",
+        );
+        // NOT labelled "AI tools" — that confusion is the bug being fixed.
+        expect(lines).not.toContain("Your AI tools are ready:");
+        const providerLines = lines.filter((l) => l.startsWith("  •"));
+        expect(providerLines).toHaveLength(2);
+        expect(providerLines[0]).toMatch(/anthropic/);
+        expect(providerLines[0]).toMatch(/Anthropic/);
+      });
+
+      it("annotates an unconfigured provider so the user knows it needs setup", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          providers: [{ name: "openai", configured: false }],
+        });
+        const providerLine = lines.find((l) => l.startsWith("  •"));
+        expect(providerLine).toMatch(/not configured yet/);
+      });
+
+      it("aligns provider names by padding to the longest name", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          providers: [
+            { name: "openai", displayName: "x" },
+            { name: "anthropic", displayName: "y" },
+          ],
+        });
+        const openLine = lines.find((l) => l.includes("openai"));
+        const anthropicLine = lines.find((l) => l.includes("anthropic"));
+        expect(openLine).toBeDefined();
+        expect(anthropicLine).toBeDefined();
+        // "anthropic" is 9 chars; "openai" padded to 9 too → labels align.
+        expect(openLine!.indexOf("x")).toBe(anthropicLine!.indexOf("y"));
+      });
+
+      it("omits the providers section when the array is empty", () => {
+        const lines = formatLoginCeremony({ ...baseInput, providers: [] });
+        expect(lines).not.toContain(
+          "Model providers you can issue a virtual key for:",
+        );
+      });
     });
   });
 
@@ -101,36 +155,6 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("try-it block", () => {
-    it("defaults to claude / codex / cursor wrappers", () => {
-      const lines = formatLoginCeremony(baseInput);
-      const tryLines = lines.filter(
-        (l) =>
-          l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-      );
-      expect(tryLines).toHaveLength(3);
-      expect(tryLines.find((l) => l.includes("claude"))).toBeDefined();
-      expect(tryLines.find((l) => l.includes("codex"))).toBeDefined();
-      expect(tryLines.find((l) => l.includes("cursor"))).toBeDefined();
-    });
-
-    it("attaches a label to known wrappers", () => {
-      const lines = formatLoginCeremony({ ...baseInput, wrappers: ["claude"] });
-      const claudeLine = lines.find((l) => l.includes("langwatch claude"));
-      expect(claudeLine).toMatch(/use Claude Code/);
-    });
-
-    it("renders unknown wrappers without a label rather than crashing", () => {
-      const lines = formatLoginCeremony({
-        ...baseInput,
-        wrappers: ["new-tool"],
-      });
-      const line = lines.find((l) => l.includes("langwatch new-tool"));
-      expect(line).toBeDefined();
-      expect(line).not.toMatch(/#/);
-    });
-  });
-
   describe("open hint", () => {
     it("appears by default", () => {
       const lines = formatLoginCeremony(baseInput);
@@ -147,33 +171,30 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("full Storyboard Screen 4 output (golden)", () => {
-    it("matches the gateway.md storyboard layout end-to-end", () => {
+  describe("full ceremony output (golden)", () => {
+    it("renders the two distinct sections end-to-end", () => {
       const lines = formatLoginCeremony({
         email: "jane@acme.com",
+        organizationName: "Acme",
+        tools: [{ slug: "claude", displayName: "Claude Code" }],
         providers: [
-          { name: "anthropic", modelSummary: "Claude — Sonnet, Haiku" },
-          { name: "openai", modelSummary: "GPT-5, GPT-5-mini" },
-          { name: "gemini", modelSummary: "2.5 Pro, 2.5 Flash" },
+          { name: "anthropic", displayName: "Anthropic", configured: true },
+          { name: "openai", displayName: "OpenAI", configured: false },
         ],
         budget: { period: "monthly", limitUsd: 500, usedUsd: 0 },
       });
-      // Golden output assertion — the storyboard ceremony shape
       expect(lines.join("\n")).toBe(
         [
-          "✓ Logged in as jane@acme.com",
+          "✓ Logged in as jane@acme.com @ Acme",
           "",
-          "Your AI tools are ready:",
-          "  • anthropic  (Claude — Sonnet, Haiku)",
-          "  • openai     (GPT-5, GPT-5-mini)",
-          "  • gemini     (2.5 Pro, 2.5 Flash)",
+          "Your AI tools (run any of these):",
+          "  $ langwatch claude  # Claude Code",
+          "",
+          "Model providers you can issue a virtual key for:",
+          "  • anthropic  Anthropic",
+          "  • openai     OpenAI  (not configured yet)",
           "",
           "Monthly budget: $500   |   Used: $0.00",
-          "",
-          "Try it:",
-          "  $ langwatch claude  # use Claude Code",
-          "  $ langwatch codex   # use Codex",
-          "  $ langwatch cursor  # use Cursor",
           "",
           "Or open the app in your browser:",
           "  $ langwatch open",

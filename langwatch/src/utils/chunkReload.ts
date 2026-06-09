@@ -17,7 +17,7 @@
 // deploy mid-session still reloads; long enough to avoid a loop if the server
 // is genuinely returning broken chunks.
 const RELOAD_COOLDOWN_MS = 10_000;
-const RELOAD_AT_KEY = "chunk-reload-at";
+export const RELOAD_AT_KEY = "chunk-reload-at";
 
 /**
  * True when an error looks like a failed chunk download rather than an

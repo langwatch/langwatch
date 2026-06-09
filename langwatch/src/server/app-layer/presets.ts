@@ -56,11 +56,19 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { BlobStore } from "./traces/blob-store.service";
+import { TraceIOExtractionService } from "./traces/trace-io-extraction.service";
+import { maybeSpool } from "./traces/edge-spool";
+import { createS3Client } from "~/server/storage";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
-import { TraceListService } from "./traces/trace-list.service";
+import {
+  setDiscoverBroadcaster,
+  TraceListService,
+} from "./traces/trace-list.service";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -78,6 +86,7 @@ import { handleLicensePurchase } from "../../../ee/billing/services/licensePurch
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { InviteService } from "../invites/invite.service";
 import { env } from "~/env.mjs";
+import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "~/server/posthog";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
@@ -104,6 +113,7 @@ import { NullReplayRepository } from "./ops/repositories/replay.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
@@ -122,14 +132,6 @@ import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.rep
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
-import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
-import {
-  InMemoryOrphanCursorStore,
-  RedisOrphanCursorStore,
-} from "../data-retention/orphan-sweep/orphanSweepCursor.store";
-import { seedOrphanSweepChain } from "../background/queues/orphanSweepChainQueue";
-import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 import { ShareService } from "./share/share.service";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
@@ -208,9 +210,35 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceListService",
   );
+  // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
+  // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
+  const blobStore = new BlobStore(createS3Client, clickhouseEnabled ? resolveClickHouseClient : undefined);
+  const ioExtractionService = new TraceIOExtractionService();
+
+  // Wire the discover-cache → SSE bridge. Module-level setter keeps
+  // the TraceListService constructor lean (the null/test preset below
+  // doesn't need a broadcaster — refreshes that never get an SSE push
+  // still hydrate the cache successfully).
+  setDiscoverBroadcaster((tenantId) => {
+    // Broadcast.event payload is a string by contract — sender + SSE
+    // bridge both deserialise it on the client. Keep it tiny: timestamp
+    // is enough for the client to confirm freshness; the actual payload
+    // ships through the discover query they re-fire on receipt.
+    const payload = JSON.stringify({
+      event: "discover_updated",
+      tenantId,
+      timestamp: Date.now(),
+    });
+    void broadcast.broadcastToTenantRateLimited(
+      tenantId,
+      payload,
+      "discover_updated",
+    );
+  });
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
+      { blobStore, ioExtractionService },
     ),
     "SpanStorageService",
   );
@@ -238,7 +266,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const traceService = TraceService.create(prisma);
+  const traceService = TraceService.create(prisma, {
+    blobStore,
+    ioExtractionService,
+  });
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
@@ -384,29 +415,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const storageMeterService = new StorageMeterService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const orphanSweepRepo = new OrphanSweepRepository(prisma);
-  // Persist sweep cursors in Redis when available; fall back to the in-memory
-  // store otherwise. The cursor lets the sweep resume across runs instead of
-  // restarting at page 0 every hour and starving the tail.
-  const orphanCursorStore = redis
-    ? new RedisOrphanCursorStore(redis)
-    : new InMemoryOrphanCursorStore();
-  const orphanSweepService = new OrphanSweepService(
-    orphanSweepRepo,
-    clickhouseEnabled ? resolveClickHouseClient : null,
-    orphanCursorStore,
-  );
-  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
-    retentionPolicyCache,
-    seedChain: (params) => seedOrphanSweepChain(params.tenantId),
-  });
-
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
     retroactive: retroactiveUpdateService,
     metering: storageMeterService,
-    orphanSweep: orphanSweepService,
   };
 
   const share = traced(
@@ -490,9 +503,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
+    // can reconstitute oversized commands (fetch from transient S3 spool) and
+    // best-effort delete the spool after event_log INSERT succeeds.
+    blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
-    retentionOrphanSweepReactor,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -507,6 +523,46 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
+      // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
+      // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
+      // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and
+      // the 5s-cached flag store keeps that per-span read cheap.
+      //
+      // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
+      // from maybeSpool (S3 outage, BlobStore.putSpool throws) is caught here.
+      // We log at warn level and return the original commandData unchanged so
+      // that ingestion is never blocked by the spool path. ADR-022.
+      processCommandData: async (data) => {
+        // Track which stage failed so the fail-open counter carries a useful
+        // reason label (flag_store vs spool/S3) for alerting (GtVrL).
+        let stage: "flag_store" | "spool" = "flag_store";
+        try {
+          const enabled = await getFeatureFlagStore().get(
+            "release_trace_blob_offload",
+            { projectId: data.tenantId },
+          );
+          if (enabled !== true) return data;
+          stage = "spool";
+          return await maybeSpool({
+            data,
+            blobStore,
+            logger: createLogger("langwatch:traces:edge-spool"),
+          });
+        } catch (err) {
+          getEdgeSpoolFailOpenCounter(stage).inc();
+          createLogger("langwatch:traces:edge-spool-fail-open").warn(
+            {
+              projectId: data.tenantId,
+              traceId: data.span.traceId,
+              spanId: data.span.spanId,
+              reason: stage,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Edge spool failed — falling back to unmodified command data (fail-open)",
+          );
+          return data;
+        }
+      },
     }),
     "TraceRequestCollectionService",
   );
@@ -655,6 +711,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     new PinnedTraceRepository(testPrisma),
   );
   const noop = async () => { };
+  // Clear the module-global discover broadcaster so a test app built
+  // after `initializeDefaultApp` doesn't inherit the production
+  // broadcaster's closure (which captured the production
+  // BroadcastService and would fire SSE pushes out of tests). The
+  // null repository's no-op refresh path can still reach the
+  // broadcaster, so leaving the prod callback wired would leak
+  // cross-app callbacks. Tests that want their own broadcaster can
+  // re-register one after `createTestApp` returns.
+  setDiscoverBroadcaster(null);
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
@@ -787,7 +852,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
-      orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

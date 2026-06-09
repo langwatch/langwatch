@@ -54,7 +54,9 @@ export function GroupRow({
         />
       </Flex>
 
-      {/* Type icon */}
+      {/* Type icon — see TreeRow for the same `colorPalette` rationale
+          (raw `${palette}.subtle` interpolation gave brittle dark-mode
+          contrast on some palettes). */}
       <Flex
         width="18px"
         height="18px"
@@ -63,8 +65,9 @@ export function GroupRow({
         flexShrink={0}
         marginRight={1.5}
         borderRadius="sm"
-        bg={`${palette}.subtle`}
-        color={`${palette}.fg`}
+        colorPalette={palette}
+        bg="colorPalette.subtle"
+        color="colorPalette.fg"
       >
         <Icon as={TypeIcon} boxSize={3} />
       </Flex>

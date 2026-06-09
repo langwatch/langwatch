@@ -4,6 +4,7 @@ import { useLocalStorage } from "usehooks-ts";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { resolveHomeDestination } from "~/utils/resolveHomeDestination";
 
 /**
  * `/` redirect — picks the right home for the user's persona via the
@@ -30,8 +31,8 @@ export default function Index() {
 
   // Implicit home-kind preference written from MyLayout (personal) and
   // useOrganizationTeamProject (project). Honored only when the user
-  // has no explicit pin via the picker, so /me sticks the same way the
-  // last project does without overriding the user's deliberate choice.
+  // has no explicit pin via the picker, so /me AND the last-visited project
+  // both stick, without overriding the user's deliberate choice.
   const [lastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
     "lastVisitedHomeKind",
     "",
@@ -39,18 +40,22 @@ export default function Index() {
 
   useEffect(() => {
     if (resolved.data?.destination) {
-      // Explicit picker pin always wins. Only override the auto-detected
-      // destination when the user has no pin AND their last visit was /me.
-      // Gate on governanceUiEnabled: /me is flag-gated and 404s for orgs
-      // without it, so never fall back there for a non-governance org (this
-      // is the admin's own localStorage leaking into an impersonated
-      // session — the impersonated customer must not be sent to /me).
-      const detectedFallback =
-        resolved.data.governanceUiEnabled &&
-        !resolved.data.isOverride &&
-        lastVisitedHomeKind === "personal" &&
-        resolved.data.destination !== "/me";
-      void router.replace(detectedFallback ? "/me" : resolved.data.destination);
+      // The persona resolver picks the DEFAULT for a user with no history. On
+      // top of that we honor the last-visited home so it sticks both ways: a
+      // user whose persona default is /me still returns to the project they
+      // last opened, and /me sticks for someone who last sat there. `project`
+      // here is the last-visited project (useOrganizationTeamProject resolves
+      // it from the selectedProjectSlug on a slug-less route). An explicit
+      // picker pin (isOverride) always wins.
+      void router.replace(
+        resolveHomeDestination({
+          resolverDestination: resolved.data.destination,
+          isOverride: resolved.data.isOverride,
+          governanceUiEnabled: resolved.data.governanceUiEnabled,
+          lastVisitedHomeKind,
+          lastProjectSlug: project?.slug ?? null,
+        }),
+      );
       return;
     }
     if (resolved.isError && project) {

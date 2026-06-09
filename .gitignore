@@ -7,8 +7,12 @@ node_modules
 # Defense against MCP env-var leaks: external tooling can mkdir a literal
 # directory like "${HOME/...}" relative to cwd when bash-style env defaults
 # aren't expanded. Never let those slip into the repo again.
-${HOME*
-${VAR*
+# NB: the `{` is escaped as `[{]` so these stay valid globs for the Rust
+# `ignore` crate (ast-grep / ripgrep), which otherwise reads `{` as an
+# unclosed alternate group and aborts directory traversal. git treats
+# `[{]` as a literal-`{` character class, so the guard is unchanged.
+$[{]HOME*
+$[{]VAR*
 
 llm-model-costs.json
 quickwit-*
@@ -122,3 +126,7 @@ langwatch/pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
 langwatch/src/tests/langy/scenario-logs/
+
+# Agent scratch + dogfood evidence (never track)
+**/.claude/dogfood-evidence/
+**/.claude/tmp/

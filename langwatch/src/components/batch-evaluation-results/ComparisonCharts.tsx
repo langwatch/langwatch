@@ -6,7 +6,7 @@
  * Supports different X-axis groupings (by run, target, model, prompt, custom metadata).
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
@@ -356,6 +356,34 @@ export const ComparisonCharts = ({
   >(() => new Set(["cost", "latency"] as MetricType[]));
   const [metricsDropdownOpen, setMetricsDropdownOpen] = useState(false);
   const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
+  const metricsBtnRef = useRef<HTMLButtonElement>(null);
+  const groupByBtnRef = useRef<HTMLButtonElement>(null);
+  // Captured on open so the portaled menu can pin itself to the trigger.
+  // Recomputed each open; we do not track scroll/resize (matches sister
+  // BatchTargetCell behavior — close-and-reopen if you want to reposition).
+  const [metricsBtnRect, setMetricsBtnRect] = useState<DOMRect | null>(null);
+  const [groupByBtnRect, setGroupByBtnRect] = useState<DOMRect | null>(null);
+
+  const openMetricsDropdown = () => {
+    const rect = metricsBtnRef.current?.getBoundingClientRect() ?? null;
+    setMetricsBtnRect(rect);
+    setMetricsDropdownOpen(true);
+  };
+  const openGroupByDropdown = () => {
+    const rect = groupByBtnRef.current?.getBoundingClientRect() ?? null;
+    setGroupByBtnRect(rect);
+    setGroupByDropdownOpen(true);
+  };
+  // Focus-return on close keeps assistive-tech users oriented — without it,
+  // focus disappears into the void when the portaled menu unmounts.
+  const closeMetricsDropdown = () => {
+    setMetricsDropdownOpen(false);
+    metricsBtnRef.current?.focus();
+  };
+  const closeGroupByDropdown = () => {
+    setGroupByDropdownOpen(false);
+    groupByBtnRef.current?.focus();
+  };
 
   const visibleMetrics = controlledVisibleMetrics ?? internalVisibleMetrics;
   const setVisibleMetrics = (metrics: Set<MetricType>) => {
@@ -823,143 +851,224 @@ export const ComparisonCharts = ({
           <HStack wrap="wrap" gap={2} paddingX={2}>
             {/* Group by dropdown */}
             {xAxisOptions.length > 0 && (
-              <Box position="relative" data-testid="xaxis-selector">
+              <Box data-testid="xaxis-selector">
                 <Button
+                  ref={groupByBtnRef}
                   size="xs"
                   variant="outline"
-                  onClick={() => setGroupByDropdownOpen(!groupByDropdownOpen)}
+                  onClick={() =>
+                    groupByDropdownOpen
+                      ? setGroupByDropdownOpen(false)
+                      : openGroupByDropdown()
+                  }
                   data-testid="group-by-button"
+                  aria-haspopup="menu"
+                  aria-expanded={groupByDropdownOpen}
                 >
                   Group by:{" "}
                   {xAxisOptions.find((o) => o.value === xAxisOption)?.label ??
                     "Runs"}
                 </Button>
-                {groupByDropdownOpen && (
-                  <Box
-                    position="absolute"
-                    top="100%"
-                    left={0}
-                    marginTop={1}
-                    bg="bg.panel"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    boxShadow="md"
-                    zIndex={1000}
-                    minWidth="150px"
-                    padding={2}
-                    data-testid="group-by-dropdown"
-                  >
-                    <VStack align="stretch" gap={1}>
-                      {xAxisOptions.map((opt) => (
-                        <HStack
-                          key={opt.value}
-                          padding={1}
-                          borderRadius="sm"
-                          cursor="pointer"
-                          bg={
-                            xAxisOption === opt.value
-                              ? "blue.subtle"
-                              : "transparent"
-                          }
-                          _hover={{
-                            bg:
+                {groupByDropdownOpen && groupByBtnRect && (
+                  <Portal>
+                    <Box
+                      position="fixed"
+                      inset={0}
+                      zIndex={1000}
+                      onClick={() => setGroupByDropdownOpen(false)}
+                      data-testid="group-by-backdrop"
+                    />
+                    <Box
+                      position="fixed"
+                      top={`${groupByBtnRect.bottom + 4}px`}
+                      left={`${groupByBtnRect.left}px`}
+                      bg="bg.panel"
+                      border="1px solid"
+                      borderColor="border"
+                      borderRadius="md"
+                      boxShadow="md"
+                      zIndex={1001}
+                      minWidth="150px"
+                      padding={2}
+                      style={{
+                        maxHeight: `calc(100vh - ${groupByBtnRect.bottom + 16}px)`,
+                        overflowY: "auto",
+                      }}
+                      data-testid="group-by-dropdown"
+                      role="menu"
+                      tabIndex={-1}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          closeGroupByDropdown();
+                        }
+                      }}
+                    >
+                      <VStack align="stretch" gap={1}>
+                        {xAxisOptions.map((opt) => (
+                          <HStack
+                            key={opt.value}
+                            padding={1}
+                            borderRadius="sm"
+                            cursor="pointer"
+                            bg={
                               xAxisOption === opt.value
-                                ? "blue.muted"
-                                : "bg.subtle",
-                          }}
-                          onClick={() => {
-                            setXAxisOption(opt.value);
-                            setGroupByDropdownOpen(false);
-                          }}
-                          data-testid={`xaxis-option-${opt.value}`}
-                        >
-                          <Text
-                            fontSize="sm"
-                            fontWeight={
-                              xAxisOption === opt.value ? "medium" : "normal"
+                                ? "blue.subtle"
+                                : "transparent"
                             }
-                            color={
-                              xAxisOption === opt.value ? "blue.fg" : "inherit"
-                            }
+                            _hover={{
+                              bg:
+                                xAxisOption === opt.value
+                                  ? "blue.muted"
+                                  : "bg.subtle",
+                            }}
+                            onClick={() => {
+                              setXAxisOption(opt.value);
+                              setGroupByDropdownOpen(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setXAxisOption(opt.value);
+                                setGroupByDropdownOpen(false);
+                              }
+                            }}
+                            role="menuitem"
+                            tabIndex={0}
+                            data-testid={`xaxis-option-${opt.value}`}
                           >
-                            {opt.label}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
+                            <Text
+                              fontSize="sm"
+                              fontWeight={
+                                xAxisOption === opt.value ? "medium" : "normal"
+                              }
+                              color={
+                                xAxisOption === opt.value
+                                  ? "blue.fg"
+                                  : "inherit"
+                              }
+                            >
+                              {opt.label}
+                            </Text>
+                          </HStack>
+                        ))}
+                      </VStack>
+                    </Box>
+                  </Portal>
                 )}
               </Box>
             )}
 
             {/* Metrics selector dropdown */}
-            <Box position="relative">
+            <Box>
               <Button
+                ref={metricsBtnRef}
                 size="xs"
                 variant="outline"
-                onClick={() => setMetricsDropdownOpen(!metricsDropdownOpen)}
+                onClick={() =>
+                  metricsDropdownOpen
+                    ? setMetricsDropdownOpen(false)
+                    : openMetricsDropdown()
+                }
                 data-testid="metrics-selector-button"
+                aria-haspopup="menu"
+                aria-expanded={metricsDropdownOpen}
               >
                 Metrics ({visibleMetrics.size}/{availableMetrics.length})
               </Button>
-              {metricsDropdownOpen && (
-                <Box
-                  position="absolute"
-                  top="100%"
-                  right={0}
-                  marginTop={1}
-                  bg="bg.panel"
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  boxShadow="md"
-                  zIndex={1000}
-                  minWidth="200px"
-                  padding={2}
-                  data-testid="metrics-dropdown"
-                >
-                  <VStack align="stretch" gap={1}>
-                    {availableMetrics.map((metric) => (
-                      <HStack
-                        key={metric.id}
-                        padding={1}
-                        borderRadius="sm"
-                        cursor="pointer"
-                        _hover={{ bg: "bg.subtle" }}
-                        onClick={() => toggleMetric(metric.id)}
-                      >
-                        <Box
-                          width="16px"
-                          height="16px"
-                          minWidth="16px"
-                          minHeight="16px"
-                          flexShrink={0}
-                          border="1px solid"
-                          borderColor="border.emphasized"
+              {metricsDropdownOpen && metricsBtnRect && (
+                <Portal>
+                  <Box
+                    position="fixed"
+                    inset={0}
+                    zIndex={1000}
+                    onClick={() => setMetricsDropdownOpen(false)}
+                    data-testid="metrics-backdrop"
+                  />
+                  <Box
+                    position="fixed"
+                    top={`${metricsBtnRect.bottom + 4}px`}
+                    // Right-align to the trigger button so the dropdown
+                    // extends leftward, matching the pre-fix visual placement.
+                    left={`${metricsBtnRect.right}px`}
+                    transform="translateX(-100%)"
+                    bg="bg.panel"
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="md"
+                    boxShadow="md"
+                    zIndex={1001}
+                    minWidth="200px"
+                    padding={2}
+                    style={{
+                      maxHeight: `calc(100vh - ${metricsBtnRect.bottom + 16}px)`,
+                      overflowY: "auto",
+                    }}
+                    data-testid="metrics-dropdown"
+                    role="menu"
+                    tabIndex={-1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeMetricsDropdown();
+                      }
+                    }}
+                  >
+                    <VStack align="stretch" gap={1}>
+                      {availableMetrics.map((metric) => (
+                        <HStack
+                          key={metric.id}
+                          padding={1}
                           borderRadius="sm"
-                          bg={
-                            visibleMetrics.has(metric.id)
-                              ? "blue.500"
-                              : "transparent"
-                          }
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="center"
+                          cursor="pointer"
+                          _hover={{ bg: "bg.subtle" }}
+                          onClick={() => toggleMetric(metric.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleMetric(metric.id);
+                            }
+                          }}
+                          role="menuitem"
+                          tabIndex={0}
+                          aria-checked={visibleMetrics.has(metric.id)}
                         >
-                          {visibleMetrics.has(metric.id) && (
-                            <Text color="white" fontSize="xs" fontWeight="bold">
-                              ✓
-                            </Text>
-                          )}
-                        </Box>
-                        <Text fontSize="sm" whiteSpace="nowrap">
-                          {metric.name}
-                        </Text>
-                      </HStack>
-                    ))}
-                  </VStack>
-                </Box>
+                          <Box
+                            width="16px"
+                            height="16px"
+                            minWidth="16px"
+                            minHeight="16px"
+                            flexShrink={0}
+                            border="1px solid"
+                            borderColor="border.emphasized"
+                            borderRadius="sm"
+                            bg={
+                              visibleMetrics.has(metric.id)
+                                ? "blue.500"
+                                : "transparent"
+                            }
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            {visibleMetrics.has(metric.id) && (
+                              <Text
+                                color="white"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                ✓
+                              </Text>
+                            )}
+                          </Box>
+                          <Text fontSize="sm" whiteSpace="nowrap">
+                            {metric.name}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </Box>
+                </Portal>
               )}
             </Box>
           </HStack>

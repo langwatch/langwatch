@@ -1,5 +1,5 @@
 /**
- * AI Tools Portal — tile type contract.
+ * AI Tools Portal - tile type contract.
  *
  * Mirrors Sergey's `AiToolEntry` Prisma model (Phase 7 backend). See:
  *   .claude/AI-TOOLS-PORTAL-LANE-B-UI.md
@@ -15,12 +15,21 @@ export type AiToolTileType =
   | "model_provider"
   | "external_tool";
 
-export type AiToolScope = "organization" | "team";
+export type AiToolScope = "organization" | "department" | "team";
 
 export interface CodingAssistantConfig {
   setupCommand: string;
   setupDocsUrl?: string;
   helperText?: string;
+  /**
+   * CLI path policy folded into the tile (replaces the standalone
+   * PlatformToolPolicy table). Both default to `true` when absent. The
+   * "cursor" assistant forces `allowOtelDirect = false` (GUI-only, no
+   * terminal OTLP env reaches the agent panel). Read by cliBootstrap to
+   * derive the login `toolPolicies` map.
+   */
+  allowVk?: boolean;
+  allowOtelDirect?: boolean;
 }
 
 export interface ModelProviderConfig {
@@ -44,17 +53,17 @@ export type AiToolConfig =
 export interface AiToolEntry {
   id: string;
   /**
-   * Legacy single-scope shape, retained for back-compat reads while the
-   * service layer migrates to `teamIds: string[]` (5aaa232d3 schema).
+   * Legacy single-scope shape, retained for back-compat reads. New writes
+   * produce scope='organization' (org-wide) or scope='department'.
    */
   scope: AiToolScope;
   scopeId: string;
   /**
-   * Multi-team scope (post-5aaa232d3). Empty array = whole organization.
-   * Non-empty = restricted to those teams. May be undefined on older
-   * cached responses; treat as empty array.
+   * Department scope. Empty array = whole organization. Non-empty =
+   * visible only to members of those departments. May be undefined on
+   * older cached responses; treat as empty array.
    */
-  teamIds?: string[];
+  departmentIds?: string[];
   type: AiToolTileType;
   displayName: string;
   slug: string;

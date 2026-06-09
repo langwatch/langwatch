@@ -16,6 +16,14 @@ const generateSecret = customAlphabet(ALPHABET, SECRET_LENGTH);
  */
 export const API_KEY_PREFIX = "sk-lw-";
 export const LEGACY_PAT_PREFIX = "pat-lw-";
+/**
+ * Ingestion-only keys (project-scoped, `traces:create` only) carry a distinct
+ * `ik-lw-` prefix so they're identifiable at a glance vs full-access `sk-lw-`
+ * keys. Same HMAC+pepper scheme and `{prefix}{lookupId}_{secret}` format — the
+ * prefix is cosmetic + for routing; the DB lookup is by lookupId regardless,
+ * so resolution is identical to any other API key.
+ */
+export const INGEST_KEY_PREFIX = "ik-lw-";
 
 /**
  * Returns the server-side pepper used when HMAC-hashing API key secrets.
@@ -52,14 +60,14 @@ function getApiKeyPepper(): string {
  * Returns the full plaintext token (shown once to user),
  * plus the lookupId and hashedSecret for DB storage.
  */
-export function generateApiKeyToken(): {
+export function generateApiKeyToken(opts?: { prefix?: string }): {
   token: string;
   lookupId: string;
   hashedSecret: string;
 } {
   const lookupId = generateId();
   const secret = generateSecret();
-  const token = `${API_KEY_PREFIX}${lookupId}_${secret}`;
+  const token = `${opts?.prefix ?? API_KEY_PREFIX}${lookupId}_${secret}`;
   const hashedSecret = hashSecret(secret);
 
   return { token, lookupId, hashedSecret };
@@ -67,7 +75,7 @@ export function generateApiKeyToken(): {
 
 /**
  * Splits an API key token string into its lookupId and secret components.
- * Accepts both new `sk-lw-` and old `pat-lw-` prefixes.
+ * Accepts new `sk-lw-`, ingest `ik-lw-`, and old `pat-lw-` prefixes.
  * Returns null if the token format is invalid.
  */
 export function splitApiKeyToken(
@@ -76,6 +84,8 @@ export function splitApiKeyToken(
   let body: string;
   if (token.startsWith(LEGACY_PAT_PREFIX)) {
     body = token.slice(LEGACY_PAT_PREFIX.length);
+  } else if (token.startsWith(INGEST_KEY_PREFIX)) {
+    body = token.slice(INGEST_KEY_PREFIX.length);
   } else if (token.startsWith(API_KEY_PREFIX)) {
     body = token.slice(API_KEY_PREFIX.length);
   } else {
@@ -155,6 +165,7 @@ export function verifySecret(
  * Determines the token type from its prefix and structure.
  *
  * - `pat-lw-*` → always an API key (old PAT format, backward compat)
+ * - `ik-lw-{16chars}_{48chars}` → API key (ingestion-only key, always split format)
  * - `sk-lw-{16chars}_{48chars}` → API key (new format, has underscore separator)
  * - `sk-lw-*` (no underscore) → legacy project key
  * - anything else → unknown
@@ -163,6 +174,7 @@ export function getTokenType(
   token: string,
 ): "apiKey" | "legacyProjectKey" | "unknown" {
   if (token.startsWith(LEGACY_PAT_PREFIX)) return "apiKey";
+  if (token.startsWith(INGEST_KEY_PREFIX)) return "apiKey";
   if (token.startsWith(API_KEY_PREFIX)) {
     // Distinguish new-format API keys from legacy project keys by structure:
     // API keys have an underscore separating lookupId and secret

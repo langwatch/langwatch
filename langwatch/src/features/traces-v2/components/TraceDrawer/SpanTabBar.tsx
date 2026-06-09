@@ -74,8 +74,6 @@ const SPAN_TYPE_PALETTE: Record<string, string> = {
 
 interface SpanTabBarProps {
   spanTree: SpanTreeNode[];
-  /** Distinct prompt references on this trace — drives the Prompts tab. */
-  promptCount: number;
   /**
    * Optional right-aligned slot rendered after all tabs — used to
    * surface things like the instrumentation scope or other secondary
@@ -138,15 +136,12 @@ function SpanFocusPresenceDot({
 
 export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
-  promptCount,
   rightSlot,
   collapsePosition = "leading",
 }: SpanTabBarProps) {
   const traceId = useDrawerStore((s) => s.traceId);
-  const activeTab = useDrawerStore((s) => s.activeTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const clearSpan = useDrawerStore((s) => s.clearSpan);
   const pinSpan = useDrawerStore((s) => s.pinSpan);
@@ -260,113 +255,29 @@ export const SpanTabBar = memo(function SpanTabBar({
     /** Dropdown-row contents when this tab is folded into the menu. */
     menuContent: React.ReactNode;
   };
+  // After the trace-view redesign the SpanTabBar carries only
+  // span-scope tabs: pinned spans (rendered first, in pin order) and
+  // the currently-selected ephemeral span (rendered at the trailing
+  // edge if it isn't already pinned). Summary / LLM-Optimized / Prompts
+  // moved out — Summary is its own DrawerViewMode in ModeSwitch; LLM
+  // and prompt views are auto-selected inside SpanDetailPane based on
+  // the selected span's kind, so there's nothing for the user to pick
+  // here.
   const tabDescriptors: TabDescriptor[] = useMemo(() => {
-    const list: TabDescriptor[] = [
-      {
-        id: "tab:summary",
-        activeId: activeTab === "summary" ? "tab:summary" : undefined,
-        label: "Summary",
-        onSelect: () => setActiveTab("summary"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:summary"
-            label="Summary"
-            shortcut="O"
-            tooltip="Show trace summary"
-            active={activeTab === "summary"}
-            activeColorPalette="blue"
-            onClick={() => setActiveTab("summary")}
-            traceId={traceId}
-            tab="summary"
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text>Summary</Text>
-            <Kbd>O</Kbd>
-          </HStack>
-        ),
-      },
-      {
-        id: "tab:llm",
-        activeId: activeTab === "llm" ? "tab:llm" : undefined,
-        label: "LLM-Optimized",
-        onSelect: () => setActiveTab("llm"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:llm"
-            label="LLM-Optimized"
-            shortcut="L"
-            tooltip="Token-efficient summary for an LLM"
-            active={activeTab === "llm"}
-            activeColorPalette="purple"
-            onClick={() => setActiveTab("llm")}
-            traceId={traceId}
-            tab="llm"
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text>LLM-Optimized</Text>
-            <Kbd>L</Kbd>
-          </HStack>
-        ),
-      },
-    ];
-    if (promptCount > 0) {
-      list.push({
-        id: "tab:prompts",
-        activeId: activeTab === "prompts" ? "tab:prompts" : undefined,
-        label: "Prompts",
-        onSelect: () => setActiveTab("prompts"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:prompts"
-            label="Prompts"
-            shortcut="P"
-            tooltip="Prompts used in this trace"
-            icon={<Icon as={LuFileText} boxSize={3.5} />}
-            active={activeTab === "prompts"}
-            activeColorPalette="blue"
-            onClick={() => setActiveTab("prompts")}
-            traceId={traceId}
-            tab="prompts"
-            badge={
-              <Badge size="xs" variant="subtle" colorPalette="blue">
-                {promptCount}
-              </Badge>
-            }
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Icon as={LuFileText} boxSize={3.5} />
-            <Text>Prompts</Text>
-            <Kbd>P</Kbd>
-            <Badge size="xs" variant="subtle" colorPalette="blue">
-              {promptCount}
-            </Badge>
-          </HStack>
-        ),
-      });
-    }
+    const list: TabDescriptor[] = [];
     inlinePinned.forEach((span) => {
       const id = `span:${span.spanId}`;
+      const isActive = selectedSpan?.spanId === span.spanId;
       list.push({
         id,
-        activeId:
-          activeTab === "span" && selectedSpan?.spanId === span.spanId
-            ? id
-            : undefined,
+        activeId: isActive ? id : undefined,
         label: span.name ?? span.spanId,
         onSelect: () => selectSpan(span.spanId),
         render: () => (
           <SpanTab
             overflowId={id}
             span={span}
-            isActive={
-              activeTab === "span" && selectedSpan?.spanId === span.spanId
-            }
+            isActive={isActive}
             onClick={() => selectSpan(span.spanId)}
             onHover={() => prefetchSpan(span.spanId)}
             actionIcon={<Icon as={LuPinOff} boxSize={3} />}
@@ -392,15 +303,15 @@ export const SpanTabBar = memo(function SpanTabBar({
       const id = "span:ephemeral";
       list.push({
         id,
-        activeId: activeTab === "span" ? id : undefined,
+        activeId: id,
         label: selectedSpan.name ?? selectedSpan.spanId,
-        onSelect: () => setActiveTab("span"),
+        onSelect: () => selectSpan(selectedSpan.spanId),
         render: () => (
           <SpanTab
             overflowId={id}
             span={selectedSpan}
-            isActive={activeTab === "span"}
-            onClick={() => setActiveTab("span")}
+            isActive
+            onClick={() => selectSpan(selectedSpan.spanId)}
             actionIcon={<Icon as={LuPin} boxSize={3} />}
             actionLabel="Pin span tab"
             onAction={() => pinSpan(selectedSpan.spanId)}
@@ -428,10 +339,7 @@ export const SpanTabBar = memo(function SpanTabBar({
     }
     return list;
   }, [
-    activeTab,
-    setActiveTab,
     traceId,
-    promptCount,
     inlinePinned,
     selectedSpan,
     isSelectedPinned,
@@ -504,9 +412,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         {overflowPinned.length > 0 && (
           <PinnedSpanOverflowMenu
             spans={overflowPinned}
-            activeSpanId={
-              activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
-            }
+            activeSpanId={selectedSpan?.spanId ?? null}
             onSelectSpan={selectSpan}
             onUnpinSpan={unpinSpan}
           />

@@ -48,6 +48,10 @@ export class TeamNotInOrganizationError extends Error {
   name = "TeamNotInOrganizationError" as const;
 }
 
+export class DestinationTeamNotFoundError extends Error {
+  name = "DestinationTeamNotFoundError" as const;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -155,6 +159,18 @@ export class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
+    if (data.teamId) {
+      const team = await this.repo.findActiveTeamInOrganization({
+        teamId: data.teamId,
+        organizationId,
+      });
+      if (!team) {
+        throw new DestinationTeamNotFoundError(
+          "Destination team not found, is archived, or belongs to a different organization",
+        );
+      }
+    }
+
     const project = await this.repo.update({ id, organizationId, data });
     if (!project) throw new ProjectNotFoundError("Project not found");
     return project;

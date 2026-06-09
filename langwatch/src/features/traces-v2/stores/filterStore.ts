@@ -3,6 +3,7 @@ import { create } from "zustand";
 import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
+  removeImplicitTermFromQuery,
   setRangeInQuery,
   addToOrGroupAtLocation,
   setFacetValueAtLocation,
@@ -103,6 +104,10 @@ interface FilterState {
   removeFacet: (field: string, value: string) => void;
   /** Remove all values for a field */
   removeField: (field: string) => void;
+  /** Remove a free-text (ImplicitField) literal from the query. Used by
+   *  the empty-state query breakdown chips to drop accidental glyphs
+   *  ("Ω") without clearing the whole query. */
+  removeFreeText: (value: string) => void;
 
   /** Set a range filter */
   setRange: (field: string, from: string, to: string) => void;
@@ -305,6 +310,13 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set((s) =>
       applyMutation(s, (q) =>
         removeFieldFromQuery({ currentQuery: q, fieldName: field }),
+      ),
+    ),
+
+  removeFreeText: (value) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeImplicitTermFromQuery({ currentQuery: q, value }),
       ),
     ),
 

@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   HStack,
   Heading,
   Image,
@@ -27,8 +26,13 @@ import {
   isToolPresetAsset,
   toolPresetAsset,
 } from "~/components/me/tiles/toolIcons";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "~/components/settings/ScopeChipPicker";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
+import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -68,6 +72,13 @@ interface CodingAssistantForm {
   setupCommand: string;
   helperText: string;
   setupDocsUrl: string;
+  /// CLI path policy folded into the tile (replaces PlatformToolPolicy).
+  /// Default true. Cursor forces allowOtelDirect=false (GUI-only).
+  allowVk: boolean;
+  allowOtelDirect: boolean;
+  /// Direct-OTLP usage is part of a bundled subscription (not billed per
+  /// token). Default true. Gateway usage ignores this and is always billed.
+  bundledPlan: boolean;
 }
 
 interface ModelProviderForm {
@@ -98,6 +109,9 @@ function blankForm(type: AiToolTileType): FormState {
       setupCommand: "",
       helperText: "",
       setupDocsUrl: "",
+      allowVk: true,
+      allowOtelDirect: true,
+      bundledPlan: true,
     };
   }
   if (type === "model_provider") {
@@ -127,13 +141,21 @@ function formFromEntry(entry: AiToolEntry): FormState {
   };
   if (entry.type === "coding_assistant") {
     const rawKind = typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
+    const kind = isAssistantKind(rawKind) ? rawKind : "custom";
+    const boolOr = (key: string, fallback: boolean): boolean =>
+      typeof cfg[key] === "boolean" ? (cfg[key] as boolean) : fallback;
     return {
       type: "coding_assistant",
       displayName: entry.displayName,
-      assistantKind: isAssistantKind(rawKind) ? rawKind : "custom",
+      assistantKind: kind,
       setupCommand: baseStr("setupCommand"),
       helperText: baseStr("helperText"),
       setupDocsUrl: baseStr("setupDocsUrl"),
+      allowVk: boolOr("allowVk", true),
+      // Cursor is GUI-only - direct OTLP never applies, regardless of a
+      // stored value. Force it off so the toggle reads honestly.
+      allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      bundledPlan: boolOr("bundledPlan", true),
     };
   }
   if (entry.type === "model_provider") {
@@ -164,6 +186,12 @@ function configFromForm(form: FormState): Record<string, unknown> {
       ...(form.setupDocsUrl.trim()
         ? { setupDocsUrl: form.setupDocsUrl.trim() }
         : {}),
+      // CLI path policy folded into the tile. Cursor is GUI-only, so its
+      // OTLP-direct path is always false regardless of the toggle state.
+      allowVk: form.allowVk,
+      allowOtelDirect:
+        form.assistantKind === "cursor" ? false : form.allowOtelDirect,
+      bundledPlan: form.bundledPlan,
     };
   }
   if (form.type === "model_provider") {
@@ -206,18 +234,43 @@ interface Props {
   onClose: () => void;
 }
 
+/** Map a tile's department bindings into ScopeChipPicker entries. Empty
+ *  bindings = org-wide → a single ORGANIZATION entry. */
+function scopesFromEntry(
+  entry: AiToolEntry,
+  organizationId: string,
+): ScopeChipPickerEntry[] {
+  const departmentIds = entry.departmentIds ?? [];
+  if (departmentIds.length === 0) {
+    return [{ scopeType: "ORGANIZATION", scopeId: organizationId }];
+  }
+  return departmentIds.map((id) => ({
+    scopeType: "DEPARTMENT" as const,
+    scopeId: id,
+  }));
+}
+
 export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const utils = api.useUtils();
   const { organization } = useOrganizationTeamProject();
-  const teams = organization?.teams ?? [];
+
+  const departmentsQuery = api.departments.list.useQuery(
+    { organizationId },
+    { enabled: !!state, refetchOnWindowFocus: false },
+  );
+  const departments = departmentsQuery.data ?? [];
 
   const [form, setForm] = useState<FormState>(() =>
     state?.mode === "edit"
       ? formFromEntry(state.entry)
       : blankForm(state?.type ?? "coding_assistant"),
   );
-  const [teamIds, setTeamIds] = useState<string[]>(
-    state?.mode === "edit" ? state.entry.teamIds ?? [] : [],
+  // Visibility scopes: a single ORGANIZATION entry = org-wide, or one or
+  // more DEPARTMENT entries. New tiles default to org-wide.
+  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>(() =>
+    state?.mode === "edit"
+      ? scopesFromEntry(state.entry, organizationId)
+      : [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
   );
   const [iconAsset, setIconAsset] = useState<string | null>(
     state?.mode === "edit"
@@ -231,22 +284,44 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     const nextForm =
       state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
     setForm(nextForm);
-    setTeamIds(state.mode === "edit" ? state.entry.teamIds ?? [] : []);
+    setScopes(
+      state.mode === "edit"
+        ? scopesFromEntry(state.entry, organizationId)
+        : [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+    );
     setIconAsset(
       state.mode === "edit"
         ? state.entry.iconAsset ?? null
         : deriveDefaultIconAsset(nextForm),
     );
-  }, [state]);
+  }, [state, organizationId]);
 
   const isEdit = state?.mode === "edit";
+
+  // Derive the department-id set from the scope picker. An ORGANIZATION
+  // entry means org-wide (empty department set); DEPARTMENT entries map
+  // back to ids. ORGANIZATION and DEPARTMENT are mutually exclusive in the
+  // picker (collapseRedundantScopes enforces it), so this is unambiguous.
+  const departmentIds = useMemo(
+    () =>
+      scopes
+        .filter((s) => s.scopeType === "DEPARTMENT")
+        .map((s) => s.scopeId),
+    [scopes],
+  );
 
   // When the user changes the assistantKind picker on a coding_assistant
   // tile, auto-update iconAsset to the corresponding preset (unless they
   // already have a custom upload they don't want to lose).
   const onAssistantKindChange = (kind: AssistantKind) => {
     if (form.type !== "coding_assistant") return;
-    setForm({ ...form, assistantKind: kind });
+    setForm({
+      ...form,
+      assistantKind: kind,
+      // Cursor is GUI-only - direct OTLP never applies, so force the
+      // toggle off when the admin picks it.
+      ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
+    });
     if (kind !== "custom") {
       setIconAsset(`preset:${kind}`);
     } else if (
@@ -319,7 +394,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     if (state.mode === "create") {
       createMutation.mutate({
         organizationId,
-        teamIds,
+        departmentIds,
         type: form.type,
         displayName: form.displayName.trim(),
         iconAsset,
@@ -332,7 +407,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
         type: form.type,
         displayName: form.displayName.trim(),
         iconAsset,
-        teamIds,
+        departmentIds,
         config,
       });
     }
@@ -383,37 +458,33 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             <FormSection
               label="Visible to"
               hint={
-                teamIds.length === 0
-                  ? "Whole organization — every member sees this tile."
-                  : `${teamIds.length} team${teamIds.length === 1 ? "" : "s"} — only members of these teams see it.`
+                departmentIds.length === 0
+                  ? "Whole organization - every member sees this tile."
+                  : `${departmentIds.length} department${departmentIds.length === 1 ? "" : "s"} - only members of these departments see it.`
               }
             >
-              {teams.length === 0 ? (
+              <ScopeChipPicker
+                value={scopes}
+                onChange={setScopes}
+                organizationId={organizationId}
+                organizationName={organization?.name ?? "Whole organization"}
+                availableDepartments={departments}
+                allowedScopeTypes={["ORGANIZATION", "DEPARTMENT"]}
+                label=""
+                showSummary={false}
+              />
+              {departments.length === 0 && (
                 <Text fontSize="xs" color="fg.muted">
-                  No teams in this organization yet. Tile will be visible to
-                  every member.
+                  No departments yet. The tile stays visible to every member.
+                  Create departments under{" "}
+                  <Link
+                    href="/settings/governance/departments"
+                    color="blue.600"
+                  >
+                    Governance → Departments
+                  </Link>{" "}
+                  to scope tiles to a group of people.
                 </Text>
-              ) : (
-                <VStack align="stretch" gap={1}>
-                  {teams.map((team) => (
-                    <Checkbox.Root
-                      key={team.id}
-                      size="sm"
-                      checked={teamIds.includes(team.id)}
-                      onCheckedChange={({ checked }) => {
-                        setTeamIds((prev) =>
-                          checked
-                            ? [...prev, team.id]
-                            : prev.filter((id) => id !== team.id),
-                        );
-                      }}
-                    >
-                      <Checkbox.HiddenInput />
-                      <Checkbox.Control />
-                      <Checkbox.Label>{team.name}</Checkbox.Label>
-                    </Checkbox.Root>
-                  ))}
-                </VStack>
               )}
             </FormSection>
 
@@ -459,9 +530,6 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             )}
 
             <HStack gap={2} marginTop={4}>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                Cancel
-              </Button>
               <Spacer />
               <Button
                 size="sm"
@@ -726,7 +794,105 @@ function CodingAssistantFields({
           }
         />
       </FormSection>
+      <CliPathsSection form={form} setForm={setForm} />
+      <CostAttributionSection form={form} setForm={setForm} />
     </>
+  );
+}
+
+/**
+ * Cost attribution for traces this tool sends through the direct OTLP
+ * ingestion path. Most coding assistants run on a bundled subscription
+ * (e.g. Claude Max), so their list-price token cost is theoretical rather
+ * than real spend. When this is on, the receiver tags those traces
+ * non-billable, and the trace summary / analytics split billed vs non-billed
+ * cost. Gateway / virtual-key usage is always billed and ignores this flag.
+ */
+function CostAttributionSection({
+  form,
+  setForm,
+}: {
+  form: CodingAssistantForm;
+  setForm: (f: FormState) => void;
+}) {
+  return (
+    <FormSection
+      label="Cost attribution"
+      hint="How usage from this tool counts toward spend. Only the direct OTLP path is affected; gateway usage is always billed per token."
+    >
+      <HStack justify="space-between">
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm">Bundled subscription (not billed per token)</Text>
+          <Text fontSize="xs" color="fg.muted">
+            Direct-OTLP usage is included in a flat plan, so its cost is shown
+            as theoretical rather than counted as real spend.
+          </Text>
+        </VStack>
+        <Switch
+          checked={form.bundledPlan}
+          onCheckedChange={({ checked }) =>
+            setForm({ ...form, bundledPlan: checked })
+          }
+        />
+      </HStack>
+    </FormSection>
+  );
+}
+
+/**
+ * CLI path policy for the `langwatch <tool>` wrapper, folded into the
+ * coding-assistant tile (replaces the standalone PlatformToolPolicy table).
+ * The CLI caches this at login (cliBootstrap's `toolPolicies` map) and only
+ * offers the paths enabled here. Cursor is GUI-only, so its direct-OTLP
+ * toggle is forced off and disabled.
+ */
+function CliPathsSection({
+  form,
+  setForm,
+}: {
+  form: CodingAssistantForm;
+  setForm: (f: FormState) => void;
+}) {
+  const cursorOnly = form.assistantKind === "cursor";
+  return (
+    <FormSection
+      label="CLI paths"
+      hint="Which routes this tool may use when launched via the langwatch CLI. The CLI reads this at login."
+    >
+      <VStack align="stretch" gap={2}>
+        <HStack justify="space-between">
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm">Allow gateway (virtual key)</Text>
+            <Text fontSize="xs" color="fg.muted">
+              Route through the LangWatch gateway with a personal virtual key.
+            </Text>
+          </VStack>
+          <Switch
+            checked={form.allowVk}
+            onCheckedChange={({ checked }) =>
+              setForm({ ...form, allowVk: checked })
+            }
+          />
+        </HStack>
+        <HStack justify="space-between">
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm">Allow direct OTLP ingestion</Text>
+            <Text fontSize="xs" color="fg.muted">
+              {cursorOnly
+                ? "Cursor is GUI-only, so direct OTLP never applies."
+                : "Export telemetry straight to the personal OTLP endpoint."}
+            </Text>
+          </VStack>
+          <Switch
+            checked={cursorOnly ? false : form.allowOtelDirect}
+            disabled={cursorOnly}
+            onCheckedChange={({ checked }) =>
+              setForm({ ...form, allowOtelDirect: checked })
+            }
+          />
+        </HStack>
+      </VStack>
+    </FormSection>
   );
 }
 
@@ -767,7 +933,7 @@ function ModelProviderFields({
             <option value="">
               {providerOptionsLoading
                 ? "Loading providers…"
-                : "— select a provider —"}
+                : "- select a provider -"}
             </option>
             {(providerOptions ?? []).map((p) => (
               <option key={p.providerKey} value={p.providerKey}>
@@ -819,7 +985,7 @@ function ModelProviderFields({
             <option value="">
               {routingPolicyOptionsLoading
                 ? "Loading policies…"
-                : "— use organization default —"}
+                : "- use organization default -"}
             </option>
             {(routingPolicyOptions ?? []).map((p) => (
               <option key={p.id} value={p.id}>

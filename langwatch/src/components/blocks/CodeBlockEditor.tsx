@@ -1,8 +1,15 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
+import { themes as prismThemes } from "prism-react-renderer";
 import { useState } from "react";
+import { useColorMode } from "~/components/ui/color-mode";
 import { CodeEditorModal } from "../../optimization_studio/components/code/CodeEditorModal";
 import { RenderCode } from "../code/RenderCode";
+
+export interface CodeBlockField {
+  identifier: string;
+  type: string;
+}
 
 export type CodeBlockEditorProps = {
   /** The code to display/edit */
@@ -22,6 +29,22 @@ export type CodeBlockEditorProps = {
    * to open the modal from the parent component.
    */
   onEditClick?: () => void;
+  /**
+   * Declared node inputs — surfaced in the Monaco editor as known locals so
+   * autocomplete and the contract validator have something to anchor on.
+   */
+  inputs?: readonly CodeBlockField[];
+  /**
+   * Declared node outputs — surfaced as `"key"` snippets inside `return {…}`
+   * and warned on when missing from the source.
+   */
+  outputs?: readonly CodeBlockField[];
+  /**
+   * Stable identifier (e.g. the node id) used as the localStorage key for
+   * persisting cursor/scroll/folding state across modal opens. Falls back to
+   * a per-instance random id if omitted, meaning state is not preserved.
+   */
+  viewStateKey?: string;
 };
 
 /**
@@ -40,8 +63,18 @@ export function CodeBlockEditor({
   language = "python",
   externalModal = false,
   onEditClick,
+  inputs,
+  outputs,
+  viewStateKey,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { colorMode } = useColorMode();
+  // Match the editor: VS Code's vsLight / vsDark prism themes pair best with
+  // Monaco's bundled `vs` / `vs-dark`.
+  const previewTheme =
+    colorMode === "dark" ? prismThemes.vsDark : prismThemes.vsLight;
+  const previewBg = colorMode === "dark" ? "#1E1E1E" : "#FFFFFF";
+  const previewBorder = colorMode === "dark" ? "#2D2D2D" : "#E5E5E5";
 
   const handleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,14 +128,18 @@ export function CodeBlockEditor({
       <RenderCode
         code={code}
         language={language}
+        theme={previewTheme}
         style={{
           width: "100%",
           fontSize: "12px",
           padding: "12px",
           borderRadius: "8px",
-          backgroundColor: "rgb(39, 40, 34)",
+          backgroundColor: previewBg,
+          border: `1px solid ${previewBorder}`,
           maxHeight: "200px",
           overflowY: "hidden",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
         }}
       />
 
@@ -113,6 +150,9 @@ export function CodeBlockEditor({
           setCode={onChange}
           open={isModalOpen}
           onClose={handleClose}
+          inputs={inputs}
+          outputs={outputs}
+          viewStateKey={viewStateKey}
         />
       )}
     </Box>

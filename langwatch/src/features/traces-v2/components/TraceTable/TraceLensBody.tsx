@@ -17,6 +17,7 @@ import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
+import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
 import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
@@ -109,10 +110,24 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sorting, setSortInStore],
   );
 
+  // Surface `columnOrder` as explicit Tanstack state. Without it,
+  // Tanstack falls back to "columns array order" for the header row
+  // but holds onto its INTERNAL leaf column cache (built once per
+  // identity) for cell rendering — which means reordering via the
+  // viewStore showed the new order in headers but kept cells in their
+  // old positions ("the cell doesn't match the col"). Passing the
+  // explicit `columnOrder` state forces Tanstack to recompute the
+  // visible leaf order on every change, keeping headers and cells in
+  // lockstep with the store.
+  const columnOrderState = useMemo<string[]>(
+    () => [SELECT_COLUMN_ID, ...lens.columns],
+    [lens.columns],
+  );
+
   const table = useReactTable({
     data: effectiveTraces,
     columns,
-    state: { sorting, columnSizing },
+    state: { sorting, columnSizing, columnOrder: columnOrderState },
     onSortingChange: handleSortingChange,
     onColumnSizingChange: handleColumnSizingChange,
     columnResizeMode: "onChange",
@@ -153,7 +168,13 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   return (
     <Box tabIndex={0} onKeyDown={handleKeyDown} outline="none" height="full">
       <TraceStatisticsProvider traces={traces} skip={isLoading}>
-        <TraceTableShell table={table} minWidth={minWidth}>
+        {/* stickyFirstColumn pins the leftmost cell (the row-checkbox) so
+            the select target stays reachable during horizontal scroll —
+            the user can still tick a row off-screen without scrolling
+            back to the start. The wider column set (TIMESTAMP, etc.)
+            makes horizontal overflow the common case rather than the
+            edge case it used to be. */}
+        <TraceTableShell table={table} minWidth={minWidth} stickyFirstColumn>
           <VirtualSpacer height={paddingTop} colSpan={colSpan} />
           {virtualItems.map((virtualItem) => {
             const row = rows[virtualItem.index];

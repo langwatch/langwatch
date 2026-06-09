@@ -45,11 +45,11 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
 import { prisma } from "~/server/db";
-import type {
-  DSPyLLMCall,
-  DSPyStepRESTParams,
+import {
+  dSPyStepRESTParamsSchema,
+  type DSPyLLMCall,
+  type DSPyStepRESTParams,
 } from "~/server/experiments/types";
-import { dSPyStepRESTParamsSchema } from "~/server/experiments/types.generated";
 import { filterFieldsEnum } from "~/server/filters/types";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
@@ -63,8 +63,10 @@ import { getPostHogInstance } from "~/server/posthog";
 import { getServerAuthSession } from "~/server/auth";
 import { connection as redis } from "~/server/redis";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
+import {
+  trackEventRESTParamsValidatorSchema,
+  type TrackEventRESTParamsValidator,
+} from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -795,7 +797,7 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       }
     }
 
-    await getApp().traces.recordSpan({
+    await getApp().traces.collection.ingestNormalizedSpan({
       tenantId: project.id,
       span: {
         traceId: body.trace_id,
@@ -823,7 +825,6 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       resource: { attributes: [] },
       instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
       piiRedactionLevel: project.piiRedactionLevel,
-      occurredAt: Date.now(),
     });
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");

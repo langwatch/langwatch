@@ -662,7 +662,12 @@ export class ModelProviderService {
   }
 
   /**
-   * Deletes a model provider.
+   * Deletes a model provider — a hard delete of the row and its encrypted
+   * credentials (scope grants cascade). The settings list surfaces rows
+   * granted at the org, team, or a sibling project, so the existence/authz
+   * lookup is anchored to the caller's organization rather than the viewing
+   * project; a PROJECT-scope lookup used to 404 an org-scoped provider that
+   * was plainly visible in the list.
    *
    * Scope authz: the caller must hold the manage-permission on EVERY
    * current scope entry. A team-level admin cannot silently blow up an
@@ -676,9 +681,17 @@ export class ModelProviderService {
     const { id, projectId, provider } = input;
 
     if (ctx) {
-      const existing = id
-        ? await this.repository.findById(id, projectId)
-        : await this.repository.findByProvider(provider, projectId);
+      const organizationId =
+        await this.resolveProjectOrganizationId(projectId);
+      // Org-anchored lookup when we can resolve the tenant; otherwise fall
+      // back to the legacy project-scope lookup so a missing project can't
+      // widen the blast radius.
+      const existing =
+        id && organizationId
+          ? await this.repository.findByIdForOrganization(id, organizationId)
+          : id
+            ? await this.repository.findById(id, projectId)
+            : await this.repository.findByProvider(provider, projectId);
       if (!existing) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -699,6 +712,21 @@ export class ModelProviderService {
     } else {
       return await this.repository.deleteByProvider(provider, projectId);
     }
+  }
+
+  /**
+   * Resolves the organization a project belongs to (via its team). Returns
+   * null when the project can't be found, letting callers fall back to a
+   * project-scoped path instead of widening access.
+   */
+  private async resolveProjectOrganizationId(
+    projectId: string,
+  ): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team?.organizationId ?? null;
   }
 
   /**

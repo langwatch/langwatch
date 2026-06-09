@@ -1,8 +1,17 @@
-import { Box, Button, Code, Heading, Text, VStack } from "@chakra-ui/react";
-import { Ghost } from "lucide-react";
+import {
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Ghost, RotateCcw } from "lucide-react";
 import { useRouteError } from "react-router";
 
 import { Link } from "~/components/ui/link";
+import { isChunkLoadError, RELOAD_AT_KEY } from "~/utils/chunkReload";
 
 /**
  * Shared fallback for (a) unknown routes (path="*") and (b) errors thrown
@@ -33,20 +42,30 @@ export default function NotFoundOrErrorPage() {
   const explicitStatus = error?.status;
   const errorMessage =
     error && "message" in error && error.message ? error.message : null;
+  const isChunkError = error != null && isChunkLoadError(error);
   // A real exception arrived (errorMessage present, no HTTP status) →
   // it's a runtime throw, not a 404. Promote to "Something went wrong"
   // so the message + stack get surfaced.
   const isRuntimeError = errorMessage !== null && explicitStatus === undefined;
   const status = explicitStatus ?? (isRuntimeError ? 500 : 404);
   const title =
-    status === 404 ? "Page not found" : "Something went wrong";
+    status === 404
+      ? "Page not found"
+      : isChunkError
+        ? "Failed to load page"
+        : "Something went wrong";
   const description =
     status === 404
       ? "The URL you were headed to does not exist (anymore). Use the nav to get back on track."
-      : errorMessage ??
-        "An unexpected error occurred. Try going back to the dashboard.";
+      : isChunkError
+        ? "A required file could not be loaded. A browser extension or network issue may be blocking part of the app."
+        : (errorMessage ??
+          "An unexpected error occurred. Try going back to the dashboard.");
   const stack =
-    isRuntimeError && error && "stack" in error && typeof error.stack === "string"
+    isRuntimeError &&
+    error &&
+    "stack" in error &&
+    typeof error.stack === "string"
       ? error.stack
       : null;
   return (
@@ -77,9 +96,32 @@ export default function NotFoundOrErrorPage() {
             {stack}
           </Code>
         )}
-        <Link href="/">
-          <Button colorPalette="orange">Back to dashboard</Button>
-        </Link>
+        <HStack gap={3}>
+          {isChunkError && (
+            <Button
+              colorPalette="orange"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(RELOAD_AT_KEY, String(Date.now()));
+                } catch {
+                  // sessionStorage may be unavailable
+                }
+                window.location.reload();
+              }}
+            >
+              <RotateCcw size={14} />
+              Reload app
+            </Button>
+          )}
+          <Link href="/">
+            <Button
+              colorPalette={isChunkError ? undefined : "orange"}
+              variant={isChunkError ? "outline" : "solid"}
+            >
+              Back to dashboard
+            </Button>
+          </Link>
+        </HStack>
       </VStack>
     </Box>
   );

@@ -7,7 +7,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Folder, Plus, User, Users } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  Folder,
+  Plus,
+  User,
+  Users,
+} from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -63,7 +71,23 @@ export type WorkspaceSwitcherCurrent =
   | { kind: "personal" }
   | { kind: "team"; teamId: string }
   | { kind: "project"; projectId: string }
+  // Org-scoped routes (`/settings/*`, `/governance`) carry no project context.
+  // The switcher shows the org as the current chip and offers the full
+  // personal/team/project list so the user can jump back into a workspace.
+  | { kind: "organization"; orgId: string; orgName: string }
   | { kind: "unknown" };
+
+/**
+ * One organization the user belongs to, for the in-place org switch offered on
+ * org-scoped routes. Kept separate from `WorkspaceSwitcherEntry` because
+ * switching org is a context change (writes `selectedOrganizationId`), not a
+ * navigation to a single href.
+ */
+export type WorkspaceSwitcherOrganization = {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+};
 
 export type WorkspaceSwitcherProps = {
   /**
@@ -88,12 +112,25 @@ export type WorkspaceSwitcherProps = {
    * this callback is provided.
    */
   onCreateProjectForTeam?: (args: { teamId: string; orgId: string }) => void;
+  /**
+   * The user's organizations, surfaced as an in-place org switch on org-scoped
+   * routes. Only rendered when `current.kind === "organization"` and the user
+   * belongs to more than one org. Omitted on project/personal routes.
+   */
+  organizations?: WorkspaceSwitcherOrganization[];
+  /**
+   * Invoked when the user picks a different org from the org-switch group.
+   * The consumer writes `selectedOrganizationId` and navigates to a route
+   * valid for any org (e.g. `/settings`).
+   */
+  onSwitchOrganization?: (orgId: string) => void;
 };
 
 const ICON_BY_KIND = {
   personal: User,
   team: Users,
   project: Folder,
+  organization: Building2,
 } as const;
 
 function entryIsCurrent(
@@ -126,6 +163,9 @@ function currentLabel(
     const p = projects.find((p) => p.projectId === current.projectId);
     return { label: p?.label ?? "Project", kind: "project" };
   }
+  if (current.kind === "organization") {
+    return { label: current.orgName, kind: "organization" };
+  }
   return { label: "Choose workspace", kind: "personal" };
 }
 
@@ -153,6 +193,8 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   projects,
   current: currentProp,
   onCreateProjectForTeam,
+  organizations,
+  onSwitchOrganization,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -172,7 +214,25 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   const triggerProjectName =
     triggerKind === "project" ? triggerLabel : null;
 
-  const hasMore = teams.length > 0 || projects.length > 0;
+  // On org-scoped routes, offer the in-place org switch when the user belongs
+  // to more than one org. The active org is the current chip, so it is not a
+  // navigation target - it just gets the checkmark.
+  const orgSwitchList =
+    current.kind === "organization" && onSwitchOrganization
+      ? (organizations ?? [])
+      : [];
+  const showOrgSwitch = orgSwitchList.length > 1;
+
+  // "My Workspace" is a switch target only when it isn't already the current
+  // context, so an org-scoped chip with no team projects still opens (the user
+  // can jump back to personal) while a personal-only user - who has nowhere
+  // else to go - keeps the disabled chip.
+  const canGoPersonal = Boolean(personal) && current.kind !== "personal";
+  const hasMore =
+    canGoPersonal ||
+    teams.length > 0 ||
+    projects.length > 0 ||
+    showOrgSwitch;
 
   // Group projects under their parent team for the nested-hierarchy render.
   // Anything whose teamId doesn't match a known team falls into the orphan
@@ -271,6 +331,52 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content minWidth="280px" maxHeight="70vh" overflowY="auto">
+              {showOrgSwitch && (
+                <Group title="Organizations">
+                  {orgSwitchList.map((org) => {
+                    const active =
+                      current.kind === "organization" &&
+                      current.orgId === org.orgId;
+                    return (
+                      <Menu.Item
+                        key={org.orgId}
+                        value={`org:${org.orgId}`}
+                        fontSize="14px"
+                        paddingY="5px"
+                        onClick={() => {
+                          setOpen(false);
+                          onSwitchOrganization?.(org.orgId);
+                        }}
+                      >
+                        <HStack gap={3} width="full" alignItems="center">
+                          <Box
+                            width="20px"
+                            display="flex"
+                            justifyContent="center"
+                            flexShrink={0}
+                          >
+                            <Building2 size={14} />
+                          </Box>
+                          <Text
+                            fontWeight={active ? "semibold" : "normal"}
+                            truncate
+                            flex={1}
+                            minWidth={0}
+                          >
+                            {org.orgName}
+                          </Text>
+                          {active && (
+                            <Box color="fg.muted" flexShrink={0}>
+                              <Check size={14} />
+                            </Box>
+                          )}
+                        </HStack>
+                      </Menu.Item>
+                    );
+                  })}
+                </Group>
+              )}
+
               {personal && (
                 <Group title="My Workspace">
                   <SwitcherItem

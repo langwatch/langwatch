@@ -50,6 +50,60 @@ export function TraceTableShell<T>({
         minWidth,
         position: "relative",
         zIndex: 1,
+        ...(stickyFirstColumn && {
+          // Pin every body row's leftmost cell during horizontal scroll
+          // so the row-select checkbox stays reachable. The TH side is
+          // handled in HeaderCell via `isStickyFirst`; this rule covers
+          // the corresponding body cells. The bg is scoped by the
+          // tbody's `data-row-variant` attribute (set on every
+          // StatusRowGroup) so error / warning rows still paint their
+          // tint on the sticky cell — without the variant scoping the
+          // checkbox column read as a permanently-neutral strip on
+          // erroring rows, hiding the status colour the rest of the
+          // row was carrying.
+          "& tbody > tr > td:first-child": {
+            position: "sticky",
+            left: 0,
+            zIndex: 1,
+          },
+          // Default rows: the sticky checkbox cell was painting
+          // `bg-panel` while the row body is `transparent` (showing
+          // the parent's `bg.surface`). In dark mode those two tokens
+          // resolve to two distinct shades, which gave each row three
+          // visually-distinct horizontal bands (sticky cell / main
+          // row body / IO-preview addon). Use `bg.surface` so the
+          // sticky cell paints the SAME surface that's behind the
+          // transparent row body. Still opaque, still covers any
+          // horizontally-scrolled content underneath it.
+          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child": {
+            backgroundColor: "var(--chakra-colors-bg-surface)",
+          },
+          // Default-row hover variant for the sticky cell. Mirrors the
+          // `style.hoverBg = gray.subtle` painted on the main row's Tr
+          // (see RegistryRow). Without this rule, only the row body
+          // picked up the hover tint and the sticky cell kept its
+          // resting bg — the row read as "half hovered".
+          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child": {
+            backgroundColor: "var(--chakra-colors-gray-subtle)",
+          },
+          "& tbody[data-row-variant='selected'] > tr > td:first-child": {
+            backgroundColor: "var(--chakra-colors-blue-subtle)",
+          },
+          "& tbody[data-row-variant='error'] > tr > td:first-child": {
+            // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
+            // as part of the same red surface the rest of the row paints.
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-panel))",
+          },
+          "& tbody[data-row-variant='warning'] > tr > td:first-child": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-panel))",
+          },
+          "& tbody[data-row-variant='error']:hover > tr > td:first-child": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-panel))",
+          },
+          "& tbody[data-row-variant='warning']:hover > tr > td:first-child": {
+            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-panel))",
+          },
+        }),
       }}
     >
       {/*

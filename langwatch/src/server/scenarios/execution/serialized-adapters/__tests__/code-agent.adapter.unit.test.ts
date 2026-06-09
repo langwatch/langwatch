@@ -116,13 +116,13 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   describe("when the adapter receives a message from the simulator", () => {
-    it("sends an execute_flow event to /studio/execute_sync", async () => {
+    it("sends an execute_flow event to /go/studio/execute_sync", async () => {
       const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
 
       await adapter.call(defaultInput);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${nlpServiceUrl}/studio/execute_sync`,
+        `${nlpServiceUrl}/go/studio/execute_sync`,
         expect.objectContaining({
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -538,7 +538,7 @@ describe("SerializedCodeAgentAdapter", () => {
         const span = findExecuteSpan();
         expect(span).toBeDefined();
         expect(span!.options.attributes["scenario.agent.id"]).toBe("agent_123");
-        expect(span!.options.attributes["http.url"]).toBe(`${nlpServiceUrl}/studio/execute_sync`);
+        expect(span!.options.attributes["http.url"]).toBe(`${nlpServiceUrl}/go/studio/execute_sync`);
         expect(span!.options.attributes["http.method"]).toBe("POST");
       });
 

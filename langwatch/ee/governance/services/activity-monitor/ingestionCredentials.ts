@@ -60,17 +60,3 @@ export function decryptCredentials(raw: unknown): Record<string, string> {
   }
   return {};
 }
-
-/** Encrypt a standalone credential value (UserIngestionBinding). */
-export function encryptCredential(value: unknown): string {
-  if (isEncrypted(value)) return value;
-  return ENCRYPTED_PREFIX + encrypt(JSON.stringify(value));
-}
-
-/** Decrypt a standalone credential value, tolerating legacy plaintext. */
-export function decryptCredential(raw: unknown): unknown {
-  if (isEncrypted(raw)) {
-    return JSON.parse(decrypt(raw.slice(ENCRYPTED_PREFIX.length)));
-  }
-  return raw;
-}

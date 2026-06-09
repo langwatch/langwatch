@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-01
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-025](./025-remove-orphan-sweep.md) — **the orphan sweep was removed entirely** (no PG orphan cleanup). The design below is retained for history. The chain triggered the 2026-06-02 retention incident (a `:` in the BullMQ jobId ran the sweep inline on the ingestion path); rather than keep iterating on the mechanism, the feature was dropped — see ADR-025 for the why and the accepted consequence.
 
 ## Context
 

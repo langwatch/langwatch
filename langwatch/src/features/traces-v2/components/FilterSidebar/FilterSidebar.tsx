@@ -31,6 +31,7 @@ import {
 import { useUIStore } from "../../stores/uiStore";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
+import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
 import {
   ConnectorLaneWidth as CONNECTOR_LANE_WIDTH,
@@ -65,6 +66,7 @@ export const FilterSidebar: React.FC = () => {
     descriptors,
     orderedKeys,
     orderedGroups,
+    hiddenByGroup,
     sectionByKey,
     toggleFacet,
     setRange,
@@ -72,6 +74,11 @@ export const FilterSidebar: React.FC = () => {
     setGroupOrder,
     setAllSectionsOpen,
     orAnalysis,
+    showFacet,
+    hideFacet,
+    resetAllFacets,
+    orderedKeysAll,
+    isSectionVisibleForDensity,
   } = useFilterSidebarData();
 
   const groupSortableIds = useMemo(
@@ -163,6 +170,7 @@ export const FilterSidebar: React.FC = () => {
             setRange={setRange}
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
+            onHide={() => hideFacet(key)}
             // INTENTIONAL: `fieldToGroupIds` includes same-field OR groups
             // (e.g. `status:error OR status:warning`), so a same-field OR
             // query gets the full visual treatment — colored ring on rows,
@@ -227,6 +235,7 @@ export const FilterSidebar: React.FC = () => {
       setRange,
       removeRange,
       handleShiftToggle,
+      hideFacet,
       orAnalysis,
     ],
   );
@@ -253,35 +262,54 @@ export const FilterSidebar: React.FC = () => {
         groups={orAnalysis.groups}
         containerRef={scrollAreaRef}
       />
-      {/* Top-right collapse button. Sits absolutely so the icon lines
-          up vertically with the first group header (TRACE) on the
-          right edge — the mirror image of the expand button that
-          appears just before the "All" lens tab once collapsed, so
-          the close/open affordance lives at roughly the same eye
-          line in both states. */}
-      <Tooltip
-        positioning={{ placement: "bottom" }}
-        content={
-          <HStack gap={1.5}>
-            <Text>Hide filters sidebar</Text>
-            <Kbd>{"["}</Kbd>
-          </HStack>
-        }
+      {/* Header bar — owns the close affordance in a flex row instead
+          of an absolutely-positioned overlay. The previous overlay sat
+          at top:6 / right:6 with z-index:2 and visibly overlapped the
+          first group's heading ("TRACE") because both lived in the
+          same ~24px-tall band on the right edge. Putting the close
+          button in its own row keeps the math obvious: the scrollable
+          area below starts AFTER the header bar, so there's no overlap
+          to reason about. Padding-y matches the group header so
+          the close icon's vertical center aligns with the heading
+          baseline that appears just below it. */}
+      <HStack
+        gap={1}
+        paddingX={2}
+        paddingY={1.5}
+        height="28px"
+        align="center"
+        justify="flex-end"
+        flexShrink={0}
+        borderBottomWidth="0"
       >
-        <IconButton
-          aria-label="Hide filters sidebar"
-          size="2xs"
-          variant="ghost"
-          color="fg.subtle"
-          onClick={toggleSidebar}
-          position="absolute"
-          top="6px"
-          right="6px"
-          zIndex={2}
+        <FacetManagerPopover
+          orderedKeysAll={orderedKeysAll}
+          sectionByKey={sectionByKey}
+          isVisible={isSectionVisibleForDensity}
+          onShow={showFacet}
+          onHide={hideFacet}
+          onResetAll={resetAllFacets}
+        />
+        <Tooltip
+          positioning={{ placement: "bottom" }}
+          content={
+            <HStack gap={1.5}>
+              <Text>Hide filters sidebar</Text>
+              <Kbd>{"["}</Kbd>
+            </HStack>
+          }
         >
-          <PanelLeftClose size={14} />
-        </IconButton>
-      </Tooltip>
+          <IconButton
+            aria-label="Hide filters sidebar"
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            onClick={toggleSidebar}
+          >
+            <PanelLeftClose size={14} />
+          </IconButton>
+        </Tooltip>
+      </HStack>
       <div
         ref={scrollAreaRef}
         style={{
@@ -290,7 +318,7 @@ export const FilterSidebar: React.FC = () => {
           flexDirection: "column",
           overflowY: "auto",
           overflowX: "hidden",
-          paddingTop: 4,
+          paddingTop: 0,
           // Reserve right-side gutter for OR connector lanes — one lane
           // per OR group, sized to match `OrConnectorOverlay`'s internal
           // LANE_WIDTH. With no OR groups the gutter collapses to zero
@@ -320,6 +348,8 @@ export const FilterSidebar: React.FC = () => {
                     id={groupSortableId(group.id)}
                     label={group.label}
                     isModified={modifiedGroupIds.has(group.id)}
+                    hiddenKeys={hiddenByGroup[group.id]}
+                    onAddFacet={showFacet}
                   >
                     {group.keys.map(renderSection)}
                   </FacetGroupHeader>

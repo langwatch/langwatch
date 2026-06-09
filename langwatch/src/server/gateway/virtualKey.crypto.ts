@@ -3,7 +3,7 @@
  *
  * Format: `vk-lw-<26-char Crockford base32 ULID>` (32 chars total).
  *   - Fixed prefix `vk-lw-` is grep/DLP-friendly + function-named, paired
- *     with `sk-lw-` (secret), `ik-lw-` (ingestion), `pat-lw-` (legacy).
+ *     with `sk-lw-` (secret / ingestion keys) and `pat-lw-` (legacy).
  *   - Body is a monotonic ULID (128 random bits, 48 ms timestamp), encoded in
  *     Crockford base32 — sortable by creation time in dashboards.
  *

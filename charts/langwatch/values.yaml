@@ -138,7 +138,7 @@ images:
     repository: langwatch/langwatch
     tag: 3.4.1 # x-release-please-version
     pullPolicy: IfNotPresent
-  ## @param images.langwatch_nlp.repository [string] NLP image repository.
+  ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
@@ -713,8 +713,10 @@ workers:
 # =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
-# Configuration for the Natural Language Processing service
-# This service handles text analysis, embeddings, and language model interactions
+# Configuration for the NLP service (nlpgo).
+# A single static Go binary that runs Studio workflow execution, the playground
+# proxy and evaluator/agent callbacks. The only Python is a transient subprocess
+# used to sandbox user code blocks. The published image is named langwatch_nlp.
 ## @section NLP service
 langwatch_nlp:
   # Number of NLP service replicas
@@ -729,16 +731,18 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
 
-  # Resource requirements for NLP processing
+  # Resource requirements for the NLP service. The service is a lean static Go
+  # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
+  # user code blocks, so it has a small footprint.
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langwatch_nlp.resources Resource requests and limits.
-  ## @param langwatch_nlp.resources.requests.cpu [string, default: 1000m] Requested CPU.
-  ## @param langwatch_nlp.resources.requests.memory [string, default: 2Gi] Requested memory.
-  ## @param langwatch_nlp.resources.limits.cpu [string, default: 2000m] CPU limit.
-  ## @param langwatch_nlp.resources.limits.memory [string, default: 4Gi] Memory limit.
+  ## @param langwatch_nlp.resources.requests.cpu [string, default: 250m] Requested CPU.
+  ## @param langwatch_nlp.resources.requests.memory [string, default: 256Mi] Requested memory.
+  ## @param langwatch_nlp.resources.limits.cpu [string, default: 1] CPU limit.
+  ## @param langwatch_nlp.resources.limits.memory [string, default: 1Gi] Memory limit.
   resources:
-    requests: { cpu: 1000m, memory: 2Gi }
-    limits: { cpu: 2000m, memory: 4Gi }
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: 1, memory: 1Gi }
 
   # Connection to the main LangWatch application
   ## @extra langwatch_nlp.upstreams Upstream to app (callbacks, etc.).
@@ -1581,6 +1585,15 @@ redis:
 gateway:
   ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
   chartManaged: true
+
+  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
+  publicUrl: ""
+
+  # The gateway needs its OWN externally-reachable endpoint, separate from
+  # the main app — point a second ingress / load balancer at gateway.ingress
+  # below (the LLM clients hit the gateway, the browser hits the app). The
+  # gateway subchart ships ingress.enabled=true with a SaaS placeholder host;
+  # override gateway.ingress.host with your domain.
 
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common

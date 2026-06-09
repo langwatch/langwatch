@@ -39,14 +39,12 @@ import type { DataRetentionPolicyService } from "../data-retention/policy/dataRe
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import type { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
 
 export interface DataRetentionDependencies {
   policy: DataRetentionPolicyService;
   pinning: PinnedTraceService;
   retroactive: RetroactiveUpdateService;
   metering: StorageMeterService;
-  orphanSweep: OrphanSweepService;
 }
 
 export interface OpsDependencies {

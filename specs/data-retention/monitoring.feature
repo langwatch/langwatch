@@ -21,11 +21,6 @@ Feature: Data retention monitoring
     Given a ClickHouse mutation has been running for more than 1 hour
     Then a stuck-mutation ops alert is triggered
 
-  Scenario: Orphan sweep counter tracks cleaned records
-    When the orphan sweep deletes 15 Annotations and 3 PublicShares
-    Then data_retention_orphans_swept_total is incremented by 15 for model Annotation
-    And data_retention_orphans_swept_total is incremented by 3 for model PublicShare
-
   Scenario: Project settings dashboard shows retention status
     When the user opens the Retention Policies settings page
     Then the "Data Retention" section of the Retention + Usage card shows a single retention summary value when all categories share the same retention

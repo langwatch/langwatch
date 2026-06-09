@@ -2,7 +2,6 @@
 #
 # Setup:
 #   cp langwatch/.env.example langwatch/.env        # Add your keys
-#   cp langwatch_nlp/.env.example langwatch_nlp/.env  # Add OPENAI_API_KEY for NLP
 #
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
@@ -160,8 +159,7 @@ services:
         fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm -w install &&
-        pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate
+        pnpm -w exec prisma generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -190,7 +188,6 @@ services:
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
         pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
         pnpm run dev
       "
@@ -280,14 +277,19 @@ services:
   # =============================================================================
   # NLP SERVICE (profile: nlp)
   # =============================================================================
+  # nlpgo — the Go NLP engine (services/nlpgo, run as the `nlpgo` subcommand of
+  # the cmd/service monobinary). Dockerfile.langwatch_nlp builds a static Go
+  # binary; there is no Python uvicorn/litellm service anymore. The image still
+  # publishes as langwatch/langwatch_nlp and binds :5561, so the app/workers
+  # dial http://langwatch_nlp:5561 (LANGWATCH_NLP_SERVICE) unchanged.
 
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     profiles: [nlp, scenarios, full]
-    env_file:
-      - langwatch_nlp/.env
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
+      # nlpgo reads LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks
+      # (falls back to it when NLPGO_ENGINE_LANGWATCH_BASE_URL is unset).
       LANGWATCH_ENDPOINT: http://app:5560
     deploy:
       resources:

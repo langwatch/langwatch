@@ -70,7 +70,7 @@ export const governanceRouter = createTRPCRouter({
    * Pick the right `/` destination for the authenticated user given the
    * org context. Returns one of:
    *   - "/me"
-   *   - "/<projectSlug>/messages"
+   *   - "/<projectSlug>"
    *   - "/governance"
    *
    * The resolver is fail-safe: any signal lookup error falls through to
@@ -78,7 +78,7 @@ export const governanceRouter = createTRPCRouter({
    * LLMOps majority experience is preserved on transient backend errors.
    *
    * Critical invariant: an org with application traces but no governance
-   * state lands on /[project]/messages — NOT /governance — even if the
+   * state lands on /[project] — NOT /governance — even if the
    * user has organization:manage and Enterprise plan. The persona-4 gate
    * is conjunctive (manage AND Enterprise AND hasIngestionSources).
    */

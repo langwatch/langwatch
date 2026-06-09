@@ -35,18 +35,25 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
     bottomSeparatorColor: "border.muted",
   },
   error: {
+    // Was `red.fg/3` — invisible at table thumbnail width and indistinguishable
+    // from `default` for most viewers, so an "All" lens with a handful of
+    // failing traces read as healthy. Bumped to `/8` so an error row reads as
+    // "something's wrong here" without crossing into "this row is selected"
+    // territory (selected uses `blue.subtle` ≈ /15 worth of weight). Hover
+    // bumps to `/14` so the row still lifts on cursor-over without saturating.
     borderColor: "red.fg",
-    bg: "red.fg/3",
-    hoverBg: "red.fg/8",
-    separatorColor: "red.fg/5",
-    bottomSeparatorColor: "red.fg/6",
+    bg: "red.fg/8",
+    hoverBg: "red.fg/14",
+    separatorColor: "red.fg/10",
+    bottomSeparatorColor: "red.fg/12",
   },
   warning: {
+    // Matched bump for parity — warning rows had the same invisibility issue.
     borderColor: "yellow.fg",
-    bg: "yellow.fg/3",
-    hoverBg: "yellow.fg/8",
-    separatorColor: "yellow.fg/5",
-    bottomSeparatorColor: "yellow.fg/6",
+    bg: "yellow.fg/8",
+    hoverBg: "yellow.fg/14",
+    separatorColor: "yellow.fg/10",
+    bottomSeparatorColor: "yellow.fg/12",
   },
   default: {
     borderColor: "transparent",
@@ -75,6 +82,13 @@ export function rowVariantFor({
 
 interface StatusRowGroupProps {
   style: RowStyle;
+  /**
+   * The resolved row variant. Surfaced as a `data-row-variant` attribute
+   * on the tbody so per-variant CSS (e.g. the sticky-first-column rule
+   * in TraceTableShell) can stay in sync with whatever colour the row
+   * itself is painting.
+   */
+  variant: RowVariant;
   onClick?: (e: React.MouseEvent) => void;
   traceId?: string;
   isNew?: boolean;
@@ -86,6 +100,7 @@ interface StatusRowGroupProps {
 
 export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
   style,
+  variant,
   onClick,
   traceId,
   isNew = false,
@@ -99,6 +114,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
     onClick={onClick}
     data-trace-id={traceId}
     data-new={isNew ? "true" : undefined}
+    data-row-variant={variant}
     css={{
       "& > tr > td": { transition: "none" },
       // Reveal `data-row-hover-reveal` children for the WHOLE row group

@@ -52,6 +52,7 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
     errorMessage: null,
     models: [],
     totalCost: 0.003,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,

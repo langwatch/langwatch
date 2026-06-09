@@ -34,7 +34,7 @@ import type { FeatureFlagServiceInterface } from "../types";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const FAMILY_FLAG = "es-trace-projection-spanstorage-killswitch";
-const PRODUCT_FLAG = "release_nlp_go_engine_enabled";
+const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 const UNREGISTERED_FLAG = "experiment_some_adhoc_posthog_flag";
 
 class InMemoryStore {

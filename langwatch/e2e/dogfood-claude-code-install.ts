@@ -58,7 +58,7 @@ void (async () => {
     const url = resp.url();
     if (url.includes("/api/trpc/") && resp.request().method() === "POST" && resp.status() === 200) {
       const body = await resp.text().catch(() => "");
-      const m = body.match(/"token":"(ik-lw-[A-Za-z0-9_]+)"/);
+      const m = body.match(/"token":"(sk-lw-[A-Za-z0-9_]+)"/);
       if (m && m[1]) {
         capturedToken = m[1];
         console.log(`[mint] full token captured from tRPC body`);
@@ -66,10 +66,10 @@ void (async () => {
     }
   });
 
-  // Click "Issue binding token" OR "Rotate token" — scoped to the drawer
+  // Click "Use this template" OR "Rotate token" — scoped to the drawer
   const installBtn = page
     .locator('div[role="dialog"]')
-    .locator('button:has-text("Rotate token"), button:has-text("Issue binding token")')
+    .locator('button:has-text("Rotate token"), button:has-text("Use this template")')
     .first();
   if (await installBtn.count() === 0) {
     console.error("[fail] no Install button in drawer");

@@ -9,6 +9,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import type { PlatformToolPolicyMap } from "./platform-tool-policy";
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -25,6 +27,66 @@ export interface GovernanceConfig {
   user?: { id?: string; email?: string; name?: string };
   organization?: { id?: string; slug?: string; name?: string };
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
+
+  /**
+   * Personal ingest keys (the project-scoped ingest-only ApiKey
+   * `sk-lw-<...>` shape minted by `/api/auth/cli/governance/ingestion-key`),
+   * keyed by the tool's source_type slug (`claude_code` / `codex` /
+   * `gemini` / `opencode`). One key per source so different wrapped
+   * tools surface as their own ingestion source in /me + /messages.
+   *
+   * When the right key is present for a wrapped tool, the
+   * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER
+   * env vars pointing at the OTLP endpoint with this key as the
+   * Authorization bearer (reusing the cache instead of re-minting).
+   *
+   * Unset until the wrapper's first auto-mint for that tool.
+   */
+  default_personal_ingest_keys?: Record<
+    string,
+    { id?: string; secret?: string; prefix?: string }
+  >;
+
+  /**
+   * Persistent answer to the post-login "save export block to your
+   * shell rc?" prompt. `skip` = user picked "never", stay quiet
+   * forever. `undefined` = ask each login that lands in an
+   * unconfigured shell. The "not now" answer doesn't persist — it
+   * lets the next login re-ask on its own.
+   */
+  shell_rc_preference?: "skip";
+
+  /**
+   * Per-wrapped-tool routing mode answer.
+   *
+   *   "gateway"   — Path A: route the tool's HTTP calls through
+   *                  the AI Gateway via base-URL swap (full server-
+   *                  side I/O + cost capture, no client OTel).
+   *   "ingestion" — Path B: enable the tool's native OTel exporter
+   *                  pointed at /api/otel + mint the user's personal
+   *                  ingest key (sk-lw-*). For codex this also writes
+   *                  the [otel] block to ~/.codex/config.toml
+   *                  automatically.
+   *   "ask"       — re-prompt on the next `langwatch <tool>`. The
+   *                  default when this key is absent.
+   *
+   * The two modes are mutually exclusive per the no-double-trace
+   * rule — gateway capture + OTel emission on the same call would
+   * double-count both traces and cost. The wrapper picks Path A
+   * by default when a personal VK is configured, and falls back
+   * to Path B when no VK + the user opts in.
+   */
+  tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
+
+  /**
+   * Per-(org, tool) path policy cached from the login bootstrap
+   * (`/api/auth/cli/bootstrap` → `toolPolicies`). The `langwatch
+   * <tool>` wrapper gates path selection on this map so it only
+   * offers the paths the org admin permits. Absent for a legacy /
+   * offline CLI that never cached it; `resolvePlatformToolPolicy`
+   * then falls back to the hardcoded defaults.
+   */
+  tool_policies?: PlatformToolPolicyMap;
 
   /**
    * Most-recent signed `request_increase_url` returned by the

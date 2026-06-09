@@ -34,6 +34,7 @@ export interface UpdateProjectInput {
   language?: string;
   framework?: string;
   piiRedactionLevel?: PIIRedactionLevel;
+  teamId?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -88,6 +89,7 @@ export interface ProjectRepository {
   }): Promise<PaginatedResult<Project>>;
   findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
   teamBelongsToOrganization(params: { teamId: string; organizationId: string }): Promise<boolean>;
+  findActiveTeamInOrganization(params: { teamId: string; organizationId: string }): Promise<{ id: string } | null>;
   createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }>;
   createTeam(input: { teamId: string; teamName: string; teamSlug: string; organizationId: string }): Promise<{ id: string }>;
 }
@@ -147,6 +149,10 @@ export class NullProjectRepository implements ProjectRepository {
 
   async teamBelongsToOrganization(_params: { teamId: string; organizationId: string }): Promise<boolean> {
     return false;
+  }
+
+  async findActiveTeamInOrganization(_params: { teamId: string; organizationId: string }): Promise<{ id: string } | null> {
+    return null;
   }
 
   async createTeamWithRoleBinding(_input: CreateTeamWithBindingInput): Promise<{ id: string }> {

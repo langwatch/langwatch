@@ -6,6 +6,9 @@ import { CLIENT_FLAG_STALE_TIME_MS } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+
+import { buildProjectSwitchHref } from "../utils/routes";
 
 import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
 
@@ -40,13 +43,32 @@ export function useWorkspaceData(): Pick<
   WorkspaceSwitcherProps,
   "personal" | "teams" | "projects" | "onCreateProjectForTeam"
 > {
-  const { organizations } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
+  const { organizations, project: currentProject } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: false,
+      redirectToProjectOnboarding: false,
+    });
   const { data: session } = useRequiredSession();
   const userId = session?.user?.id;
   const { openDrawer } = useDrawer();
+  const router = useRouter();
+
+  // Switching projects should keep the user on the equivalent view of the
+  // target project instead of bouncing them home (the regression). Delegates
+  // to the shared route resolver so the switcher and the legacy ProjectSelector
+  // stay in lockstep. `homeFallback: "plain"` lands on the project home for
+  // org-scoped, personal, and settings routes that have no per-project view.
+  const buildProjectHref = useCallback(
+    (targetSlug: string): string =>
+      buildProjectSwitchHref({
+        routePattern: router.pathname,
+        resolvedPathname: router.asPath,
+        currentProjectSlug: currentProject?.slug,
+        targetSlug,
+        homeFallback: "plain",
+      }),
+    [router.pathname, router.asPath, currentProject?.slug],
+  );
 
   const organizationIds = useMemo(
     () => (organizations ?? []).map((org) => org.id),
@@ -130,7 +152,7 @@ export function useWorkspaceData(): Pick<
             orgId: org.id,
             orgName: org.name,
             orgSlug: org.slug,
-            href: `/${project.slug}`,
+            href: buildProjectHref(project.slug),
             label: project.name,
           })),
         ),
@@ -138,7 +160,7 @@ export function useWorkspaceData(): Pick<
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return { teams, projects };
-  }, [organizations, userId]);
+  }, [organizations, userId, buildProjectHref]);
 
   const personal = showPersonal
     ? {

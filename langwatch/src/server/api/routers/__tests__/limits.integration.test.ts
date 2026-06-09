@@ -4,22 +4,52 @@
  * Integration tests for Limits tRPC endpoints.
  * Tests the router layer including message limit status calculation.
  */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { OrganizationUserRole } from "@prisma/client";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { UsageService } from "../../../app-layer/usage/usage.service";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { OrganizationUserRole } from "@prisma/client";
-import { createTestApp } from "../../../app-layer/presets";
-import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
-// Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)
-const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
-  mockGetCurrentMonthCount: vi.fn(),
+// Hoisted so it survives vi.mock hoisting if a factory ever needs it.
+const { mockGetActivePlan } = vi.hoisted(() => ({
   mockGetActivePlan: vi.fn(),
 }));
 
+const PRO_PLAN = {
+  ...FREE_PLAN,
+  planSource: "subscription",
+  type: "PRO",
+  name: "Pro",
+  free: false,
+  maxMessagesPerMonth: 1000,
+} as const;
+
+/**
+ * Controls the monthly usage the page reads. getUsage → UsageStatsService reads
+ * getApp().usage.getCurrentMonthCountForDisplay(); spying the real prototype
+ * method keeps the stub type-checked against UsageService (no casts) and fails
+ * to compile if the method is renamed.
+ */
+function stubMonthlyUsage(count: number) {
+  return vi
+    .spyOn(UsageService.prototype, "getCurrentMonthCountForDisplay")
+    .mockResolvedValue(count);
+}
 
 describe("Limits Router Integration", () => {
   const testOrgSlug = "limits-router-test-org";
@@ -27,18 +57,11 @@ describe("Limits Router Integration", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
-    mockGetActivePlan.mockResolvedValue({
-      ...FREE_PLAN,
-      planSource: "subscription",
-      type: "PRO",
-      name: "Pro",
-      free: false,
-      maxMessagesPerMonth: 1000,
-    });
+    mockGetActivePlan.mockResolvedValue(PRO_PLAN);
 
-    // Wire App singleton so UsageStatsService.create() can call getApp().usage
+    // Wire App singleton so UsageStatsService.create() can call getApp().usage.
+    // usage is the real service; tests stub one method via stubMonthlyUsage().
     globalForApp.__langwatch_app = createTestApp({
-      usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -88,6 +111,7 @@ describe("Limits Router Integration", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await resetApp();
   });
 
@@ -106,18 +130,9 @@ describe("Limits Router Integration", () => {
 
   describe("getUsage", () => {
     beforeEach(async () => {
-      mockGetCurrentMonthCount.mockReset();
-      mockGetActivePlan.mockResolvedValue({
-        ...FREE_PLAN,
-        planSource: "subscription",
-        type: "PRO",
-        name: "Pro",
-        free: false,
-        maxMessagesPerMonth: 1000,
-      });
+      mockGetActivePlan.mockResolvedValue(PRO_PLAN);
       await resetApp();
       globalForApp.__langwatch_app = createTestApp({
-        usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan,
         }),
@@ -127,7 +142,7 @@ describe("Limits Router Integration", () => {
     describe("when usage is below 80% threshold", () => {
       // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status ok", async () => {
-        mockGetCurrentMonthCount.mockResolvedValue(500);
+        stubMonthlyUsage(500);
 
         const result = await caller.limits.getUsage({ organizationId });
 
@@ -140,7 +155,7 @@ describe("Limits Router Integration", () => {
     describe("when usage is between 80% and 100%", () => {
       // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status warning and percentage", async () => {
-        mockGetCurrentMonthCount.mockResolvedValue(850);
+        stubMonthlyUsage(850);
 
         const result = await caller.limits.getUsage({ organizationId });
 
@@ -153,7 +168,7 @@ describe("Limits Router Integration", () => {
     describe("when usage reaches or exceeds limit", () => {
       // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status exceeded", async () => {
-        mockGetCurrentMonthCount.mockResolvedValue(1000);
+        stubMonthlyUsage(1000);
 
         const result = await caller.limits.getUsage({ organizationId });
 
@@ -163,7 +178,7 @@ describe("Limits Router Integration", () => {
 
       // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("keeps enforcement behavior when plan provider returns a copied FREE plan object", async () => {
-        mockGetCurrentMonthCount.mockResolvedValue(1500);
+        stubMonthlyUsage(1500);
         mockGetActivePlan.mockResolvedValue({
           ...FREE_PLAN,
           maxMessagesPerMonth: 1000,

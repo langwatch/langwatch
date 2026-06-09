@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  *
- * SCIM enterprise-extension costCenter -> cost center auto-assignment,
+ * SCIM enterprise-extension costCenter -> department auto-assignment,
  * against a real Postgres test container, no mocks. Binds the SCIM
- * scenarios of cost-centers.feature.
+ * scenarios of departments.feature.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,7 +13,7 @@ import { SCIM_ENTERPRISE_USER_SCHEMA } from "../scim.types";
 import type { ScimCreateUserRequest, ScimPatchRequest } from "../scim.types";
 
 import { prisma } from "../../db";
-import { CostCenterService } from "../../../../ee/governance/services/cost-center/costCenter.service";
+import { DepartmentService } from "../../../../ee/governance/services/department/department.service";
 import {
   startTestContainers,
   stopTestContainers,
@@ -22,12 +22,12 @@ import {
 const CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
 const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 
-describe("ScimService cost-center auto-assignment", () => {
-  const ns = `scim-cc-${nanoid(8)}`;
+describe("ScimService department auto-assignment", () => {
+  const ns = `scim-dept-${nanoid(8)}`;
   const ORG_ID = `org-${ns}`;
 
   const scim = () => ScimService.create(prisma);
-  const costCenters = () => CostCenterService.create(prisma);
+  const departments = () => DepartmentService.create(prisma);
 
   const createRequest = (
     email: string,
@@ -62,7 +62,7 @@ describe("ScimService cost-center auto-assignment", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await prisma.costCenter.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.department.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { email: { contains: ns } } });
@@ -72,8 +72,8 @@ describe("ScimService cost-center auto-assignment", () => {
 
   describe("given an org that provisions users through SCIM", () => {
     /** @scenario A SCIM-provisioned user is assigned from the enterprise costCenter attribute */
-    it("assigns the user to the named cost center carried on the enterprise extension", async () => {
-      const engineering = await costCenters().create({
+    it("assigns the user to the named department carried on the enterprise extension", async () => {
+      const engineering = await departments().create({
         organizationId: ORG_ID,
         name: "Engineering",
       });
@@ -85,14 +85,14 @@ describe("ScimService cost-center auto-assignment", () => {
       });
 
       const membership = await membershipFor(email);
-      expect(membership.costCenterId).toBe(engineering.id);
+      expect(membership.departmentId).toBe(engineering.id);
     });
 
-    /** @scenario An unrecognized SCIM costCenter creates the cost center on first use */
-    it("creates a cost center the first time SCIM references it, then assigns it", async () => {
+    /** @scenario An unrecognized SCIM costCenter creates the department on first use */
+    it("creates a department the first time SCIM references it, then assigns it", async () => {
       const email = `${ns}-research@example.com`;
 
-      const before = await prisma.costCenter.findFirst({
+      const before = await prisma.department.findFirst({
         where: { organizationId: ORG_ID, name: "Research", archivedAt: null },
       });
       expect(before).toBeNull();
@@ -102,16 +102,16 @@ describe("ScimService cost-center auto-assignment", () => {
         organizationId: ORG_ID,
       });
 
-      const created = await prisma.costCenter.findFirstOrThrow({
+      const created = await prisma.department.findFirstOrThrow({
         where: { organizationId: ORG_ID, name: "Research", archivedAt: null },
       });
       const membership = await membershipFor(email);
-      expect(membership.costCenterId).toBe(created.id);
+      expect(membership.departmentId).toBe(created.id);
     });
 
     /** @scenario Updating the SCIM costCenter reassigns the user */
     it("replaces the prior assignment when the IdP updates the costCenter", async () => {
-      const marketing = await costCenters().create({
+      const marketing = await departments().create({
         organizationId: ORG_ID,
         name: "Marketing",
       });
@@ -139,7 +139,7 @@ describe("ScimService cost-center auto-assignment", () => {
       });
 
       const membership = await membershipFor(email);
-      expect(membership.costCenterId).toBe(marketing.id);
+      expect(membership.departmentId).toBe(marketing.id);
     });
 
     /** @scenario Clearing the SCIM costCenter unassigns the user */
@@ -164,7 +164,7 @@ describe("ScimService cost-center auto-assignment", () => {
       });
 
       const membership = await membershipFor(email);
-      expect(membership.costCenterId).toBeNull();
+      expect(membership.departmentId).toBeNull();
     });
   });
 });

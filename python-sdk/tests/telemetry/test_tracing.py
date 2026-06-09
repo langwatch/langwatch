@@ -1,6 +1,7 @@
 # NOTE: This test will result in logs to the console about a missing LangWatch API key,
 # which is expected as we don't care about integration-level API reporting in this test.
 
+import inspect
 import json
 import os
 from uuid import uuid4
@@ -10,6 +11,27 @@ import pytest
 
 import langwatch
 from langwatch.telemetry.tracing import LangWatchTrace
+
+
+def test_trace_default_has_no_client_truncation():
+    """The SDK must not truncate span content client-side by default (#4215).
+
+    Fidelity is the backend's job (ADR-022: event_log source-of-truth + edge
+    spool); the Python SDK stays consistent with the TS/Go SDKs and stock
+    OpenTelemetry, none of which truncate span content client-side. This guards
+    against silently re-introducing a default per-field byte cap on either the
+    public `trace()` factory or the underlying LangWatchTrace constructor.
+    """
+    assert (
+        inspect.signature(langwatch.trace).parameters["max_string_length"].default
+        is None
+    )
+    assert (
+        inspect.signature(LangWatchTrace.__init__)
+        .parameters["max_string_length"]
+        .default
+        is None
+    )
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -299,6 +299,7 @@ export const organizationRouter = createTRPCRouter({
           elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
+          supportContact: z.string().max(500).nullable().optional(),
         })
         .refine((data) => {
           const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
@@ -323,24 +324,7 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const organizationUser = await prisma.organizationUser.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-          role: "ADMIN",
-        },
-      });
-
-      if (!organizationUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
-
+    .mutation(async ({ input }) => {
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
@@ -351,6 +335,7 @@ export const organizationRouter = createTRPCRouter({
         elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
+        supportContact: input.supportContact,
       });
 
       if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {

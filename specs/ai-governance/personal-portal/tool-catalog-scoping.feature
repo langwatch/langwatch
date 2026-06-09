@@ -45,13 +45,13 @@ Feature: AI Tools Portal — org/team scoping resolution
     When alice (admin) calls `aiTools.adminList({ organizationId: "acme" })`
     Then "copilot" IS in alice's adminList response with enabled=false
 
-  @bdd @phase-7 @scoping @archived
-  Scenario: Archived entries are hidden from both lists
-    Given an entry "deprecated-tool" was archived (archivedAt set)
+  @bdd @phase-7 @scoping @deleted
+  Scenario: Deleted entries are removed from both lists
+    Given an entry "deprecated-tool" was deleted
     When bob calls `aiTools.list`
     Then "deprecated-tool" is NOT in bob's response
     When alice calls `aiTools.adminList`
-    Then "deprecated-tool" IS still in alice's adminList (audit-trail preservation)
+    Then "deprecated-tool" is NOT in alice's adminList
 
   @bdd @phase-7 @scoping @ordering
   Scenario: list-for-user respects admin-curated order

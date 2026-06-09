@@ -289,6 +289,12 @@ const SpanCost = ({ span }: { span: Span }) => {
 
 type SpanTreeProps = {
   traceId: string;
+  /**
+   * Approximate trace timestamp (ms since epoch), forwarded to the span reads
+   * as a partition-pruning hint. Lets the drawer's span loads target the
+   * trace's weekly `stored_spans` partitions instead of cold-scanning S3.
+   */
+  occurredAtMs?: number;
 };
 
 export function SpanTree(props: SpanTreeProps) {
@@ -300,6 +306,7 @@ export function SpanTree(props: SpanTreeProps) {
   const loader = useSpanTreeLoader({
     projectId: project?.id ?? "",
     traceId: props.traceId,
+    occurredAtMs: props.occurredAtMs,
     enabled: !!project && !!props.traceId,
   });
 

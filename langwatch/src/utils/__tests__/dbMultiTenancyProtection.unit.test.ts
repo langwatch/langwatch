@@ -1,7 +1,12 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { guardProjectId } from "../dbMultiTenancyProtection";
+import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
+import {
+  PROJECT_TENANCY_REGIMES,
+  SCOPED_MODEL_NAMES,
+  guardProjectId,
+} from "../dbMultiTenancyProtection";
 
 /**
  * Regression tests for the multitenancy guard — specifically its exempt
@@ -618,5 +623,93 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
         }),
       ).rejects.toThrow(/configId.*scopeType.*scopeId/);
     });
+  });
+});
+
+/**
+ * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
+ * WITHOUT a projectId column must be classified into exactly one regime, so a
+ * new model cannot silently slip in - or out of - the projectId guard:
+ *   - GLOBAL_MODELS / RELATIONAL_PARENT_SCOPED: hand-listed, no tenant column;
+ *   - SCOPED_MODELS: projectId-less but validated by row id / scope / parent FK;
+ *   - org-bearing: derived from ORG_BEARING_MODEL_NAMES (the org guard registry).
+ * Org-bearing models must NEVER be hand-listed here - the org guard is the
+ * single source of truth for "this model is org-scoped, not project-scoped".
+ */
+describe("project-tenancy regime partition", () => {
+  const {
+    GLOBAL_MODELS,
+    RELATIONAL_PARENT_SCOPED,
+    LICENSE_COUNTED_PROJECT_MODELS,
+  } = PROJECT_TENANCY_REGIMES;
+  const allModelNames = Prisma.dmmf.datamodel.models.map((m) => m.name);
+  const modelHasField = (model: string, field: string) =>
+    Prisma.dmmf.datamodel.models
+      .find((m) => m.name === model)
+      ?.fields.some((f) => f.name === field) ?? false;
+  const noProjectIdModels = allModelNames.filter(
+    (name) => !modelHasField(name, "projectId"),
+  );
+  const orgBearing = new Set(ORG_BEARING_MODEL_NAMES);
+
+  it("classifies every projectId-less model into exactly one regime", () => {
+    const classified = new Set<string>([
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...SCOPED_MODEL_NAMES,
+      ...ORG_BEARING_MODEL_NAMES,
+    ]);
+    const unclassified = noProjectIdModels.filter(
+      (name) => !classified.has(name),
+    );
+    expect(unclassified).toEqual([]);
+  });
+
+  it("never hand-lists a phantom (every listed name exists in the datamodel)", () => {
+    const known = new Set(allModelNames);
+    const phantoms = [
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...LICENSE_COUNTED_PROJECT_MODELS,
+      ...SCOPED_MODEL_NAMES,
+    ].filter((name) => !known.has(name));
+    expect(phantoms).toEqual([]);
+  });
+
+  it("never hand-lists an org-bearing model (those derive from the org registry)", () => {
+    const handListedOrgBearing = [
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...LICENSE_COUNTED_PROJECT_MODELS,
+    ].filter((name) => orgBearing.has(name));
+    expect(handListedOrgBearing).toEqual([]);
+  });
+
+  it("keeps the hand-listed buckets and SCOPED_MODELS pairwise disjoint", () => {
+    const buckets: Array<[string, readonly string[]]> = [
+      ["GLOBAL_MODELS", GLOBAL_MODELS],
+      ["RELATIONAL_PARENT_SCOPED", RELATIONAL_PARENT_SCOPED],
+      ["LICENSE_COUNTED_PROJECT_MODELS", LICENSE_COUNTED_PROJECT_MODELS],
+      ["SCOPED_MODELS", SCOPED_MODEL_NAMES],
+    ];
+    const overlaps: string[] = [];
+    for (let i = 0; i < buckets.length; i++) {
+      for (let j = i + 1; j < buckets.length; j++) {
+        const earlier = new Set(buckets[i]![1]);
+        for (const name of buckets[j]![1]) {
+          if (earlier.has(name)) {
+            overlaps.push(`${name} in ${buckets[i]![0]} & ${buckets[j]![0]}`);
+          }
+        }
+      }
+    }
+    expect(overlaps).toEqual([]);
+  });
+
+  it("license-counted models actually carry a projectId column", () => {
+    const withoutProjectId = LICENSE_COUNTED_PROJECT_MODELS.filter(
+      (name) => !modelHasField(name, "projectId"),
+    );
+    expect(withoutProjectId).toEqual([]);
   });
 });

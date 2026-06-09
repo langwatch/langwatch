@@ -10,9 +10,7 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import {
-  decryptCredential,
   decryptCredentials,
-  encryptCredential,
   encryptParserConfigCredentials,
 } from "../ingestionCredentials";
 
@@ -62,20 +60,6 @@ describe("ingestionCredentials", () => {
     it("returns an empty object for missing credentials", () => {
       expect(decryptCredentials(undefined)).toEqual({});
       expect(decryptCredentials(null)).toEqual({});
-    });
-  });
-
-  describe("given a standalone binding credential", () => {
-    it("round-trips through encryptCredential / decryptCredential", () => {
-      const value = { apiKey: "sk-ant-123", workspace: "wsp" };
-      const sealed = encryptCredential(value);
-      expect(sealed).toMatch(/^enc:v1:/);
-      expect(decryptCredential(sealed)).toEqual(value);
-    });
-
-    it("tolerates legacy plaintext on read", () => {
-      const legacy = { apiKey: "plain" };
-      expect(decryptCredential(legacy)).toEqual(legacy);
     });
   });
 });

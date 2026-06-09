@@ -4,8 +4,8 @@
  * tRPC router for the AI Tools Portal catalog (Phase 7).
  *
  * RBAC: gates on the resource-specific catalog
- *   - `aiTools:view` for reads (list-for-user) — every org member
- *   - `aiTools:manage` for writes + admin reads — org ADMIN by default
+ *   - `aiTools:view` for reads (list-for-user) - every org member
+ *   - `aiTools:manage` for writes + admin reads - org ADMIN by default
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  *
@@ -17,7 +17,7 @@
  *     `config.suggestedRoutingPolicyId`.
  *   - external-tool tile click → markdown render + linkUrl, no backend.
  *
- * So this router OWNS the catalog entity only — the per-tile behaviors
+ * So this router OWNS the catalog entity only - the per-tile behaviors
  * are wired client-side against existing endpoints.
  */
 import { TRPCError } from "@trpc/server";
@@ -44,7 +44,7 @@ const typeSchema = z.enum(
 /// single-colon regex rejected `preset:tool:globe` from the
 /// internal-tool drawer's preset picker.
 ///
-/// Cap at ~256KB encoded (≈ 192KB binary) — large enough for an SVG
+/// Cap at ~256KB encoded (≈ 192KB binary) - large enough for an SVG
 /// / 256×256 PNG, small enough to keep the Postgres row footprint
 /// reasonable.
 const iconAssetSchema = z
@@ -62,7 +62,7 @@ const iconAssetSchema = z
 
 export const aiToolsRouter = createTRPCRouter({
   /**
-   * User-facing list — returns enabled, non-archived entries the
+   * User-facing list - returns enabled, non-archived entries the
    * caller can see (org-scoped + their team-scoped, with team
    * overriding org by slug). Powers the /me portal grid.
    */
@@ -78,7 +78,7 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
-   * Per-org provider availability — drives the model_provider tile
+   * Per-org provider availability - drives the model_provider tile
    * preflight on /me. Returns the distinct set of `provider` strings
    * the calling user has access to via the scope ladder; the tile
    * compares its `config.providerKey` against this and renders an
@@ -101,12 +101,12 @@ export const aiToolsRouter = createTRPCRouter({
    * Auto-fill helper for the Claude Code coding-assistant tile. Returns
    * the OTLP endpoint URL of an active claude_code IngestionSource in
    * the org so end users don't need a round-trip with admin to learn
-   * the URL — only the bearer token stays in the admin-handoff path
+   * the URL - only the bearer token stays in the admin-handoff path
    * (ingestSecret is hash-only on the server, members can't retrieve
    * it). Returns `null` when the org hasn't published a claude_code
    * source yet; tile then renders the all-placeholder template.
    *
-   * Discloses ONLY the URL. No source name, no scope, no secret —
+   * Discloses ONLY the URL. No source name, no scope, no secret -
    * the URL is publicly resolvable per source-id anyway (the bearer
    * token gates the actual write). RBAC at `aiTools:view` (every org
    * member has it) is the right grant for the discoverability surface.
@@ -130,8 +130,8 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
-   * Admin list — includes disabled + archived. Powers the catalog
-   * editor at /settings/governance/tool-catalog.
+   * Admin list - includes disabled (but not deleted) tiles. Powers the
+   * catalog editor at /settings/governance/tool-catalog.
    */
   adminList: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -161,8 +161,8 @@ export const aiToolsRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         /// Empty array = org-wide (visible to every member).
-        /// Non-empty = entry visible only to members of those teams.
-        teamIds: z.array(z.string()).default([]),
+        /// Non-empty = entry visible only to members of those departments.
+        departmentIds: z.array(z.string()).default([]),
         type: typeSchema,
         displayName: z.string().min(1).max(128),
         iconAsset: iconAssetSchema,
@@ -176,7 +176,7 @@ export const aiToolsRouter = createTRPCRouter({
       try {
         return await service.create({
           organizationId: input.organizationId,
-          teamIds: input.teamIds,
+          departmentIds: input.departmentIds,
           type: input.type as (typeof SUPPORTED_TILE_TYPES)[number],
           displayName: input.displayName,
           iconAsset: input.iconAsset,
@@ -203,9 +203,9 @@ export const aiToolsRouter = createTRPCRouter({
         id: z.string(),
         displayName: z.string().min(1).max(128).optional(),
         iconAsset: iconAssetSchema,
-        /// Pass to overwrite the team binding set. Empty = org-wide.
+        /// Pass to overwrite the department binding set. Empty = org-wide.
         /// Omit to leave the existing binding untouched.
-        teamIds: z.array(z.string()).optional(),
+        departmentIds: z.array(z.string()).optional(),
         order: z.number().int().min(0).optional(),
         enabled: z.boolean().optional(),
         type: typeSchema.optional(),
@@ -221,7 +221,7 @@ export const aiToolsRouter = createTRPCRouter({
           organizationId: input.organizationId,
           displayName: input.displayName,
           iconAsset: input.iconAsset,
-          teamIds: input.teamIds,
+          departmentIds: input.departmentIds,
           order: input.order,
           enabled: input.enabled,
           type: input.type as
@@ -242,12 +242,17 @@ export const aiToolsRouter = createTRPCRouter({
       }
     }),
 
-  archive: protectedProcedure
+  /**
+   * Permanently delete a tile. Distinct from `setEnabled(false)`, which
+   * only hides it: this drops the row so it disappears from the admin
+   * editor and every member's portal.
+   */
+  remove: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
-      return await service.archive({
+      return await service.remove({
         id: input.id,
         organizationId: input.organizationId,
       });
@@ -257,7 +262,7 @@ export const aiToolsRouter = createTRPCRouter({
    * Single-purpose enable/disable shorthand. Equivalent to calling
    * `update({ id, enabled })` but exists as its own procedure so the
    * admin catalog editor's per-row toggle has a clean intent-named
-   * mutation (matches the BDD spec contract — see
+   * mutation (matches the BDD spec contract - see
    * specs/ai-governance/personal-portal/admin-catalog-editor.feature).
    */
   setEnabled: protectedProcedure
@@ -280,7 +285,7 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
-   * One-click "import starter pack" — publishes the documented default
+   * One-click "import starter pack" - publishes the documented default
    * tile set (4 coding assistants + 4 model providers, all org-scoped)
    * onto a fresh org's catalog. Idempotent: re-imports skip slugs the
    * admin already has, so re-clicking after partial setup just fills
@@ -310,7 +315,7 @@ export const aiToolsRouter = createTRPCRouter({
 
   /**
    * The starter-pack catalog the admin editor renders as a checklist.
-   * Static org-agnostic projection — gated on aiTools:manage to match the
+   * Static org-agnostic projection - gated on aiTools:manage to match the
    * editor's own access (only catalog admins ever see it).
    */
   starterPackCatalog: protectedProcedure
@@ -341,7 +346,7 @@ export const aiToolsRouter = createTRPCRouter({
   /**
    * Admin drawer dropdown source for the model_provider tile's
    * `suggestedRoutingPolicyId`. Returns the org-scoped routing
-   * policies (only — team-scoped policies are bound to a team's
+   * policies (only - team-scoped policies are bound to a team's
    * personal-VK flow and not surfaceable through a tile config).
    */
   routingPolicyOptions: protectedProcedure

@@ -27,6 +27,15 @@ import {
 const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hours
 
 /**
+ * SQL for a trace's bundled (non-billed) cost. Prefers the fold-time per-span
+ * NonBilledCost column; rows folded before it existed (NULL) fall back to the
+ * legacy all-or-nothing langwatch.cost.non_billable boolean. Always non-null.
+ */
+function nonBilledCostExpression(ts: string): string {
+  return `coalesce(${ts}.NonBilledCost, if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0), 0)`;
+}
+
+/**
  * Generate a unique parameter name for metrics using random suffix.
  * Uses 'm_' prefix to avoid collisions with filter params.
  */
@@ -409,6 +418,36 @@ function translatePerformanceMetric(
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.TotalCost`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+        params: {},
+      };
+
+    // Cost actually billed per token: the whole list-price cost minus the
+    // bundled (non-billed) portion. NonBilledCost is the fold-time per-span
+    // sum; rows folded before that column existed (NULL) fall back to the
+    // legacy all-or-nothing langwatch.cost.non_billable boolean.
+    case "performance.cost_billed":
+      return {
+        selectExpression: translateSimpleAggregation(
+          `(coalesce(${ts}.TotalCost, 0) - ${nonBilledCostExpression(ts)})`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+        params: {},
+      };
+
+    // Bundled / theoretical cost not billed per token (the list-price value of
+    // bundled-subscription usage). The grand total is performance.total_cost.
+    case "performance.cost_non_billed":
+      return {
+        selectExpression: translateSimpleAggregation(
+          nonBilledCostExpression(ts),
           aggregation,
           alias,
         ),

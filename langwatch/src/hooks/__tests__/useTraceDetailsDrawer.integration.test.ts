@@ -1,27 +1,19 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useTraceDetailsDrawer } from "../useTraceDetailsDrawer";
-import type { DrawerProps } from "../../components/drawerRegistry";
 
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DrawerProps } from "../../components/drawerRegistry";
+import { useTraceDetailsDrawer } from "../useTraceDetailsDrawer";
+
+// The hook is a thin convenience wrapper: it always delegates to
+// `openDrawer("traceDetails", …)`. The cross-cutting concerns (EXTERNAL-user
+// restriction, traces-v2 opt-in routing) live centrally in `CurrentDrawer`
+// and `openDrawer` and are covered by their own tests — here we only pin the
+// delegation contract.
 vi.mock("../useDrawer", () => ({
   useDrawer: vi.fn(),
-}));
-
-// `useTraceDetailsDrawer` now reads project / feature-flag / device
-// preference to decide v1-vs-v2 routing. Stub them so the hook always
-// stays on the legacy (v1) path — that's the behaviour these tests
-// were written against and the test name still asserts.
-vi.mock("../useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
-}));
-vi.mock("../useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
-}));
-vi.mock("../../features/traces-v2/hooks/useTracesV2Preference", () => ({
-  useTracesV2Preference: () => ({ preferred: false, setPreferred: vi.fn() }),
 }));
 
 import { useDrawer } from "../useDrawer";

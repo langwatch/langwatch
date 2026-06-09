@@ -11,6 +11,8 @@ const TEAM_B: ScopeChipPickerEntry = { scopeType: "TEAM", scopeId: "team-b" };
 const PROJ_A1: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-a1" };
 const PROJ_A2: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-a2" };
 const PROJ_B1: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-b1" };
+const DEPT_X: ScopeChipPickerEntry = { scopeType: "DEPARTMENT", scopeId: "dept-x" };
+const DEPT_Y: ScopeChipPickerEntry = { scopeType: "DEPARTMENT", scopeId: "dept-y" };
 
 const ctx = {
   organizationId: "org-1",
@@ -29,7 +31,7 @@ describe("given the user is editing a multi-scope selection", () => {
       expect(collapseRedundantScopes(next, prev, ctx)).toEqual([ORG]);
     });
 
-    it("does not touch other-org entries (defensive — picker today is single-org)", () => {
+    it("does not touch other-org entries (defensive - picker today is single-org)", () => {
       const otherOrg: ScopeChipPickerEntry = {
         scopeType: "ORGANIZATION",
         scopeId: "org-other",
@@ -86,10 +88,32 @@ describe("given the user is editing a multi-scope selection", () => {
     });
   });
 
+  describe("when adding a DEPARTMENT", () => {
+    it("drops the organization (a department narrows from org-wide)", () => {
+      const prev = [ORG];
+      const next = [ORG, DEPT_X];
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([DEPT_X]);
+    });
+
+    it("leaves sibling departments alone (a tile can target several)", () => {
+      const prev = [DEPT_Y];
+      const next = [DEPT_Y, DEPT_X];
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([DEPT_Y, DEPT_X]);
+    });
+  });
+
+  describe("when adding ORGANIZATION over departments", () => {
+    it("clears the departments (org-wide supersedes them)", () => {
+      const prev = [DEPT_X, DEPT_Y];
+      const next = [DEPT_X, DEPT_Y, ORG];
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([ORG]);
+    });
+  });
+
   describe("when no new scope is added (removal / no-op)", () => {
     it("returns next unchanged", () => {
       const prev = [ORG, TEAM_A];
-      // User unchecked TEAM_A — nothing was added.
+      // User unchecked TEAM_A - nothing was added.
       const next = [ORG];
       expect(collapseRedundantScopes(next, prev, ctx)).toEqual([ORG]);
     });

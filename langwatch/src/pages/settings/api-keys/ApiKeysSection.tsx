@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Heading,
   HStack,
   Spacer,
   Table,
@@ -27,6 +28,7 @@ import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
+import { IngestionKeysSection } from "./IngestionKeysSection";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
 import { TokenCreatedDialog } from "./TokenCreatedDialog";
 
@@ -113,13 +115,28 @@ export function ApiKeysSection({
     projectId: project?.id,
   });
 
-  // Client-side filter: map each key's roleBindings → scopes so
-  // filterProvidersByScope can apply its inclusive cascade directly.
+  // Split ingestion keys (ingest-only, CLI-minted, project-scoped write
+  // credentials carrying a non-null ingestSourceType) from regular personal /
+  // service API keys. They render in two separate labeled sections. `!= null`
+  // catches both null and undefined so keys without the field stay in the
+  // regular list.
   const allApiKeys = apiKeys.data ?? [];
+  const ingestionKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType != null),
+    [allApiKeys],
+  );
+  const serviceApiKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType == null),
+    [allApiKeys],
+  );
+
+  // Client-side filter: map each regular key's roleBindings → scopes so
+  // filterProvidersByScope can apply its inclusive cascade directly. The scope
+  // filter only governs the regular API keys section.
   const filteredKeys = useMemo(
     () =>
       filterProvidersByScope(
-        allApiKeys.map((k) => ({
+        serviceApiKeys.map((k) => ({
           ...k,
           scopes: k.roleBindings.map((rb) => ({
             scopeType: rb.scopeType,
@@ -133,7 +150,7 @@ export function ApiKeysSection({
           currentProjectId: project?.id,
         },
       ),
-    [allApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
+    [serviceApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
   );
 
   const handleCreate = (input: CreateApiKeyInput): void => {
@@ -315,7 +332,19 @@ export function ApiKeysSection({
 
   return (
     <>
-      <VStack gap={4} width="full" align="start">
+      <VStack gap={8} width="full" align="stretch">
+        {/* API keys — personal + service keys (ingestSourceType == null).
+            The "Create API key" flow and scope filter belong to this section. */}
+        <VStack gap={4} width="full" align="start">
+        {ingestionKeys.length > 0 && (
+          <VStack gap={1} align="start">
+            <Heading size="md">API keys</Heading>
+            <Text fontSize="sm" color="fg.muted">
+              Keys scoped to a user or service that honor your role bindings and
+              can be revoked individually.
+            </Text>
+          </VStack>
+        )}
         <HStack width="full" flexWrap="wrap" gap={2}>
           <Text fontSize="sm" color="fg.muted">
             Do not share your API keys or expose them in the browser or other
@@ -338,7 +367,7 @@ export function ApiKeysSection({
         </HStack>
 
         <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" size="md" width="full">
               <Table.Header>
                 <Table.Row>
@@ -381,7 +410,18 @@ export function ApiKeysSection({
                       <Badge size="sm" colorPalette="purple">Service</Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <Badge size="sm" colorPalette="teal">Project</Badge>
+                      {/* Name the project this legacy key is fixed to, using
+                          the same named scope chip as the user-scoped rows. */}
+                      <ProviderScopeChips
+                        size="xs"
+                        scopes={[
+                          {
+                            scopeType: "PROJECT",
+                            scopeId: project?.id ?? "",
+                            name: project?.name,
+                          },
+                        ]}
+                      />
                     </Table.Cell>
                     <Table.Cell>
                       <Badge size="sm" colorPalette="green">All</Badge>
@@ -509,6 +549,14 @@ export function ApiKeysSection({
             </Table.Root>
           </Card.Body>
         </Card.Root>
+        </VStack>
+
+        {/* Ingestion keys render below the API keys table. */}
+        <IngestionKeysSection
+          keys={ingestionKeys}
+          isAdmin={isAdmin}
+          onRevoke={setApiKeyToRevoke}
+        />
       </VStack>
 
       <CreateApiKeyDrawer

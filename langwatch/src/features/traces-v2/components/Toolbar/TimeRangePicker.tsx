@@ -57,8 +57,21 @@ export const TimeRangePicker: React.FC = () => {
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button size="xs" variant="outline" fontWeight="normal">
-          <Clock size={12} />
+        {/* The trigger reads as the page-global "what window am I
+            looking at" control. The previous `shortLabel` rendered as a
+            tiny "30d" chip indistinguishable from the secondary icon
+            buttons next to it — operator feedback was that this was
+            the single most important control on the toolbar but it
+            visually disappeared. Switched to the verbose `label`
+            (`Last 30 days`) at `size="sm"` so it carries its weight. */}
+        <Button
+          size="sm"
+          variant="outline"
+          fontWeight="medium"
+          paddingX={3}
+          gap={1.5}
+        >
+          <Clock size={14} />
           {formatTriggerLabel(timeRange)}
         </Button>
       </Popover.Trigger>
@@ -83,10 +96,15 @@ const PresetColumn: React.FC<{
   activePresetId: string | null;
   onSelect: (preset: TimeRangePreset) => void;
 }> = ({ activePresetId, onSelect }) => (
+  // Tightened from `paddingY={2}` to `1` and shrunk per-button height
+  // (see PresetButton). With ~10 presets across multiple groups, the
+  // previous default Button sizing pushed the popover past 360px tall
+  // — felt out of scale for what is a navigation dropdown. Trim
+  // everything down to ~6-row Xcode-style chip list height.
   <VStack
     align="stretch"
     gap={0}
-    paddingY={2}
+    paddingY={1}
     paddingX={1}
     minWidth="150px"
     borderRightWidth="1px"
@@ -95,12 +113,14 @@ const PresetColumn: React.FC<{
     {PRESET_GROUPS.map((group, groupIdx) => (
       <Fragment key={group.label}>
         <Text
-          textStyle="xs"
-          fontWeight="medium"
+          textStyle="2xs"
+          fontWeight="700"
           color="fg.subtle"
+          textTransform="uppercase"
+          letterSpacing="0.08em"
           paddingX={2}
-          paddingBottom={1}
-          paddingTop={groupIdx === 0 ? 0 : 2}
+          paddingBottom={0.5}
+          paddingTop={groupIdx === 0 ? 0 : 1.5}
         >
           {group.label}
         </Text>
@@ -129,6 +149,12 @@ const PresetButton: React.FC<{
     fontWeight={isActive ? "semibold" : "normal"}
     color={isActive ? "fg" : "fg.muted"}
     onClick={onClick}
+    // Force a slimmer row — Chakra's xs Button is 28px by default
+    // which compounded across 10 presets made the picker too tall.
+    height="22px"
+    minHeight="22px"
+    paddingY={0}
+    paddingX={1.5}
   >
     <Flex width="14px" justify="center" align="center" flexShrink={0}>
       {isActive && <Check size={12} />}
@@ -152,7 +178,7 @@ const AbsoluteRangeColumn: React.FC<{
   const parsed = parseAbsoluteRange({ from, to });
 
   return (
-    <VStack align="stretch" gap={3} padding={3} flex={1}>
+    <VStack align="stretch" gap={2} padding={2} flex={1}>
       <Text textStyle="xs" fontWeight="medium" color="fg.subtle">
         Absolute range
       </Text>
@@ -206,7 +232,7 @@ const Footer: React.FC<{ range: TimeRange }> = ({ range }) => {
   };
 
   return (
-    <HStack justify="space-between" paddingX={3} paddingY={2}>
+    <HStack justify="space-between" paddingX={2} paddingY={1}>
       <Text textStyle="xs" color="fg.subtle">
         {timezone}
       </Text>
@@ -228,10 +254,14 @@ function formatTriggerLabel(range: TimeRange): string {
   const preset = range.presetId
     ? getPresetById(range.presetId)
     : matchPreset(range);
-  if (preset) return preset.shortLabel;
+  // Verbose preset label ("Last 30 days") instead of the cryptic short
+  // form ("30d"). Time window is the most-impactful control on the
+  // page; the trigger should read at a glance. Absolute ranges still
+  // collapse to the date pair because no shorter form exists.
+  if (preset) return preset.label;
   const from = new Date(range.from);
   const to = new Date(range.to);
-  return `${format(from, "MMM d, HH:mm")} - ${format(to, "MMM d, HH:mm")}`;
+  return `${format(from, "MMM d, HH:mm")} – ${format(to, "MMM d, HH:mm")}`;
 }
 
 function toDatetimeLocal(epochMs: number): string {

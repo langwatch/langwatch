@@ -1,0 +1,20 @@
+id: no-localhost-fallback-ts
+snapshots:
+  const url = env.API_URL ?? "http://localhost:3000";:
+    labels:
+    - source: env.API_URL ?? "http://localhost:3000"
+      style: primary
+      start: 12
+      end: 50
+  const url = env.API_URL ?? "https://localhost";:
+    labels:
+    - source: env.API_URL ?? "https://localhost"
+      style: primary
+      start: 12
+      end: 46
+  const url = env.API_URL ?? `http://localhost:${port}/api`;:
+    labels:
+    - source: env.API_URL ?? `http://localhost:${port}/api`
+      style: primary
+      start: 12
+      end: 57

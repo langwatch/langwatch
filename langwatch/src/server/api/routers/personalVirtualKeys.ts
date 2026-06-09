@@ -15,7 +15,7 @@ import { z } from "zod";
 import {
   PersonalVirtualKeyService,
   PersonalVirtualKeyNotFoundError,
-  NoDefaultRoutingPolicyError,
+  NoEligibleProvidersError,
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
@@ -32,7 +32,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * Service options for VK lifecycle calls. Forwards the gateway-URL
  * env signal so the service can pick the right default for the
  * deployment shape: explicit `LW_GATEWAY_BASE_URL` always wins,
- * otherwise SaaS gets `gateway.langwatch.com` and self-hosted falls
+ * otherwise SaaS gets `gateway.langwatch.ai` and self-hosted falls
  * back to `http://localhost:5563` (the Docker port the AI gateway
  * binds to). Without this, fresh self-hosted installs displayed the
  * production gateway URL on the VK reveal card and the user's curl
@@ -206,24 +206,22 @@ export const personalVirtualKeysRouter = createTRPCRouter({
           routingPolicyId: input.routingPolicyId,
         });
       } catch (err) {
-        // Spec contract — no_default_routing_policy maps to 409 so the
-        // CLI / device-flow client can surface the actionable
-        // "ask your admin to publish a default policy" message.
-        if (err instanceof NoDefaultRoutingPolicyError) {
+        // Default-resolution path with zero accessible providers — the
+        // user genuinely has nothing to route through. Map to 409 so
+        // the CLI / /me UI can surface the actionable "ask your admin
+        // to add a provider" message at mint time instead of letting
+        // the user discover the gap via a copy-pasted curl that 504s.
+        if (err instanceof NoEligibleProvidersError) {
           throw new TRPCError({
             code: "CONFLICT",
             message: err.message,
             cause: err,
           });
         }
-        // G34 — empty routing policy (provider list is []). Mapping to
-        // 422 (UNPROCESSABLE_CONTENT) per master_orchestrator's
-        // contract for validate-before-mint: the request is
-        // syntactically fine but the org's state doesn't yet support
-        // processing it. /me consumes the actionable
-        // "ask your admin to add providers" message at mint time
-        // instead of letting the user discover the gap via a
-        // copy-pasted curl that 504s.
+        // G34 — empty routing policy (provider list is []) when the
+        // caller explicitly pinned that policy. Mapping to 422
+        // (UNPROCESSABLE_CONTENT) — the request is syntactically fine
+        // but the pinned policy does not yet support processing it.
         if (err instanceof RoutingPolicyHasNoProvidersError) {
           throw new TRPCError({
             code: "UNPROCESSABLE_CONTENT",

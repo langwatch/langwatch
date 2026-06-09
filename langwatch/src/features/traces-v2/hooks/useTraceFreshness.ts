@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list
@@ -32,7 +32,6 @@ export function useTraceFreshness() {
     (s) => s.setSseConnectionState,
   );
   const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
-  const pulse = useRefreshUIStore((s) => s.pulse);
   const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -49,12 +48,25 @@ export function useTraceFreshness() {
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
-      // Spin the refresh icon for every update event — invalidations that
-      // resolve from cache wouldn't otherwise flip isFetching long enough
-      // for the user to notice anything happened. Skipped in `ask` mode
-      // because the operator hasn't asked to see anything yet — flashing
-      // the icon would look like a stealth refresh.
-      if (mode === "live") pulse();
+      // The refresh pulse (top-of-page aurora) used to fire on every
+      // SSE trace_summary_updated event in "live" mode. For high-
+      // throughput projects that's a constant flash — users called it
+      // out as visual noise that didn't seem to correspond to anything
+      // appearing in the table. We now keep the pulse for two cases
+      // only:
+      //
+      //   1. User-initiated refresh — handled implicitly via
+      //      `useTraceListRefresh.refresh()` and lens/tab/refresh
+      //      switches that flip TanStack's `isFetching`.
+      //   2. An incoming trace that's about to land in the visible
+      //      window — handled in `useTraceNewCount` (it watches the
+      //      newCount response and pulses when count rises above zero
+      //      in live mode, just before the list refetch lands the new
+      //      rows under the user's cursor).
+      //
+      // The bare SSE event no longer fires the pulse. The (N new) pill
+      // remains the per-event surface — it stays accurate because we
+      // still invalidate `newCount` below.
 
       // Refresh the new-count query in BOTH live and ask modes so the
       // floating "(N new)" pill stays in sync. In `ask` we deliberately
@@ -101,7 +113,7 @@ export function useTraceFreshness() {
         });
       }
     },
-    [trpcUtils, requestFastPoll, pulse, project?.id],
+    [trpcUtils, requestFastPoll, project?.id],
   );
 
   const onSpanStored = useCallback(
@@ -110,14 +122,17 @@ export function useTraceFreshness() {
       const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
 
-      void trpcUtils.tracesV2.spanTree.invalidate({
-        projectId,
-        traceId: openTraceId,
-      });
-      void trpcUtils.tracesV2.spanDetail.invalidate({
-        projectId,
-        traceId: openTraceId,
-      });
+      // Invalidate every per-trace query that changes shape when a new
+      // span lands — keeps the cache push-fresh so the per-hook
+      // refetchInterval can stay off while SSE is connected. The key
+      // is scoped to `projectId` + `traceId` so only the open trace
+      // is invalidated, not the entire CSR cache.
+      const key = { projectId, traceId: openTraceId };
+      void trpcUtils.tracesV2.spanTree.invalidate(key);
+      void trpcUtils.tracesV2.spanDetail.invalidate(key);
+      void trpcUtils.tracesV2.spanLangwatchSignals.invalidate(key);
+      void trpcUtils.tracesV2.traceEvents.invalidate(key);
+      void trpcUtils.tracesV2.resourceInfo.invalidate(key);
     },
     [trpcUtils, project?.id],
   );
@@ -125,9 +140,7 @@ export function useTraceFreshness() {
   // Honour the operator's "live updates" preference — when disabled,
   // skip subscribing and force the connection state to disconnected so
   // the toolbar indicator reads correctly.
-  const liveUpdatesEnabled = useSseStatusStore(
-    (s) => s.liveUpdatesEnabled,
-  );
+  const liveUpdatesEnabled = useSseStatusStore((s) => s.liveUpdatesEnabled);
 
   const { connectionState, lastEventAt } = useTraceUpdateListener({
     projectId: project?.id ?? "",
@@ -137,6 +150,33 @@ export function useTraceFreshness() {
     debounceMs: 2000,
     maxWaitMs: 2000,
   });
+
+  // `discover` (facets) freshness. The server fires `discover_updated` when a
+  // background refresh in TraceListService lands a fresher facets payload in
+  // the shared cache; on receipt we invalidate, which refetches against the
+  // now-warm cache. This lives in the page-level coordinator rather than inside
+  // useTraceFacets because that hook is consumed by several sidebar components
+  // (SearchBar, FilterSidebar, TokenValuePicker) and tRPC subscriptions are not
+  // deduplicated across hook instances the way queries are: one subscription
+  // per consumer opened a duplicate SSE connection each, and on HTTP/1.1 (dev)
+  // those persistent connections starve the 6-per-origin pool, leaving query
+  // bursts (the drawer opening) stuck pending. One coordinator subscription
+  // invalidates the shared query, refreshing every consumer.
+  useSSESubscription<
+    { tenantId: string; timestamp: number },
+    { projectId: string }
+  >(
+    // @ts-expect-error - tRPC subscription type isn't perfectly inferred for the
+    // hook's generic; the underlying procedure shape matches.
+    api.tracesV2.onDiscoverUpdate,
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id,
+      onData: () => {
+        void trpcUtils.tracesV2.discover.invalidate();
+      },
+    },
+  );
 
   useEffect(() => {
     setSseConnectionState(

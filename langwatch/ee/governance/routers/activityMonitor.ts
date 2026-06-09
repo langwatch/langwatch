@@ -6,10 +6,10 @@
  * with real data from gateway_activity_events (CH) + IngestionSource
  * (PG).
  *
- * RBAC: read-only — all procedures gate on `activityMonitor:view`
+ * RBAC: read-only - all procedures gate on `activityMonitor:view`
  * per the catalog in api/rbac.ts. Only org ADMIN (or a custom role
  * granting it) sees the dashboard. MEMBER + EXTERNAL roles get nothing
- * by default — the previous `organization:view` gate leaked all spend
+ * by default - the previous `organization:view` gate leaked all spend
  * + anomaly + ingestion-health views to every org member.
  *
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
@@ -121,15 +121,15 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Spend rolled up by cost center across every project in the org.
-   * Powers the bird's-eye "Spend by cost center" card and answers the
+   * Spend rolled up by department across every project in the org.
+   * Powers the bird's-eye "Spend by department" card and answers the
    * marketing-versus-engineering comparison, including personal AI use.
    * Unlike `spendByUser`/`spendByTeam` this reads the whole org's spend,
    * not just the governance ingestion silo.
    *
-   * Spec: specs/ai-gateway/governance/cost-centers.feature
+   * Spec: specs/ai-gateway/governance/departments.feature
    */
-  spendByCostCenter: protectedProcedure
+  spendByDepartment: protectedProcedure
     .input(
       z.object({
         organizationId: z.string(),
@@ -140,7 +140,7 @@ export const activityMonitorRouter = createTRPCRouter({
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
-      return await service.spendByCostCenter({
+      return await service.spendByDepartment({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
       });
@@ -212,7 +212,7 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Recent events for a single IngestionSource — powers the per-source
+   * Recent events for a single IngestionSource - powers the per-source
    * detail page's "raw vs normalised" preview. Cursor-paginated by
    * eventTimestamp DESC via the optional `beforeIso` parameter.
    */
