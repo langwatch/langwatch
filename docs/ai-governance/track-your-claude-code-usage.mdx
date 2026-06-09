@@ -170,7 +170,7 @@ An `ik-lw-` write-only key (obtainable via the governance REST endpoint) also au
 
 ### The two-file recipe
 
-Commit `.claude/settings.json` with the non-secret flags and keep the bearer token **plus the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: the enable flag lives only in the local file, so a fresh clone with just the committed `settings.json` (and no `settings.local.json`) never attempts to export. This matters because the committed flags include `OTEL_LOG_USER_PROMPTS` and `OTEL_LOG_RAW_API_BODIES` (prompt text and raw API bodies) — that content must never ship until the repo owner opts in locally. `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local enable flag combines with the committed flags rather than replacing them.
+Commit `.claude/settings.json` with the non-secret flags and keep the bearer token **plus the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: the enable flag lives only in the local file, so a fresh clone with just the committed `settings.json` (and no `settings.local.json`) never attempts to export. This matters because the committed flags include `OTEL_LOG_USER_PROMPTS` (prompt text); raw API bodies (`OTEL_LOG_RAW_API_BODIES`) are kept off in committed config as the highest-risk flag and opted into locally only when needed. None of this content ships until the repo owner opts in locally by adding the enable flag. `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local enable flag combines with the committed flags rather than replacing them.
 
 **`.claude/settings.json`** (commit this):
 
@@ -180,7 +180,7 @@ Commit `.claude/settings.json` with the non-secret flags and keep the bearer tok
     "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
-    "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_RAW_API_BODIES": "0",
     "OTEL_TRACES_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_METRICS_EXPORTER": "otlp",
