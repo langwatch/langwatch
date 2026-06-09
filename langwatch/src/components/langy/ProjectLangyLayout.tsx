@@ -3,11 +3,9 @@ import { OrganizationUserRole } from "@prisma/client";
 import type { ReactNode } from "react";
 import { Outlet, useParams } from "react-router";
 
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 
 import { LangyProvider, useLangy } from "./LangyContext";
 import {
@@ -45,29 +43,20 @@ export default function ProjectLangyLayout() {
 }
 
 /**
- * Langy's visibility gate, relocated verbatim from DashboardLayout. Langy is a
- * staff-only, flag-gated surface shown on project routes the user belongs to.
- * The original `!publicPage` and `isProjectRoute` terms are implied here — this
- * component only renders under /:project/* routes, which are never public — so
- * they drop out. Everything else is derivable from app-level hooks, which is
- * why Langy can live a level above the page.
+ * Langy's visibility gate, relocated verbatim from DashboardLayout. Langy is
+ * shown on project routes the user belongs to. The original `!publicPage` and
+ * `isProjectRoute` terms are implied here — this component only renders under
+ * /:project/* routes, which are never public — so they drop out. Everything
+ * else is derivable from app-level hooks, which is why Langy can live a level
+ * above the page.
  */
 function useShowLangy(): boolean {
   const { data: session } = useRequiredSession();
-  const { team, project, organization, organizationRole } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const { team, project, organizationRole } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
-  const { enabled: langyFlagEnabled } = useFeatureFlag(
-    "release_langy_enabled",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project,
-    },
-  );
 
   const user = session?.user;
   const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;

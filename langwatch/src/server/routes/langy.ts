@@ -28,8 +28,6 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { featureFlagService } from "~/server/featureFlag";
-import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import { auditLog } from "~/server/auditLog";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
@@ -117,14 +115,14 @@ async function persistUserMessage(opts: {
 }
 
 // Every Langy route does its own authentication in-handler: the app-level
-// guard below validates the session + isLangwatchStaff + release_langy_enabled,
-// and each handler additionally checks the project-scoped evaluations:view
-// permission. We register through the SecuredApp builder with handlerManagedAuth
-// so the routes declare a policy (the auth guarantee test requires every
-// concrete endpoint to be classified) while keeping that in-handler enforcement.
+// guard below validates the session, and each handler additionally checks the
+// project-scoped evaluations:view permission. We register through the
+// SecuredApp builder with handlerManagedAuth so the routes declare a policy
+// (the auth guarantee test requires every concrete endpoint to be classified)
+// while keeping that in-handler enforcement.
 const LANGY_HANDLER_AUTH_REASON =
-  "Staff-gated UI route: session + isLangwatchStaff + release_langy_enabled " +
-  "enforced by the app-level guard; project evaluations:view checked per-handler.";
+  "Session-gated UI route enforced by the app-level guard; " +
+  "project evaluations:view checked per-handler.";
 
 const secured = createServiceApp({ basePath: "/api" });
 
