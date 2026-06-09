@@ -152,8 +152,6 @@ Within ~30 seconds of your first turn:
   ![Path 2 trace detail](/images/ai-governance/post-bypass/14-claude-pathb-trace-detail-storegate-fix.png)
 </Frame>
 
-<Info>Claude Code 2.1.x does not emit the assistant's response text on OpenTelemetry, only token counts. Input prompt, model, tokens, cache split, and cost render fine; the output text column stays empty until Anthropic ships that field.</Info>
-
 ## Per-repo telemetry with plain `claude` (no wrapper)
 
 Use this when you have both work and personal repos on the same machine, want telemetry on for specific repos only, run plain `claude` (no wrapper), want the configuration auto-applied per repo at launch with no leak to personal repos.
