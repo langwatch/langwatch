@@ -57,6 +57,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
+- [Update trace metadata](https://langwatch.ai/docs/api-reference/traces/update-metadata.md): Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.
 - [Create public path for single trace](https://langwatch.ai/docs/api-reference/traces/create-public-trace-path.md)
 - [Delete an existing public path for a trace](https://langwatch.ai/docs/api-reference/traces/delete-public-trace-path.md)
 
