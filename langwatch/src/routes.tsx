@@ -289,20 +289,6 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/cli/auth")),
   },
 
-  // Project routes
-  {
-    path: "/:project",
-    ...page(() => import("./pages/[project]/index")),
-  },
-  {
-    path: "/:project/agents",
-    ...page(() => import("./pages/[project]/agents")),
-  },
-  {
-    path: "/:project/automations",
-    ...page(() => import("./pages/[project]/automations")),
-  },
-
   // AI Gateway — org-scoped admin pages live under /settings/gateway/**
   // alongside model-providers, routing-policies, audit-log etc. Every
   // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
