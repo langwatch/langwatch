@@ -62,11 +62,11 @@ const chatRequestSchema = z.object({
    * (LangySidebar Composer). Optional — when absent, the agent falls back
    * to the project's DEFAULT-role model the gate resolved against.
    *
-   * Wire-level field today: forwarded to the OpenCode agent payload so the
-   * agent can pass it to the gateway as the `model` parameter. Until the
-   * agent honors it, this is effectively a hint (no behavior change, but
-   * the picker choice rides through the system). Validation is provider/-
-   * shape only here; the gateway is the final allowlist.
+   * Forwarded to the OpenCode agent payload so the agent can pass it to the
+   * gateway as the `model` parameter. Validated here in two layers: this
+   * Zod step enforces provider/model shape; the route then checks the value
+   * against the project's Langy VK `modelsAllowed` allowlist so a malicious
+   * or stale client can't pick a model the project hasn't approved.
    */
   modelOverride: z
     .string()
@@ -284,8 +284,8 @@ langyRoute().post("/langy/chat", async (c) => {
   ].join(" ");
 
   let credentials;
+  const credentialService = LangyCredentialService.create(prisma);
   try {
-    const credentialService = LangyCredentialService.create(prisma);
     credentials = await credentialService.getOrProvision({
       projectId,
       actorUserId: session.user.id,
@@ -295,6 +295,37 @@ langyRoute().post("/langy/chat", async (c) => {
       return c.json({ error: error.message }, { status: 409 });
     }
     throw error;
+  }
+
+  // Defense in depth: when a `modelOverride` rides in, enforce the project's
+  // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
+  // has no allowlist (modelsAllowed=null), the gateway is still the final
+  // enforcer; this check only rejects values the project has explicitly NOT
+  // allowed. Resolves the project's org via the conversation we already
+  // ensured above so we don't refetch the project.
+  if (modelOverride) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    if (project) {
+      const modelsAllowed = await credentialService.getModelsAllowed(
+        projectId,
+        project.team.organizationId,
+      );
+      if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
+        logger.warn(
+          { projectId, modelOverride, modelsAllowed },
+          "modelOverride not in VK allowlist — rejecting",
+        );
+        return c.json(
+          {
+            error: `Model "${modelOverride}" is not allowed for this project's Langy. Pick from the configured models.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
   }
 
   const agentResponse = await fetch(`${agentUrl}/chat`, {

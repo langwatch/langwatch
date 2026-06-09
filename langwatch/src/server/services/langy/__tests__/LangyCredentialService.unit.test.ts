@@ -172,4 +172,116 @@ describe("LangyCredentialService", () => {
       });
     });
   });
+
+  // Server-side allowlist read used by /langy/chat to reject tampered
+  // `modelOverride` values before they reach the OpenCode pod. The picker
+  // UI also narrows by this list — the server check is defense in depth.
+  describe("getModelsAllowed", () => {
+    function makeVkWithScopeQuery(vks: Array<unknown>) {
+      return {
+        getAllForScope: vi.fn().mockResolvedValue(vks),
+      } as any;
+    }
+
+    describe("when the Langy VK has a modelsAllowed array configured", () => {
+      it("returns the array", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([
+          {
+            name: "Langy",
+            principalUserId: null,
+            organizationId: "org-1",
+            config: { modelsAllowed: ["anthropic/claude-opus-4-7"] },
+          },
+        ]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        const result = await svc.getModelsAllowed("p1", "org-1");
+
+        expect(result).toEqual(["anthropic/claude-opus-4-7"]);
+        expect(vk.getAllForScope).toHaveBeenCalledWith({
+          scopeType: "PROJECT",
+          scopeId: "p1",
+        });
+      });
+    });
+
+    describe("when the Langy VK has modelsAllowed=null", () => {
+      it("returns null — caller treats as 'no allowlist, gateway enforces'", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([
+          {
+            name: "Langy",
+            principalUserId: null,
+            organizationId: "org-1",
+            config: { modelsAllowed: null },
+          },
+        ]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+      });
+    });
+
+    describe("when the Langy VK has modelsAllowed=[] (empty)", () => {
+      it("returns null — empty arrays are equivalent to 'unset' for this check", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([
+          {
+            name: "Langy",
+            principalUserId: null,
+            organizationId: "org-1",
+            config: { modelsAllowed: [] },
+          },
+        ]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+      });
+    });
+
+    describe("when no Langy VK exists for the project", () => {
+      it("returns null", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+      });
+    });
+
+    describe("when another VK in scope is named 'Langy' but has a principalUserId", () => {
+      it("ignores it — only the auto-managed (principalUserId=null) Langy VK counts", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([
+          {
+            name: "Langy",
+            principalUserId: "u-impersonator",
+            organizationId: "org-1",
+            config: { modelsAllowed: ["evil/model"] },
+          },
+        ]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+      });
+    });
+
+    describe("when a Langy VK belongs to a different organization", () => {
+      it("ignores it — cross-org leakage guard", async () => {
+        const prisma = makePrisma();
+        const vk = makeVkWithScopeQuery([
+          {
+            name: "Langy",
+            principalUserId: null,
+            organizationId: "org-OTHER",
+            config: { modelsAllowed: ["anthropic/claude-opus-4-7"] },
+          },
+        ]);
+        const svc = new LangyCredentialService(prisma, vk);
+
+        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+      });
+    });
+  });
 });

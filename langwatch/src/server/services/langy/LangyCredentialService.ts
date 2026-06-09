@@ -271,6 +271,34 @@ export class LangyCredentialService {
     }
     return secret;
   }
+
+  /**
+   * Returns the `modelsAllowed` array on the project's Langy VK. Null means
+   * "no allowlist set" — every eligible model is allowed (the gateway is the
+   * final allowlist in that case). Used by /langy/chat to validate the
+   * picker's per-send `modelOverride` server-side so the gateway isn't the
+   * only line of defense.
+   */
+  async getModelsAllowed(
+    projectId: string,
+    organizationId: string,
+  ): Promise<string[] | null> {
+    const langyVk = (
+      await this.virtualKeyService.getAllForScope({
+        scopeType: "PROJECT",
+        scopeId: projectId,
+      })
+    ).find(
+      (vk) =>
+        vk.name === LANGY_VK_DISPLAY_NAME &&
+        vk.principalUserId === null &&
+        vk.organizationId === organizationId,
+    );
+    if (!langyVk) return null;
+    const cfg = langyVk.config as { modelsAllowed?: string[] | null } | null;
+    const allowed = cfg?.modelsAllowed;
+    return allowed && allowed.length > 0 ? allowed : null;
+  }
 }
 
 async function resolveActorUserId(

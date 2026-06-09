@@ -470,9 +470,15 @@ function LangyPanel({
     return allowed && allowed.length > 0 ? allowed : null;
   }, [virtualKeysQuery.data, projectId]);
 
-  // Options the picker offers: the VK allowlist when present, else every
-  // registry model (ModelSelector further narrows that to the project's
-  // enabled providers). "Narrow to VK, fall back to all."
+  // Options the picker offers. Two-stage filter:
+  //   1. langyModelsAllowed (VK allowlist) narrows the universe to admin-
+  //      approved models when set; null = "no explicit allowlist".
+  //   2. ModelSelector internally further narrows by the project's actually-
+  //      enabled providers (getCustomModels → enabled+mode filter), so even
+  //      when the VK is unconstrained the dropdown shows ONLY models the
+  //      project can run today.
+  // The /langy/chat route mirrors the VK-allowlist check server-side so
+  // tampered clients can't pick something that's been disallowed.
   const modelOptions = useMemo(
     () => langyModelsAllowed ?? allModelOptions,
     [langyModelsAllowed],
@@ -1035,8 +1041,11 @@ function Composer({
   // Provider icon for the currently-selected model. Used by the collapsed
   // pill so we render a clean centered logo instead of clipping the full
   // ModelSelector trigger to 30px (which leaves the model name cut in half).
+  // `null` during the cold-start window (model="" before resolvedDefault
+  // lands) — used as a render gate below so we don't flash an empty pill.
   const collapsedProviderIcon = useMemo(() => {
-    const providerKey = (model ?? "").split("/")[0] ?? "";
+    const providerKey = model.split("/")[0] ?? "";
+    if (!providerKey) return null;
     return (
       modelProviderIcons[providerKey as keyof typeof modelProviderIcons] ?? null
     );
@@ -1058,15 +1067,39 @@ function Composer({
         {/* Per-send model picker. Collapsed to a small bubble showing just
             the provider logo; on hover/focus the bubble fluidly expands into
             the full picker. ModelSelector stays mounted — width animation
-            reveals the model label + caret without a remount. */}
+            reveals the model label + caret without a remount.
+
+            Hidden via visibility (not unmounted) until the model resolves
+            so we don't flash an empty 30px circle for the 50-300ms cold
+            window before the resolved-default query lands. Reserving the
+            slot keeps the composer from jumping. */}
         <Flex
           justifyContent="flex-end"
           marginBottom={1.5}
           data-testid="langy-model-picker"
           data-model={model}
+          visibility={collapsedProviderIcon ? "visible" : "hidden"}
+          aria-hidden={!collapsedProviderIcon}
           onMouseEnter={() => setPickerExpanded(true)}
           onMouseLeave={collapsePicker}
           onFocus={() => setPickerExpanded(true)}
+          // Mirror onFocus: collapse when focus moves OUT of the wrapper —
+          // BUT not when focus is moving into the Select's own portaled
+          // popover (search input, option list). Those live as siblings of
+          // <body>, not inside this wrapper, so the naive "is relatedTarget
+          // a descendant?" check would close the dropdown the instant the
+          // user opens it. Treat anything inside any `[data-scope="select"]`
+          // subtree as still-within-the-picker for blur purposes.
+          onBlur={(e) => {
+            const next = e.relatedTarget as HTMLElement | null;
+            if (!next) {
+              collapsePicker();
+              return;
+            }
+            if (e.currentTarget.contains(next)) return;
+            if (next.closest?.('[data-scope="select"]')) return;
+            collapsePicker();
+          }}
         >
           <Box
             position="relative"
