@@ -301,30 +301,28 @@ langyRoute().post("/langy/chat", async (c) => {
   // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
   // has no allowlist (modelsAllowed=null), the gateway is still the final
   // enforcer; this check only rejects values the project has explicitly NOT
-  // allowed. Resolves the project's org via the conversation we already
-  // ensured above so we don't refetch the project.
+  // allowed. The org is taken from `credentials` (the resolver already
+  // returned it) so we don't refetch the project — no risk of a TOCTOU race
+  // silently skipping the check between calls.
   if (modelOverride) {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    if (project) {
-      const modelsAllowed = await credentialService.getModelsAllowed(
-        projectId,
-        project.team.organizationId,
+    const modelsAllowed = await credentialService.getModelsAllowed(
+      projectId,
+      credentials.organizationId,
+    );
+    if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
+      // Don't log the full allowlist on every reject — it's the project's
+      // configured-model list and travels further than the user's UI does
+      // (SIEM, support tickets). Log shape + count so we still see drift.
+      logger.warn(
+        { projectId, modelOverride, allowedCount: modelsAllowed.length },
+        "modelOverride not in VK allowlist — rejecting",
       );
-      if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
-        logger.warn(
-          { projectId, modelOverride, modelsAllowed },
-          "modelOverride not in VK allowlist — rejecting",
-        );
-        return c.json(
-          {
-            error: `Model "${modelOverride}" is not allowed for this project's Langy. Pick from the configured models.`,
-          },
-          { status: 400 },
-        );
-      }
+      return c.json(
+        {
+          error: `Model "${modelOverride}" is not allowed for this project's Langy. Pick from the configured models.`,
+        },
+        { status: 400 },
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 
 import { encrypt, decrypt } from "~/utils/encryption";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
 import { getResolvedDefaultForFeature } from "~/server/modelProviders/modelDefaults.read";
 import { createLogger } from "~/utils/logger/server";
@@ -169,6 +170,13 @@ export type LangyCredentials = {
   langwatchEndpoint: string;
   /** AI gateway base URL — set as OPENAI_BASE_URL for opencode. */
   gatewayBaseUrl: string;
+  /**
+   * The organization the project belongs to. Returned here so callers that
+   * already resolved credentials don't re-fetch the project to discover its
+   * org (the route's allowlist-check path used to do this and risked a
+   * race where the project disappeared between calls).
+   */
+  organizationId: string;
 };
 
 /**
@@ -248,6 +256,7 @@ export class LangyCredentialService {
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl,
+      organizationId: project.team.organizationId,
     };
   }
 
@@ -278,25 +287,31 @@ export class LangyCredentialService {
    * final allowlist in that case). Used by /langy/chat to validate the
    * picker's per-send `modelOverride` server-side so the gateway isn't the
    * only line of defense.
+   *
+   * Tenancy is enforced at the DB layer (organizationId in the WHERE) rather
+   * than via a post-fetch in-memory filter, so a stray scope row pointing to
+   * the right projectId but a wrong-org VK can't reach this code path. The
+   * config blob is parsed through Zod so a corrupted/drifted VK config
+   * surfaces as a parse error instead of silently disabling enforcement.
    */
   async getModelsAllowed(
     projectId: string,
     organizationId: string,
   ): Promise<string[] | null> {
-    const langyVk = (
-      await this.virtualKeyService.getAllForScope({
-        scopeType: "PROJECT",
-        scopeId: projectId,
-      })
-    ).find(
-      (vk) =>
-        vk.name === LANGY_VK_DISPLAY_NAME &&
-        vk.principalUserId === null &&
-        vk.organizationId === organizationId,
-    );
+    const langyVk = await this.prisma.virtualKey.findFirst({
+      where: {
+        organizationId,
+        name: LANGY_VK_DISPLAY_NAME,
+        principalUserId: null,
+        scopes: {
+          some: { scopeType: "PROJECT", scopeId: projectId },
+        },
+      },
+      select: { config: true },
+    });
     if (!langyVk) return null;
-    const cfg = langyVk.config as { modelsAllowed?: string[] | null } | null;
-    const allowed = cfg?.modelsAllowed;
+    const parsed = parseVirtualKeyConfig(langyVk.config);
+    const allowed = parsed.modelsAllowed;
     return allowed && allowed.length > 0 ? allowed : null;
   }
 }

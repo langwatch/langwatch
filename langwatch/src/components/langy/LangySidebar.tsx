@@ -1090,14 +1090,23 @@ function Composer({
           // a descendant?" check would close the dropdown the instant the
           // user opens it. Treat anything inside any `[data-scope="select"]`
           // subtree as still-within-the-picker for blur purposes.
+          //
+          // `relatedTarget` is `EventTarget | null` — narrow with `instanceof`
+          // before calling Node/Element methods, since focus leaving to
+          // browser chrome / another window can yield a non-Element target
+          // that would throw on `.contains()`.
           onBlur={(e) => {
-            const next = e.relatedTarget as HTMLElement | null;
+            const next = e.relatedTarget;
             if (!next) {
               collapsePicker();
               return;
             }
-            if (e.currentTarget.contains(next)) return;
-            if (next.closest?.('[data-scope="select"]')) return;
+            if (next instanceof Node && e.currentTarget.contains(next)) return;
+            if (
+              next instanceof Element &&
+              next.closest('[data-scope="select"]')
+            )
+              return;
             collapsePicker();
           }}
         >
