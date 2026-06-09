@@ -224,7 +224,16 @@ View confirmed traces in `/traces` and cost attribution in `/me`.
 
 **Claude Code reads `settings.json` `env` at launch.** A session already running when you add or change the `env` block emits nothing until you restart `claude`. If telemetry is missing after editing the file, exit and relaunch.
 
-**`.gitignore` covering all of `.claude/` silently swallows the committed `settings.json`.** Some repos ignore the entire `.claude/` directory for privacy. That prevents `git add` from staging `settings.json`, so teammates never inherit the telemetry flags — yet local telemetry still works for you (the file is present on disk), so you won't notice. Fix: either `git add -f .claude/settings.json` to force-track it, or add `!.claude/settings.json` as a negation rule in `.gitignore` to exclude it from the blanket ignore.
+**`.gitignore` covering all of `.claude/` silently swallows the committed `settings.json`.** Some repos ignore the entire `.claude/` directory for privacy. That prevents `git add` from staging `settings.json`, so teammates never inherit the telemetry flags — yet local telemetry still works for you (the file is present on disk), so you won't notice. Fix: either `git add -f .claude/settings.json` to force-track it, or — if you want the file tracked by default — fix the `.gitignore` itself. A bare `!.claude/settings.json` negation is a no-op here, because git won't descend into an excluded directory to re-include a file under it. You have to un-ignore the directory first, then re-ignore the secret files:
+
+```gitignore
+.claude/
+!.claude/                       # un-ignore the dir so specific files can be re-included
+.claude/settings.local.json     # re-ignore the secret (personal/token) file
+.claude/*.lock                  # re-ignore other previously-covered files (e.g. scheduled_tasks.lock)
+```
+
+After this, `git check-ignore .claude/settings.json` reports it is no longer ignored (so it commits), while `settings.local.json` stays ignored (so your token is safe).
 
 **Shared key vs key per repo.** One `sk-lw-` key can serve any number of repos — attribution rides on the `project.repo` resource attribute, not the key itself. However, revoking a shared key (app/dashboard only — no CLI revoke) kills telemetry for all repos using it. If you need isolated blast radius, mint a separate key per repo.
 
