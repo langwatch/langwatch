@@ -93,6 +93,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
       borderLeftColor="border.subtle"
       borderRadius="sm"
       bg="bg.subtle"
+      data-spotlight="evaluator-drilldown"
     >
       <VStack align="stretch" gap={1.5}>
         {totalVerdictCount > 0 && (

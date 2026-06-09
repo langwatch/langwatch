@@ -415,6 +415,7 @@ export function VizPlaceholder({
           bg={{ base: "bg.surface", _dark: "bg.panel" }}
           flexShrink={0}
           minHeight="38px"
+          data-spotlight="viz-tabs"
         >
           <HStack
             ref={tabScrollerRef}

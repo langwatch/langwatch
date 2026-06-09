@@ -1,8 +1,11 @@
 import { HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -14,9 +17,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ChevronsDownUp, ChevronsUpDown, PanelLeftClose } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, type LucideIcon, PanelLeftClose } from "lucide-react";
 import type React from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -30,6 +33,7 @@ import {
 } from "./OrConnectorOverlay";
 import { SectionRenderer } from "./SectionRenderer";
 import { SortableSection } from "./SortableSection";
+import { getFacetIcon } from "./utils";
 
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
@@ -39,6 +43,7 @@ export const FilterSidebar: React.FC = () => {
   // all (the expand affordance sits on the table footer's pagination
   // row). So this component is only ever mounted in the expanded path.
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const { hasAnyTraces } = useProjectHasTraces();
   const facetManagerOpen = useUIStore((s) => s.facetManagerOpen);
   const setFacetManagerOpen = useUIStore((s) => s.setFacetManagerOpen);
 
@@ -68,6 +73,70 @@ export const FilterSidebar: React.FC = () => {
   // FacetRow positions and re-measure on scroll/resize.
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
+  // Track which section is being dragged so we can (a) render a lightweight
+  // DragOverlay and (b) suppress the OrConnectorOverlay recompute during drag.
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Stable per-key onHide callbacks — recreating them inline in renderSection
+  // creates fresh function references each render, which defeats memo on
+  // SectionRenderer. Cache them in a ref-backed Map so each key gets exactly
+  // one stable identity for the lifetime of the sidebar.
+  const hideFacetCallbacksRef = useRef<Map<string, () => void>>(new Map());
+  const getHideFacetCallback = useCallback(
+    (key: string) => {
+      let cb = hideFacetCallbacksRef.current.get(key);
+      if (!cb) {
+        cb = () => hideFacet(key);
+        hideFacetCallbacksRef.current.set(key, cb);
+      }
+      return cb;
+    },
+    [hideFacet],
+  );
+
+  // Pre-compute the OR props for every key in one pass over orAnalysis.
+  // Previously these were three IIFEs per key inside renderSection, which
+  // ran fresh every render and returned new object/array references — making
+  // React.memo on SectionRenderer useless.
+  const orPropsByKey = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        orGroupId: string | undefined;
+        orPeers: readonly string[] | undefined;
+        orMemberValues: ReadonlySet<string> | undefined;
+      }
+    >();
+    for (const [key, ids] of orAnalysis.fieldToGroupIds) {
+      const orGroupId =
+        ids && ids.length === 1 ? ids[0] : undefined;
+      let orPeers: readonly string[] | undefined;
+      if (ids && ids.length > 0) {
+        const peers = new Set<string>();
+        for (const id of ids) {
+          const group = orAnalysis.groups.find((g) => g.id === id);
+          if (!group) continue;
+          for (const f of group.fields) if (f !== key) peers.add(f);
+        }
+        orPeers = peers.size > 0 ? [...peers] : undefined;
+      }
+      let orMemberValues: ReadonlySet<string> | undefined;
+      if (ids && ids.length > 0) {
+        const values = new Set<string>();
+        for (const id of ids) {
+          const group = orAnalysis.groups.find((g) => g.id === id);
+          if (!group) continue;
+          for (const m of group.members) {
+            if (m.field === key) values.add(m.value);
+          }
+        }
+        orMemberValues = values.size > 0 ? values : undefined;
+      }
+      map.set(key, { orGroupId, orPeers, orMemberValues });
+    }
+    return map;
+  }, [orAnalysis]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE_PX },
@@ -84,8 +153,13 @@ export const FilterSidebar: React.FC = () => {
   // currently visible (filtered out by density) keep their place in the
   // saved order — we only reorder among the visible keys, then merge
   // the result with any non-visible ones still in the stored order.
+  const handleDragStart = useCallback(({ active }: DragStartEvent) => {
+    setActiveId(String(active.id));
+  }, []);
+
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
+      setActiveId(null);
       if (!over || active.id === over.id) return;
       const oldIndex = orderedKeys.indexOf(String(active.id));
       const newIndex = orderedKeys.indexOf(String(over.id));
@@ -142,6 +216,7 @@ export const FilterSidebar: React.FC = () => {
     }) => {
       const section = sectionByKey.get(key);
       if (!section) return null;
+      const orProps = orPropsByKey.get(key);
       return (
         // Per-section boundary — a single facet that throws (e.g. malformed
         // descriptor, attribute renderer crash) should show an inline panel
@@ -160,59 +235,11 @@ export const FilterSidebar: React.FC = () => {
             setRange={setRange}
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
-            onHide={() => hideFacet(key)}
+            onHide={getHideFacetCallback(key)}
             dragHandleProps={dragHandleProps}
-            // INTENTIONAL: `fieldToGroupIds` includes same-field OR groups
-            // (e.g. `status:error OR status:warning`), so a same-field OR
-            // query gets the full visual treatment — colored ring on rows,
-            // pinning via `orMemberValues`, AND a connector line via the
-            // overlay scanning `[data-or-group=...]`. Same-field ORs are
-            // already visually adjacent within their own facet section, but
-            // the connector + ring confirm to the user that those values
-            // are bound by OR (not just both checked under the implicit
-            // sidebar-ANDing). If this ever feels noisy, filter to
-            // `g.fields.size > 1` here — but the current call is to keep
-            // the link visible.
-            //
-            // Only project a single id when the field belongs to exactly
-            // one group. With multiple disjoint OR groups (e.g.
-            // `(status:error OR model:gpt-4o) AND (status:warning OR
-            // origin:application)`), `status:warning` would otherwise
-            // render under the FIRST group's id/colour/lane — wrong half
-            // of the time. Leaving it `undefined` for ambiguous fields
-            // means the row drops the ring/lane assignment but still
-            // joins both groups' peer/member sets via the unions below.
-            orGroupId={(() => {
-              const ids = orAnalysis.fieldToGroupIds.get(key);
-              return ids && ids.length === 1 ? ids[0] : undefined;
-            })()}
-            orPeers={(() => {
-              const ids = orAnalysis.fieldToGroupIds.get(key);
-              if (!ids || ids.length === 0) return undefined;
-              // Union peers across every group this field touches — when
-              // a field shows up in multiple disjoint OR groups, the
-              // sidebar should mention all of its co-facets.
-              const peers = new Set<string>();
-              for (const id of ids) {
-                const group = orAnalysis.groups.find((g) => g.id === id);
-                if (!group) continue;
-                for (const f of group.fields) if (f !== key) peers.add(f);
-              }
-              return peers.size > 0 ? [...peers] : undefined;
-            })()}
-            orMemberValues={(() => {
-              const ids = orAnalysis.fieldToGroupIds.get(key);
-              if (!ids || ids.length === 0) return undefined;
-              const values = new Set<string>();
-              for (const id of ids) {
-                const group = orAnalysis.groups.find((g) => g.id === id);
-                if (!group) continue;
-                for (const m of group.members) {
-                  if (m.field === key) values.add(m.value);
-                }
-              }
-              return values.size > 0 ? values : undefined;
-            })()}
+            orGroupId={orProps?.orGroupId}
+            orPeers={orProps?.orPeers}
+            orMemberValues={orProps?.orMemberValues}
           />
         </IsolatedErrorBoundary>
       );
@@ -226,8 +253,8 @@ export const FilterSidebar: React.FC = () => {
       setRange,
       removeRange,
       handleShiftToggle,
-      hideFacet,
-      orAnalysis,
+      getHideFacetCallback,
+      orPropsByKey,
     ],
   );
 
@@ -240,6 +267,18 @@ export const FilterSidebar: React.FC = () => {
   const showSkeleton =
     facetsLoading && descriptors.length === 0 && categoricals.length === 0;
 
+  // Hide the sidebar entirely when the discover endpoint has returned
+  // with no descriptors AND the project has never received a real trace.
+  // This avoids showing a "Getting filters ready…" hint + skeleton rail
+  // that will never populate for projects that haven't integrated yet.
+  // Once real traces arrive (hasAnyTraces flips true), the sidebar
+  // reveals itself on the next render because this condition no longer
+  // holds. The genuine loading state (facetsLoading true) is a different
+  // branch and still shows the caption + skeleton below.
+  if (hasAnyTraces === false && !facetsLoading && descriptors.length === 0) {
+    return null;
+  }
+
   return (
     <VStack
       height="full"
@@ -248,11 +287,16 @@ export const FilterSidebar: React.FC = () => {
       overflow="hidden"
       as="aside"
       position="relative"
+      data-spotlight="facet-sidebar"
     >
-      <OrConnectorOverlay
-        groups={orAnalysis.groups}
-        containerRef={scrollAreaRef}
-      />
+      {/* Suppress the overlay during drag — recomputing DOM positions on every
+          pointer-move frame causes layout thrashing. Lines snap back on dragEnd. */}
+      {!activeId && (
+        <OrConnectorOverlay
+          groups={orAnalysis.groups}
+          containerRef={scrollAreaRef}
+        />
+      )}
       {/* Header bar: Configure (text), expand/collapse-all toggle, and
           hide-sidebar. minHeight=36px matches the Toolbar's tab row at
           the top of the trace table, so the two bars sit on the same
@@ -340,6 +384,21 @@ export const FilterSidebar: React.FC = () => {
           paddingRight: `${4 + orAnalysis.groups.length * CONNECTOR_LANE_WIDTH}px`,
         }}
       >
+        {/* Loading caption — shown when discover is in flight and no cached
+            facets exist yet. The synthetic sections already render below it
+            so the sidebar isn't blank, but a small hint reassures the user
+            that live data is coming. Disappears as soon as discover responds. */}
+        {facetsLoading && (!descriptors || descriptors.length === 0) && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            paddingX={3}
+            paddingTop={2}
+            paddingBottom={1}
+          >
+            Getting filters ready…
+          </Text>
+        )}
         {showSkeleton ? (
           <FilterSidebarSkeleton />
         ) : (
@@ -351,6 +410,7 @@ export const FilterSidebar: React.FC = () => {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
@@ -358,14 +418,73 @@ export const FilterSidebar: React.FC = () => {
               strategy={verticalListSortingStrategy}
             >
               {orderedKeys.map((key) => (
-                <SortableSection key={key} id={key}>
+                <SortableSection key={key} id={key} isAnyDragging={!!activeId}>
                   {(dragHandleProps) => renderSection({ key, dragHandleProps })}
                 </SortableSection>
               ))}
             </SortableContext>
+            {/* Lightweight drag ghost — renders only the header strip (icon +
+                title + grip) so the full section content doesn't move with the
+                cursor. Keeps the animation smooth by painting a tiny node rather
+                than the entire section tree. */}
+            <DragOverlay>
+              {activeId ? (
+                <DragGhostHeader
+                  label={sectionByKey.get(activeId)?.label ?? activeId}
+                  icon={getFacetIcon({
+                    key: activeId,
+                    group: sectionByKey.get(activeId)?.group,
+                  })}
+                />
+              ) : null}
+            </DragOverlay>
           </DndContext>
         )}
       </div>
     </VStack>
   );
 };
+
+/**
+ * Lightweight ghost rendered in the DragOverlay while the user is dragging a
+ * section. Shows only the header strip (icon + label + grip icon) — much
+ * cheaper to paint than the full section tree, which avoids jank on slow
+ * devices. Styled to match the SidebarSection header so it looks like a
+ * real row being lifted.
+ */
+const DragGhostHeader: React.FC<{
+  label: string;
+  icon: LucideIcon | undefined;
+}> = ({ label, icon: SectionIcon }) => (
+  <HStack
+    gap={1}
+    paddingX={3}
+    paddingY={2}
+    bg="bg.panel"
+    borderWidth="1px"
+    borderColor="border"
+    borderRadius="md"
+    boxShadow="md"
+    opacity={0.9}
+    cursor="grabbing"
+  >
+    <HStack gap={1} minWidth={0} flex={1}>
+      {SectionIcon && (
+        <Text as="span" color="fg.subtle" display="flex" alignItems="center">
+          <SectionIcon size={12} />
+        </Text>
+      )}
+      <Text
+        textStyle="2xs"
+        fontWeight="500"
+        color="fg.subtle"
+        textTransform="uppercase"
+        letterSpacing="0.08em"
+        truncate
+      >
+        {label}
+      </Text>
+    </HStack>
+    <GripVertical size={12} color="var(--chakra-colors-fg-subtle)" />
+  </HStack>
+);

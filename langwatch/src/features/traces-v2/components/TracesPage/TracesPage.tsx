@@ -17,7 +17,11 @@ import { useURLSync } from "../../hooks/useURLSync";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
+import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { IntegrationCTACard } from "../../onboarding/components/IntegrationCTACard";
+import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
@@ -111,20 +115,13 @@ export const TracesPage: React.FC = () => {
     topLevelOnboardingStage === "serviceSegue" ||
     topLevelOnboardingStage === "facetsReveal" ||
     topLevelOnboardingStage === "outro";
-  // Empty state shows when the project hasn't received a real trace
-  // *and* the user hasn't persistently dismissed the card for this
-  // project. The dismissal is per-project + localStorage-backed, so
-  // clicking Skip / Learn / completing the sample-data countdown
-  // sticks across reloads. The toolbar's Continue integration clears
-  // the dismissal when the user wants to come back.
-  // Tour mode is an explicit override: existing customers
-  // (`firstMessage=true`, real data in the table) hit the toolbar's
-  // Tour button and we drop them into the empty-state journey on
-  // top of their real project. The dismissal flag still wins —
-  // clicking "Done exploring" exits cleanly. Without the override
-  // the journey would only ever fire for genuinely-empty projects.
-  const showEmptyState =
-    !setupDismissed && (hasAnyTraces === false || tourActive);
+  // Empty state (old journey takeover) now only shows when `tourActive`
+  // is explicitly set via the legacy journey entry point. No-traces users
+  // see the regular `ResultsPane` with sample data injected via
+  // `usePreviewTracesActive` and an inline integration CTA card.
+  // Phase 2 will replace the journey state machine with contextual
+  // spotlights and this branch will be removed entirely.
+  const showEmptyState = tourActive && !setupDismissed;
   // Dim the surrounding chrome only while the card is *active*. The
   // moment the user clicks any exit action (Load sample / Skip / Learn)
   // `setupDisengaged` flips and the dim lifts — even if the card itself
@@ -193,6 +190,10 @@ export const TracesPage: React.FC = () => {
           <PageKeyboardShortcuts />
           <TraceDrawerMount />
         </VStack>
+        {/* Phase 2 spotlight tour overlay — floats above the page,
+            non-modal. Activated by the "Show me around" toolbar button
+            or by #sp=<id> in the URL fragment. */}
+        <SpotlightOverlay />
       </OnboardingHost>
     </DensityProvider>
   );
@@ -220,6 +221,7 @@ const FilterAside: React.FC<{
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const persistSidebarLayout = useUIStore((s) => s.persistSidebarLayout);
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
+  const { hasAnyTraces } = useProjectHasTraces();
   // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
   // viewport, leaving the actual trace table unreadable. Force the
   // collapsed rail on small screens regardless of the persisted preference,
@@ -245,6 +247,15 @@ const FilterAside: React.FC<{
   // lives in the table footer (see `Pagination`) so the page is one
   // continuous slab while collapsed, with one button to bring it back.
   if (collapsed) return null;
+
+  // No real traces yet — the discover endpoint won't return any field
+  // descriptors, so the filter facets have nothing to show. Hide the
+  // sidebar entirely until real data arrives so we don't present an
+  // empty chrome rail with "Getting filters ready…" that never populates.
+  // `FilterSidebar` also checks this independently but we gate here too
+  // so the outer `Box` wrapper (which has explicit `width`) isn't left
+  // as a silent whitespace column.
+  if (hasAnyTraces === false) return null;
 
   const autoExpandedWidth =
     SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
@@ -311,6 +322,15 @@ const ResultsPane: React.FC = React.memo(() => {
     cancelExport,
   } = useTraceListExport();
 
+  const { hasAnyTraces } = useProjectHasTraces();
+  const isPreviewActive = usePreviewTracesActive();
+  const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
+  // Only show the "this is sample data" banner when the user has real traces
+  // and explicitly opted in via the toolbar. For no-traces projects the CTA
+  // card already explains that the rows are sample data, so the banner would
+  // be redundant.
+  const showSampleBanner = isPreviewActive && hasAnyTraces === true && showSamplePreview;
+
   const isSelectedExport =
     selectionMode === "all-matching" || explicitCount > 0;
   const dialogTraceCount =
@@ -331,6 +351,10 @@ const ResultsPane: React.FC = React.memo(() => {
       height="full"
     >
       <Toolbar onExportAll={() => openExportDialog()} />
+      {/* Sample-data ribbon — shown when user has real traces and has
+          explicitly opted into sample preview. Not shown for no-traces
+          projects where the CTA card already contextualises the sample rows. */}
+      {showSampleBanner && <SampleDataBanner />}
       <BulkActionBar
         totalHits={totalHits}
         pageTraceIds={pageTraceIds}
@@ -353,6 +377,10 @@ const ResultsPane: React.FC = React.memo(() => {
           overflow="auto"
           bg={{ base: "bg.surface", _dark: "bg.muted" }}
         >
+          {/* Integration CTA card — pinned banner above the trace rows for
+              no-traces projects. Self-gates via useIntegrationCTAVisible so
+              it vanishes once real traces arrive or the user snoozes it. */}
+          <IntegrationCTACard />
           <TraceTable />
         </Box>
         <FindBar />

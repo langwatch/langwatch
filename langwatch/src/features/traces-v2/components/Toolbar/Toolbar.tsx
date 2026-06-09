@@ -1,8 +1,13 @@
 import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Bookmark, Compass, Download, Tent } from "lucide-react";
+import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
+import { useCallback } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
+import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
+import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
@@ -19,16 +24,47 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
-  // Tour entry point — the toolbar's only onboarding affordance. The
-  // What's-new dialog used to live next to this button; it retired
-  // when the tour outro absorbed its content (release notes,
-  // multiplayer hint, shortcuts, beta note). Replaying the tour
-  // takes the user past the OutroPanel, which is now the only
-  // surface for that information. While the journey is rendering
-  // the same button doubles as the exit ("On safari" → click to
-  // end), so users have one consistent place to leave the demo
-  // instead of hunting for an exit in the empty-state body.
-  const { onLaunchTour, onEndTour, tourActive } = useTourEntryPoints();
+  // Tour entry point — kept for backwards compatibility. The journey
+  // state machine (Phase 2) may still use onLaunchTour / onEndTour
+  // internally. For Phase 1 the toolbar button exclusively toggles
+  // `showSamplePreview` and does NOT launch the journey.
+  const { onEndTour } = useTourEntryPoints();
+
+  const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
+  const setShowSamplePreview = useOnboardingStore(
+    (s) => s.setShowSamplePreview,
+  );
+  const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
+  const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
+  const setCurrentSpotlightId = useOnboardingStore(
+    (s) => s.setCurrentSpotlightId,
+  );
+
+  const handleSamplePreviewToggle = useCallback(() => {
+    if (showSamplePreview) {
+      setShowSamplePreview(false);
+      // If the legacy journey was somehow also active, end it cleanly.
+      onEndTour();
+    } else {
+      setShowSamplePreview(true);
+    }
+  }, [showSamplePreview, setShowSamplePreview, onEndTour]);
+
+  const handleShowMeAround = useCallback(() => {
+    if (spotlightsActive) {
+      // Toggle off — dismiss the spotlight tour.
+      setSpotlightsActive(false);
+      setCurrentSpotlightId(null);
+      writeSpotlightFragment(null);
+    } else {
+      // Start the tour from the first spotlight.
+      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+      const firstId = first?.id ?? null;
+      setCurrentSpotlightId(firstId);
+      setSpotlightsActive(true);
+      writeSpotlightFragment(firstId);
+    }
+  }, [spotlightsActive, setSpotlightsActive, setCurrentSpotlightId]);
 
   // "Save Lens" outline button only surfaces when the active lens has
   // pending local changes. Clicking it opens the shared
@@ -42,6 +78,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
   );
   const createLens = useViewStore((s) => s.createLens);
+  // Hide "Save the result as a lens" when the current query has a parse
+  // error — saving a broken query as a lens would just create a lens
+  // that silently fails to filter on load. The button comes back the
+  // moment the error is resolved.
+  const hasParseError = useFilterStore((s) => Boolean(s.parseError));
 
   return (
     <Flex
@@ -55,7 +96,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
     >
       <LensTabs />
       <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
-        {activeLensIsDraft && (
+        {activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
             onSubmit={(name) => createLens(name)}
@@ -69,25 +110,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
               <Icon boxSize={3.5}>
                 <Bookmark />
               </Icon>
-              Save Lens
+              Save the result as a lens
             </Button>
           </LensNamePopover>
         )}
         <Tooltip
           content={
-            tourActive
-              ? "Click to end the tour"
-              : "Take the trace explorer tour"
+            showSamplePreview
+              ? "Hide sample traces"
+              : "See sample traces to explore the UI"
           }
           positioning={{ placement: "bottom" }}
         >
           <Button
             size="xs"
-            variant={tourActive ? "subtle" : "ghost"}
-            colorPalette={tourActive ? "orange" : undefined}
-            onClick={tourActive ? onEndTour : onLaunchTour}
-            aria-label={tourActive ? "End the tour" : "Take the tour"}
-            aria-pressed={tourActive}
+            variant={showSamplePreview ? "subtle" : "ghost"}
+            colorPalette={showSamplePreview ? "orange" : undefined}
+            onClick={handleSamplePreviewToggle}
+            aria-label={
+              showSamplePreview ? "Hide sample data" : "See sample data"
+            }
+            aria-pressed={showSamplePreview}
           >
             {/* Brighter orange in light mode (matches the orange
                 indicator dot on the "All" lens tab) — `orange.fg` was
@@ -96,9 +139,38 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
               boxSize={3.5}
               color={{ base: "orange.500", _dark: "orange.fg" }}
             >
-              {tourActive ? <Tent /> : <Compass />}
+              {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
-            {tourActive ? "On safari" : "Tour"}
+            {showSamplePreview ? "Hide sample data" : "See sample data"}
+          </Button>
+        </Tooltip>
+        <Tooltip
+          content={
+            spotlightsActive
+              ? "End the guided tour"
+              : "Start the guided tour of this page"
+          }
+          positioning={{ placement: "bottom" }}
+        >
+          <Button
+            size="xs"
+            variant={spotlightsActive ? "subtle" : "ghost"}
+            colorPalette={spotlightsActive ? "blue" : undefined}
+            onClick={handleShowMeAround}
+            aria-label={spotlightsActive ? "End tour" : "Show me around"}
+            aria-pressed={spotlightsActive}
+          >
+            <Icon
+              boxSize={3.5}
+              color={
+                spotlightsActive
+                  ? "blue.fg"
+                  : { base: "fg.muted", _dark: "fg.subtle" }
+              }
+            >
+              <Map />
+            </Icon>
+            {spotlightsActive ? "End tour" : "Show me around"}
           </Button>
         </Tooltip>
         <LiveIndicator />
