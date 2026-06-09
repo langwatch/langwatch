@@ -21,13 +21,12 @@ vi.mock("~/server/db", () => ({
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
       const span = { setAttribute: () => {} };
-      return (fn as (span: { setAttribute: () => void }) => Promise<unknown>)(span);
+      return (fn as (span: { setAttribute: () => void }) => Promise<unknown>)(
+        span,
+      );
     },
   }),
 }));
@@ -519,7 +518,10 @@ describe("ClickHouseTraceService", () => {
         } as never);
 
         await service.getAllTracesForProject(
-          { ...baseInput, query: "100% success_rate" } as GetAllTracesForProjectInput,
+          {
+            ...baseInput,
+            query: "100% success_rate",
+          } as GetAllTracesForProjectInput,
           protections,
         );
 
@@ -705,9 +707,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve(idRows),
           })
           // summary — OOM
-          .mockRejectedValueOnce(
-            new Error("MEMORY_LIMIT_EXCEEDED"),
-          )
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
           // retry batch 1: traces 0-24
           .mockResolvedValueOnce({
             json: () => Promise.resolve(summaryRows.slice(0, 25)),
@@ -781,10 +781,9 @@ describe("ClickHouseTraceService", () => {
           })
           // evaluations — OOM
           .mockRejectedValueOnce(
-            Object.assign(
-              new Error("Query memory limit exceeded"),
-              { type: "MEMORY_LIMIT_EXCEEDED" },
-            ),
+            Object.assign(new Error("Query memory limit exceeded"), {
+              type: "MEMORY_LIMIT_EXCEEDED",
+            }),
           )
           // evaluations retry batch
           .mockResolvedValueOnce({
@@ -851,6 +850,115 @@ describe("ClickHouseTraceService", () => {
         expect(traces).toHaveLength(1);
         expect(traces[0]!.spans).toHaveLength(1);
         expect(traces[0]!.spans[0]!.span_id).toBe("span-1");
+      });
+    });
+  });
+
+  describe("getTracesWithSpans()", () => {
+    describe("when the join read hits MEMORY_LIMIT_EXCEEDED", () => {
+      it("retries in batches and returns all traces with their spans", async () => {
+        const traceIds = ["trace-0", "trace-1"];
+
+        mockClickHouseQuery
+          // summary query for the full list — OOM
+          .mockRejectedValueOnce(
+            new Error(
+              "Query memory limit exceeded: would use 3.50 GiB, " +
+                "maximum: 3.50 GiB: MEMORY_LIMIT_EXCEEDED",
+            ),
+          )
+          // retry batch (both traces fit in one batch of 25): summary then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(traceIds.map((id) => makeSummaryRow(id))),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(traceIds.map((id) => makeSpanRow(id, `${id}-s`))),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          traceIds,
+          protections,
+        );
+
+        expect(traces).not.toBeNull();
+        expect(traces!.map((t) => t.trace_id).sort()).toEqual(traceIds);
+        for (const trace of traces!) {
+          expect(trace.spans).toHaveLength(1);
+        }
+      });
+
+      it("splits into 25-trace batches when retrying with >25 traces", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          // full-list summary — OOM
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // batch 1: summary (0-24) then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(0, 25).map((id) => makeSummaryRow(id)),
+              ),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(0, 25).map((id) => makeSpanRow(id, `${id}-s`)),
+              ),
+          })
+          // batch 2: summary (25-29) then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(25).map((id) => makeSummaryRow(id)),
+              ),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`)),
+              ),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          traceIds,
+          protections,
+        );
+
+        expect(traces).toHaveLength(30);
+        // call 0 = OOM, 1 = summary batch1, 2 = spans batch1, 3 = summary batch2
+        const batch1Summary = mockClickHouseQuery.mock.calls[1]![0];
+        const batch2Summary = mockClickHouseQuery.mock.calls[3]![0];
+        expect(batch1Summary.query_params.traceIds).toHaveLength(25);
+        expect(batch2Summary.query_params.traceIds).toHaveLength(5);
+      });
+
+      it("does not batch-retry non-OOM errors", async () => {
+        mockClickHouseQuery.mockRejectedValue(
+          new Error("SYNTAX_ERROR: bad query"),
+        );
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await expect(
+          service.getTracesWithSpans("proj_123", ["trace-0"], protections),
+        ).rejects.toThrow();
+        // The single failed query is not followed by per-batch retries.
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
       });
     });
   });
