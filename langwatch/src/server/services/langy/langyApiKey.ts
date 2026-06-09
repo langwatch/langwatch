@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { Prisma, RoleBindingScopeType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   computePermissionsFromSelections,
@@ -38,26 +38,6 @@ const LANGY_PERMISSION_SELECTIONS: Record<string, AccessLevel | "none"> = {
 const LANGY_PERMISSIONS = computePermissionsFromSelections(
   LANGY_PERMISSION_SELECTIONS,
 );
-
-async function hasLangyKey(
-  prisma: PrismaClient,
-  projectId: string,
-): Promise<boolean> {
-  const existing = await prisma.apiKey.findFirst({
-    where: {
-      name: LANGY_API_KEY_NAME,
-      revokedAt: null,
-      roleBindings: {
-        some: {
-          scopeType: RoleBindingScopeType.PROJECT,
-          scopeId: projectId,
-        },
-      },
-    },
-    select: { id: true },
-  });
-  return existing !== null;
-}
 
 /**
  * Returns the decrypted, ready-to-use dedicated Langy key token for a project,
