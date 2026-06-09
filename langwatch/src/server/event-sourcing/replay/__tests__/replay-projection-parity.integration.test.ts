@@ -117,8 +117,19 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
         "evt-replay-parity-003",
       ] as const;
 
+      // Use a recent base timestamp so the rows are within the active retention
+      // window. event_log has a DELETE TTL installed at deploy time:
+      //   IF(_retention_days > 0, toDateTime(EventOccurredAt/1000) + toIntervalDay(_retention_days), '2106-01-01') DELETE
+      // The prior fixture used a hardcoded Nov-2023 epoch (1700000000000 ms).
+      // With the default _retention_days=308, the TTL expiry was ~Sep 2024 —
+      // already stale at the CI run date (2026-06-09). ClickHouse TTL-deleted
+      // the freshly-inserted parts before the SELECT, returning 0 rows.
+      // Using Date.now() keeps the rows current; _retention_days:0 is an
+      // additional belt-and-suspenders sentinel meaning "never expire" (same
+      // idiom used in large-trace-blob-offload-readpath.integration.test.ts).
+      const baseOccurredAt = Date.now();
       const records = EVENT_IDS.map((eventId, i) => {
-        const occurredAt = 1700000000000 + i * 1000;
+        const occurredAt = baseOccurredAt + i * 1000;
         const eventPayload = JSON.stringify({
           id: eventId,
           aggregateId: traceId,
@@ -169,12 +180,12 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
           // (TenantId, AggregateType, AggregateId, IdempotencyKey). Production
           // ALWAYS stamps IdempotencyKey = event.idempotencyKey || event.id
           // (eventStoreUtils.eventToRecord), so distinct events of one trace get
-          // distinct sort keys and never collapse. Omitting it here let every
-          // event of this trace share the key (""), so a background merge in the
-          // insert→read window collapsed the sequence to the single
-          // max-EventTimestamp row — the read then returned fewer rows than were
-          // inserted (the observed shard-5 flake). Stamp it to match production.
+          // distinct sort keys and never collapse.
           IdempotencyKey: eventId,
+          // _retention_days: 0 = never-expire sentinel (same as the blob-offload
+          // readpath test). Prevents TTL deletion regardless of the table's
+          // retention window — test-only fixture, not production data.
+          _retention_days: 0,
         };
       });
 
@@ -183,10 +194,6 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
         values: records,
         format: "JSONEachRow",
         // Synchronous insert so the SELECT below reads the rows back immediately.
-        // (async_insert:0 is harmless but was NOT the flake fix — a prior harden
-        // wrongly attributed the 0-rows failure to async-insert visibility; the
-        // real cause was ReplacingMergeTree dedup on an empty IdempotencyKey,
-        // fixed by the distinct IdempotencyKey stamped above.)
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 1 },
       });
 
