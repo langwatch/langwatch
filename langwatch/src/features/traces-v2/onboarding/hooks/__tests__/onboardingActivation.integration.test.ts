@@ -55,10 +55,24 @@ describe("onboarding activation is opt-in", () => {
   });
 
   describe("when the tour has been dismissed for this project", () => {
-    it("keeps the journey inactive even if tourActive still lingers", () => {
+    // `tourActive` is global + in-memory; the dismissal is per-project +
+    // persisted. A tour launched elsewhere leaves `tourActive` true after
+    // navigating to a previously-dismissed project, so BOTH gates must
+    // honour the dismissal or the fixture rows leak in with the journey
+    // chrome off.
+    beforeEach(() => {
       mockTourActive = true;
       mockDismissed = { p1: true };
+    });
+
+    it("keeps the journey inactive even if tourActive still lingers", () => {
       expect(renderHook(() => useOnboardingActive()).result.current).toBe(
+        false,
+      );
+    });
+
+    it("keeps the sample-data preview inactive too", () => {
+      expect(renderHook(() => usePreviewTracesActive()).result.current).toBe(
         false,
       );
     });
