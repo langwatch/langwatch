@@ -133,7 +133,13 @@ export const FilterSidebar: React.FC = () => {
   }, [allExpanded, orderedKeys, setAllSectionsOpen]);
 
   const renderSection = useCallback(
-    (key: string, dragHandleProps?: React.HTMLAttributes<HTMLDivElement>) => {
+    ({
+      key,
+      dragHandleProps,
+    }: {
+      key: string;
+      dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+    }) => {
       const section = sectionByKey.get(key);
       if (!section) return null;
       return (
@@ -353,7 +359,7 @@ export const FilterSidebar: React.FC = () => {
             >
               {orderedKeys.map((key) => (
                 <SortableSection key={key} id={key}>
-                  {(dragHandleProps) => renderSection(key, dragHandleProps)}
+                  {(dragHandleProps) => renderSection({ key, dragHandleProps })}
                 </SortableSection>
               ))}
             </SortableContext>

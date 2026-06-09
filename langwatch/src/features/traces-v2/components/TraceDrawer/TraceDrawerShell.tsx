@@ -307,7 +307,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           trace={trace}
                           spans={spanTree}
                           selectedSpan={selectedSpan}
-                          spansLoading={spanTreeQuery.isLoading}
+                          isSpansLoading={spanTreeQuery.isLoading}
                           layout={layout}
                         />
                       )}

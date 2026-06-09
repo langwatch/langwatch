@@ -23,7 +23,7 @@ interface TraceAccordionsProps {
    * work" the moment the spanTree query was even slightly slow.
    */
   selectedSpanId?: string | null;
-  spansLoading?: boolean;
+  isSpansLoading?: boolean;
   onSelectSpan?: (spanId: string) => void;
 }
 
@@ -33,7 +33,7 @@ export const TraceAccordions = memo(function TraceAccordions({
   selectedSpan,
   activeTab,
   selectedSpanId,
-  spansLoading,
+  isSpansLoading,
   onSelectSpan,
 }: TraceAccordionsProps) {
   useSyncSectionPresence({ traceId: trace.traceId, tab: activeTab });
@@ -60,7 +60,7 @@ export const TraceAccordions = memo(function TraceAccordions({
   // the spanId isn't in it (deleted span, stale link), we DO fall
   // through to the summary — the operator gets a graceful "couldn't
   // find that span" landing rather than an indefinite skeleton.
-  if (activeTab === "span" && selectedSpanId && spansLoading) {
+  if (activeTab === "span" && selectedSpanId && isSpansLoading) {
     return (
       <Box padding={4}>
         <VStack align="stretch" gap={2}>

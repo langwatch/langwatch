@@ -44,8 +44,8 @@ import { facetLabel, sortBySectionOrder } from "../utils";
 export function useFilterSidebarData() {
   const ast = useFilterStore((s) => s.ast);
   const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
-  const setRange = useFilterStore((s) => s.setRange);
-  const removeRange = useFilterStore((s) => s.removeRange);
+  const storeSetRange = useFilterStore((s) => s.setRange);
+  const storeRemoveRange = useFilterStore((s) => s.removeRange);
 
   // Cross-facet OR analysis. Sections whose field shows up in
   // `fieldToGroupIds` are part of (at least) one OR group; the colour is
@@ -61,15 +61,37 @@ export function useFilterSidebarData() {
   // glue that hands the analysis + field to the helper and forwards
   // the result.
   const toggleFacet = useCallback(
-    (field: string, value: string, options?: { modifierKey?: boolean }) => {
+    ({
+      field,
+      value,
+      isModifierKey = false,
+    }: {
+      field: string;
+      value: string;
+      isModifierKey?: boolean;
+    }) => {
       const routing = routeToggleViaOrGroups({
         analysis: orAnalysisRaw,
         field,
-        modifierKey: options?.modifierKey ?? false,
+        modifierKey: isModifierKey,
       });
       storeToggleFacet(field, value, routing);
     },
     [storeToggleFacet, orAnalysisRaw],
+  );
+
+  const setRange = useCallback(
+    ({ field, from, to }: { field: string; from: string; to: string }) => {
+      storeSetRange(field, from, to);
+    },
+    [storeSetRange],
+  );
+
+  const removeRange = useCallback(
+    ({ field }: { field: string }) => {
+      storeRemoveRange(field);
+    },
+    [storeRemoveRange],
   );
 
   const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();

@@ -17,11 +17,15 @@ interface SectionRendererProps {
   ast: LiqeQuery;
   facetItemsByKey: Map<string, FacetItem[]>;
   valueStateGetters: Map<string, (value: string) => FacetValueState>;
-  toggleFacet: (
-    field: string,
-    value: string,
-    options?: { modifierKey?: boolean },
-  ) => void;
+  toggleFacet: ({
+    field,
+    value,
+    isModifierKey,
+  }: {
+    field: string;
+    value: string;
+    isModifierKey?: boolean;
+  }) => void;
   /** Set when this section's field belongs to a cross-facet OR group;
    * threaded into the section so it can render its "linked" badge. */
   orGroupId?: string;
@@ -32,8 +36,8 @@ interface SectionRendererProps {
    * those rows get a coloured ring so the user can see which specific
    * values participate. */
   orMemberValues?: ReadonlySet<string>;
-  setRange: (field: string, from: string, to: string) => void;
-  removeRange: (field: string) => void;
+  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
+  removeRange: ({ field }: { field: string }) => void;
   onShiftToggle: (nextOpen: boolean) => void;
   /** Called when the user clicks the X to remove this section from
    * the sidebar. Threaded into the section components which surface
@@ -74,7 +78,8 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       ? {
           active:
             getFacetValueState(ast, "none", noneToggleValue) === "include",
-          onToggle: () => toggleFacet("none", noneToggleValue),
+          onToggle: () =>
+            toggleFacet({ field: "none", value: noneToggleValue }),
         }
       : undefined;
 
@@ -103,7 +108,9 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         field={section.key}
         items={facetItemsByKey.get(section.key)!}
         getValueState={valueStateGetters.get(section.key)!}
-        onToggle={toggleFacet}
+        onToggle={(field, value, options) =>
+          toggleFacet({ field, value, isModifierKey: options?.modifierKey })
+        }
         onShiftToggle={onShiftToggle}
         onHide={onHide}
         dragHandleProps={dragHandleProps}
@@ -128,8 +135,10 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         currentFrom={current?.from}
         currentTo={current?.to}
         formatValue={getRangeFormatter(section.key)}
-        onChange={(from, to) => setRange(section.key, String(from), String(to))}
-        onClear={() => removeRange(section.key)}
+        onChange={(from, to) =>
+          setRange({ field: section.key, from: String(from), to: String(to) })
+        }
+        onClear={() => removeRange({ field: section.key })}
         onShiftToggle={onShiftToggle}
         onHide={onHide}
         dragHandleProps={dragHandleProps}
@@ -157,9 +166,15 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"
       }
       onToggleValue={(attrKey, value, options) =>
-        toggleFacet(fieldFor(attrKey), value, options)
+        toggleFacet({
+          field: fieldFor(attrKey),
+          value,
+          isModifierKey: options?.modifierKey,
+        })
       }
-      onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
+      onToggleNone={(attrKey) =>
+        toggleFacet({ field: "none", value: fieldFor(attrKey) })
+      }
       onShiftToggle={onShiftToggle}
       onHide={onHide}
       dragHandleProps={dragHandleProps}

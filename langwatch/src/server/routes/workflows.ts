@@ -67,7 +67,7 @@ secured.access(
   }
 
   try {
-    const model = await getVercelAIModel(projectId, undefined, "studio.autocomplete");
+    const model = await getVercelAIModel({ projectId, featureKey: "studio.autocomplete" });
 
     const copilot = new CompletionCopilot(undefined, {
       model: async (prompt) => {

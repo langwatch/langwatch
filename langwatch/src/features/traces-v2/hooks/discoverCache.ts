@@ -83,10 +83,13 @@ export function getCachedDiscover(
   return entry.facets;
 }
 
-export function setCachedDiscover(
-  projectId: string,
-  facets: DiscoverDescriptors,
-): void {
+export function setCachedDiscover({
+  projectId,
+  facets,
+}: {
+  projectId: string;
+  facets: DiscoverDescriptors;
+}): void {
   memory[projectId] = { facets, savedAt: Date.now() };
   persist(memory);
 }

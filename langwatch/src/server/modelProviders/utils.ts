@@ -26,11 +26,15 @@ import {
  * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
  * it to a sticky toast prompting the user to configure a default.
  */
-export const getVercelAIModel = async (
-  projectId: string,
-  model?: string,
+export const getVercelAIModel = async ({
+  projectId,
+  model,
   featureKey = "prompt.create_default",
-) => {
+}: {
+  projectId: string;
+  model?: string;
+  featureKey?: string;
+}) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });

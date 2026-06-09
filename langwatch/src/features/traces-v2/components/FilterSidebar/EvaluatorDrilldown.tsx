@@ -12,13 +12,17 @@ interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */
   item: FacetItem;
   ast: LiqeQuery;
-  toggleFacet: (
-    field: string,
-    value: string,
-    options?: { modifierKey?: boolean },
-  ) => void;
-  setRange: (field: string, from: string, to: string) => void;
-  removeRange: (field: string) => void;
+  toggleFacet: ({
+    field,
+    value,
+    isModifierKey,
+  }: {
+    field: string;
+    value: string;
+    isModifierKey?: boolean;
+  }) => void;
+  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
+  removeRange: ({ field }: { field: string }) => void;
 }
 
 const VERDICT_FIELD = "evaluatorVerdict";
@@ -58,42 +62,13 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   // missing, but the hook order stays stable.
   const aggregates = item.aggregates;
   const verdicts = useMemo<VerdictPillSpec[]>(
-    () =>
-      aggregates
-        ? [
-            {
-              verdict: "pass",
-              label: "Passed",
-              count: aggregates.passedCount,
-              palette: "green",
-            },
-            {
-              verdict: "fail",
-              label: "Failed",
-              count: aggregates.failedCount,
-              palette: "red",
-            },
-            {
-              verdict: "unknown",
-              label: "Errored",
-              count: aggregates.erroredCount,
-              palette: "yellow",
-            },
-          ]
-        : [],
+    () => (aggregates ? buildVerdictSpecs(aggregates) : []),
     [aggregates],
   );
-
-  const activeVerdicts = useMemo(() => {
-    const set = new Set<string>();
-    for (const v of verdicts) {
-      if (getFacetValueState(ast, VERDICT_FIELD, v.verdict) === "include") {
-        set.add(v.verdict);
-      }
-    }
-    return set;
-  }, [ast, verdicts]);
-
+  const activeVerdicts = useMemo(
+    () => computeActiveVerdicts(ast, verdicts),
+    [ast, verdicts],
+  );
   const currentScoreRange = useMemo(
     () => getRangeValue(ast, SCORE_FIELD),
     [ast],
@@ -121,90 +96,29 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
     >
       <VStack align="stretch" gap={1.5}>
         {totalVerdictCount > 0 && (
-          <VStack align="stretch" gap={1}>
-            <Text
-              textStyle="2xs"
-              color="fg.subtle"
-              textTransform="uppercase"
-              letterSpacing="0.08em"
-              fontWeight="600"
-            >
-              Verdict
-            </Text>
-            <HStack gap={1} flexWrap="wrap">
-              {verdicts
-                .filter((v) => v.count > 0)
-                .map((v) => {
-                  const active = activeVerdicts.has(v.verdict);
-                  return (
-                    <Box
-                      key={v.verdict}
-                      as="button"
-                      type="button"
-                      display="inline-flex"
-                      alignItems="center"
-                      gap={1}
-                      paddingX={1.5}
-                      paddingY={0.5}
-                      borderRadius="md"
-                      borderWidth="1px"
-                      borderColor={
-                        active ? `${v.palette}.solid` : `${v.palette}.muted`
-                      }
-                      bg={active ? `${v.palette}.solid` : `${v.palette}.subtle`}
-                      color={
-                        active ? `${v.palette}.contrast` : `${v.palette}.fg`
-                      }
-                      cursor="pointer"
-                      transition="background 100ms ease, border-color 100ms ease"
-                      _hover={{
-                        bg: active
-                          ? `${v.palette}.solid`
-                          : `${v.palette}.muted`,
-                      }}
-                      onClick={() => toggleFacet(VERDICT_FIELD, v.verdict)}
-                      aria-pressed={active}
-                    >
-                      <Text textStyle="2xs" fontWeight="600">
-                        {v.label}
-                      </Text>
-                      <Text textStyle="2xs" fontWeight="500" opacity={0.85}>
-                        {v.count.toLocaleString()}
-                      </Text>
-                    </Box>
-                  );
-                })}
-            </HStack>
-          </VStack>
+          <VerdictSection
+            verdicts={verdicts}
+            activeVerdicts={activeVerdicts}
+            onToggle={(verdict) =>
+              toggleFacet({ field: VERDICT_FIELD, value: verdict })
+            }
+          />
         )}
         {aggregates.hasScore && (
-          <VStack align="stretch" gap={1}>
-            <HStack justify="space-between" align="center" gap={2}>
-              <Text
-                textStyle="2xs"
-                color="fg.subtle"
-                textTransform="uppercase"
-                letterSpacing="0.08em"
-                fontWeight="600"
-              >
-                Score
-              </Text>
-              <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
-                {formatScore(aggregates.scoreMin)} →{" "}
-                {formatScore(aggregates.scoreMax)}
-              </Text>
-            </HStack>
-            <ScoreRangeInput
-              min={aggregates.scoreMin ?? 0}
-              max={aggregates.scoreMax ?? 1}
-              currentFrom={currentScoreRange?.from}
-              currentTo={currentScoreRange?.to}
-              onChange={(from, to) =>
-                setRange(SCORE_FIELD, String(from), String(to))
-              }
-              onClear={() => removeRange(SCORE_FIELD)}
-            />
-          </VStack>
+          <ScoreSection
+            scoreMin={aggregates.scoreMin}
+            scoreMax={aggregates.scoreMax}
+            currentFrom={currentScoreRange?.from}
+            currentTo={currentScoreRange?.to}
+            onChange={(from, to) =>
+              setRange({
+                field: SCORE_FIELD,
+                from: String(from),
+                to: String(to),
+              })
+            }
+            onClear={() => removeRange({ field: SCORE_FIELD })}
+          />
         )}
         {aggregates.hasLabel && (
           <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
@@ -215,6 +129,160 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
     </Box>
   );
 };
+
+function buildVerdictSpecs(aggregates: {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+}): VerdictPillSpec[] {
+  return [
+    {
+      verdict: "pass",
+      label: "Passed",
+      count: aggregates.passedCount,
+      palette: "green",
+    },
+    {
+      verdict: "fail",
+      label: "Failed",
+      count: aggregates.failedCount,
+      palette: "red",
+    },
+    {
+      verdict: "unknown",
+      label: "Errored",
+      count: aggregates.erroredCount,
+      palette: "yellow",
+    },
+  ];
+}
+
+function computeActiveVerdicts(
+  ast: LiqeQuery,
+  verdicts: VerdictPillSpec[],
+): Set<string> {
+  const set = new Set<string>();
+  for (const v of verdicts) {
+    if (getFacetValueState(ast, VERDICT_FIELD, v.verdict) === "include") {
+      set.add(v.verdict);
+    }
+  }
+  return set;
+}
+
+interface VerdictSectionProps {
+  verdicts: VerdictPillSpec[];
+  activeVerdicts: Set<string>;
+  onToggle: (verdict: VerdictPillSpec["verdict"]) => void;
+}
+
+const VerdictSection: React.FC<VerdictSectionProps> = ({
+  verdicts,
+  activeVerdicts,
+  onToggle,
+}) => (
+  <VStack align="stretch" gap={1}>
+    <SectionLabel>Verdict</SectionLabel>
+    <HStack gap={1} flexWrap="wrap">
+      {verdicts
+        .filter((v) => v.count > 0)
+        .map((v) => (
+          <VerdictPill
+            key={v.verdict}
+            spec={v}
+            active={activeVerdicts.has(v.verdict)}
+            onClick={() => onToggle(v.verdict)}
+          />
+        ))}
+    </HStack>
+  </VStack>
+);
+
+interface VerdictPillProps {
+  spec: VerdictPillSpec;
+  active: boolean;
+  onClick: () => void;
+}
+
+const VerdictPill: React.FC<VerdictPillProps> = ({ spec, active, onClick }) => (
+  <Box
+    as="button"
+    type="button"
+    display="inline-flex"
+    alignItems="center"
+    gap={1}
+    paddingX={1.5}
+    paddingY={0.5}
+    borderRadius="md"
+    borderWidth="1px"
+    borderColor={active ? `${spec.palette}.solid` : `${spec.palette}.muted`}
+    bg={active ? `${spec.palette}.solid` : `${spec.palette}.subtle`}
+    color={active ? `${spec.palette}.contrast` : `${spec.palette}.fg`}
+    cursor="pointer"
+    transition="background 100ms ease, border-color 100ms ease"
+    _hover={{
+      bg: active ? `${spec.palette}.solid` : `${spec.palette}.muted`,
+    }}
+    onClick={onClick}
+    aria-pressed={active}
+  >
+    <Text textStyle="2xs" fontWeight="600">
+      {spec.label}
+    </Text>
+    <Text textStyle="2xs" fontWeight="500" opacity={0.85}>
+      {spec.count.toLocaleString()}
+    </Text>
+  </Box>
+);
+
+interface ScoreSectionProps {
+  scoreMin: number | null;
+  scoreMax: number | null;
+  currentFrom?: number;
+  currentTo?: number;
+  onChange: (from: number, to: number) => void;
+  onClear: () => void;
+}
+
+const ScoreSection: React.FC<ScoreSectionProps> = ({
+  scoreMin,
+  scoreMax,
+  currentFrom,
+  currentTo,
+  onChange,
+  onClear,
+}) => (
+  <VStack align="stretch" gap={1}>
+    <HStack justify="space-between" align="center" gap={2}>
+      <SectionLabel>Score</SectionLabel>
+      <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+        {formatScore(scoreMin)} → {formatScore(scoreMax)}
+      </Text>
+    </HStack>
+    <ScoreRangeInput
+      min={scoreMin ?? 0}
+      max={scoreMax ?? 1}
+      currentFrom={currentFrom}
+      currentTo={currentTo}
+      onChange={onChange}
+      onClear={onClear}
+    />
+  </VStack>
+);
+
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <Text
+    textStyle="2xs"
+    color="fg.subtle"
+    textTransform="uppercase"
+    letterSpacing="0.08em"
+    fontWeight="600"
+  >
+    {children}
+  </Text>
+);
 
 function formatScore(value: number | null): string {
   if (value === null || Number.isNaN(value)) return "—";

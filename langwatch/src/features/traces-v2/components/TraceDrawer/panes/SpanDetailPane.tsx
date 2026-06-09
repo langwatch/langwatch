@@ -26,7 +26,7 @@ interface SpanDetailPaneProps {
    * fall back to the trace summary on every cold open of the trace
    * pane — see the comment in TraceAccordions for the full story.
    */
-  spansLoading?: boolean;
+  isSpansLoading?: boolean;
 }
 
 /**
@@ -54,7 +54,7 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   spans,
   selectedSpan,
   layout,
-  spansLoading,
+  isSpansLoading,
 }: SpanDetailPaneProps) {
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
@@ -115,7 +115,7 @@ export const SpanDetailPane = memo(function SpanDetailPane({
               selectedSpan={selectedSpan}
               activeTab="span"
               selectedSpanId={selectedSpanId}
-              spansLoading={spansLoading}
+              isSpansLoading={isSpansLoading}
               onSelectSpan={selectSpan}
             />
           </IsolatedErrorBoundary>

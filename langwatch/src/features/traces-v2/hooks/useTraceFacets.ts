@@ -107,7 +107,7 @@ export function useTraceFacets() {
     if (!projectId) return;
     if (!query.isSuccess || query.isPreviousData) return;
     if (!query.data || query.data.pending) return;
-    setCachedDiscover(projectId, query.data.facets);
+    setCachedDiscover({ projectId, facets: query.data.facets });
   }, [projectId, query.isSuccess, query.isPreviousData, query.data]);
 
   // Warm-start: hand the sidebar the previous session's descriptors so
