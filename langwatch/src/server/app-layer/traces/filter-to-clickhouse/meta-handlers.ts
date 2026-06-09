@@ -22,9 +22,14 @@ const HAS_VALUES = [
   "annotation",
   "conversation",
   "user",
+  "customer",
   "topic",
   "subtopic",
   "label",
+  "model",
+  "service",
+  "traceName",
+  "rootSpanType",
 ] as const;
 
 /** Stored simulation_runs.Status values, by their lowercase UI label. */

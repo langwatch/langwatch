@@ -265,7 +265,12 @@ const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
             onClear();
             return;
           }
-          onChange(Number(nextFrom || min), Number(nextTo || max));
+          // Number("-") / Number("1e") are NaN — keep the partial input
+          // local without propagating it as a real range bound.
+          const parsedFrom = Number(nextFrom || min);
+          const parsedTo = Number(nextTo || max);
+          if (Number.isNaN(parsedFrom) || Number.isNaN(parsedTo)) return;
+          onChange(parsedFrom, parsedTo);
         }}
         flex={1}
         minWidth={0}
@@ -300,7 +305,10 @@ const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
             onClear();
             return;
           }
-          onChange(Number(nextFrom || min), Number(nextTo || max));
+          const parsedFrom = Number(nextFrom || min);
+          const parsedTo = Number(nextTo || max);
+          if (Number.isNaN(parsedFrom) || Number.isNaN(parsedTo)) return;
+          onChange(parsedFrom, parsedTo);
         }}
         flex={1}
         minWidth={0}

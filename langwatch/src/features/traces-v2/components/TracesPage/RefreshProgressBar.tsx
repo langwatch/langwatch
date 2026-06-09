@@ -24,7 +24,10 @@ export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   //    was still mid-fetch, which read as "refresh failed silently."
   const pulsed = useRefreshUIStore((s) => s.isRefreshing);
   const { isRefreshing: fetching } = useTraceListRefresh();
-  const active = forceVisible ?? (pulsed || fetching);
+  // `??` would let `forceVisible={false}` mask a real in-flight refresh —
+  // the comment above promises OR semantics, so honour them: any truthy
+  // source flips active on.
+  const active = forceVisible || pulsed || fetching;
   if (!active) return null;
 
   return (

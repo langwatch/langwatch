@@ -92,9 +92,16 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   // ID-rooted; the operator is telling us they know the id is rare
   // / new / not yet ingested). Trimmed of surrounding whitespace.
   const trimmedFilter = filter.trim();
-  const exactValueMatch = values.some(
-    (v) => v.value.toLowerCase() === trimmedFilter.toLowerCase(),
-  );
+  const exactValueMatch = values.some((v) => {
+    const lower = trimmedFilter.toLowerCase();
+    return (
+      v.value.toLowerCase() === lower ||
+      // The picker now resolves by id AND label, so an exact label hit
+      // (e.g. typing "Faithfulness" against an evaluator whose id is a
+      // hash) must also suppress the "use as new value" custom row.
+      (v.label !== undefined && v.label.toLowerCase() === lower)
+    );
+  });
   const customValue =
     trimmedFilter.length > 0 && !exactValueMatch ? trimmedFilter : null;
   // Total interactive rows for keyboard navigation: known values

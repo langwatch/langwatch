@@ -55,11 +55,26 @@ function persist(cache: Cache): void {
 
 let memory: Cache = load();
 
+function isValidEntry(entry: unknown): entry is Entry {
+  // Persisted via JSON.parse → could be anything if a sibling tab or a
+  // pre-rename version of the app wrote into the same key. We only need
+  // the two fields the rest of the cache touches.
+  if (typeof entry !== "object" || entry === null) return false;
+  const e = entry as Partial<Entry>;
+  return typeof e.savedAt === "number" && e.facets !== undefined;
+}
+
 export function getCachedDiscover(
   projectId: string,
 ): DiscoverDescriptors | null {
   const entry = memory[projectId];
-  if (!entry) return null;
+  if (!isValidEntry(entry)) {
+    if (entry !== undefined) {
+      delete memory[projectId];
+      persist(memory);
+    }
+    return null;
+  }
   if (Date.now() - entry.savedAt > TTL_MS) {
     delete memory[projectId];
     persist(memory);
