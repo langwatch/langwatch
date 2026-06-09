@@ -1,6 +1,10 @@
 import { RoleBindingScopeType, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { RoleBindingForSynthesis, RoleBindingRepository } from "./role-binding.repository";
+import type {
+  RoleBindingForSynthesis,
+  RoleBindingRepository,
+  TeamScopedMemberBinding,
+} from "./role-binding.repository";
 
 export class PrismaRoleBindingRepository implements RoleBindingRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -46,6 +50,49 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         },
       },
     });
+  }
+
+  async listTeamScopedUserBindingsByTeamIds({
+    organizationId,
+    teamIds,
+  }: {
+    organizationId: string;
+    teamIds: string[];
+  }): Promise<Map<string, TeamScopedMemberBinding[]>> {
+    // Pre-seed every requested teamId so the caller can rely on a hit even for
+    // teams with no members, and so a single query covers all teams (no N+1).
+    const byTeam = new Map<string, TeamScopedMemberBinding[]>(
+      teamIds.map((teamId) => [teamId, []]),
+    );
+    if (teamIds.length === 0) return byTeam;
+
+    const bindings = await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: { in: teamIds },
+        userId: { not: null },
+      },
+      include: { user: true, customRole: true },
+    });
+
+    for (const binding of bindings) {
+      // The query filters userId non-null and includes user, but Prisma's types
+      // don't narrow — skip defensively rather than assert, so a future change
+      // to the where/include can't silently produce undefined fields.
+      if (!binding.userId || !binding.user) continue;
+      byTeam.get(binding.scopeId)?.push({
+        userId: binding.userId,
+        role: binding.role,
+        customRoleId: binding.customRoleId,
+        createdAt: binding.createdAt,
+        updatedAt: binding.updatedAt,
+        user: binding.user,
+        customRole: binding.customRole,
+      });
+    }
+
+    return byTeam;
   }
 
   async validateScopeInOrg({

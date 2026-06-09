@@ -231,6 +231,47 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       },
     });
 
+    // TEAM-scoped RoleBindings mirroring the TeamUser rows above. These are the
+    // authoritative membership source the picker/settings reads consult since
+    // the TeamUser→RoleBinding migration (which backfilled exactly these); the
+    // TeamUser rows are kept too, matching real post-migration data.
+    await prisma.roleBinding.createMany({
+      data: [
+        {
+          id: `rb-team-admin-${ns}`,
+          organizationId: ORG_ID,
+          userId: ADMIN_USER_ID,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: REGULAR_TEAM_ID,
+        },
+        {
+          id: `rb-team-member-${ns}`,
+          organizationId: ORG_ID,
+          userId: MEMBER_USER_ID,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: REGULAR_TEAM_ID,
+        },
+        {
+          id: `rb-admin-personal-${ns}`,
+          organizationId: ORG_ID,
+          userId: ADMIN_USER_ID,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: ADMIN_PERSONAL_TEAM_ID,
+        },
+        {
+          id: `rb-member-personal-${ns}`,
+          organizationId: ORG_ID,
+          userId: MEMBER_USER_ID,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: MEMBER_PERSONAL_TEAM_ID,
+        },
+      ],
+    });
+
     // Group fixture so admin happy-path tests have something to find.
     // Group + 1 admin member; member denial tests don't depend on the
     // group existing because the permission gate fires before the query.
