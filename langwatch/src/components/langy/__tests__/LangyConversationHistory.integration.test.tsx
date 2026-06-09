@@ -87,6 +87,34 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
+// LangySidebar's per-send model picker pulls three tRPC queries — two from
+// the picker wrapper itself (getResolvedDefault + virtualKeys.list) and one
+// from the nested ModelSelector (listAllForProjectForFrontend). These tests
+// focus on the conversation-history surface, not the picker — boundary-mock
+// all three with idle-but-finished queries so React Query thinks they've
+// settled. Without this the panel throws "Unable to retrieve application
+// context" because no hook is wrapped in a tRPC provider.
+vi.mock("~/utils/api", () => ({
+  api: {
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: { providers: [] },
+          isLoading: false,
+        }),
+      },
+    },
+    virtualKeys: {
+      list: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+  },
+}));
+
 import { LangyDrawer } from "../LangySidebar";
 import { toaster } from "~/components/ui/toaster";
 
