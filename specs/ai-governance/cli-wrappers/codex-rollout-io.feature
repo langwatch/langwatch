@@ -56,6 +56,12 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
     Then the assistant tool_call and the tool message carry the same synthetic id
 
   @unit
+  Scenario: A synthetic tool-call id does not leak across the turn boundary
+    Given a turn with an id-less function_call whose output never arrives, followed by a later turn with its own id-less function_call_output
+    When the rollout is parsed
+    Then the later turn's tool message does not pair to the previous turn's orphaned tool_call id
+
+  @unit
   Scenario: The assistant final answer is taken from the agent_message when present
     Given a rollout turn with an agent_message of phase "final_answer" and message "done"
     When the rollout is parsed

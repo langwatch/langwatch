@@ -205,6 +205,46 @@ describe("parseCodexRollout", () => {
     });
   });
 
+  describe("given an id-less tool call left unmatched when its turn ends", () => {
+    describe("when a later turn has its own id-less tool output", () => {
+      /** @scenario "A synthetic tool-call id does not leak across the turn boundary" */
+      it("does not pair the later output to the previous turn's orphaned call", () => {
+        const turns = parseCodexRollout(
+          rollout(
+            taskStarted("trace-1", "t1"),
+            userMsg("first"),
+            // codex omitted the id and the matching output never arrives this
+            // turn; the queued synthetic id must not survive the boundary.
+            {
+              type: "response_item",
+              payload: { type: "function_call", name: "exec_command", arguments: "{}" },
+            },
+            agentMessage("answered one"),
+            taskStarted("trace-2", "t2"),
+            userMsg("second"),
+            {
+              type: "response_item",
+              payload: { type: "function_call_output", output: "late result" },
+            },
+            agentMessage("answered two"),
+          ),
+        );
+
+        // The second turn's cumulative history holds both the orphaned call
+        // (from turn one) and its own late output. They must carry DIFFERENT
+        // synthetic ids — the cleared queue stops the stale id leaking in.
+        const msgs = turns[1]!.inputMessages;
+        const orphanCall = msgs.find((m) => m.tool_calls);
+        const laterOutput = msgs.find((m) => m.role === "tool");
+        expect(orphanCall?.tool_calls?.[0]?.id).toBeTruthy();
+        expect(laterOutput?.tool_call_id).toBeTruthy();
+        expect(laterOutput?.tool_call_id).not.toBe(
+          orphanCall?.tool_calls?.[0]?.id,
+        );
+      });
+    });
+  });
+
   describe("given both an agent_message and a response_item assistant message", () => {
     describe("when it is parsed", () => {
       /** @scenario "The assistant final answer is taken from the agent_message when present" */

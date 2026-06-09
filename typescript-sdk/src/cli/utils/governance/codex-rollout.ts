@@ -343,6 +343,12 @@ class CodexTurnAccumulator {
         this.history.push({ role: "assistant", content: finalAnswer.trim() });
       }
     }
+    // Synthetic fallback ids only pair a call with its output *within* a turn.
+    // A call left unmatched at the boundary (output never arrived) must not
+    // leak its queued id into the next turn, or that turn's first id-less
+    // output would pair to the wrong call. `autoToolCallSeq` stays monotonic
+    // so the ids themselves remain unique across the session.
+    this.pendingToolCallIds.length = 0;
     this.cur = null;
     this.pendingAssistant = null;
     this.agentFinal = null;
