@@ -6,7 +6,6 @@ import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presen
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
-import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceDrawerUrlHydrator } from "../../hooks/useTraceDrawerUrlHydrator";
@@ -90,7 +89,6 @@ export const TracesPage: React.FC = () => {
   useTracesPageTitle();
 
   const { project } = useOrganizationTeamProject();
-  const { hasAnyTraces } = useProjectHasTraces();
   const setupDismissedByProject = useOnboardingStore(
     (s) => s.setupDismissedByProject,
   );
@@ -111,20 +109,13 @@ export const TracesPage: React.FC = () => {
     topLevelOnboardingStage === "serviceSegue" ||
     topLevelOnboardingStage === "facetsReveal" ||
     topLevelOnboardingStage === "outro";
-  // Empty state shows when the project hasn't received a real trace
-  // *and* the user hasn't persistently dismissed the card for this
-  // project. The dismissal is per-project + localStorage-backed, so
-  // clicking Skip / Learn / completing the sample-data countdown
-  // sticks across reloads. The toolbar's Continue integration clears
-  // the dismissal when the user wants to come back.
-  // Tour mode is an explicit override: existing customers
-  // (`firstMessage=true`, real data in the table) hit the toolbar's
-  // Tour button and we drop them into the empty-state journey on
-  // top of their real project. The dismissal flag still wins —
-  // clicking "Done exploring" exits cleanly. Without the override
-  // the journey would only ever fire for genuinely-empty projects.
-  const showEmptyState =
-    !setupDismissed && (hasAnyTraces === false || tourActive);
+  // The onboarding journey is OPT-IN: it shows only while the user has
+  // explicitly launched the tour (`tourActive`), never automatically for
+  // a never-traced project. A data-less project shows the normal centered
+  // empty state with a "Take the tour" button instead (see
+  // EmptyFilterState). The dismissal flag still wins — ending the tour
+  // ("Done exploring") flips `tourActive` off and `setupDismissed` on.
+  const showEmptyState = !setupDismissed && tourActive;
   // Dim the surrounding chrome only while the card is *active*. The
   // moment the user clicks any exit action (Load sample / Skip / Learn)
   // `setupDisengaged` flips and the dim lifts — even if the card itself

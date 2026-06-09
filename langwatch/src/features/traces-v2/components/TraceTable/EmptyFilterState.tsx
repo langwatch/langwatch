@@ -8,9 +8,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
-import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { useTourEntryPoints } from "../../onboarding/hooks/useTourEntryPoints";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -50,12 +49,25 @@ interface EmptyContent {
 function emptyContent({
   activeLensId,
   hasFilters,
+  hasAnyTraces,
   rangeHours,
 }: {
   activeLensId: string;
   hasFilters: boolean;
+  hasAnyTraces: boolean | undefined;
   rangeHours: number;
 }): EmptyContent {
+  // Never-traced project with no active query: the project simply has no
+  // data yet. Lens / time-window copy would mislead here (widening the
+  // window can't surface traces that were never sent), so lead with the
+  // "no traces yet" message and the take-the-tour affordance.
+  if (hasAnyTraces === false && !hasFilters) {
+    return {
+      title: "No traces yet",
+      description:
+        "Send your first trace to start exploring, or take a quick tour to see how the explorer looks with real data.",
+    };
+  }
   if (activeLensId === "errors") {
     return {
       title: "No errors in this range",
@@ -127,57 +139,64 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const activeLensId = useViewStore((s) => s.activeLensId);
   const selectLens = useViewStore((s) => s.selectLens);
-  const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissed = !!useOnboardingStore((s) =>
-    project ? s.setupDismissedByProject[project.id] : false,
-  );
-  const setSetupDismissedForProject = useOnboardingStore(
-    (s) => s.setSetupDismissedForProject,
-  );
-  const resetOnboardingStage = useOnboardingStore((s) => s.reset);
-  // Only offer the rewatch link in the "real, but empty" state — the
-  // user dismissed the onboarding card (`setupDismissed`) and the
-  // project hasn't received a real trace yet. Once any real trace
-  // arrives this affordance disappears; education isn't something we
-  // expect users to need, just something we leave out for the
-  // genuinely curious.
-  const showRewatchIntro =
-    hasAnyTraces === false && setupDismissed && !!project;
+  const { onLaunchTour } = useTourEntryPoints();
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
-  const content = emptyContent({ activeLensId, hasFilters, rangeHours });
+  const content = emptyContent({
+    activeLensId,
+    hasFilters,
+    hasAnyTraces,
+    rangeHours,
+  });
+  // A genuinely-empty project (never received a trace) with no active
+  // query gets a single "Take the tour" CTA instead of the time-window /
+  // lens nudges — those only make sense once data exists somewhere. The
+  // tour is the path to a feel for the product and the setup instructions.
+  const showTourCta = hasAnyTraces === false && !hasFilters;
 
   const actions: ActionButton[] = [];
-  if (hasFilters) {
-    actions.push({ label: "Clear filters", onClick: clearAll, primary: true });
-  }
-  if (activeLensId !== "all-traces") {
+  if (showTourCta) {
     actions.push({
-      label: "All traces",
-      onClick: () => selectLens("all-traces"),
-      primary: !hasFilters,
+      label: "Take the tour",
+      onClick: onLaunchTour,
+      primary: true,
     });
-  }
-  if (rangeHours < 24) {
-    actions.push({
-      label: "Last 24 hours",
-      onClick: () => setTimeRange(rangePreset(1, "Last 24 hours")),
-    });
-    actions.push({
-      label: "Last 7 days",
-      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-    });
-  } else if (rangeHours < 24 * 7) {
-    actions.push({
-      label: "Last 7 days",
-      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-    });
-    actions.push({
-      label: "Last 30 days",
-      onClick: () => setTimeRange(rangePreset(30, "Last 30 days")),
-    });
+  } else {
+    if (hasFilters) {
+      actions.push({
+        label: "Clear filters",
+        onClick: clearAll,
+        primary: true,
+      });
+    }
+    if (activeLensId !== "all-traces") {
+      actions.push({
+        label: "All traces",
+        onClick: () => selectLens("all-traces"),
+        primary: !hasFilters,
+      });
+    }
+    if (rangeHours < 24) {
+      actions.push({
+        label: "Last 24 hours",
+        onClick: () => setTimeRange(rangePreset(1, "Last 24 hours")),
+      });
+      actions.push({
+        label: "Last 7 days",
+        onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
+      });
+    } else if (rangeHours < 24 * 7) {
+      actions.push({
+        label: "Last 7 days",
+        onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
+      });
+      actions.push({
+        label: "Last 30 days",
+        onClick: () => setTimeRange(rangePreset(30, "Last 30 days")),
+      });
+    }
   }
 
   return (
@@ -222,23 +241,6 @@ export const EmptyFilterState: React.FC = () => {
             without retyping the whole query, and flags accidental
             non-ASCII glyphs the parser otherwise renders silently. */}
         {hasFilters && <QueryBreakdownChips />}
-
-        {showRewatchIntro && (
-          <Button
-            variant="plain"
-            size="xs"
-            color="fg.subtle"
-            padding={0}
-            minHeight="auto"
-            _hover={{ color: "fg.muted" }}
-            onClick={() => {
-              resetOnboardingStage();
-              setSetupDismissedForProject(project!.id, false);
-            }}
-          >
-            ↻ Rewatch the intro
-          </Button>
-        )}
       </Stack>
     </Flex>
   );
