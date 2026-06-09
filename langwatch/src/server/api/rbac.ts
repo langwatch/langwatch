@@ -1489,6 +1489,7 @@ export const checkPermissionOrPubliclyShared =
     if (!allowed) {
       const sharedResource = await ctx.prisma.publicShare.findFirst({
         where: {
+          projectId: input.projectId,
           resourceType:
             typeof resourceType === "function"
               ? resourceType(input)
