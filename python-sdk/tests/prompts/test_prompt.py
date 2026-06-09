@@ -140,3 +140,91 @@ def test_from_api_response_handles_none_response_format():
     result = PromptData.from_api_response(mock_response)
 
     assert result.response_format is None
+
+
+def test_from_api_response_extracts_runtime_config():
+    """
+    @scenario Python prompt models expose runtime config
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+    mock_response.parameters = {"sdk": True}
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert result.parameters == {"sdk": True}
+
+
+def test_from_api_response_defaults_missing_runtime_config_to_empty_dict():
+    """
+    @scenario Python prompt models expose runtime config
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+    mock_response.parameters = None
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert result.parameters == {}
+
+
+def test_from_api_response_reads_parameters_from_real_deserialized_response():
+    """
+    @scenario Python prompt models expose runtime config
+
+    Regression: the request body models send `parameters`, but the response
+    models still carry it via the generator's `additional_properties` extras
+    bag (the recursive runtime-parameters schema can't be emitted by the
+    OpenAPI generator, so the field isn't promoted to first-class). A Mock
+    can't prove that path, so deserialize a real response with `from_dict`
+    and assert the parameters survive the wire round-trip.
+    """
+    response = GetApiPromptsByIdResponse200.from_dict(
+        {
+            "id": "prompt_1",
+            "handle": "my-prompt",
+            "scope": "PROJECT",
+            "name": "My Prompt",
+            "updatedAt": "2024-01-01T00:00:00Z",
+            "projectId": "project_1",
+            "organizationId": "org_1",
+            "versionId": "v1",
+            "version": 1,
+            "createdAt": "2024-01-01T00:00:00Z",
+            "prompt": "Test",
+            "messages": [],
+            "inputs": [],
+            "outputs": [],
+            "model": "openai/gpt-4",
+            "parameters": {"environment": "staging", "retries": 3},
+        }
+    )
+
+    # Until the field is promoted, it lands in the generator's extras bag.
+    assert response.additional_properties.get("parameters") == {
+        "environment": "staging",
+        "retries": 3,
+    }
+
+    result = PromptData.from_api_response(response)
+    assert result.parameters == {"environment": "staging", "retries": 3}

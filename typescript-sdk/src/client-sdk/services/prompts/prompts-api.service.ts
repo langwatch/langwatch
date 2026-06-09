@@ -13,6 +13,7 @@ import {
   formatApiErrorForOperation,
   formatApiErrorMessage,
 } from "@/client-sdk/services/_shared/format-api-error";
+import type { RuntimeParameters } from "@/cli/types";
 
 const syncActionSchema = z.enum([
   "created",
@@ -55,6 +56,7 @@ export interface SyncResult {
     remoteVersion: number;
     differences: string[];
     remoteConfigData: ConfigData;
+    remoteParameters?: RuntimeParameters;
   };
 }
 
@@ -331,6 +333,7 @@ export class PromptsApiService {
         role: "system" | "user" | "assistant";
         content: string;
       }>;
+      parameters?: RuntimeParameters;
     },
   ): Promise<{ created: boolean; prompt: PromptResponse }> {
     const payload = {
@@ -342,6 +345,7 @@ export class PromptsApiService {
       maxTokens: config.modelParameters?.max_tokens,
       inputs: [{ identifier: "input", type: "str" as const }],
       outputs: [{ identifier: "output", type: "str" as const }],
+      parameters: config.parameters ?? {},
       commitMessage: `Updated via CLI sync`,
       schemaVersion: "1.0" as const,
     };
@@ -370,6 +374,7 @@ export class PromptsApiService {
   async sync(params: {
     name: string;
     configData: ConfigData;
+    parameters?: RuntimeParameters;
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
@@ -390,6 +395,7 @@ export class PromptsApiService {
           params: { path: { id: params.name } },
           body: {
             configData: params.configData,
+            parameters: params.parameters ?? {},
             localVersion: params.localVersion,
             commitMessage: params.commitMessage,
           },

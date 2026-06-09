@@ -35,6 +35,7 @@ class PutApiPromptsByIdBody:
         tags (list[str] | Unset):
         scope (PutApiPromptsByIdBodyScope | Unset):
         handle (str | Unset):
+        parameters (dict[str, Any] | Unset):
     """
 
     commit_message: str
@@ -50,6 +51,7 @@ class PutApiPromptsByIdBody:
     tags: list[str] | Unset = UNSET
     scope: PutApiPromptsByIdBodyScope | Unset = UNSET
     handle: str | Unset = UNSET
+    parameters: dict[str, Any] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         commit_message = self.commit_message
@@ -99,6 +101,8 @@ class PutApiPromptsByIdBody:
 
         handle = self.handle
 
+        parameters = self.parameters
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -130,6 +134,8 @@ class PutApiPromptsByIdBody:
             field_dict["scope"] = scope
         if handle is not UNSET:
             field_dict["handle"] = handle
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
 
         return field_dict
 
@@ -197,6 +203,8 @@ class PutApiPromptsByIdBody:
 
         handle = d.pop("handle", UNSET)
 
+        parameters = cast(dict[str, Any], d.pop("parameters", UNSET))
+
         put_api_prompts_by_id_body = cls(
             commit_message=commit_message,
             model=model,
@@ -211,6 +219,7 @@ class PutApiPromptsByIdBody:
             tags=tags,
             scope=scope,
             handle=handle,
+            parameters=parameters,
         )
 
         return put_api_prompts_by_id_body

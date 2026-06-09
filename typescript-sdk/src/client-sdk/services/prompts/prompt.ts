@@ -33,6 +33,9 @@ export class Prompt {
   public readonly maxTokens?: number;
   public readonly responseFormat?: CorePromptData["responseFormat"];
 
+  // === Runtime parameters ===
+  public readonly parameters: Record<string, unknown> = {};
+
   // === Optional identification (for tracing) ===
   public readonly id?: string;
   public readonly handle?: string | null;
