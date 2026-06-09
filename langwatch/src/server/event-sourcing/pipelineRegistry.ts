@@ -368,10 +368,11 @@ export class PipelineRegistry {
     });
 
     const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: (tenantId, traceId) =>
+      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
         this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
           tenantId,
           traceId,
+          occurredAtMs,
         ),
       recordSpan: recordSpanDispatch.fn,
     });
