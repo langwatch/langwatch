@@ -166,22 +166,30 @@ describe("serveStaticOrFallback", () => {
     });
   });
 
-  describe("when a file is deleted between open and read (TOCTOU)", () => {
-    it("returns 404 instead of crashing with an unhandled stream error", async () => {
-      const ephemeralPath = join(
-        clientDistDir,
-        "assets",
-        "ephemeral-abc123.js",
-      );
+  describe("given an asset that existed at deploy time", () => {
+    const ephemeralName = "ephemeral-abc123.js";
+    let ephemeralPath: string;
+
+    beforeAll(() => {
+      ephemeralPath = join(clientDistDir, "assets", ephemeralName);
       writeFileSync(ephemeralPath, "console.log('ephemeral');\n");
+    });
 
-      const res = await fetch(`${baseUrl}/assets/ephemeral-abc123.js`);
+    it("serves the file normally", async () => {
+      const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
       expect(res.status).toBe(200);
+      expect(await res.text()).toContain("ephemeral");
+    });
 
-      unlinkSync(ephemeralPath);
+    describe("when the file is deleted mid-deploy before the next request", () => {
+      beforeAll(() => {
+        unlinkSync(ephemeralPath);
+      });
 
-      const res2 = await fetch(`${baseUrl}/assets/ephemeral-abc123.js`);
-      expect(res2.status).toBe(404);
+      it("returns 404 instead of an unhandled 500", async () => {
+        const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
+        expect(res.status).toBe(404);
+      });
     });
   });
 });

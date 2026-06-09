@@ -60,7 +60,7 @@ export function serveStaticOrFallback({
   }
 
   const staticPath = path.join(clientDistDir, normalizedRelative);
-  if (tryServeFile(res, staticPath, pathname)) {
+  if (tryServeFile({ res, filePath: staticPath, pathname })) {
     return true;
   }
 
@@ -73,7 +73,7 @@ export function serveStaticOrFallback({
   }
 
   const indexHtml = path.join(clientDistDir, "index.html");
-  return tryServeSpaFallback(res, indexHtml);
+  return tryServeSpaFallback({ res, indexHtmlPath: indexHtml });
 }
 
 /**
@@ -81,11 +81,15 @@ export function serveStaticOrFallback({
  * existsSync and createReadStream. Returns false when the file doesn't exist
  * or isn't a regular file so the caller can fall through.
  */
-function tryServeFile(
-  res: ServerResponse,
-  filePath: string,
-  pathname: string,
-): boolean {
+function tryServeFile({
+  res,
+  filePath,
+  pathname,
+}: {
+  res: ServerResponse;
+  filePath: string;
+  pathname: string;
+}): boolean {
   let fd: number;
   try {
     fd = fs.openSync(filePath, "r");
@@ -110,7 +114,7 @@ function tryServeFile(
     res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
   }
 
-  pipeWithErrorHandling(fs.createReadStream("", { fd }), res);
+  pipeWithErrorHandling({ stream: fs.createReadStream("", { fd }), res });
   return true;
 }
 
@@ -118,10 +122,13 @@ function tryServeFile(
  * Serve the SPA shell (index.html) as a fallback for non-asset routes.
  * Returns false only when index.html itself doesn't exist.
  */
-function tryServeSpaFallback(
-  res: ServerResponse,
-  indexHtmlPath: string,
-): boolean {
+function tryServeSpaFallback({
+  res,
+  indexHtmlPath,
+}: {
+  res: ServerResponse;
+  indexHtmlPath: string;
+}): boolean {
   let fd: number;
   try {
     fd = fs.openSync(indexHtmlPath, "r");
@@ -131,7 +138,7 @@ function tryServeSpaFallback(
 
   res.setHeader("Content-Type", "text/html");
   res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
-  pipeWithErrorHandling(fs.createReadStream("", { fd }), res);
+  pipeWithErrorHandling({ stream: fs.createReadStream("", { fd }), res });
   return true;
 }
 
@@ -140,10 +147,13 @@ function tryServeSpaFallback(
  * error, respond with 500 if headers haven't been sent yet, otherwise
  * just destroy the connection cleanly.
  */
-function pipeWithErrorHandling(
-  stream: fs.ReadStream,
-  res: ServerResponse,
-): void {
+function pipeWithErrorHandling({
+  stream,
+  res,
+}: {
+  stream: fs.ReadStream;
+  res: ServerResponse;
+}): void {
   stream.on("error", () => {
     if (!res.headersSent) {
       res.statusCode = 500;
