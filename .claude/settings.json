@@ -3,7 +3,6 @@
     "gopls-lsp@claude-plugins-official": true
   },
   "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
