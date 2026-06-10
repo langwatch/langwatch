@@ -245,6 +245,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
