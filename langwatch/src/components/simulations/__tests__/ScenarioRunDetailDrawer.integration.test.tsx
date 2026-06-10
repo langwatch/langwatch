@@ -9,11 +9,34 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { Drawer } from "../../ui/drawer";
+import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 import { ScenarioRunHeader } from "../ScenarioRunHeader";
 import { SimulationConsole } from "../simulation-console/SimulationConsole";
+
+// MediaPart fires a tRPC existence probe on a media error event; stub it so the
+// probe never resolves to a placeholder on the happy path (mirrors the
+// standalone ScenarioMessageRenderer + MediaPart integration tests).
+vi.mock("~/utils/api", () => ({
+  api: {
+    storedObjects: {
+      headById: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
+  },
+}));
+
+vi.mock("../../copilot-kit/TraceMessage", () => ({
+  TraceMessage: ({ traceId }: { traceId: string }) => (
+    <button data-testid="trace-message" data-trace-id={traceId}>
+      View Trace
+    </button>
+  ),
+}));
 
 const DrawerWrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>
@@ -135,6 +158,54 @@ describe("ScenarioRunDetailDrawer", () => {
           screen.getByText("=== Scenario Test Report ==="),
         ).toBeInTheDocument();
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #4138 — post-extraction `input_audio` URL shape, in the DRAWER context.
+  //
+  // The drawer mounts <ScenarioMessageRenderer variant="drawer" /> inside its
+  // Drawer.Content (ScenarioRunDetailDrawer.tsx:386-393). This pins that a
+  // voice turn carrying the post-extraction url shape renders its native
+  // <audio> when composed inside the real Drawer container — the drawer-side
+  // companion to the grid-variant fixture in
+  // ScenarioMessageRenderer.integration.test.tsx.
+  // -------------------------------------------------------------------------
+  describe("ScenarioMessageRenderer (drawer variant) for an input_audio url turn (#4138)", () => {
+    beforeAll(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    it("renders a media-part-audio element whose src is the file url inside the drawer", () => {
+      render(
+        <ScenarioMessageRenderer
+          variant="drawer"
+          projectId="proj_test"
+          messages={[
+            {
+              id: "msg_audio_url_drawer",
+              role: "assistant",
+              content: [
+                {
+                  type: "input_audio",
+                  input_audio: {
+                    url: "/api/files/test-id",
+                    mimeType: "audio/mpeg",
+                  },
+                },
+              ],
+            } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+          ]}
+        />,
+        { wrapper: DrawerWrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio.tagName.toLowerCase()).toBe("audio");
+      expect(audio).toHaveAttribute("src", "/api/files/test-id");
+      expect(audio).toHaveAttribute("controls");
+      expect(screen.queryByText(/input_audio/)).toBeNull();
     });
   });
 });

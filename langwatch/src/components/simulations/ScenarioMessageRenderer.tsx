@@ -86,6 +86,11 @@ export function ScenarioMessageRenderer({
               <VStack
                 key={item.id}
                 align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                // Test affordance: Chakra's `align` prop compiles to an atomic
+                // CSS class jsdom's getComputedStyle cannot read, so the
+                // left/right alignment is asserted via this mirrored attribute.
+                // Same value as `align` above — no behavior change.
+                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
                 gap={1}
               >
                 {item.role === "assistant" ? (
@@ -136,6 +141,8 @@ export function ScenarioMessageRenderer({
               <VStack
                 key={item.id}
                 align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                // Test affordance — see the `text` case. Mirrors `align`.
+                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
               >
                 <Image src={item.src} maxH="200px" borderRadius="md" />
               </VStack>
@@ -146,6 +153,8 @@ export function ScenarioMessageRenderer({
               <VStack
                 key={item.id}
                 align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                // Test affordance — see the `text` case. Mirrors `align`.
+                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
                 width="100%"
               >
                 <VStack
