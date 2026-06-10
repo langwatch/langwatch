@@ -45,6 +45,9 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
 import { prisma } from "~/server/db";
+import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import {
   dSPyStepRESTParamsSchema,
   type DSPyLLMCall,
@@ -526,19 +529,37 @@ secured.access(handlerManagedAuth("user session validated in-handler via getServ
     );
   }
 
-  const project = await prisma.project.findFirst({
-    where: {
-      id: projectId,
-      archivedAt: null,
-      team: {
-        members: {
-          some: { user: { id: session.user.id } },
-        },
-      },
-    },
-  });
+  // The demo project is a globally-readable showcase: isDemoProject grants
+  // `project:view` to ANY caller, so it must never reach the RoleBinding check
+  // below — otherwise any authenticated user could mint an MCP auth code
+  // embedding the demo project's API key. (The old `team.members.some` check
+  // happened to block this; the RoleBinding-aware check does not.)
+  if (isDemoProject(projectId, "project:view")) {
+    return c.json(
+      { error: "Project not found or you don't have access" },
+      403,
+    );
+  }
 
-  if (!project) {
+  // Authorize against RoleBindings (the authoritative source since migration
+  // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
+  // TeamUser relation. A user added to the team after that migration has no
+  // TeamUser row, so the old `team.members.some` check rejected them with a
+  // false 403. `project:view` is the baseline grant every team role (incl.
+  // VIEWER) has, and hasProjectPermission also honors org-level access.
+  // ProjectService is constructed directly (not via getApp()) so this handler
+  // stays unit-testable without booting the app container — the same pattern
+  // used in presets.ts and the project-service middleware.
+  const projectService = new ProjectService(new PrismaProjectRepository(prisma));
+  const project = await projectService.getById(projectId);
+
+  if (
+    !project ||
+    project.archivedAt !== null ||
+    !(await hasProjectPermission({ prisma, session }, projectId, "project:view"))
+  ) {
+    // Single 403 whether the project is missing, archived, or simply
+    // inaccessible — never disclose existence of a project the caller can't reach.
     return c.json(
       { error: "Project not found or you don't have access" },
       403,

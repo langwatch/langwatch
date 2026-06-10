@@ -26,13 +26,30 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `GET` | `/api/projects` | List all projects in the organization |
 | `POST` | `/api/projects` | Create a new project (returns a service API key) |
 | `GET` | `/api/projects/{id}` | Get project details |
-| `PATCH` | `/api/projects/{id}` | Update project fields |
+| `PATCH` | `/api/projects/{id}` | Update project fields (including moving to a different team) |
 | `DELETE` | `/api/projects/{id}` | Archive a project |
+| `GET` | `/api/projects/{id}/api-key` | Get the project's API key |
+| `POST` | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key |
+
+## Moving a Project to Another Team
+
+You can move a project to a different team by including `teamId` in the `PATCH` request:
+
+```bash
+curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"teamId": "<destination_team_id>"}'
+```
+
+<Warning>
+Moving a project changes its access boundary. Members who had access through the source team will lose inherited access, while members of the destination team will gain it. Project-level access overrides are preserved.
+</Warning>
 
 ## Typical Flow
 
 1. Create an admin API key in Settings > API Keys with `organization:manage` permission
-2. Call `POST /api/projects` with the project name and team
+2. Call `POST /api/projects` with the project name and either an existing `teamId` or a `newTeamName`
 3. Store the returned `serviceApiKey` and project `id`
 4. Use both values in your application:
 

@@ -13613,6 +13613,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
@@ -15455,6 +15459,10 @@
                   "handle": {
                     "type": "string",
                     "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [

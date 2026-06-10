@@ -194,6 +194,13 @@ export interface PipelineRegistryDeps {
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  /**
+   * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
+   * When provided, the trace-processing pipeline wires it into RecordSpanCommand
+   * so oversized commands (> 256 KB) are fetched from S3 and the spool is
+   * best-effort DELETEd after event_log INSERT succeeds.
+   */
+  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
@@ -436,6 +443,9 @@ export class PipelineRegistry {
         spanStorageBroadcastReactor,
         claudeCodeSpanSyncReactor,
         gatewayBudgetSyncReactor,
+        // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
+        // oversized commands and best-effort delete the transient S3 spool.
+        blobStore: this.deps.blobStore,
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
       }),

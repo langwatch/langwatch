@@ -1,19 +1,19 @@
-import { TraceUsageService } from "../../traces/trace-usage.service";
-import { EventUsageService } from "../../traces/event-usage.service";
-import type { PlanResolver } from "../subscription/plan-provider";
+import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
+import type { OrganizationRepository } from "../../repositories/organization.repository";
+import type { EventUsageService } from "../../traces/event-usage.service";
+import type { TraceUsageService } from "../../traces/trace-usage.service";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
+import type { SimulationRunService } from "../simulations/simulation-run.service";
+import type { PlanResolver } from "../subscription/plan-provider";
+import { ScenarioSetLimitExceededError } from "./errors";
+import { buildLimitMessage } from "./limit-message";
 import {
-  resolveUsageMeter,
   type MeterDecision,
+  resolveUsageMeter,
   type UsageUnit,
 } from "./usage-meter-policy";
-import { buildLimitMessage } from "./limit-message";
-import { OrganizationRepository } from "../../repositories/organization.repository";
-import { ScenarioSetLimitExceededError } from "./errors";
-import type { SimulationRunService } from "../simulations/simulation-run.service";
-import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 const MAX_FREE_SCENARIO_SETS = 3;
@@ -45,12 +45,24 @@ export class UsageService {
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
-    private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
+    private readonly simulationRunService: Pick<
+      SimulationRunService,
+      "getDistinctExternalSetIds"
+    >,
     private readonly clickhouseAvailable: boolean,
   ) {
-    this.countCache = new TtlCache<number>(CACHE_TTL_MS, "ttlcache:usage:count:");
-    this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS, "ttlcache:usage:decision:");
-    this.scenarioSetCache = new TtlCache<string[]>(CACHE_TTL_MS, "ttlcache:usage:scenarioSets:");
+    this.countCache = new TtlCache<number>(
+      CACHE_TTL_MS,
+      "ttlcache:usage:count:",
+    );
+    this.decisionCache = new TtlCache<MeterDecision>(
+      CACHE_TTL_MS,
+      "ttlcache:usage:decision:",
+    );
+    this.scenarioSetCache = new TtlCache<string[]>(
+      CACHE_TTL_MS,
+      "ttlcache:usage:scenarioSets:",
+    );
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
@@ -130,7 +142,9 @@ export class UsageService {
       }
 
       const fromService =
-        await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
+        await this.simulationRunService.getDistinctExternalSetIds({
+          projectIds,
+        });
       knownSetIds = [...fromService];
       await this.scenarioSetCache.set(organizationId, knownSetIds);
     }
@@ -142,7 +156,10 @@ export class UsageService {
 
     // This is a new set -- check against limit
     if (knownSetIds.length >= maxScenarioSets) {
-      throw new ScenarioSetLimitExceededError(knownSetIds.length, maxScenarioSets);
+      throw new ScenarioSetLimitExceededError(
+        knownSetIds.length,
+        maxScenarioSets,
+      );
     }
 
     // Allowed: record the new set in the cache
@@ -169,13 +186,41 @@ export class UsageService {
     organizationId: string;
   }): Promise<number | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
-    // The count would never exceed the limit, so querying is wasted work.
-    // Returns "unlimited" so callers can distinguish from actual 0 usage.
+    // The count would never exceed the limit, so querying is wasted work for
+    // ENFORCEMENT. Returns "unlimited" so callers can distinguish from actual 0
+    // usage. Display callers that need the real volume regardless of the cap use
+    // getCurrentMonthCountForDisplay instead.
     const plan = await this.planResolver(organizationId);
     if (plan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
       return "unlimited";
     }
 
+    return this.computeCurrentMonthCount({ organizationId });
+  }
+
+  /**
+   * Always computes the real current-month usage count (events or traces per
+   * the resolved meter), regardless of whether the plan caps usage.
+   *
+   * Seat-based / metered plans (GROWTH_SEAT_*) have no monthly message cap but
+   * still accrue billable events that are metered and billed via Stripe. The
+   * usage page must surface that volume, so it cannot use getCurrentMonthCount
+   * (which short-circuits unlimited plans to "unlimited" for enforcement and
+   * would otherwise render as "0").
+   */
+  async getCurrentMonthCountForDisplay({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    return this.computeCurrentMonthCount({ organizationId });
+  }
+
+  private async computeCurrentMonthCount({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
     const decision = await this.getCachedMeterDecision(organizationId);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
@@ -269,6 +314,4 @@ export class UsageService {
 
     return decision;
   }
-
 }
-

@@ -88,7 +88,13 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = 5000,
+        # No client-side truncation by default. Full input/output reaches the
+        # backend, which owns sizing (ADR-022: event_log is the source of truth,
+        # with the edge spool + server-side caps handling oversize). This keeps
+        # the Python SDK consistent with the TS/Go SDKs and stock OpenTelemetry —
+        # none of which truncate span content client-side (#4215). Set to an int
+        # (>= 100) to opt into a client-side per-field byte cap.
+        max_string_length: Optional[int] = None,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -778,7 +784,11 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = 5000,
+    # No client-side truncation by default — must stay in lockstep with the
+    # LangWatchTrace constructor default. The backend owns sizing (ADR-022); the
+    # SDK stays consistent with the TS/Go SDKs and stock OpenTelemetry. Set to an
+    # int (>= 100) to opt into a client-side per-field byte cap.
+    max_string_length: Optional[int] = None,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,

@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
-import { type DeepPartial, useForm } from "react-hook-form";
+import { type DeepPartial, type Resolver, useForm } from "react-hook-form";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
@@ -59,8 +59,13 @@ export const usePromptConfigForm = ({
      */
     defaultValues: parsedInitialValues,
     resolver: (data, context, options) => {
-      // Use ref to get current schema (updated by useEffect)
-      return zodResolver(schemaRef.current)(data, context, options);
+      // Use ref to get current schema (updated by useEffect). The schema
+      // validates PromptConfigFormValues, so narrow the inferred resolver type
+      // to match rather than widening the call site with `any`.
+      const resolver = zodResolver(
+        schemaRef.current,
+      ) as Resolver<PromptConfigFormValues>;
+      return resolver(data, context, options);
     },
   });
 
@@ -189,6 +194,11 @@ export const usePromptConfigForm = ({
     if (methods.formState.isDirty) return;
 
     disableOnChangeRef.current = true;
+    const currentRuntimeParameters = methods.getValues("version.parameters");
+    const nextRuntimeParameters = parsedInitialValues?.version?.parameters ?? {};
+    if (!isEqual(currentRuntimeParameters, nextRuntimeParameters)) {
+      methods.setValue("version.parameters", nextRuntimeParameters);
+    }
     // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(
       parsedInitialValues?.version?.configData ?? {},

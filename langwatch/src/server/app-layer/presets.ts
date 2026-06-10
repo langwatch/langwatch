@@ -56,6 +56,11 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { BlobStore } from "./traces/blob-store.service";
+import { TraceIOExtractionService } from "./traces/trace-io-extraction.service";
+import { maybeSpool } from "./traces/edge-spool";
+import { createS3Client } from "~/server/storage";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -81,6 +86,7 @@ import { handleLicensePurchase } from "../../../ee/billing/services/licensePurch
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { InviteService } from "../invites/invite.service";
 import { env } from "~/env.mjs";
+import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "~/server/posthog";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
@@ -107,6 +113,7 @@ import { NullReplayRepository } from "./ops/repositories/replay.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
@@ -203,6 +210,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceListService",
   );
+  // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
+  // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
+  const blobStore = new BlobStore(createS3Client, clickhouseEnabled ? resolveClickHouseClient : undefined);
+  const ioExtractionService = new TraceIOExtractionService();
+
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
   // the TraceListService constructor lean (the null/test preset below
   // doesn't need a broadcaster — refreshes that never get an SSE push
@@ -226,6 +238,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
+      { blobStore, ioExtractionService },
     ),
     "SpanStorageService",
   );
@@ -253,7 +266,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const traceService = TraceService.create(prisma);
+  const traceService = TraceService.create(prisma, {
+    blobStore,
+    ioExtractionService,
+  });
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
@@ -487,6 +503,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
+    // can reconstitute oversized commands (fetch from transient S3 spool) and
+    // best-effort delete the spool after event_log INSERT succeeds.
+    blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
   });
@@ -503,6 +523,46 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
+      // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
+      // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
+      // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and
+      // the 5s-cached flag store keeps that per-span read cheap.
+      //
+      // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
+      // from maybeSpool (S3 outage, BlobStore.putSpool throws) is caught here.
+      // We log at warn level and return the original commandData unchanged so
+      // that ingestion is never blocked by the spool path. ADR-022.
+      processCommandData: async (data) => {
+        // Track which stage failed so the fail-open counter carries a useful
+        // reason label (flag_store vs spool/S3) for alerting (GtVrL).
+        let stage: "flag_store" | "spool" = "flag_store";
+        try {
+          const enabled = await getFeatureFlagStore().get(
+            "release_trace_blob_offload",
+            { projectId: data.tenantId },
+          );
+          if (enabled !== true) return data;
+          stage = "spool";
+          return await maybeSpool({
+            data,
+            blobStore,
+            logger: createLogger("langwatch:traces:edge-spool"),
+          });
+        } catch (err) {
+          getEdgeSpoolFailOpenCounter(stage).inc();
+          createLogger("langwatch:traces:edge-spool-fail-open").warn(
+            {
+              projectId: data.tenantId,
+              traceId: data.span.traceId,
+              spanId: data.span.spanId,
+              reason: stage,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Edge spool failed — falling back to unmodified command data (fail-open)",
+          );
+          return data;
+        }
+      },
     }),
     "TraceRequestCollectionService",
   );
