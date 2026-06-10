@@ -302,6 +302,11 @@ export function CSVReaderComponent({
   return (
     <CSVReader
       accept=".csv,.json,.jsonl"
+      config={{
+        // Every well-formed CSV ends with a newline; without this the final
+        // line parses as [""] and uploads as an empty record
+        skipEmptyLines: "greedy",
+      }}
       onUploadAccepted={async (results: { data: string[][] }, file: File) => {
         if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
           try {
@@ -322,6 +327,7 @@ export function CSVReaderComponent({
               );
             }
             readString(jsonToCSV(jsonContents), {
+              skipEmptyLines: "greedy",
               complete: (results) => {
                 setResults({ data: results.data as string[][] });
               },
