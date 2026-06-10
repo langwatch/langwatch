@@ -127,8 +127,9 @@ export function TreeRow({
       </HStack>
       {/* Token breakdown — same rows the header Tokens pill shows on
           hover, scoped to this span. Only rendered when the span
-          actually reported usage. */}
-      {totalTokens > 0 && (
+          actually reported usage — or a cost, so spans with an explicit
+          cost but no token counts still surface it in the tooltip. */}
+      {(totalTokens > 0 || (span.cost ?? 0) > 0) && (
         <Box
           marginTop={1.5}
           display="grid"
@@ -157,7 +158,9 @@ export function TreeRow({
               value={span.cacheCreationTokens.toLocaleString()}
             />
           )}
-          <TipCell label="Total" value={totalTokens.toLocaleString()} />
+          {totalTokens > 0 && (
+            <TipCell label="Total" value={totalTokens.toLocaleString()} />
+          )}
           {span.cost != null && span.cost > 0 && (
             <TipCell label="Cost" value={formatCost(span.cost)} />
           )}
@@ -438,7 +441,7 @@ export function TreeRow({
             color="fg.muted"
             flexShrink={0}
             marginLeft={2}
-            width="52px"
+            minWidth="52px"
             textAlign="right"
             whiteSpace="nowrap"
             fontVariantNumeric="tabular-nums"
@@ -451,7 +454,7 @@ export function TreeRow({
             color="fg.muted"
             flexShrink={0}
             marginLeft={2}
-            width="52px"
+            minWidth="52px"
             textAlign="right"
             whiteSpace="nowrap"
             fontVariantNumeric="tabular-nums"

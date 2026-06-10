@@ -43,6 +43,12 @@ interface RefreshUIState {
 // rapid pulses should reset the same clear-deadline, not stack timers.
 let pulseClearTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Safety valve for the refresh-request latch: if no observable fetch ever
+// follows a requestRefresh() (queries unmounted, navigation away), clear the
+// request after this long so the aurora can't stick on forever.
+const REFRESH_REQUEST_TIMEOUT_MS = 15_000;
+let refreshRequestTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useRefreshUIStore = create<RefreshUIState>((set) => ({
   isRefreshing: false,
   setRefreshing: (value) => set({ isRefreshing: value }),
@@ -58,12 +64,27 @@ export const useRefreshUIStore = create<RefreshUIState>((set) => ({
   setReplacingData: (value) => set({ isReplacingData: value }),
   refreshRequested: false,
   refreshSawFetch: false,
-  requestRefresh: () => set({ refreshRequested: true, refreshSawFetch: false }),
+  requestRefresh: () => {
+    if (refreshRequestTimer) clearTimeout(refreshRequestTimer);
+    set({ refreshRequested: true, refreshSawFetch: false });
+    refreshRequestTimer = setTimeout(() => {
+      refreshRequestTimer = null;
+      set((s) =>
+        s.refreshRequested
+          ? { refreshRequested: false, refreshSawFetch: false }
+          : s,
+      );
+    }, REFRESH_REQUEST_TIMEOUT_MS);
+  },
   observeFetching: (fetching) =>
     set((s) => {
       if (!s.refreshRequested) return s;
       if (fetching) return { refreshSawFetch: true };
       if (s.refreshSawFetch) {
+        if (refreshRequestTimer) {
+          clearTimeout(refreshRequestTimer);
+          refreshRequestTimer = null;
+        }
         return { refreshRequested: false, refreshSawFetch: false };
       }
       return s;

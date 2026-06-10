@@ -180,6 +180,8 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
+  SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
+  SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs
 `;
@@ -284,7 +286,7 @@ const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
 };
 
-interface SpanSummaryQueryRow {
+export interface SpanSummaryQueryRow {
   SpanId: string;
   ParentSpanId: string | null;
   SpanName: string;
@@ -303,6 +305,8 @@ interface SpanSummaryQueryRow {
   CacheCreationTokens: string;
   CustomInputRate: string;
   CustomOutputRate: string;
+  CustomCacheReadRate: string;
+  CustomCacheCreationRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
 }
@@ -314,7 +318,7 @@ function attrNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   const explicitCost = attrNumber(row.Cost);
   const inputTokens = attrNumber(row.InputTokens);
   const outputTokens = attrNumber(row.OutputTokens);
@@ -327,7 +331,9 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   // the same priority cascade (custom enrichment rates → static model
   // registry → SDK span cost) with the attributes this summary query
   // already selects.
-  let cost = explicitCost;
+  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown" — treat any
+  // non-positive explicit cost as absent so the computed fallback runs.
+  let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
   if (cost === null) {
     const computed = computeSpanCost({
       attrs: {
@@ -341,6 +347,10 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CustomInputRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
           row.CustomOutputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
+          row.CustomCacheReadRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
+          row.CustomCacheCreationRate || undefined,
         [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
       } as NormalizedAttributes,
       model: row.ResponseModel || row.Model || undefined,
