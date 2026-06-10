@@ -434,7 +434,38 @@ describe("PromptEditorDrawer", () => {
       expect(await screen.findByText("input_1")).toBeInTheDocument();
     });
 
-    // Outputs are now in the LLM config popover, not as a separate field group
+    /** @scenario Outputs section renders below the inputs section */
+    it("shows the outputs section below the variables section", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      const variablesTitle = screen.getByText("Variables");
+      const outputsTitle = screen.getByText("Outputs");
+      expect(outputsTitle).toBeInTheDocument();
+      // Outputs renders after Variables in document order — users shape
+      // the response right where they define the inputs, instead of
+      // hunting inside the model-selector popover (which still edits
+      // the same state).
+      expect(
+        variablesTitle.compareDocumentPosition(outputsTitle) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario Adding an output from the section enables structured outputs */
+    it("adds an output from the outputs section", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("add-output-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Number/ }));
+
+      // Default config ships a single "output"; the new float output
+      // dedupes to output_1 and lands in rename-edit mode. Multiple
+      // outputs = structured outputs on.
+      expect(
+        await screen.findByTestId("output-name-input-output_1"),
+      ).toBeInTheDocument();
+    });
 
     it("shows Saved button initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);

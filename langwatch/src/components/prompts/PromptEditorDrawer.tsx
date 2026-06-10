@@ -16,6 +16,7 @@ import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
+import { FormOutputsSection } from "~/components/outputs/FormOutputsSection";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -1153,7 +1154,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         </Box>
 
         {/* Variables */}
-        <Box paddingX={4} paddingBottom={4}>
+        <Box paddingX={4}>
           <FormVariablesSection
             title="Variables"
             showMappings={
@@ -1170,6 +1171,14 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 "This is the user message input. It will be sent as the user message to the LLM.",
             }}
           />
+        </Box>
+
+        {/* Outputs — same form state the model selector's structured
+            outputs editor mutates, surfaced as a section so shaping the
+            response (rename to score, add reasoning, …) doesn't require
+            discovering the popover. Mirrors the code component's panel. */}
+        <Box paddingX={4} paddingBottom={4}>
+          <FormOutputsSection />
         </Box>
       </VStack>
     </FormProvider>

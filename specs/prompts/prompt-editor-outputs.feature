@@ -18,19 +18,19 @@ Feature: Structured outputs section in the prompt editor
   # Outputs section placement and behavior
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Outputs section renders below the inputs section
     Then I see an "Outputs" section below the "Inputs" section
     And it lists the prompt's current outputs with their types
 
-  @integration @unimplemented
+  @integration
   Scenario: Adding an output from the section enables structured outputs
     Given the prompt has the default single "output" of type str
     When I add an output "reasoning" of type str from the Outputs section
     Then the prompt now produces structured outputs with "output" and "reasoning"
     And the model-selector popover shows structured outputs enabled
 
-  @integration @unimplemented
+  @integration
   Scenario: Renaming and retyping an output from the section
     Given the prompt has an output "output" of type str
     When I rename it to "score" and change its type to float

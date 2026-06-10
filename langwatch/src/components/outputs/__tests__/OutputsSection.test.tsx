@@ -255,6 +255,7 @@ describe("OutputsSection", () => {
       expect(input).toHaveValue("output");
     });
 
+    /** @scenario Renaming and retyping an output from the section */
     it("updates identifier on blur", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
