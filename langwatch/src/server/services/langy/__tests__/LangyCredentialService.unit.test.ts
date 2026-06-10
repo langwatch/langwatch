@@ -68,6 +68,47 @@ describe("LangyCredentialService", () => {
         expect(vk.create).not.toHaveBeenCalled();
         expect(prisma.projectSecret.create).not.toHaveBeenCalled();
       });
+
+      it("appends /v1 when LW_GATEWAY_BASE_URL lacks it (the dev-cluster bug)", async () => {
+        // The SaaS dev cluster set LW_GATEWAY_BASE_URL=http://langwatch-gateway:80
+        // (no /v1), so the worker POSTed to /responses → 404. The credential
+        // service must hand the worker an OpenAI-compatible /v1 base.
+        process.env.LW_GATEWAY_BASE_URL = "http://langwatch-gateway:80";
+        const prisma = makePrisma({
+          projectSecret: {
+            findUnique: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+          },
+        });
+        const svc = new LangyCredentialService(prisma, makeVkService());
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe("http://langwatch-gateway:80/v1");
+      });
+
+      it("does not double-append /v1 and tolerates a trailing slash", async () => {
+        process.env.LW_GATEWAY_BASE_URL = "http://langwatch-gateway:80/v1/";
+        const prisma = makePrisma({
+          projectSecret: {
+            findUnique: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+          },
+        });
+        const svc = new LangyCredentialService(prisma, makeVkService());
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe("http://langwatch-gateway:80/v1");
+      });
     });
   });
 

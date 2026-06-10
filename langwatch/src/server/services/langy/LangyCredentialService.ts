@@ -35,6 +35,22 @@ export const LANGY_VK_SECRET_NAME = "langy_vk_secret";
 export const LANGY_VK_DISPLAY_NAME = "Langy";
 
 /**
+ * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
+ * `OPENAI_BASE_URL`, so it must point at the gateway's OpenAI-compatible
+ * surface — the `/v1` prefix under which `/responses` and `/chat/completions`
+ * live. `LW_GATEWAY_BASE_URL` is shared with the Go gateway's control-plane
+ * discovery and is set without `/v1` in some deployments (the SaaS dev
+ * cluster shipped `http://langwatch-gateway:80`), which made the worker POST
+ * to `/responses` → 404. Normalise here so Langy is correct regardless of how
+ * the deployment spells the env. Idempotent: a value already ending in `/v1`
+ * is returned unchanged.
+ */
+export function ensureGatewayV1BaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
+}
+
+/**
  * Idempotently provision a Langy VirtualKey for a project + persist its
  * secret to ProjectSecret. Exported so project.create can call it eagerly
  * (so users see the VK in /virtual-keys from day 1) AND the credential
@@ -255,7 +271,7 @@ export class LangyCredentialService {
       langwatchApiKey: langyApiKeyToken ?? project.apiKey,
       llmVirtualKey,
       langwatchEndpoint,
-      gatewayBaseUrl,
+      gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
       organizationId: project.team.organizationId,
     };
   }
