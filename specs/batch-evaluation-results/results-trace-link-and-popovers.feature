@@ -16,7 +16,7 @@ Feature: Evaluation results trace links and detail popovers
   # Trace links from workflow evaluate runs
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Result rows from a workflow evaluate run link to a resolvable trace
     Given a workflow was published and evaluated via the studio Evaluate button
     When I open a result row's trace from the results table

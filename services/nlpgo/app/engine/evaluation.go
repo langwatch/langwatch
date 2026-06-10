@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,9 +12,23 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
+
+// newRowTraceID mints a random W3C trace id for one evaluated dataset
+// row. Crypto randomness keeps collisions out of the question across
+// concurrent evaluations; the all-zero (invalid) id is re-rolled.
+func newRowTraceID() trace.TraceID {
+	var tid trace.TraceID
+	for !tid.IsValid() {
+		_, _ = cryptorand.Read(tid[:])
+	}
+	return tid
+}
 
 // newDeterministicRand returns a math/rand source seeded with the
 // given int64. Used by splitTrainTest to reproduce sklearn's
@@ -345,19 +360,27 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 					continue // drain remaining jobs to let producer finish
 				}
 				entryStart := time.Now()
+				// Each entry gets its own REAL trace: detach from the
+				// evaluation request's span and pin a fresh W3C trace id
+				// via the context-aware ID generator, recording that same
+				// id on the result row. The previous shape minted a ULID
+				// per row that no exported span ever carried (ingestion
+				// does not re-home spans by the langwatch.trace_id
+				// attribute), so every "view trace" link on evaluate runs
+				// resolved to Trace not found.
+				rowTraceID := newRowTraceID()
+				rowCtx := trace.ContextWithSpanContext(ctx, trace.SpanContext{})
+				rowCtx = otelsetup.WithTraceIDOverride(rowCtx, rowTraceID)
 				entryReq := ExecuteRequest{
 					Workflow:  req.Workflow,
 					Inputs:    j.entry,
 					Origin:    req.Origin,
 					ProjectID: req.ProjectID,
 					ThreadID:  req.ThreadID,
-					// Each entry gets its own trace id so the LangWatch
-					// trace view shows one trace per evaluated row, not
-					// all rows merged into the parent eval trace.
-					TraceID: "",
-					Type:    "execute_flow",
+					TraceID:   rowTraceID.String(),
+					Type:      "execute_flow",
 				}
-				entryRes, err := e.Execute(ctx, entryReq)
+				entryRes, err := e.Execute(rowCtx, entryReq)
 				duration := time.Since(entryStart).Milliseconds()
 				var entryTraceID string
 				if entryRes != nil {
