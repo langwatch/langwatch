@@ -893,7 +893,7 @@ describe("webhookService", () => {
     });
 
     describe("when no active subscription remains", () => {
-      /** @scenario Cancelling the last active subscription removes the organization policy */
+      /** @scenario Cancelling the last active subscription removes the organization policies */
       it("removes the organization-scoped traces retention policy", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
@@ -937,7 +937,7 @@ describe("webhookService", () => {
     });
 
     describe("when another active subscription remains", () => {
-      /** @scenario Cancelling one of several subscriptions keeps the policy */
+      /** @scenario Cancelling one of several subscriptions keeps the policies */
       it("leaves the organization retention policy in place", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
@@ -1149,7 +1149,7 @@ describe("webhookService", () => {
     });
 
     describe("when a cancel-by-update leaves no active subscription", () => {
-      /** @scenario Cancelling the last active subscription removes the organization policy */
+      /** @scenario Cancelling the last active subscription removes the organization policies */
       it("removes the organization-scoped traces retention policy", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),

@@ -20,33 +20,39 @@ Feature: Seat subscription provisions an organization retention policy
   Background:
     Given an organization with no retention override
 
+  @unit
   Scenario: A first paid Growth Seat activation provisions the organization policies
     Given a pending Growth Seat subscription for the organization
     When the subscription is activated by a successful payment
     Then an organization-scoped retention policy is set to the platform default for every category
 
+  @unit
   Scenario: A renewal does not re-provision the policy
     Given an already-active Growth Seat subscription for the organization
     When a renewal payment succeeds
     Then no retention policy is provisioned
 
+  @unit
   Scenario: A non-seat plan does not provision a policy
     Given a pending non-seat paid subscription for the organization
     When the subscription is activated by a successful payment
     Then no retention policy is provisioned
 
+  @unit
   Scenario: A retention failure never fails the billing webhook
     Given a pending Growth Seat subscription for the organization
     And provisioning the retention policy will fail
     When the subscription is activated by a successful payment
     Then the activation still completes and the confirmation notification is sent
 
+  @unit
   Scenario: Cancelling the last active subscription removes the organization policies
     Given an organization whose only active subscription is cancelled
     When the cancellation is finalized
     Then every organization-scoped retention policy is removed
     And retention reverts to the platform default
 
+  @unit
   Scenario: Cancelling one of several subscriptions keeps the policies
     Given an organization that still has another active subscription
     When one subscription is cancelled
