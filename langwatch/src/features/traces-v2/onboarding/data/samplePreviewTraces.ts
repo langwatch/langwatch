@@ -1668,6 +1668,9 @@ function buildPreviewHeader(trace: TraceListItem): TraceHeader {
     lastUsedPromptId: null,
     lastUsedPromptVersionNumber: null,
     lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    nonBilledCost: 0,
+    attributes: {},
   };
 }
 
@@ -1689,6 +1692,7 @@ function buildPreviewConversation(
         traceId: trace.traceId,
         timestamp: trace.timestamp,
         name: trace.name,
+        rootSpanType: trace.rootSpanType ?? "agent",
         status: trace.status,
         input: trace.input,
         output: trace.output,

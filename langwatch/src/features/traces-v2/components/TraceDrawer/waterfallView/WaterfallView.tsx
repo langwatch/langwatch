@@ -98,14 +98,16 @@ export const WaterfallView = memo(function WaterfallView({
   // identify which span IDs are genuinely new since the last render and
   // fire a per-row pulse for each, leaving the visible viewport stable.
   // Trace switches reset the baseline so opening a different trace does
-  // not pulse every existing row.
+  // not pulse every existing row. The root span's id is stable within a
+  // trace and unique across traces, so it doubles as the trace-identity
+  // marker here (SpanTreeNode doesn't carry the traceId field).
   const prevSpanIdsRef = useRef<Set<string> | null>(null);
-  const prevTraceIdRef = useRef<string | null>(null);
-  const currentTraceId = spans[0]?.traceId ?? null;
+  const prevRootSpanIdRef = useRef<string | null>(null);
+  const currentRootSpanId = spans[0]?.spanId ?? null;
   useEffect(() => {
     const currentIds = new Set(spans.map((s) => s.spanId));
-    if (prevTraceIdRef.current !== currentTraceId) {
-      prevTraceIdRef.current = currentTraceId;
+    if (prevRootSpanIdRef.current !== currentRootSpanId) {
+      prevRootSpanIdRef.current = currentRootSpanId;
       prevSpanIdsRef.current = currentIds;
       return;
     }
@@ -119,7 +121,7 @@ export const WaterfallView = memo(function WaterfallView({
       if (!prev.has(id)) pulse(id);
     }
     prevSpanIdsRef.current = currentIds;
-  }, [spans, currentTraceId]);
+  }, [spans, currentRootSpanId]);
   const { rootStart, rootDuration } = useMemo(
     () => getTraceRange(filteredSpans),
     [filteredSpans],
