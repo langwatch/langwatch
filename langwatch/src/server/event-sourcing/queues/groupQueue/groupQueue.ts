@@ -521,7 +521,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (drainedSiblings.length > 0) {
         const parsedSiblings = await Promise.all(
           drainedSiblings.map((sibling) =>
-            this.parseDrainedPayload(sibling, groupId),
+            this.parseDrainedPayload({ sibling, groupId }),
           ),
         );
         const siblingPayloads = parsedSiblings.filter(
@@ -761,10 +761,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * here and recoverable via event replay, mirroring the dispatched job's own
    * parse-failure handling).
    */
-  private async parseDrainedPayload(
-    sibling: DrainedJob,
-    groupId: string,
-  ): Promise<Payload | null> {
+  private async parseDrainedPayload({
+    sibling,
+    groupId,
+  }: {
+    sibling: DrainedJob;
+    groupId: string;
+  }): Promise<Payload | null> {
     try {
       const jobData = await decodeJobEnvelope(sibling.jobDataJson);
       return this.stripInternalFields(jobData);
