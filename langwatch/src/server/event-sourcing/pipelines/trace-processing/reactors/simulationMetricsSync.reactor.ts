@@ -30,7 +30,10 @@ export interface SimulationMetricsSyncReactorDeps {
 /**
  * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
  * (fail-open path): only simulation traces (scenario.run_id present)
- * with something to aggregate need this reactor.
+ * with something to aggregate need this reactor. Role cost/latency are
+ * no longer accumulated on the fold; computeRunMetrics derives them
+ * per-trace from stored_spans, so we dispatch in pull mode rather than
+ * carrying metrics.
  */
 function hasSimulationMetrics(foldState: TraceSummaryData): boolean {
   if (!foldState.attributes["scenario.run_id"]) return false;
@@ -57,9 +60,6 @@ export function createSimulationMetricsSyncReactor(
       const { tenantId, foldState } = context;
       if (!hasSimulationMetrics(foldState)) return;
 
-      // Role cost/latency are no longer accumulated on the fold;
-      // computeRunMetrics derives them per-trace from stored_spans, so we
-      // dispatch in pull mode rather than carrying metrics.
       const scenarioRunId = foldState.attributes["scenario.run_id"]!;
 
       const traceId = foldState.traceId;

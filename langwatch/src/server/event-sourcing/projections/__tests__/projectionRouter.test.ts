@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { incrementEsReactorTotal } from "~/server/metrics";
 import { ProjectionRouter } from "../projectionRouter";
+
+vi.mock("~/server/metrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/metrics")>();
+  return {
+    ...actual,
+    incrementEsReactorTotal: vi.fn(),
+  };
+});
 import type { QueueManager } from "../../services/queues/queueManager";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -488,6 +497,11 @@ describe("ProjectionRouter", () => {
 
           expect(mockSend).not.toHaveBeenCalled();
           expect(reactorHandle).not.toHaveBeenCalled();
+          expect(incrementEsReactorTotal).toHaveBeenCalledWith(
+            TEST_CONSTANTS.PIPELINE_NAME,
+            "filtered-reactor",
+            "skipped",
+          );
         });
 
         it("skips inline execution too", async () => {
@@ -953,6 +967,38 @@ describe("ProjectionRouter", () => {
         // Per-span reactors (embedded-eval sync, evaluation triggers) must see
         // EVERY event, not just the last — otherwise N-1 spans are dropped.
         expect(seen).toEqual(["e1", "e2", "e3"]);
+      });
+
+      it("evaluates shouldReact per coalesced event, not once per batch", async () => {
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          createMockQueueManager(),
+        );
+        const store = createMockFoldProjectionStore();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        const fold = batchFold(store);
+        router.registerFoldProjection(fold);
+
+        const seen: string[] = [];
+        const reactor: ReactorDefinition<Event> = {
+          name: "selective-per-span-spy",
+          shouldReact: (event) => event.id !== "e2",
+          handle: async (event) => {
+            seen.push(event.id);
+          },
+        };
+        router.registerReactor("my-fold", reactor);
+
+        const events = [
+          makeBatchEvent("e1", 1000),
+          makeBatchEvent("e2", 2000),
+          makeBatchEvent("e3", 3000),
+        ];
+
+        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+
+        expect(seen).toEqual(["e1", "e3"]);
       });
 
       it("dispatches reactors in occurredAt order even when events arrive shuffled", async () => {

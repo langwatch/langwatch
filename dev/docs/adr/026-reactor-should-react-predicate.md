@@ -127,5 +127,12 @@ that condition belongs in `handle()`.
 ## References
 
 - Related ADRs: [ADR-023](./023-orphan-sweep-reactor-chain.md) (reactor
-  infrastructure background)
+  infrastructure background; its orphan-sweep reactor was since removed,
+  see [ADR-025](./025-remove-orphan-sweep.md)),
+  [ADR-021](./021-lean-fold-cache.md) and
+  [ADR-022](./022-event-log-source-of-truth.md) (fold-state caching —
+  the `toCacheable` lean-cache hook must preserve every field the fold's
+  `apply` reads, and reactors receive the post-apply state, so predicates
+  reading `foldState.attributes` see the same values the handler does
+  even on cache-rehydrated paths)
 - Spec: [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)

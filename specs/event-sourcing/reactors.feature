@@ -28,26 +28,26 @@ Feature: Reactors
     Then the reactor is NOT initialized or executed in this process
 
   Scenario: Irrelevant events are filtered before enqueue
-    Given a reactor with a shouldReact predicate
-    And an event the predicate evaluates as not relevant
+    Given a reactor that declares which events are relevant to it
+    And an event the reactor considers not relevant
     When the fold projection successfully applies and stores the event
     Then no job is enqueued for that reactor
     And the reactor's handler never runs for that event
     And a skipped outcome is recorded for observability
 
   Scenario: Relevant events are dispatched as before
-    Given a reactor with a shouldReact predicate
-    And an event the predicate evaluates as relevant
+    Given a reactor that declares which events are relevant to it
+    And an event the reactor considers relevant
     When the fold projection successfully applies and stores the event
     Then the reactor is dispatched with the event and the fold state
 
-  Scenario: A failing predicate never drops a side effect
-    Given a reactor whose shouldReact predicate throws an error
+  Scenario: A failing relevance check never drops a side effect
+    Given a reactor whose relevance check throws an error
     When the fold projection successfully applies and stores the event
     Then the error is logged
     And the reactor is dispatched anyway
 
-  Scenario: Reactors without a predicate are unaffected
-    Given a reactor with no shouldReact predicate
+  Scenario: Reactors without a relevance check are unaffected
+    Given a reactor that does not declare a relevance check
     When the fold projection successfully applies and stores the event
     Then the reactor is dispatched for every event

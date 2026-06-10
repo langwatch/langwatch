@@ -43,7 +43,7 @@ function needsOriginResolution(
   foldState: TraceSummaryData,
 ): boolean {
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
-  return !(foldState.attributes ?? {})["langwatch.origin"];
+  return !foldState.attributes?.["langwatch.origin"];
 }
 
 export function createOriginGateReactor(

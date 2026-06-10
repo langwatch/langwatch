@@ -98,6 +98,25 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
 }
 
 /**
+ * Cheap presence check — no JSON.parse. The predicate runs on the projection
+ * hot path with attacker-supplied span payloads, so it only looks for an
+ * evaluation event carrying a string payload; full parsing and validation
+ * stay in handle() off the hot path.
+ */
+function spanHasEvaluationEvents(span: OtlpSpan): boolean {
+  return (span.events ?? []).some(
+    (event) =>
+      event.name === EVAL_EVENT_NAME &&
+      event.attributes.some(
+        (attr) =>
+          attr.key === "json_encoded_event" &&
+          attr.value !== undefined &&
+          "stringValue" in attr.value,
+      ),
+  );
+}
+
+/**
  * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
  * (fail-open path): only span events that are recent (not a resync) and
  * actually carry `langwatch.evaluation.custom` events need this reactor.
@@ -105,7 +124,7 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
 function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
   if (!isSpanReceivedEvent(event)) return false;
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
-  return extractEvaluationsFromSpan(event.data.span).length > 0;
+  return spanHasEvaluationEvents(event.data.span);
 }
 
 /**
@@ -139,6 +158,7 @@ export function createCustomEvaluationSyncReactor(
       const { tenantId, aggregateId: traceId } = context;
 
       const evaluations = extractEvaluationsFromSpan(event.data.span);
+      if (evaluations.length === 0) return;
 
       logger.debug(
         { tenantId, traceId, evaluationCount: evaluations.length },

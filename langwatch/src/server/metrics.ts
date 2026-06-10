@@ -289,7 +289,9 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 // Event Sourcing Pipeline Metrics (command, fold, map, reactor)
 // ============================================================================
 
-type ESStatus = "completed" | "failed" | "skipped";
+type ESStatus = "completed" | "failed";
+/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
+type ReactorStatus = ESStatus | "skipped";
 
 // --- Command metrics ---
 register.removeSingleMetric("es_command_total");
@@ -392,7 +394,7 @@ const esReactorTotal = new Counter({
 export const incrementEsReactorTotal = (
   pipelineName: string,
   reactorName: string,
-  status: ESStatus,
+  status: ReactorStatus,
 ) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
 
 register.removeSingleMetric("es_reactor_duration_milliseconds");

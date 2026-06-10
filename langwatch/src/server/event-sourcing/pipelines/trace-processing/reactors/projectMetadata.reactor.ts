@@ -31,7 +31,7 @@ export interface ProjectMetadataReactorDeps {
  * a real trace will trigger this reactor again.
  */
 function isRealFirstIngest(foldState: TraceSummaryData): boolean {
-  return (foldState.attributes ?? {})["langwatch.origin"] !== "sample";
+  return foldState.attributes?.["langwatch.origin"] !== "sample";
 }
 
 export function createProjectMetadataReactor(

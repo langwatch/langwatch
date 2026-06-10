@@ -288,5 +288,23 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
         ).toBe(false);
       });
     });
+
+    describe("when trace has exactly zero cost", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: 0,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
   });
 });
