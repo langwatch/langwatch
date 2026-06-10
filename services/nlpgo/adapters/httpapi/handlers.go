@@ -53,14 +53,14 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		executor := application.Executor()
 		if executor == nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 				"reason": "engine_not_wired",
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
 		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",
 			}, err))
 			return
@@ -68,7 +68,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 
 		req, herrErr := decodeStudioClientEvent(r, body)
 		if herrErr != nil {
-			herr.WriteHTTP(w, *herrErr)
+			writeHandlerError(r.Context(), w, *herrErr)
 			return
 		}
 		ctx := enrichRequestLogContext(r.Context(), req)
@@ -82,7 +82,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 		result, err := executor.Execute(ctx, *req)
 		if err != nil {
 			span.RecordError(err)
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "engine_error",
 			}, err))
 			return
@@ -326,7 +326,7 @@ func emitStudioControlEvent(w http.ResponseWriter, eventType string) {
 	if !ok {
 		// Same flusher constraint as the main path; surface a
 		// structured error before any 200 OK lands on the wire.
-		herr.WriteHTTP(w, herr.New(context.Background(), domain.ErrInternal, herr.M{
+		writeHandlerError(context.Background(), w, herr.New(context.Background(), domain.ErrInternal, herr.M{
 			"reason": "no_flusher",
 		}, errors.New("response writer does not support flushing")))
 		return
@@ -378,14 +378,14 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		executor := application.Executor()
 		if executor == nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 				"reason": "engine_not_wired",
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
 		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",
 			}, err))
 			return
@@ -410,7 +410,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 
 		req, herrErr := decodeStudioClientEvent(r, body)
 		if herrErr != nil {
-			herr.WriteHTTP(w, *herrErr)
+			writeHandlerError(r.Context(), w, *herrErr)
 			return
 		}
 		ctx := enrichRequestLogContext(r.Context(), req)
@@ -430,7 +430,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			// any Set/WriteHeader call — once 200 OK is on the wire,
 			// herr.WriteHTTP can no longer set a non-2xx status and
 			// the client sees mixed signals.
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, herr.M{
+			writeHandlerError(ctx, w, herr.New(ctx, domain.ErrInternal, herr.M{
 				"reason": "no_flusher",
 			}, errors.New("response writer does not support flushing")))
 			return
@@ -454,6 +454,10 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			Heartbeat: streamHeartbeat(r),
 		})
 		if err != nil {
+			// The SSE error frame reaches the client; this line is the
+			// server-side trail for it (the engine stream failed to start).
+			clog.Get(r.Context()).Error("studio_stream_failed",
+				zap.String("fault", "platform"), zap.String("message", err.Error()))
 			writeSSE(w, flusher, "error", map[string]any{"message": err.Error()})
 			return
 		}
@@ -538,7 +542,7 @@ func proxyPassthroughHandler(proxy PlaygroundProxy) http.HandlerFunc {
 		// Fall back to the original 501 stub when the dispatcher isn't
 		// wired (eg. in tests that don't exercise the playground path).
 		return func(w http.ResponseWriter, r *http.Request) {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 				"reason": "gateway_proxy_not_wired",
 				"path":   r.URL.Path,
 			}, errors.New("playground proxy not wired")))

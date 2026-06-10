@@ -98,6 +98,11 @@ type GatewayHTTPError struct {
 	Headers    map[string]string
 }
 
+// HTTPStatusCode exposes the gateway/provider status for fault
+// classification in the engine without it importing this adapter package
+// (errors.As against a small interface target).
+func (e *GatewayHTTPError) HTTPStatusCode() int { return e.StatusCode }
+
 // Error implements error. Surfaces the upstream provider's message
 // verbatim (parsed out of the OpenAI-shape response body) so the trace
 // drawer and SSE error frame carry the real reason — "You exceeded your
