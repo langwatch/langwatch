@@ -25,6 +25,9 @@ export interface SlackBlockKitTemplateOption {
   displayName: string;
   emoji: string;
   tagline: string;
+  /** Short chip shown on the picker card naming what one message contains —
+   *  the per-trace vs bundled-digest distinction users otherwise miss. */
+  deliveryNote: string;
   cadenceFit: SlackBlockKitTemplateCadenceFit;
   recommendedForEvaluationFilter?: true;
   source: string;
@@ -36,7 +39,8 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "trace_alert_compact",
     displayName: "Compact alert",
     emoji: "🔔",
-    tagline: "Single trace, header + markdown input/output.",
+    tagline: "Header, then the trace's input and output as quoted markdown.",
+    deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     source: traceAlertCompactSource,
     Wireframe: TraceAlertCompactWireframe,
@@ -45,7 +49,9 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "eval_failure_detailed",
     displayName: "Eval failure detail",
     emoji: "🛑",
-    tagline: "Single trace with quoted input/output for eval-shaped filters.",
+    tagline:
+      "Names the failing evaluator, then quotes the trace's input and output.",
+    deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     recommendedForEvaluationFilter: true,
     source: evalFailureDetailedSource,
@@ -55,7 +61,9 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "digest_compact",
     displayName: "Digest — compact",
     emoji: "📊",
-    tagline: "One row per match. Best for hourly digests or busy channels.",
+    tagline:
+      "One line per matched trace. Best for hourly windows or busy channels.",
+    deliveryNote: "all matches, 1 message",
     cadenceFit: "digest",
     source: digestCompactSource,
     Wireframe: DigestCompactWireframe,
@@ -64,7 +72,9 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "digest_inline_rich",
     displayName: "Digest — inline rich",
     emoji: "📊",
-    tagline: "Full input/output per match, grouped by evaluator. 5–15min cadence.",
+    tagline:
+      "Full input/output for every matched trace, grouped by evaluator. Suits 5–15 min windows.",
+    deliveryNote: "all matches, 1 message",
     cadenceFit: "digest",
     source: digestInlineRichSource,
     Wireframe: DigestInlineRichWireframe,

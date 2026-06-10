@@ -46,6 +46,11 @@ export interface AutomationDraft {
    *  holds the trace this long before re-evaluating filters; only meaningful
    *  for notify actions (persist actions ignore it). */
   traceDebounceMs: number;
+  /** True once the user has looked at the cadence stage (opened it and hit
+   *  Done, or changed either knob). New drafts start unconfirmed so the
+   *  defaults can't silently ship without the author ever seeing them;
+   *  hydrated rows start confirmed because the saved values were chosen. */
+  cadenceConfirmed: boolean;
   /** Per-provider slice — all present, so type-switching never loses the
    *  slice the user was on. */
   slices: AllSlices;
@@ -60,6 +65,7 @@ export type DraftAction =
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
   | { type: "SET_CADENCE"; value: NotificationCadence }
   | { type: "SET_TRACE_DEBOUNCE_MS"; value: number }
+  | { type: "CONFIRM_CADENCE" }
   | SetSliceAction
   | { type: "HYDRATE"; value: AutomationDraft };
 
@@ -93,6 +99,7 @@ export const INITIAL_DRAFT: AutomationDraft = {
   // actions ignore this at dispatch time, so a non-zero default is harmless
   // even while the user is type-switching.
   traceDebounceMs: DEFAULT_TRACE_DEBOUNCE_MS,
+  cadenceConfirmed: false,
   slices: initialSlices(),
 };
 
@@ -121,9 +128,15 @@ export function reducer(
     case "SET_FILTERS":
       return { ...state, filters: action.value };
     case "SET_CADENCE":
-      return { ...state, notificationCadence: action.value };
+      return {
+        ...state,
+        notificationCadence: action.value,
+        cadenceConfirmed: true,
+      };
     case "SET_TRACE_DEBOUNCE_MS":
-      return { ...state, traceDebounceMs: action.value };
+      return { ...state, traceDebounceMs: action.value, cadenceConfirmed: true };
+    case "CONFIRM_CADENCE":
+      return state.cadenceConfirmed ? state : { ...state, cadenceConfirmed: true };
     case "SET_SLICE":
       return {
         ...state,

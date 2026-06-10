@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { useAutomationStore } from "../state/automationStore";
 import {
+  useCadenceConfirmed,
   useCadenceSummary,
   useConditionsSet,
   useConfigComplete,
@@ -39,6 +40,7 @@ export function MainSectionList({
   const conditionsSummary = useSummariseConditions();
   const configSummary = useConfigurationSummary();
   const cadenceSummary = useCadenceSummary();
+  const cadenceConfirmed = useCadenceConfirmed();
   const isNotifyAction = useIsNotifyAction();
   const setSection = useAutomationStore((s) => s.setSection);
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -84,8 +86,12 @@ export function MainSectionList({
       {isNotifyAction ? (
         <SectionRow
           title="Cadence"
-          summary={cadenceSummary}
-          complete={isNotifyAction}
+          summary={
+            cadenceConfirmed
+              ? cadenceSummary
+              : `Choose when to deliver — currently ${cadenceSummary}.`
+          }
+          complete={cadenceConfirmed}
           onClick={() => setSection("cadence")}
         />
       ) : null}

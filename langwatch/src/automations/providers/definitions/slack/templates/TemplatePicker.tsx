@@ -38,8 +38,9 @@ export function SlackBlockKitTemplatePicker({
   return (
     <Stack gap={2} align="stretch">
       <Text textStyle="xs" color="fg.muted">
-        Pick a starting layout. Block Kit renders in Slack — the thumbnail
-        shows structure, not the final look.
+        {cadence === "digest"
+          ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
+          : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
       </Text>
       <SimpleGrid columns={{ base: 2, md: options.length }} gap={3}>
         {options.map((option) => {
@@ -102,6 +103,7 @@ function Card({
             ) : null}
           </HStack>
           <Box
+            position="relative"
             borderWidth="1px"
             borderColor="border.muted"
             borderRadius="sm"
@@ -110,6 +112,15 @@ function Card({
             minHeight="120px"
           >
             <Wireframe />
+            <Badge
+              size="xs"
+              variant="surface"
+              position="absolute"
+              top={1.5}
+              right={1.5}
+            >
+              {option.deliveryNote}
+            </Badge>
           </Box>
           <Text textStyle="xs" color="fg.muted" lineClamp={2}>
             {option.tagline}

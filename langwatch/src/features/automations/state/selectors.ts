@@ -32,6 +32,8 @@ export const useConfigurationSummary = () =>
   useAutomationStore((s) => configurationSummary(s.draft));
 export const useCadenceSummary = () =>
   useAutomationStore((s) => cadenceSummary(s.draft));
+export const useCadenceConfirmed = () =>
+  useAutomationStore((s) => s.draft.cadenceConfirmed);
 export const useNotifyChannel = () =>
   useAutomationStore((s) => notifyChannel(s.draft));
 export const useIsNotifyAction = () =>

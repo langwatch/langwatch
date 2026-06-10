@@ -82,6 +82,33 @@ describe("draftReducer", () => {
       expect(next.customGraphId).toBeNull();
     });
   });
+
+  describe("cadence confirmation", () => {
+    it("starts unconfirmed so a fresh draft can't ship unseen defaults", () => {
+      expect(INITIAL_DRAFT.cadenceConfirmed).toBe(false);
+    });
+    it("confirms when the cadence is changed", () => {
+      const next = reducer(SAMPLE, { type: "SET_CADENCE", value: "immediate" });
+      expect(next.cadenceConfirmed).toBe(true);
+    });
+    it("confirms when the settle window is changed", () => {
+      const next = reducer(SAMPLE, {
+        type: "SET_TRACE_DEBOUNCE_MS",
+        value: 60_000,
+      });
+      expect(next.cadenceConfirmed).toBe(true);
+    });
+    it("confirms on CONFIRM_CADENCE without touching the values", () => {
+      const next = reducer(SAMPLE, { type: "CONFIRM_CADENCE" });
+      expect(next.cadenceConfirmed).toBe(true);
+      expect(next.notificationCadence).toBe(SAMPLE.notificationCadence);
+      expect(next.traceDebounceMs).toBe(SAMPLE.traceDebounceMs);
+    });
+    it("returns the same state when already confirmed", () => {
+      const confirmed = reducer(SAMPLE, { type: "CONFIRM_CADENCE" });
+      expect(reducer(confirmed, { type: "CONFIRM_CADENCE" })).toBe(confirmed);
+    });
+  });
 });
 
 describe("filtersAreSet", () => {

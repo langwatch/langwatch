@@ -95,6 +95,19 @@ Feature: Staged automation authoring drawer
       When the cadence section opens
       Then the cadence is "Every 5 minutes" by default
 
+    Scenario: A new notification cannot be saved until the cadence is reviewed
+      Given the user is creating a new notification automation
+      And the trigger and setup sections are complete
+      Then the cadence section is not marked complete
+      And saving is blocked with a prompt to review the cadence
+      When the user opens the cadence section and confirms it
+      Then the cadence section is marked complete
+      And the automation can be saved
+
+    Scenario: Editing an existing notification does not re-demand a cadence review
+      Given the user opens an existing notification automation for editing
+      Then the cadence section is already marked complete
+
   Rule: The author can preview templates and test fire before saving
 
     Scenario: Opening the template editor for a trigger with no custom templates

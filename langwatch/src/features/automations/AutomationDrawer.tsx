@@ -50,9 +50,11 @@ import {
 import { explainDomainError, readDomainError } from "./logic/errorExplainer";
 import { useAutomationStore } from "./state/automationStore";
 import {
+  useCadenceConfirmed,
   useConditionsSet,
   useConfigComplete,
   useDraft,
+  useIsNotifyAction,
   useSection,
 } from "./state/selectors";
 
@@ -60,11 +62,13 @@ function saveDisabledReason(
   conditionsSet: boolean,
   configComplete: boolean,
   actionPicked: boolean,
+  cadenceNeedsReview: boolean,
 ): string {
   const missing: string[] = [];
   if (!conditionsSet) missing.push("set a trigger");
   if (!actionPicked) missing.push("pick a type");
   else if (!configComplete) missing.push("complete the setup");
+  if (cadenceNeedsReview) missing.push("review the cadence");
   if (missing.length === 0) return "";
   return `To save, ${missing.join(" and ")}.`;
 }
@@ -103,6 +107,9 @@ export function AutomationDrawer({
   const section = useSection();
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
+  const isNotify = useIsNotifyAction();
+  const cadenceConfirmed = useCadenceConfirmed();
+  const cadenceNeedsReview = isNotify && !cadenceConfirmed;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -188,6 +195,9 @@ export function AutomationDrawer({
             : DEFAULT_TRACE_DEBOUNCE_MS,
         ),
       ),
+      // The saved row's cadence was chosen (or accepted) when it was created,
+      // so editing doesn't re-demand a visit to the cadence stage.
+      cadenceConfirmed: true,
       slices: {
         ...INITIAL_DRAFT.slices,
         [action]: provider.client.fromTriggerRow({
@@ -310,7 +320,7 @@ export function AutomationDrawer({
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
-  const canSave = conditionsSet && configComplete;
+  const canSave = conditionsSet && configComplete && !cadenceNeedsReview;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -495,6 +505,7 @@ export function AutomationDrawer({
                   conditionsSet,
                   configComplete,
                   !!draft.action,
+                  cadenceNeedsReview,
                 )}
                 disabled={canSave}
               >
@@ -538,7 +549,10 @@ export function AutomationDrawer({
 
       <CadenceSecondaryDrawer
         open={section === "cadence"}
-        onDone={() => setSection(null)}
+        onDone={() => {
+          dispatch({ type: "CONFIRM_CADENCE" });
+          setSection(null);
+        }}
       />
     </>
   );
