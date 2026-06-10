@@ -17,7 +17,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type { Protections } from "../../elasticsearch/protections";
+import type { Protections } from "../protections";
 
 const tenantId = `test-field-names-${nanoid()}`;
 const now = Date.now();

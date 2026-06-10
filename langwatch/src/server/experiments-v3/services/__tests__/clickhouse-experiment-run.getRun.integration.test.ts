@@ -17,9 +17,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
 });
 
 // Imported after the mock is registered.
-const { ClickHouseExperimentRunService } = await import(
-  "../clickhouse-experiment-run.service"
-);
+const { ExperimentRunService } = await import("../experiment-run.service");
 
 const tenantId = `test-exp-getrun-${nanoid()}`;
 
@@ -62,13 +60,13 @@ async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
 }
 
 let ch: ClickHouseClient;
-let service: InstanceType<typeof ClickHouseExperimentRunService>;
+let service: InstanceType<typeof ExperimentRunService>;
 
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   testClient = ch;
-  service = new ClickHouseExperimentRunService({} as any);
+  service = new ExperimentRunService({} as any);
 }, 60_000);
 
 afterAll(async () => {
@@ -81,7 +79,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("ClickHouseExperimentRunService.getRun (integration)", () => {
+describe("ExperimentRunService.getRun (integration)", () => {
   describe("when a run has several versions", () => {
     it("returns the fields of the version with the greatest UpdatedAt", async () => {
       const experimentId = `exp-latest-${nanoid()}`;
