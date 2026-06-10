@@ -9,6 +9,7 @@ import { useTourEntryPoints } from "../../onboarding";
 import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
 import { AutomateButton } from "./AutomateButton";
@@ -67,6 +68,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     (s) => s.setCurrentSpotlightId,
   );
 
+  const closeDrawer = useDrawerStore((s) => s.closeDrawer);
   const handleSamplePreviewToggle = useCallback(() => {
     if (showSamplePreview) {
       setShowSamplePreview(false);
@@ -76,6 +78,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       setSpotlightsActive(false);
       setCurrentSpotlightId(null);
       writeSpotlightFragment(null);
+      // A drawer left open over a sample trace would now point at a row
+      // that no longer exists in the table — close it with the samples.
+      closeDrawer();
       // If the legacy journey was somehow also active, end it cleanly.
       onEndTour();
     } else {
@@ -98,6 +103,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     onEndTour,
     setSpotlightsActive,
     setCurrentSpotlightId,
+    closeDrawer,
   ]);
 
   const handleShowMeAround = useCallback(() => {

@@ -4,6 +4,7 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
@@ -357,6 +358,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
+      {/* Show-once feature spotlights — only meaningful once a trace has
+          rendered (the anchors live in the drawer body). Keyed reads via
+          the traceId prop so the queue re-evaluates per trace. */}
+      {trace ? <DrawerSpotlights traceId={trace.traceId} /> : null}
     </Drawer.Root>
   );
 }

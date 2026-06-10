@@ -247,6 +247,12 @@ export const ConversationContext = memo(function ConversationContext({
 
   return (
     <Box
+      // Drawer-spotlight anchor: only emitted for genuinely multi-turn
+      // conversations so the show-once "Conversation context" spotlight
+      // never fires on a single-turn trace that merely has the pane
+      // rendered (the pane stays mounted for any conversationId to
+      // avoid the load → unmount blank-band flash documented above).
+      {...(ctx.total > 1 ? { "data-spotlight": "conversation-context" } : {})}
       display="flex"
       flexDirection="column"
       height="100%"
@@ -579,9 +585,7 @@ const ConversationRow = memo(function ConversationRow({
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
         _hover={
-          isCurrent
-            ? undefined
-            : { bg: { base: "gray.50", _dark: "bg.muted" } }
+          isCurrent ? undefined : { bg: { base: "gray.50", _dark: "bg.muted" } }
         }
         transition="background 0.12s ease"
         textAlign="left"

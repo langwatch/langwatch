@@ -85,14 +85,14 @@ export function useSpotlightURLSync(): void {
 // Anchor position measurement
 // ---------------------------------------------------------------------------
 
-interface AnchorRect {
+export interface AnchorRect {
   top: number;
   left: number;
   width: number;
   height: number;
 }
 
-function measureAnchor(anchor: string): AnchorRect | null {
+export function measureAnchor(anchor: string): AnchorRect | null {
   if (typeof document === "undefined") return null;
   const el = document.querySelector<HTMLElement>(
     `[data-spotlight="${anchor}"]`,
@@ -179,23 +179,26 @@ function spotlightIndex({
 interface SpotlightPopoverProps {
   spotlight: Spotlight;
   anchorRect: AnchorRect;
-  ctx: SpotlightContext;
-  currentId: string | null;
+  /** Zero-based position of this step within its tour/queue. */
+  stepIndex: number;
+  /** Total number of steps in the tour/queue. */
+  stepTotal: number;
   onNext: () => void;
   onBack: () => void;
   onDismiss: () => void;
 }
 
-function SpotlightPopover({
+export function SpotlightPopover({
   spotlight,
   anchorRect,
-  ctx,
-  currentId,
+  stepIndex,
+  stepTotal,
   onNext,
   onBack,
   onDismiss,
 }: SpotlightPopoverProps): React.ReactElement {
-  const { index, total } = spotlightIndex({ currentId, ctx });
+  const index = stepIndex;
+  const total = stepTotal;
   const hasNext = index < total - 1;
   const hasPrev = index > 0;
 
@@ -375,7 +378,7 @@ function SpotlightPopover({
 // can see which element the spotlight is talking about.
 // ---------------------------------------------------------------------------
 
-function HighlightRing({
+export function HighlightRing({
   anchorRect,
 }: {
   anchorRect: AnchorRect;
@@ -564,6 +567,8 @@ export function SpotlightOverlay(): React.ReactElement | null {
 
   if (!spotlightsActive || !resolved || !anchorRect) return null;
 
+  const pageStep = spotlightIndex({ currentId: resolved.id, ctx });
+
   return (
     <Portal>
       <AnimatePresence mode="wait">
@@ -594,8 +599,8 @@ export function SpotlightOverlay(): React.ReactElement | null {
           <SpotlightPopover
             spotlight={resolved}
             anchorRect={anchorRect}
-            ctx={ctx}
-            currentId={resolved.id}
+            stepIndex={pageStep.index}
+            stepTotal={pageStep.total}
             onNext={handleNext}
             onBack={handleBack}
             onDismiss={handleDismiss}

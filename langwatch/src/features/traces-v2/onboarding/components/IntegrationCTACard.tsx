@@ -34,8 +34,10 @@ export function useIntegrationCTAVisible({
   projectId: string | undefined;
 }): boolean {
   const { hasAnyTraces } = useProjectHasTraces();
-  const dismissedAt = useOnboardingStore(
-    (s) => (projectId ? (s.integrationCtaDismissedAtByProject[projectId] ?? null) : null),
+  const dismissedAt = useOnboardingStore((s) =>
+    projectId
+      ? (s.integrationCtaDismissedAtByProject[projectId] ?? null)
+      : null,
   );
 
   if (!projectId) return false;
