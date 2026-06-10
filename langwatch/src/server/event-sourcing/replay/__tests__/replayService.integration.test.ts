@@ -712,6 +712,19 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         format: "JSONEachRow",
       });
 
+      // Discovery must see the freshly inserted event — poll until ClickHouse
+      // reports it visible (insert visibility is not synchronous on CI).
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const visible = await client.query({
+          query: `SELECT count() AS c FROM event_log WHERE TenantId = {tenantId:String} AND AggregateId = {aggregateId:String}`,
+          query_params: { tenantId: tenantA, aggregateId: `span-s1-${suffix}` },
+          format: "JSONEachRow",
+        });
+        const [row] = (await visible.json()) as Array<{ c: string }>;
+        if (Number(row?.c) > 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
       const spanAggKey = aggregateKey({
         tenantId: tenantA,
         aggregateType: "span",
