@@ -2,6 +2,21 @@ import type { SystemStyleObject } from "@chakra-ui/react";
 
 export type FacetValueState = "neutral" | "include" | "exclude";
 
+/**
+ * Per-value aggregates the evaluator facet attaches so its sidebar
+ * drilldown can render verdict pills + score range inline without
+ * firing a second query per evaluator. Other facets leave this absent.
+ */
+export interface FacetItemAggregates {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+  scoreMin: number | null;
+  scoreMax: number | null;
+  hasScore: boolean;
+  hasLabel: boolean;
+}
+
 export interface FacetItem {
   value: string;
   label: string;
@@ -21,6 +36,8 @@ export interface FacetItem {
    * as "no matches" rather than "loading."
    */
   synthetic?: boolean;
+  /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
+  aggregates?: FacetItemAggregates;
 }
 
 export interface AttributeKey {
@@ -50,13 +67,38 @@ export interface SectionBase {
 
 export interface CategoricalSection extends SectionBase {
   kind: "cat";
-  topValues: { value: string; label?: string; count: number }[];
+  topValues: {
+    value: string;
+    label?: string;
+    count: number;
+    /**
+     * Forwarded from the discover response. Only set on the evaluator
+     * facet (its query builder emits the matching SQL aggregates) —
+     * other facets leave it absent. Surfaced here so the sidebar's
+     * drilldown can read per-evaluator pass/fail / score range
+     * without firing a second query.
+     */
+    aggregates?: FacetItemAggregates;
+  }[];
+  /**
+   * True when this section was synthesised from FACET_DEFAULTS before the
+   * discover response arrived (or when the project has no traces yet).
+   * Used to show a "No values yet" placeholder instead of an empty list.
+   */
+  synthetic?: boolean;
 }
 
 export interface RangeSectionData extends SectionBase {
   kind: "range";
   min: number;
   max: number;
+  /**
+   * True when this descriptor was synthesised from RANGE_DEFAULTS before
+   * discover responded. The range section renders a placeholder caption
+   * instead of an interactive slider so the user knows the filter will
+   * populate once traces arrive.
+   */
+  synthetic?: boolean;
 }
 
 export interface AttributesSectionData extends SectionBase {

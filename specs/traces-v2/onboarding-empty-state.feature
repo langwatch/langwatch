@@ -11,16 +11,6 @@
 # described the old layout have been deleted; the ones below match what
 # `TracesEmptyOnboarding`, `IntegrateDrawer`, `ApiKeyIntegrationInfoCard`,
 # `SampleDataBanner`, and `CelebrationBanner` actually do.
-#
-# AUDIT NOTE (2026-06-09): The journey is now OPT-IN. A never-traced project
-# no longer auto-drops the user into the animated walkthrough — that was too
-# busy for a first landing. It shows the normal centered empty state (the
-# LangWatch mark + a short "no traces yet" message) and offers a "Take the
-# tour" button (only when no search query is active) that launches the
-# journey on demand. The journey internals below (stages, Integrate drawer,
-# sample-data preview, celebration) are unchanged once the tour is launched.
-# Both gate hooks (`useOnboardingActive`, `usePreviewTracesActive`) now key
-# off `tourActive` only, not `firstMessage === false`.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EMPTY STATE DISPLAY
@@ -28,42 +18,24 @@
 
 Feature: Onboarding empty state
 
-Rule: A never-traced project shows the empty state, with the tour opt-in
-  A project that has never received a real trace (`firstMessage` false)
-  shows the normal empty trace table — the centered LangWatch mark with a
-  short "no traces yet" message — NOT the stage-driven journey. The journey
-  is opt-in: the empty state offers a "Take the tour" button (only when
-  there is no active search query) that launches it on demand. This keeps a
-  brand-new, data-less page calm instead of dropping the user straight into
-  a busy animated walkthrough.
+Rule: Onboarding empty state
+  When a project has never received a real trace, the Observe page
+  replaces the trace table with a stage-driven journey that walks the
+  user through what the explorer can do, while keeping the chrome
+  (search bar, filter sidebar, toolbar) on-screen in a dimmed inert
+  state so the layout the user is moving toward stays visible.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project's `firstMessage` flag is false
 
-  @integration
-  Scenario: A never-traced project shows the empty state, not the auto-tour
-    When the Observe page loads with no active search query
-    Then the centered empty state with the LangWatch mark is shown
-    And the onboarding journey is not auto-rendered
-    And a "Take the tour" button is offered
-
-  @integration
-  Scenario: The tour button is hidden while a search query is active
-    Given the project has no traces
-    When the user has typed a search query that matches nothing
-    Then the empty state explains that nothing matches the query
-    And no "Take the tour" button is shown
-
-  @integration
-  Scenario: Taking the tour launches the onboarding journey on demand
-    Given the never-traced project is showing the empty state
-    When the user clicks "Take the tour"
-    Then the onboarding journey is rendered in place of the trace results pane
-    And the sample-data preview becomes active
+  Scenario: Empty state renders when project has never received a trace
+    When the Observe page loads
+    Then the empty-state journey is rendered in place of the trace results pane
+    And the journey starts on the `welcome` stage
 
   Scenario: Page chrome stays visible but inert while the journey is active
-    Given the user has launched the tour
+    When the Observe page loads with zero traces and the journey not dismissed
     Then the search bar is rendered with reduced opacity, `pointer-events: none`, and the `inert` attribute
     And the filter sidebar is rendered with the same dimmed inert treatment
     And focus, hover, and pointer events do not reach the dimmed chrome
@@ -73,11 +45,11 @@ Rule: A never-traced project shows the empty state, with the tour opt-in
     Then the filter sidebar is rendered without the dimmed inert treatment
     And the rest of the chrome (search bar, toolbar) remains dimmed inert
 
-  Scenario: Ending the tour returns to the empty state
+  Scenario: Skip dismisses the empty state for this project
     Given the empty-state journey is visible
-    When the user ends the tour ("Done exploring")
+    When the user clicks "Skip for now" or presses "K"
     Then the journey is hidden for this project (persisted in localStorage)
-    And the centered empty state is shown again with the "Take the tour" button still available
+    And the real trace table is shown
 
 
 # ─────────────────────────────────────────────────────────────────────────────

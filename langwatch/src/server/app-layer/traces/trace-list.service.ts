@@ -4,16 +4,16 @@ import type { TopicService } from "~/server/app-layer/topics/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createLogger } from "~/utils/logger/server";
+import {
+  deriveTraceStatus,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-status";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
 } from "./facet-registry";
-import {
-  deriveTraceStatus,
-  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
-} from "./derive-trace-status";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
 import type {
   BatchedFacetResult,
@@ -289,10 +289,11 @@ const DISCOVER_WINDOW_PRESETS: ReadonlyArray<{
  * requests for the "same" window hit the same slot regardless of which
  * sub-minute timestamp the client computed.
  */
-function snapToWindowPreset(timeRange: {
+function snapToWindowPreset(timeRange: { from: number; to: number }): {
   from: number;
   to: number;
-}): { from: number; to: number; label: string } {
+  label: string;
+} {
   const span = Math.max(0, timeRange.to - timeRange.from);
   const preset =
     DISCOVER_WINDOW_PRESETS.find((p) => span <= p.maxSpanMs) ??
@@ -331,12 +332,33 @@ function discoverCacheKey(
   return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
+/**
+ * Per-value result aggregates carried by the evaluator facet so the
+ * sidebar inline-drilldown can render verdict pills, score-range
+ * sliders, and hasLabel discriminators without firing a second query
+ * per evaluator. Absent on other facets where it's not meaningful.
+ */
+export interface EvaluatorValueAggregates {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+  scoreMin: number | null;
+  scoreMax: number | null;
+  hasScore: boolean;
+  hasLabel: boolean;
+}
+
 interface CategoricalFacetDescriptor {
   key: string;
   kind: "categorical";
   label: string;
   group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topValues: { value: string; label?: string; count: number }[];
+  topValues: {
+    value: string;
+    label?: string;
+    count: number;
+    aggregates?: EvaluatorValueAggregates;
+  }[];
   totalDistinct: number;
 }
 
@@ -754,11 +776,7 @@ export class TraceListService {
                 descriptor = await this.discoverRange(def, params);
                 break;
               case "dynamic_keys":
-                descriptor = await this.discoverDynamicKeys(
-                  def,
-                  params,
-                  TOP_N,
-                );
+                descriptor = await this.discoverDynamicKeys(def, params, TOP_N);
                 break;
             }
             return { kind: "standalone", key: def.key, descriptor };

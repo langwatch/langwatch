@@ -230,11 +230,18 @@ function StatusChip({
 
   const jumpToSpan = useCallback(
     (spanId: string) => {
-      // Land on the span detail tab — `selectSpan` flips activeTab to
-      // "span" internally, so we just ensure trace mode here. The
-      // accordion-side focus-glow observer on SpanAccordions will catch
-      // the follow-up `requestFocus({section: "exceptions"})` fired by
-      // ExceptionsContent and pulse the span's own Exceptions section.
+      // Land on the trace pane with the span selected. `setViewMode`
+      // flips the drawer to the trace-pane layout (PaneLayout); the
+      // SpanDetailPane mounts because `selectedSpanId` is now set, and
+      // the SpanTabBar highlights the selected span. The accordion-side
+      // focus-glow observer on SpanAccordions catches the follow-up
+      // `requestFocus({section: "exceptions"})` fired by
+      // ExceptionsContent and pulses the span's own Exceptions section.
+      //
+      // When the spanTree query is still in flight we'd previously fall
+      // through to the trace summary view; TraceAccordions now renders
+      // a span-shaped skeleton in that window so the jump reads as
+      // "landed, waiting for data" rather than "jump didn't take."
       setViewMode("trace");
       selectSpan(spanId);
     },
@@ -1222,6 +1229,16 @@ export const DrawerHeader = memo(function DrawerHeader({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           hasConversation={!!trace.conversationId}
+          // `useConversationContext` returns `isLoading: true` while the
+          // turns are in flight; combined with `turns.length === 0` it
+          // means the conversation hasn't resolved yet. We only want the
+          // "loading" gate when a conversationId is declared — otherwise
+          // the tab is permanently disabled with a different reason.
+          conversationLoading={
+            !!trace.conversationId &&
+            conversationContext.isLoading &&
+            conversationContext.turns.length === 0
+          }
           traceId={trace.traceId}
           endSlot={
             <HStack gap={2}>

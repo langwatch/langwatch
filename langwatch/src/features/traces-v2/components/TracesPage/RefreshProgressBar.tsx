@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import type React from "react";
+import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { AuroraSvg } from "./AuroraSvg";
 
@@ -14,8 +15,19 @@ interface RefreshProgressBarProps {
 export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   forceVisible,
 }) => {
-  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
-  const active = forceVisible ?? isRefreshing;
+  // Two sources, OR-ed:
+  //  - pulse: short fixed-duration flash for view switches and other
+  //    transitions that don't kick a fetch (uiStore-driven).
+  //  - isFetching: every in-flight tracesV2 list/discover/newCount
+  //    query, tied directly to the React-Query cache. Without this the
+  //    aurora cleared after the 900ms pulse even while a slow project
+  //    was still mid-fetch, which read as "refresh failed silently."
+  const pulsed = useRefreshUIStore((s) => s.isRefreshing);
+  const { isRefreshing: fetching } = useTraceListRefresh();
+  // `??` would let `forceVisible={false}` mask a real in-flight refresh —
+  // the comment above promises OR semantics, so honour them: any truthy
+  // source flips active on.
+  const active = forceVisible || pulsed || fetching;
   if (!active) return null;
 
   return (

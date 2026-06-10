@@ -8,8 +8,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
-import { useTourEntryPoints } from "../../onboarding/hooks/useTourEntryPoints";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -49,25 +47,12 @@ interface EmptyContent {
 function emptyContent({
   activeLensId,
   hasFilters,
-  hasAnyTraces,
   rangeHours,
 }: {
   activeLensId: string;
   hasFilters: boolean;
-  hasAnyTraces: boolean | undefined;
   rangeHours: number;
 }): EmptyContent {
-  // Never-traced project with no active query: the project simply has no
-  // data yet. Lens / time-window copy would mislead here (widening the
-  // window can't surface traces that were never sent), so lead with the
-  // "no traces yet" message and the take-the-tour affordance.
-  if (hasAnyTraces === false && !hasFilters) {
-    return {
-      title: "No traces yet",
-      description:
-        "Send your first trace to start exploring, or take a quick tour to see how the explorer looks with real data.",
-    };
-  }
   if (activeLensId === "errors") {
     return {
       title: "No errors in this range",
@@ -139,64 +124,40 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const activeLensId = useViewStore((s) => s.activeLensId);
   const selectLens = useViewStore((s) => s.selectLens);
-  const { hasAnyTraces } = useProjectHasTraces();
-  const { onLaunchTour } = useTourEntryPoints();
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
-  const content = emptyContent({
-    activeLensId,
-    hasFilters,
-    hasAnyTraces,
-    rangeHours,
-  });
-  // A genuinely-empty project (never received a trace) with no active
-  // query gets a single "Take the tour" CTA instead of the time-window /
-  // lens nudges — those only make sense once data exists somewhere. The
-  // tour is the path to a feel for the product and the setup instructions.
-  const showTourCta = hasAnyTraces === false && !hasFilters;
+  const content = emptyContent({ activeLensId, hasFilters, rangeHours });
 
   const actions: ActionButton[] = [];
-  if (showTourCta) {
+  if (hasFilters) {
+    actions.push({ label: "Clear filters", onClick: clearAll, primary: true });
+  }
+  if (activeLensId !== "all-traces") {
     actions.push({
-      label: "Take the tour",
-      onClick: onLaunchTour,
-      primary: true,
+      label: "All traces",
+      onClick: () => selectLens("all-traces"),
+      primary: !hasFilters,
     });
-  } else {
-    if (hasFilters) {
-      actions.push({
-        label: "Clear filters",
-        onClick: clearAll,
-        primary: true,
-      });
-    }
-    if (activeLensId !== "all-traces") {
-      actions.push({
-        label: "All traces",
-        onClick: () => selectLens("all-traces"),
-        primary: !hasFilters,
-      });
-    }
-    if (rangeHours < 24) {
-      actions.push({
-        label: "Last 24 hours",
-        onClick: () => setTimeRange(rangePreset(1, "Last 24 hours")),
-      });
-      actions.push({
-        label: "Last 7 days",
-        onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-      });
-    } else if (rangeHours < 24 * 7) {
-      actions.push({
-        label: "Last 7 days",
-        onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
-      });
-      actions.push({
-        label: "Last 30 days",
-        onClick: () => setTimeRange(rangePreset(30, "Last 30 days")),
-      });
-    }
+  }
+  if (rangeHours < 24) {
+    actions.push({
+      label: "Last 24 hours",
+      onClick: () => setTimeRange(rangePreset(1, "Last 24 hours")),
+    });
+    actions.push({
+      label: "Last 7 days",
+      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
+    });
+  } else if (rangeHours < 24 * 7) {
+    actions.push({
+      label: "Last 7 days",
+      onClick: () => setTimeRange(rangePreset(7, "Last 7 days")),
+    });
+    actions.push({
+      label: "Last 30 days",
+      onClick: () => setTimeRange(rangePreset(30, "Last 30 days")),
+    });
   }
 
   return (
@@ -205,16 +166,15 @@ export const EmptyFilterState: React.FC = () => {
       justify="center"
       height="full"
       paddingX={6}
-      paddingY={16}
+      paddingY={12}
     >
-      <Stack gap={6} align="center" textAlign="center" maxWidth="440px">
+      <Stack gap={5} align="center" textAlign="center" maxWidth="440px">
         <LangWatchMark />
-
-        <Stack gap={2} align="center">
-          <Heading textStyle="xl" fontWeight="semibold" color="fg">
+        <Stack gap={1.5} align="center">
+          <Heading textStyle="lg" fontWeight="semibold" color="fg">
             {content.title}
           </Heading>
-          <Text textStyle="sm" color="fg.muted" lineHeight="1.7">
+          <Text textStyle="sm" color="fg.muted" lineHeight="1.6">
             {content.description}
           </Text>
         </Stack>

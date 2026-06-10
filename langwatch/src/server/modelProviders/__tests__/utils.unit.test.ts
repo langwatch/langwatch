@@ -46,7 +46,7 @@ describe("getVercelAIModel", () => {
       mockGetProjectModelProviders.mockResolvedValue({});
 
       await expect(
-        getVercelAIModel("project-123", "azure/my-gpt4-deployment"),
+        getVercelAIModel({ projectId: "project-123", model: "azure/my-gpt4-deployment" }),
       ).rejects.toThrow(
         'Model provider "azure" is not configured for this project.',
       );
@@ -58,7 +58,7 @@ describe("getVercelAIModel", () => {
       });
 
       await expect(
-        getVercelAIModel("project-123", "azure/my-gpt4-deployment"),
+        getVercelAIModel({ projectId: "project-123", model: "azure/my-gpt4-deployment" }),
       ).rejects.toThrow(
         'Model provider "azure" is configured but disabled.',
       );
@@ -90,7 +90,7 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        const result = await getVercelAIModel("project-123");
+        const result = await getVercelAIModel({ projectId: "project-123" });
 
         expect(result).toBeDefined();
       });
@@ -111,7 +111,7 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
           /All configured model providers are disabled or have no usable models/,
         );
       });
@@ -121,7 +121,7 @@ describe("getVercelAIModel", () => {
       it("throws error about no providers configured", async () => {
         mockGetProjectModelProviders.mockResolvedValue({});
 
-        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
           "No model providers configured",
         );
       });
@@ -140,7 +140,7 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+        await expect(getVercelAIModel({ projectId: "project-123" })).rejects.toThrow(
           "All configured model providers are disabled",
         );
       });
@@ -167,7 +167,7 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        const result = await getVercelAIModel("project-123");
+        const result = await getVercelAIModel({ projectId: "project-123" });
 
         expect(result).toBeDefined();
       });

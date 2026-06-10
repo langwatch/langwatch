@@ -4,6 +4,15 @@ import { Tooltip } from "~/components/ui/tooltip";
 
 interface TraceDrawerSkeletonProps {
   onClose: () => void;
+  /**
+   * Span count carried over from the table row that opened the drawer.
+   * When known, the accordion body section renders that many skeleton
+   * rows so the panel doesn't reflow once the real spanTree query
+   * resolves. `null` for entry paths that don't have the row in hand
+   * (URL hydration, history back/forward) — the skeleton then falls
+   * back to a small default block.
+   */
+  expectedSpanCount?: number | null;
 }
 
 /**
@@ -12,7 +21,18 @@ interface TraceDrawerSkeletonProps {
  * doesn't reflow the panel when content arrives, and so the close affordance
  * stays clickable while the trace fetches.
  */
-export function TraceDrawerSkeleton({ onClose }: TraceDrawerSkeletonProps) {
+// Visible-span budget for the skeleton body. Most operators won't scroll
+// past ~30 rows during a load; rendering more is wasted layout work.
+const MAX_SKELETON_SPAN_ROWS = 30;
+// Approximate height of a single span row in the accordion when fully
+// rendered. Matches the SpanAccordions row height at the comfortable
+// density — close enough that the post-load swap reads as silent.
+const SPAN_SKELETON_ROW_PX = 36;
+
+export function TraceDrawerSkeleton({
+  onClose,
+  expectedSpanCount,
+}: TraceDrawerSkeletonProps) {
   return (
     // Solid surface bg — `Drawer.Content` is transparent (so the real
     // header below can run a backdrop-blur fill against the page),
@@ -124,13 +144,38 @@ export function TraceDrawerSkeleton({ onClose }: TraceDrawerSkeletonProps) {
 
       <Box borderBottomWidth="1px" borderColor="border" />
 
-      {/* Accordion / panel body. */}
+      {/* Accordion / panel body. When we know the row's span count (from
+          the trace summary projection on the table row that triggered
+          the drawer) we render that many skeleton "span" rows so the
+          panel's height matches what the live spanTree will eventually
+          fill. Falls back to a small placeholder block when the count
+          isn't available (URL hydration, history navigation). */}
       <VStack align="stretch" gap={2} padding={4}>
-        <Skeleton height="44px" borderRadius="md" />
-        <Skeleton height="120px" borderRadius="md" />
-        <Skeleton height="44px" borderRadius="md" />
-        <Skeleton height="80px" borderRadius="md" />
-        <Skeleton height="44px" borderRadius="md" />
+        {expectedSpanCount && expectedSpanCount > 0 ? (
+          <>
+            {/* Section header skeletons (Spans / Events / Evals). */}
+            <Skeleton height="44px" borderRadius="md" />
+            {/* Span rows — one per span, capped at MAX_SKELETON_SPAN_ROWS
+                so a 1000-span trace doesn't render a 36 000 px column. */}
+            {Array.from({
+              length: Math.min(expectedSpanCount, MAX_SKELETON_SPAN_ROWS),
+            }).map((_, i) => (
+              <Skeleton
+                key={`span-${i}`}
+                height={`${SPAN_SKELETON_ROW_PX}px`}
+                borderRadius="sm"
+              />
+            ))}
+          </>
+        ) : (
+          <>
+            <Skeleton height="44px" borderRadius="md" />
+            <Skeleton height="120px" borderRadius="md" />
+            <Skeleton height="44px" borderRadius="md" />
+            <Skeleton height="80px" borderRadius="md" />
+            <Skeleton height="44px" borderRadius="md" />
+          </>
+        )}
       </VStack>
     </VStack>
   );

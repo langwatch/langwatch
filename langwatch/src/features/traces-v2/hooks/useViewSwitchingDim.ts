@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFilterStore } from "../stores/filterStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
+import { useDensityStore } from "../stores/densityStore";
 import { useViewStore } from "../stores/viewStore";
 
 interface DimInputs {
@@ -34,6 +35,7 @@ export function useViewSwitchingDim({
   const sortColumnId = useViewStore((s) => s.sort.columnId);
   const sortDirection = useViewStore((s) => s.sort.direction);
   const activeLensId = useViewStore((s) => s.activeLensId);
+  const density = useDensityStore((s) => s.density);
 
   const pulse = useRefreshUIStore((s) => s.pulse);
   const setReplacingData = useRefreshUIStore((s) => s.setReplacingData);
@@ -50,6 +52,7 @@ export function useViewSwitchingDim({
     sortColumnId,
     sortDirection,
     activeLensId,
+    density,
   });
 
   const [viewSwitching, setViewSwitching] = useState(false);
@@ -65,6 +68,7 @@ export function useViewSwitchingDim({
       sortColumnId,
       sortDirection,
       activeLensId,
+      density,
     };
     const prev = prevRef.current;
     const changed =
@@ -76,7 +80,8 @@ export function useViewSwitchingDim({
       prev.pageSize !== next.pageSize ||
       prev.sortColumnId !== next.sortColumnId ||
       prev.sortDirection !== next.sortDirection ||
-      prev.activeLensId !== next.activeLensId;
+      prev.activeLensId !== next.activeLensId ||
+      prev.density !== next.density;
 
     if (changed) {
       prevRef.current = next;
@@ -92,6 +97,7 @@ export function useViewSwitchingDim({
     sortColumnId,
     sortDirection,
     activeLensId,
+    density,
   ]);
 
   useEffect(() => {
@@ -101,8 +107,8 @@ export function useViewSwitchingDim({
   }, [viewSwitching, isFetching, isFetched]);
 
   useEffect(() => {
-    setReplacingData(viewSwitching && isPreviousData);
-  }, [viewSwitching, isPreviousData, setReplacingData]);
+    setReplacingData(viewSwitching && (isPreviousData || isFetching));
+  }, [viewSwitching, isPreviousData, isFetching, setReplacingData]);
 
   // Publish refresh state via the freshness store's pulse action so the
   // aurora bar + LiveIndicator spinner show every time the query updates.

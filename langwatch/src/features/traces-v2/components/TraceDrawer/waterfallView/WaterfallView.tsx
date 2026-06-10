@@ -7,6 +7,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useDrawerStore } from "../../../stores/drawerStore";
+import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
@@ -90,6 +91,37 @@ export const WaterfallView = memo(function WaterfallView({
     () => flattenTree(tree, collapsedIds, expandedGroups),
     [tree, collapsedIds, expandedGroups],
   );
+
+  // When SSE delivers a new span for the trace currently in the drawer,
+  // the waterfall used to wash itself with an Aurora gradient — which
+  // forced a layout cascade through the virtualizer every time. Now we
+  // identify which span IDs are genuinely new since the last render and
+  // fire a per-row pulse for each, leaving the visible viewport stable.
+  // Trace switches reset the baseline so opening a different trace does
+  // not pulse every existing row. The root span's id is stable within a
+  // trace and unique across traces, so it doubles as the trace-identity
+  // marker here (SpanTreeNode doesn't carry the traceId field).
+  const prevSpanIdsRef = useRef<Set<string> | null>(null);
+  const prevRootSpanIdRef = useRef<string | null>(null);
+  const currentRootSpanId = spans[0]?.spanId ?? null;
+  useEffect(() => {
+    const currentIds = new Set(spans.map((s) => s.spanId));
+    if (prevRootSpanIdRef.current !== currentRootSpanId) {
+      prevRootSpanIdRef.current = currentRootSpanId;
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    if (prevSpanIdsRef.current === null) {
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    const prev = prevSpanIdsRef.current;
+    const pulse = useSpanPulseStore.getState().pulse;
+    for (const id of currentIds) {
+      if (!prev.has(id)) pulse(id);
+    }
+    prevSpanIdsRef.current = currentIds;
+  }, [spans, currentRootSpanId]);
   const { rootStart, rootDuration } = useMemo(
     () => getTraceRange(filteredSpans),
     [filteredSpans],

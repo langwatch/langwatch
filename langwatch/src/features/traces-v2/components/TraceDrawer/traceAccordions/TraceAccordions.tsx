@@ -1,3 +1,4 @@
+import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import type {
   SpanTreeNode,
@@ -12,6 +13,17 @@ interface TraceAccordionsProps {
   spans: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
   activeTab: "summary" | "span";
+  /**
+   * Set on the span-detail mount when the user has asked for a span
+   * (via the row's drawer, the error popover's "Open span", the URL,
+   * etc.) but the span tree hasn't resolved yet. Drives the
+   * `activeTab === "span"` fallback below: when set, we render a
+   * lightweight skeleton instead of dropping back to the trace summary,
+   * because falling back was reading as "the open-span jump didn't
+   * work" the moment the spanTree query was even slightly slow.
+   */
+  selectedSpanId?: string | null;
+  isSpansLoading?: boolean;
   onSelectSpan?: (spanId: string) => void;
 }
 
@@ -20,6 +32,8 @@ export const TraceAccordions = memo(function TraceAccordions({
   spans,
   selectedSpan,
   activeTab,
+  selectedSpanId,
+  isSpansLoading,
   onSelectSpan,
 }: TraceAccordionsProps) {
   useSyncSectionPresence({ traceId: trace.traceId, tab: activeTab });
@@ -36,6 +50,28 @@ export const TraceAccordions = memo(function TraceAccordions({
         span={selectedSpan}
         onSelectSpan={onSelectSpan}
       />
+    );
+  }
+  // Span tab + an id we haven't resolved yet + tree is still loading →
+  // render a skeleton instead of falling through to the trace summary.
+  // Without this branch, clicking "Open span" on a trace whose spans
+  // were mid-fetch landed the operator on the trace summary view, which
+  // read like the jump hadn't taken effect. Once the tree resolves but
+  // the spanId isn't in it (deleted span, stale link), we DO fall
+  // through to the summary — the operator gets a graceful "couldn't
+  // find that span" landing rather than an indefinite skeleton.
+  if (activeTab === "span" && selectedSpanId && isSpansLoading) {
+    return (
+      <Box padding={4}>
+        <VStack align="stretch" gap={2}>
+          <Skeleton height="20px" width="40%" borderRadius="sm" />
+          <Skeleton height="14px" width="65%" borderRadius="sm" />
+          <Skeleton height="14px" width="55%" borderRadius="sm" />
+          <Skeleton height="120px" borderRadius="md" />
+          <Skeleton height="36px" borderRadius="md" />
+          <Skeleton height="36px" borderRadius="md" />
+        </VStack>
+      </Box>
     );
   }
   return (

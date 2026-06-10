@@ -1,11 +1,15 @@
 import { create } from "zustand";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation";
-// Flame + spanlist were retired during the trace-view redesign; see
-// VizPlaceholder.TABS for the rationale. URL params from before the
-// redesign that point at the removed values fall back to "waterfall"
-// via the isVizTab guard below.
-export type VizTab = "waterfall" | "topology" | "sequence";
+// Flame was retired during the trace-view redesign on the grounds that
+// Waterfall already showed depth/parent/child — then brought back in
+// Round 3 because the time-weighted block layout reads completely
+// differently from the indented-row waterfall when scanning *where*
+// time is spent (the waterfall makes parent/child easy; flame makes
+// hot paths obvious). Span list stays retired — it didn't add a new
+// data axis, just filter chrome over the same rows. URL params
+// pointing at "spanlist" fall back to "waterfall" via isVizTab.
+export type VizTab = "waterfall" | "topology" | "sequence" | "flame";
 // "summary" / "llm" / "prompts" were removed from the SpanTabBar in the
 // redesign — Summary is now its own DrawerViewMode, and LLM / prompts
 // content is auto-selected based on the span's kind inside SpanDetailPane.
@@ -101,6 +105,15 @@ interface DrawerState extends DrawerUrlState {
    * queries as a partition-pruning hint on `stored_spans`.
    */
   occurredAtMs: number | null;
+  /**
+   * Span count carried over from the table row that opened the drawer
+   * — used by `TraceDrawerSkeleton` to render an accurate-height
+   * placeholder while the real spanTree query is in flight, so the
+   * drawer body doesn't reflow when the data lands. `null` for entry
+   * paths (URL hydration, history navigation) that don't have the row
+   * in hand — the skeleton falls back to its default size in that case.
+   */
+  expectedSpanCount: number | null;
   pinnedSpanIds: string[];
 
   eventsExpanded: boolean;
@@ -109,7 +122,11 @@ interface DrawerState extends DrawerUrlState {
 
   traceBackStack: TraceHistoryEntry[];
 
-  openTrace: (traceId: string, occurredAtMs?: number | null) => void;
+  openTrace: (
+    traceId: string,
+    occurredAtMs?: number | null,
+    expectedSpanCount?: number | null,
+  ) => void;
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
@@ -174,10 +191,16 @@ function isViewMode(value: string | null): value is DrawerViewMode {
 }
 
 function isVizTab(value: string | null): value is VizTab {
-  // "flame" and "spanlist" used to be valid here; URLs from before the
-  // redesign carrying those values just fall through to the default
-  // (waterfall) when the guard returns false.
-  return value === "waterfall" || value === "topology" || value === "sequence";
+  // "spanlist" used to be valid here; URLs from before the redesign
+  // carrying that value fall through to the default (waterfall) when
+  // the guard returns false. "flame" was retired in the redesign and
+  // revived in Round 3 — it's valid again.
+  return (
+    value === "waterfall" ||
+    value === "topology" ||
+    value === "sequence" ||
+    value === "flame"
+  );
 }
 
 // `isDrawerTab` retired alongside `activeTab` — the SpanDetailPane body
@@ -458,6 +481,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   occurredAtMs: initial.occurredAtMs,
+  expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
   viewMode: initial.viewMode,
   vizTab: initial.vizTab,
@@ -468,11 +492,12 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs) =>
+  openTrace: (traceId, occurredAtMs, expectedSpanCount) =>
     set({
       isOpen: true,
       traceId,
       occurredAtMs: occurredAtMs ?? null,
+      expectedSpanCount: expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
     }),
@@ -484,6 +509,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       shortcutsOpen: false,
       traceId: null,
       occurredAtMs: null,
+      expectedSpanCount: null,
       selectedSpanId: null,
       pinnedSpanIds: [],
       traceBackStack: [],

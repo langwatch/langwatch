@@ -1,26 +1,31 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useOnboardingStore } from "../store/onboardingStore";
 
 /**
  * "Is the onboarding overlay rendering right now?".
  *
- * The journey is OPT-IN: it shows iff the user has explicitly launched
- * the tour (`tourActive`), not automatically for new projects. A
- * never-traced project shows the normal centered empty state with a
- * "Take the tour" button instead — auto-dropping a first-time visitor
- * into the animated walkthrough was too busy.
+ * Three inputs combine into one boolean so consumers (TracesPage chrome
+ * dim, sidebar visibility forks) don't have to know how onboarding
+ * activation is decided:
  *
- *   - `setupDismissed` — per-project, persisted. Ending the tour flips
- *     this true; relaunching flips it back. Always wins.
- *   - `tourActive` — flipped true by the "Take the tour" button (empty
- *     state or toolbar) and false when the tour ends.
+ *   - `setupDismissed` — per-project, persisted. Clicking Done /
+ *     Skip flips this true; the toolbar's Resume button flips it
+ *     back. Always wins — once you're out, you're out.
+ *   - `hasAnyTraces === false` — auto-fire for genuinely new
+ *     projects (firstMessage flag is false on the project model).
+ *   - `tourActive` — explicit override flipped by the toolbar Tour
+ *     button so existing customers can opt into the demo even with
+ *     real data in their table.
  *
- * The journey shows iff `!setupDismissed && tourActive`. Any decoration
- * component that mounts onboarding UI should gate on this hook so we
- * don't add DOM nodes for users who aren't seeing the journey.
+ * The journey shows iff `!setupDismissed && (hasAnyTraces === false ||
+ * tourActive)`. Any decoration component that mounts onboarding UI
+ * should gate on this hook so we don't add DOM nodes for users who
+ * aren't seeing the journey.
  */
 export function useOnboardingActive(): boolean {
   const { project } = useOrganizationTeamProject();
+  const { hasAnyTraces } = useProjectHasTraces();
   const setupDismissedByProject = useOnboardingStore(
     (s) => s.setupDismissedByProject,
   );
@@ -28,5 +33,5 @@ export function useOnboardingActive(): boolean {
 
   if (!project) return false;
   if (setupDismissedByProject[project.id]) return false;
-  return tourActive;
+  return hasAnyTraces === false || tourActive;
 }

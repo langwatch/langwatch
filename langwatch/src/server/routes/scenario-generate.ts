@@ -110,7 +110,7 @@ secured.access(
   }
 
   try {
-    const model = await getVercelAIModel(projectId, undefined, "scenarios.generator");
+    const model = await getVercelAIModel({ projectId, featureKey: "scenarios.generator" });
 
     const userPrompt = currentScenario
       ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`

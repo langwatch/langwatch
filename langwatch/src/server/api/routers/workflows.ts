@@ -1081,7 +1081,7 @@ export const workflowRouter = createTRPCRouter({
         });
       }
       const commitMessage = await wrapAiCall(commitFeature, async () => generateText({
-        model: await getVercelAIModel(input.projectId, undefined, "workflows.commit_message"),
+        model: await getVercelAIModel({ projectId: input.projectId, featureKey: "workflows.commit_message" }),
         providerOptions: {
           openai: {
             reasoningEffort: "low",
