@@ -80,7 +80,10 @@ vi.mock("~/utils/api", () => ({
       },
       createOrUpdate: {
         useMutation: () => ({
-          mutate: (data: unknown, options: { onError?: (error: unknown) => void }) => {
+          mutate: (
+            data: unknown,
+            options: { onError?: (error: unknown) => void },
+          ) => {
             mockCreateOrUpdateMutate(data, options);
 
             if (mockMutationError.current) {
@@ -127,10 +130,7 @@ const Wrapper = ({ children }: { children?: ReactNode }) => (
 );
 
 function renderDrawer(props: { id?: string; cloneModel?: string } = {}) {
-  return render(
-    <LLMModelCostDrawer {...props} />,
-    { wrapper: Wrapper },
-  );
+  return render(<LLMModelCostDrawer {...props} />, { wrapper: Wrapper });
 }
 
 async function submitStoredModelCost() {

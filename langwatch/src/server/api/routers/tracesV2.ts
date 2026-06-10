@@ -1014,7 +1014,7 @@ export const tracesV2Router = createTRPCRouter({
         }
       }
 
-      // Token usage with no price on it — offer the user a cost mapping.
+      // Token usage with no price on it, offer the user a cost mapping.
       // The cheap guards run first; the rule lookup only fires for spans
       // that actually present the unmapped-cost symptom.
       detail.costSuggestion = await deriveUnmappedCostSuggestion({

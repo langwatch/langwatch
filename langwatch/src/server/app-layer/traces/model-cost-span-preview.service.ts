@@ -69,8 +69,8 @@ export interface CostRuleMatchingSpansPreview {
  * Previews which of the project's recently-seen models (and sample spans) a
  * model cost rule's regex would match.
  *
- * Matching deliberately runs through `matchModelCostWithFallbacks` — the
- * exact function the ingestion pipeline uses — so the preview can never
+ * Matching deliberately runs through `matchModelCostWithFallbacks`, the
+ * exact function the ingestion pipeline uses, so the preview can never
  * disagree with what the rule will actually do (vendor-prefix stripping,
  * Bedrock id normalization, lowercase fallback and all).
  */

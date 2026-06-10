@@ -134,7 +134,7 @@ const regexCache = new Map<string, RegExp | null>();
 
 /**
  * The cost-rule preview feeds user keystrokes through the matcher, so the
- * pattern space is unbounded — reset the cache when it grows past any
+ * pattern space is unbounded, reset the cache when it grows past any
  * plausible working set instead of leaking entries forever.
  */
 const REGEX_CACHE_MAX_ENTRIES = 5_000;

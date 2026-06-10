@@ -196,7 +196,7 @@ export const spanDetailSchema = z.object({
   ),
   /**
    * Present when the span names a model and carries token usage but nothing
-   * (custom rule or static registry) prices it — the UI offers to create a
+   * (custom rule or static registry) prices it, the UI offers to create a
    * model cost mapping for `model`. Only computed by `spanDetail`.
    */
   costSuggestion: z.object({ model: z.string() }).nullish(),

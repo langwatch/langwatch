@@ -29,7 +29,7 @@ export interface MatchingSpansPreviewInput {
 
 /**
  * Deep link that opens the traces explorer with the trace drawer already on
- * this span — the same `drawer.*` params the drawer serializes itself.
+ * this span, the same `drawer.*` params the drawer serializes itself.
  */
 function traceDrawerUrl(
   projectSlug: string,
@@ -244,7 +244,7 @@ export function LLMModelCostMatchingSpans({
               {data.unmatchedModels.length > 0 ? (
                 <>
                   <Text textStyle="xs" color="fg.muted">
-                    Models seen in this project that do not match — click one to
+                    Models seen in this project that do not match, click one to
                     fill the regex:
                   </Text>
                   <Box>

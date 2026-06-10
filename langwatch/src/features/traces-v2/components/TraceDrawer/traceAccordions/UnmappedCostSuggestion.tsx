@@ -5,7 +5,7 @@ import { exactModelMatchRegex } from "~/utils/modelCostRegex";
 /**
  * Deep link to the model costs settings page (project context comes from
  * the session, not the path) with the cost drawer already open and
- * prefilled — `drawer.*` params are how `CurrentDrawer` hydrates drawer
+ * prefilled, `drawer.*` params are how `CurrentDrawer` hydrates drawer
  * props from the URL.
  */
 export function modelCostMappingUrl(model: string): string {

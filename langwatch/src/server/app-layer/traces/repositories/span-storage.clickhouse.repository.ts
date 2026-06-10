@@ -174,7 +174,7 @@ const SUMMARY_SPAN_SELECT = `
 `;
 
 /**
- * Canonical model-name expression — response model wins over request model,
+ * Canonical model-name expression, response model wins over request model,
  * mirroring `extractModel` in span.mapper.ts so the cost-rule preview sees
  * the same model string the cost pipeline matches against. Map subscripts
  * return '' for missing keys, hence the nullIf/coalesce dance.
@@ -216,7 +216,7 @@ function mapModelSpanSampleRow(
     spanId: row.SpanId,
     spanName: row.SpanName,
     model: row.Model,
-    // Canonical key first, legacy alias as fallback — same coalesce order
+    // Canonical key first, legacy alias as fallback, same coalesce order
     // as extractMetrics in span.mapper.ts.
     inputTokens: tokenCount(row.InputTokensRaw, row.PromptTokensRaw),
     outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
@@ -1564,7 +1564,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
     const client = await this.resolveClient(tenantId);
     // Cross-trace scan bounded by the StartTime window (partition pruning)
-    // and reading only two Map subscripts — no heavy attribute values.
+    // and reading only two Map subscripts, no heavy attribute values.
     // `uniq` (approximate) instead of count() so ReplacingMergeTree row
     // versions don't inflate the per-model span counts.
     const result = await client.query({
@@ -1619,8 +1619,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const client = await this.resolveClient(tenantId);
     // Light columns only (scalars + token Map subscripts), grouped by span
     // with argMax so ReplacingMergeTree versions dedup to the latest row.
-    // Spans carrying token usage sort first — a token-less span makes a
-    // poor cost example — then recency. `LIMIT BY` keeps one chatty model
+    // Spans carrying token usage sort first, a token-less span makes a
+    // poor cost example, then recency. `LIMIT BY` keeps one chatty model
     // from crowding out the rest of the sample.
     const result = await client.query({
       query: `

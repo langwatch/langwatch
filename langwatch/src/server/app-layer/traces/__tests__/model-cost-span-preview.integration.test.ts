@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Model cost rule preview + unmapped-cost suggestion, against a real
- * ClickHouse (span storage) and real Postgres (custom cost rules). No mocks —
+ * ClickHouse (span storage) and real Postgres (custom cost rules). No mocks,
  * the whole point of the preview is parity with the production matching
  * pipeline, so the tests drive the same repository, service, and matching
  * functions production uses.
@@ -146,7 +146,7 @@ beforeAll(async () => {
           "gen_ai.response.model": `response-model-${ns}`,
         },
       }),
-      // Outside the preview window — must never appear.
+      // Outside the preview window, must never appear.
       makeSpanRow({
         tenant: tenantId,
         traceId: `trace-old-${ns}`,
@@ -157,7 +157,7 @@ beforeAll(async () => {
           "gen_ai.usage.input_tokens": "10",
         },
       }),
-      // Another tenant's span — must never leak into the preview.
+      // Another tenant's span, must never leak into the preview.
       makeSpanRow({
         tenant: otherTenantId,
         traceId: `trace-foreign-${ns}`,
@@ -245,7 +245,7 @@ describe("previewCostRuleMatchingSpans", () => {
   describe("when the regex relies on the pipeline's matching fallbacks", () => {
     it("matches a raw Bedrock inference-profile id through Bedrock normalization", async () => {
       // `eu.anthropic.claude-sonnet-4-6-v1:0` normalizes to
-      // `anthropic/claude-sonnet-4-6` before matching — same as ingestion.
+      // `anthropic/claude-sonnet-4-6` before matching, same as ingestion.
       const preview = await previewCostRuleMatchingSpans(spans, {
         projectId: tenantId,
         regex: "anthropic/claude-sonnet-4-6",
@@ -347,7 +347,7 @@ describe("unmapped cost suggestion + scope-cascade rule resolution", () => {
         apiKey: `key-${projectId}`,
       },
     });
-    // Organization-scoped rule (legacy projectId column stays null) — the
+    // Organization-scoped rule (legacy projectId column stays null), the
     // shape that used to be invisible to ingestion enrichment.
     await prisma.customLLMModelCost.create({
       data: {

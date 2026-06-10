@@ -10,6 +10,19 @@ const COMMIT_DEBOUNCE_MS = 150;
 /** Snap to "cleared" when both endpoints are within this fraction of the full range. */
 const CLEAR_EPSILON = 0.01;
 
+/**
+ * Slider step sized to the range span. The default step of 1 makes a
+ * sub-unit range unusable, a cost facet spanning $0…$0.0139 only lets the
+ * thumbs snap to the two endpoints, so no intermediate filter can be set by
+ * dragging. Integer-scale spans keep step 1 so token/duration sliders snap
+ * to whole units; smaller spans get a fine fraction of the range. Exported
+ * for unit testing.
+ */
+export function sliderStepForSpan(span: number): number {
+  if (!Number.isFinite(span) || span <= 0) return 1;
+  return span >= 100 ? 1 : span / 100;
+}
+
 /** Strip currency / unit suffixes so users can paste back the formatted
  * label and still get a parseable number. "1.5s" → 1.5, "$0.05" → 0.05,
  * "12,300" → 12300. Returns null for anything that doesn't yield a
@@ -178,11 +191,7 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
       hasActive={isActive}
       activeIndicator={
         summary ? (
-          <Text
-            textStyle="2xs"
-            color="blue.fg"
-            fontWeight="500"
-          >
+          <Text textStyle="2xs" color="blue.fg" fontWeight="500">
             {summary}
           </Text>
         ) : undefined
@@ -206,68 +215,69 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
           </Box>
         ) : null}
         {!synthetic || max > 0 ? (
-        <>
-        {/*
-         * A SimpleSlider with `min === max` (or any non-positive span)
-         * trips zag-js's invariants and throws synchronously, which has
-         * been masking real errors during empty-state mounts. Skip the
-         * slider in that degenerate case.
-         *
-         * When every visible trace shares the same value (e.g. all
-         * traces have `totalTokens = 512`) the range can't narrow
-         * anything. Render a disabled-looking slider with both thumbs
-         * collapsed at the value plus a hover tooltip explaining why
-         * — visually consistent with the interactive case, just
-         * inert. Rare in practice (mostly sample-data territory) so
-         * it doesn't deserve its own special-case empty-state copy.
-         */}
-        {max > min ? (
           <>
-            <SimpleSlider
-              size="sm"
-              min={min}
-              max={max}
-              value={localValue}
-              onValueChange={(d) => {
-                // Drop frames that would inject NaN into local state —
-                // zag-js can momentarily emit `undefined` on degenerate
-                // ranges (rapid resize, value === min === max). Falling
-                // back to the previous local value keeps the slider
-                // visually stable instead of glitching to "0".
-                const lo = d.value[0];
-                const hi = d.value[1];
-                if (lo === undefined || hi === undefined) return;
-                setLocalValue([lo, hi]);
-              }}
-              onValueChangeEnd={handleChangeEnd}
-              colorPalette={isActive ? "blue" : "gray"}
-            />
+            {/*
+             * A SimpleSlider with `min === max` (or any non-positive span)
+             * trips zag-js's invariants and throws synchronously, which has
+             * been masking real errors during empty-state mounts. Skip the
+             * slider in that degenerate case.
+             *
+             * When every visible trace shares the same value (e.g. all
+             * traces have `totalTokens = 512`) the range can't narrow
+             * anything. Render a disabled-looking slider with both thumbs
+             * collapsed at the value plus a hover tooltip explaining why
+             * — visually consistent with the interactive case, just
+             * inert. Rare in practice (mostly sample-data territory) so
+             * it doesn't deserve its own special-case empty-state copy.
+             */}
+            {max > min ? (
+              <>
+                <SimpleSlider
+                  size="sm"
+                  min={min}
+                  max={max}
+                  step={sliderStepForSpan(max - min)}
+                  value={localValue}
+                  onValueChange={(d) => {
+                    // Drop frames that would inject NaN into local state —
+                    // zag-js can momentarily emit `undefined` on degenerate
+                    // ranges (rapid resize, value === min === max). Falling
+                    // back to the previous local value keeps the slider
+                    // visually stable instead of glitching to "0".
+                    const lo = d.value[0];
+                    const hi = d.value[1];
+                    if (lo === undefined || hi === undefined) return;
+                    setLocalValue([lo, hi]);
+                  }}
+                  onValueChangeEnd={handleChangeEnd}
+                  colorPalette={isActive ? "blue" : "gray"}
+                />
 
-            <HStack justify="space-between" gap={2}>
-              <RangeEndpointInput
-                value={localValue[0]}
+                <HStack justify="space-between" gap={2}>
+                  <RangeEndpointInput
+                    value={localValue[0]}
+                    format={formatValue}
+                    ariaLabel={`${title} minimum`}
+                    onCommit={(n) => commitImmediate(n, localValue[1])}
+                  />
+                  <RangeEndpointInput
+                    value={localValue[1]}
+                    format={formatValue}
+                    ariaLabel={`${title} maximum`}
+                    align="right"
+                    onCommit={(n) => commitImmediate(localValue[0], n)}
+                  />
+                </HStack>
+              </>
+            ) : (
+              <DisabledRangeVisual
+                value={min}
                 format={formatValue}
-                ariaLabel={`${title} minimum`}
-                onCommit={(n) => commitImmediate(n, localValue[1])}
+                isActive={isActive}
+                onClear={onClear}
               />
-              <RangeEndpointInput
-                value={localValue[1]}
-                format={formatValue}
-                ariaLabel={`${title} maximum`}
-                align="right"
-                onCommit={(n) => commitImmediate(localValue[0], n)}
-              />
-            </HStack>
+            )}
           </>
-        ) : (
-          <DisabledRangeVisual
-            value={min}
-            format={formatValue}
-            isActive={isActive}
-            onClear={onClear}
-          />
-        )}
-        </>
         ) : null}
       </VStack>
     </SidebarSection>

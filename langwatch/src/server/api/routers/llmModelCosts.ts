@@ -191,7 +191,7 @@ export const llmModelCostsRouter = createTRPCRouter({
   /**
    * Live preview for the cost rule drawer: which recently-seen models (and
    * sample spans) would this regex match, and what would those spans cost at
-   * the rates being edited. Gated on traces:view — the response exposes span
+   * the rates being edited. Gated on traces:view, the response exposes span
    * metadata (model names, token counts, trace ids), not cost-rule config.
    */
   previewMatchingSpans: protectedProcedure

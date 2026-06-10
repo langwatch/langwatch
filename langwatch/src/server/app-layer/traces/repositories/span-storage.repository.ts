@@ -91,7 +91,7 @@ export interface OccurredAtHint {
 }
 
 /**
- * Per-model usage rollup over a recent window — feeds the model cost rule
+ * Per-model usage rollup over a recent window, feeds the model cost rule
  * preview ("which models would this regex match, and how much traffic do
  * they carry").
  */
@@ -218,7 +218,7 @@ export interface SpanStorageRepository {
   ): Promise<Span[]>;
   /**
    * Distinct model names seen on the tenant's spans since `fromMs`, with
-   * span counts, ordered by traffic. Cross-trace by design (no traceId) —
+   * span counts, ordered by traffic. Cross-trace by design (no traceId),
    * the model cost rule preview needs the project-wide model inventory.
    */
   findModelUsageStats(params: {
