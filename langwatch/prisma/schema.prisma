@@ -1170,6 +1170,40 @@ model RetentionPolicy {
   @@index([scopeType, scopeId])
 }
 
+enum DataPrivacyScopeType {
+  ORGANIZATION
+  DEPARTMENT
+  TEAM
+  PROJECT
+}
+
+// A data-privacy rule for one scope (ADR-021): single-scope-per-row, identified
+// inline by (scopeType, scopeId, personalOnly), anchored to one owning
+// organization. `config` is a DataPrivacyConfig JSON blob (see
+// src/server/data-privacy/dataPrivacy.types.ts) covering content disposition per
+// category (capture / restrict / drop), the restrict audience, the PII level,
+// secrets redaction, and extra attribute keys to drop. Resolution cascades
+// PROJECT -> DEPARTMENT -> TEAM -> ORGANIZATION per field; unset fields inherit
+// and list fields (custom drop-keys, custom secret patterns) union down the
+// chain. `personalOnly` narrows an ORGANIZATION or DEPARTMENT rule to personal
+// (per-user) projects; for those the department is resolved through the project
+// owner. With no rule anywhere, platform defaults apply (content captured and
+// visible to the team, essential PII, secrets redacted).
+model DataPrivacyPolicy {
+  id             String               @id @default(nanoid())
+  organizationId String
+  scopeType      DataPrivacyScopeType
+  scopeId        String
+  personalOnly   Boolean              @default(false)
+  config         Json
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId, personalOnly])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM
