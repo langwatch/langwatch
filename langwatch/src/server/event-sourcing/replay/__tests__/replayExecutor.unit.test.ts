@@ -501,6 +501,59 @@ describe("MapAccumulator", () => {
     });
   });
 
+  describe("when buffered records reach the configured writeBatchSize", () => {
+    it("flushes full chunks via bulkAppend during apply, before flush() is called", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
+
+      await acc.apply(makeEvent({ data: { value: 1 } }));
+      expect(bulkAppendSpy).not.toHaveBeenCalled();
+
+      await acc.apply(makeEvent({ data: { value: 2 } }));
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
+
+      await acc.apply(makeEvent({ data: { value: 3 } }));
+      await acc.apply(makeEvent({ data: { value: 4 } }));
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      await acc.apply(makeEvent({ data: { value: 5 } }));
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+      const allRecords = bulkAppendSpy.mock.calls.flatMap(
+        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
+      );
+      expect(allRecords).toEqual([
+        { doubled: 2 },
+        { doubled: 4 },
+        { doubled: 6 },
+        { doubled: 8 },
+        { doubled: 10 },
+      ]);
+
+      // A second flush must not re-write already-flushed records.
+      await acc.flush();
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("keeps per-aggregate context grouping on incremental writes", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
+
+      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+
+      // Incremental write fired: one call per aggregate, each with its context.
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
+        [Array<{ doubled: number }>, { aggregateId: string }]
+      >) {
+        expect(records).toHaveLength(1);
+        expect(["agg-A", "agg-B"]).toContain(context.aggregateId);
+      }
+    });
+  });
+
   describe("when no events are applied", () => {
     it("skips store on flush", async () => {
       const { projection, bulkAppendSpy, appendSpy } = createTestMapProjection();

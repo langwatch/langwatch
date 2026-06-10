@@ -3,6 +3,7 @@ import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 
 export function ReplayStatusBanner() {
   const router = useRouter();
@@ -16,6 +17,10 @@ export function ReplayStatusBanner() {
   // Only show banner while actively running
   if (!status || status.state !== "running") return null;
 
+  const activeProjectionNames = parseActiveProjections(
+    status.currentProjection,
+  );
+
   return (
     <Card.Root borderColor="blue.200" borderWidth="1px">
       <Card.Body padding={4}>
@@ -27,11 +32,11 @@ export function ReplayStatusBanner() {
             <Text textStyle="sm" fontWeight="semibold">
               Replay running
             </Text>
-            {status.currentProjection && (
+            {activeProjectionNames.length > 0 && (
               <Badge size="sm" variant="subtle">
-                {status.currentProjection.includes("+")
-                  ? `${status.currentProjection.split("+").length} projections`
-                  : status.currentProjection}
+                {activeProjectionNames.length === 1
+                  ? activeProjectionNames[0]
+                  : `${activeProjectionNames.length} projections`}
               </Badge>
             )}
           </HStack>
