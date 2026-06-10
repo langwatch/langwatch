@@ -5,14 +5,21 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
   assistant reply never reach the wire. Codex DOES persist the full transcript
   to disk at ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sessionid>.jsonl, and
   each turn's `task_started` event records the very OTLP trace_id codex used for
-  that turn's spans. After a wrapped `langwatch codex` session exits, the
-  wrapper replays the rollout (the running conversation state) into an
-  accumulating chat history and, for each turn, emits one OTLP span on codex's
-  own trace_id carrying the full request body as a langwatch chat_messages
-  envelope (system prompt + every prior message + the current prompt + tool
-  calls) plus the assistant's final reply. The span joins the existing
-  token-spans on the same trace, so the trace renders the same full conversation
-  a claude trace does, with zero receiver changes.
+  that turn's spans. The wrapper replays the rollout (the running conversation
+  state) into an accumulating chat history and, for each turn, emits one OTLP
+  span on codex's own trace_id carrying the full request body as a langwatch
+  chat_messages envelope (system prompt + every prior message + the current
+  prompt + tool calls) plus the assistant's final reply. The span joins the
+  existing token-spans on the same trace, so the trace renders the same full
+  conversation a claude trace does, with zero receiver changes.
+
+  Because the rollout is append-only, the wrapper does not wait for exit: it
+  polls the rollout while the session runs and emits each turn the moment that
+  turn completes, with a single final sweep on exit. Content therefore streams
+  in per turn instead of arriving as one large upload at the end, and a long
+  session never lands a multi-megabyte burst when it closes. The per-turn span
+  id is derived from the turn's trace_id, so re-emitting the same turn is
+  idempotent (the ingest dedups), which makes the poll-then-final-sweep safe.
 
   Background:
     Given a wrapped `langwatch codex` session running in Path B (direct OTLP)
@@ -78,3 +85,26 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
     Given a parsed turn with traceId "abc123" and a system + user request body
     When the I/O spans are built for OTLP export
     Then the export contains a span with that trace_id, a chat_messages langwatch.input, and langwatch.span.type "llm"
+
+  Rule: completed turns stream during the session, not as one upload on exit
+
+    @unit
+    Scenario: A completed turn is streamed mid-session and only its content is posted
+      Given a streamer watching the session's rollout directory
+      And the rollout so far holds one completed turn for trace_id "t-one"
+      When the streamer harvests
+      Then it posts one span for trace_id "t-one"
+
+    @unit
+    Scenario: A turn is not streamed until its assistant reply lands
+      Given a streamer watching the session's rollout directory
+      And the rollout's only turn has a user message but no assistant reply yet
+      When the streamer harvests
+      Then it posts nothing
+      And when the assistant reply is appended and the streamer harvests again it posts that turn
+
+    @unit
+    Scenario: Re-harvesting an already-streamed turn posts nothing
+      Given a streamer that has already streamed the turn for trace_id "t-one"
+      When a later turn for trace_id "t-two" completes and the streamer harvests
+      Then it posts only "t-two", never re-posting "t-one"

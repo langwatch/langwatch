@@ -125,42 +125,38 @@ export async function findRecentRollouts(
   return out;
 }
 
-/**
- * Recover codex turn I/O from rollouts written during this session and POST it
- * as OTLP spans. Best-effort and fully swallowed: a coding session must never
- * fail because the post-hoc content harvest hit a snag. Returns the number of
- * turns emitted (0 when nothing was found).
- */
-export async function harvestAndEmitCodexIO(args: {
-  sinceMs: number;
-  nowMs: number;
-  endpoint: string;
-  token: string;
-  sessionsRoot?: string;
-  fetchImpl?: typeof fetch;
-}): Promise<number> {
-  const { sinceMs, nowMs, endpoint, token, sessionsRoot, fetchImpl } = args;
-  const files = await findRecentRollouts(
-    sinceMs,
-    sessionsRoot ?? join(homedir(), ".codex", "sessions"),
-  );
-  if (files.length === 0) return 0;
-
+/** Read + parse every in-window rollout into one flat turn list. */
+async function readRolloutTurns(
+  sinceMs: number,
+  sessionsRoot: string,
+): Promise<CodexTurnIO[]> {
+  const files = await findRecentRollouts(sinceMs, sessionsRoot);
   const turns: CodexTurnIO[] = [];
   for (const file of files) {
     try {
-      const content = await readFile(file, "utf8");
-      turns.push(...parseCodexRollout(content));
+      turns.push(...parseCodexRollout(await readFile(file, "utf8")));
     } catch {
       /* skip unreadable rollout */
     }
   }
-  if (turns.length === 0) return 0;
+  return turns;
+}
 
+/**
+ * POST a batch of turns as OTLP IO spans. Capped at 5s so a slow or unreachable
+ * endpoint can't wedge the user's shell; the caller swallows failures (content
+ * recovery must never break a coding session).
+ */
+async function postCodexTurns(args: {
+  turns: CodexTurnIO[];
+  nowMs: number;
+  endpoint: string;
+  token: string;
+  fetchImpl?: typeof fetch;
+}): Promise<void> {
+  const { turns, nowMs, endpoint, token, fetchImpl } = args;
   const body = buildCodexIOExportRequest(turns, nowMs);
   const doFetch = fetchImpl ?? fetch;
-  // Cap the POST so a slow or unreachable endpoint can't wedge the user's
-  // shell after codex has already exited.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);
   try {
@@ -176,5 +172,67 @@ export async function harvestAndEmitCodexIO(args: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Recover codex turn I/O from rollouts written during this session and POST it
+ * as OTLP spans. Best-effort and fully swallowed: a coding session must never
+ * fail because the post-hoc content harvest hit a snag. Returns the number of
+ * turns emitted (0 when nothing was found).
+ */
+export async function harvestAndEmitCodexIO(args: {
+  sinceMs: number;
+  nowMs: number;
+  endpoint: string;
+  token: string;
+  sessionsRoot?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<number> {
+  const { sinceMs, nowMs, endpoint, token, sessionsRoot, fetchImpl } = args;
+  const turns = await readRolloutTurns(
+    sinceMs,
+    sessionsRoot ?? join(homedir(), ".codex", "sessions"),
+  );
+  if (turns.length === 0) return 0;
+  await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;
+}
+
+/**
+ * Streaming harvester: emits each turn the moment it completes instead of
+ * dumping the whole session in one POST on exit. The wrapper polls `harvest()`
+ * on an interval while codex runs (plus one final sweep on exit). The rollout
+ * is append-only and `parseCodexRollout` only yields turns that have a reply,
+ * so an in-flight turn simply isn't in the parse yet; we additionally dedup by
+ * trace_id so a turn is POSTed exactly once across ticks. Re-emitting the same
+ * turn would be idempotent server-side anyway (the span id is derived from the
+ * trace_id), so a failed POST is safely retried on the next tick.
+ */
+export function createCodexIOStreamer(args: {
+  sinceMs: number;
+  endpoint: string;
+  token: string;
+  sessionsRoot?: string;
+  fetchImpl?: typeof fetch;
+}): { harvest: (nowMs: number) => Promise<number> } {
+  const root = args.sessionsRoot ?? join(homedir(), ".codex", "sessions");
+  const emitted = new Set<string>();
+  return {
+    async harvest(nowMs: number): Promise<number> {
+      const turns = await readRolloutTurns(args.sinceMs, root);
+      const fresh = turns.filter((t) => t.traceId && !emitted.has(t.traceId));
+      if (fresh.length === 0) return 0;
+      await postCodexTurns({
+        turns: fresh,
+        nowMs,
+        endpoint: args.endpoint,
+        token: args.token,
+        fetchImpl: args.fetchImpl,
+      });
+      // Mark emitted only after a successful POST so a transient failure
+      // retries the same turns next tick (dedup keeps the retry idempotent).
+      for (const t of fresh) emitted.add(t.traceId);
+      return fresh.length;
+    },
+  };
 }

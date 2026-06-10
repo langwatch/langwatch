@@ -24,8 +24,14 @@ import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
-import { harvestAndEmitCodexIO } from "./codex-rollout-otlp";
+import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
+
+/**
+ * How often the wrapper polls codex's append-only rollout while the session
+ * runs, streaming each completed turn's I/O instead of one burst on exit.
+ */
+const CODEX_IO_POLL_MS = 2_500;
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -594,9 +600,47 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
   const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
 
-  // Stamp the session start so the post-exit codex rollout harvest only reads
-  // rollout files this run produced (codex names them by start time + mtime).
+  // Stamp the session start so the codex rollout harvest only reads rollout
+  // files this run produced (codex names them by start time + mtime).
   const sessionStartMs = Date.now();
+
+  // Codex never puts the prompt or the assistant reply on the wire (its OTLP
+  // spans carry tokens + model only), but it writes the full transcript to an
+  // append-only rollout file whose per-turn `task_started` records the exact
+  // OTLP trace_id. Poll it WHILE codex runs and emit each turn the moment it
+  // completes, so content streams in per turn instead of one multi-megabyte
+  // burst on exit. The poll plus a final sweep on close are idempotent (the
+  // per-turn span id is trace_id-derived), so overlap dedups server-side.
+  const codexStreamer =
+    tool === "codex" &&
+    modeResult.mode === "ingestion" &&
+    modeResult.endpoint &&
+    modeResult.ingestionToken
+      ? createCodexIOStreamer({
+          sinceMs: sessionStartMs,
+          endpoint: `${modeResult.endpoint.replace(/\/+$/, "")}/v1/traces`,
+          token: modeResult.ingestionToken,
+        })
+      : null;
+  let codexPoll: ReturnType<typeof setInterval> | null = null;
+  if (codexStreamer) {
+    let inFlight = false;
+    codexPoll = setInterval(() => {
+      // Skip a tick if the previous harvest (file read + POST, ≤5s) is still
+      // running so slow ticks can't pile up.
+      if (inFlight) return;
+      inFlight = true;
+      void codexStreamer
+        .harvest(Date.now())
+        .catch(() => 0)
+        .finally(() => {
+          inFlight = false;
+        });
+    }, CODEX_IO_POLL_MS);
+    // The child process drives the lifecycle; never let the poll keep the event
+    // loop alive on its own.
+    codexPoll.unref?.();
+  }
 
   let child;
   if (aliasShell) {
@@ -636,25 +680,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     child.on("close", (code) => resolve(code ?? 1));
   });
 
-  // Codex never puts the prompt or the assistant reply on the wire (its OTLP
-  // spans carry tokens + model only), but it writes the full transcript to a
-  // rollout file whose per-turn `task_started` records the exact OTLP trace_id.
-  // After the session, recover that content and POST it onto codex's own
-  // trace_ids so the trace summary's input/output populate. Best-effort: a
-  // coding session must never fail (or stall) on the content harvest.
-  if (
-    tool === "codex" &&
-    modeResult.mode === "ingestion" &&
-    modeResult.endpoint &&
-    modeResult.ingestionToken
-  ) {
+  // Stop polling and do one final sweep so the last turn (completed between the
+  // last poll and exit) still lands. Best-effort: a coding session must never
+  // fail or stall on the content harvest.
+  if (codexPoll) clearInterval(codexPoll);
+  if (codexStreamer) {
     try {
-      await harvestAndEmitCodexIO({
-        sinceMs: sessionStartMs,
-        nowMs: Date.now(),
-        endpoint: `${modeResult.endpoint.replace(/\/+$/, "")}/v1/traces`,
-        token: modeResult.ingestionToken,
-      });
+      await codexStreamer.harvest(Date.now());
     } catch {
       /* content recovery is non-essential; never block exit on it */
     }
