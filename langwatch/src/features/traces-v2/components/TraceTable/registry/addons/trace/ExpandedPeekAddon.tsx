@@ -83,7 +83,10 @@ function flattenPeekTree(nodes: PeekTreeNode[]): PeekTreeNode[] {
 }
 
 const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
-  const { data: spans, isLoading } = useTraceSpanTree(trace.traceId);
+  const { data: spans, isLoading } = useTraceSpanTree(
+    trace.traceId,
+    trace.timestamp,
+  );
 
   const flatSpans = useMemo(() => {
     if (!spans || spans.length === 0) return [];
