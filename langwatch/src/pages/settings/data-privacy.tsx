@@ -25,6 +25,12 @@ import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
+  buildRuleConfig,
+  isEmptyRuleConfig,
+  ruleSummary,
+  type RuleAudience,
+} from "~/components/settings/dataPrivacyRuleConfig";
+import {
   CONTENT_CATEGORIES,
   type ContentCategory,
   type DataPrivacyConfig,
@@ -106,19 +112,6 @@ function buildScopeOptions(available: DataPrivacyScopeAvailable): ScopeOption[] 
     });
   }
   return options;
-}
-
-function ruleSummary(config: DataPrivacyConfig): string {
-  const parts: string[] = [];
-  for (const category of CONTENT_CATEGORIES) {
-    const disposition = config.categories?.[category]?.disposition;
-    if (disposition && disposition !== "capture") {
-      parts.push(`${CATEGORY_LABELS[category]} ${disposition}`);
-    }
-  }
-  if (config.pii) parts.push(`PII ${PII_LABELS[config.pii.level]}`);
-  if (config.secrets && !config.secrets.enabled) parts.push("Secrets off");
-  return parts.length > 0 ? parts.join(" · ") : "No changes";
 }
 
 function DataPrivacySettings() {
@@ -353,8 +346,6 @@ function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
   );
 }
 
-type Audience = "admins" | "allMembers" | "noOne";
-
 const dispositionCollection = createListCollection({
   items: [
     { value: "capture", label: "Captured (visible to your team)" },
@@ -370,12 +361,6 @@ const audienceCollection = createListCollection({
     { value: "noOne", label: "No one (fully hidden)" },
   ],
 });
-
-function audienceConfig(audience: Audience): { admins?: boolean; allMembers?: boolean } {
-  if (audience === "admins") return { admins: true };
-  if (audience === "allMembers") return { allMembers: true };
-  return {};
-}
 
 function AddPrivacyRuleDrawer({
   open,
@@ -411,7 +396,7 @@ function AddPrivacyRuleDrawer({
     system: "capture",
     tools: "capture",
   });
-  const [audience, setAudience] = useState<Audience>("admins");
+  const [audience, setAudience] = useState<RuleAudience>("admins");
   const [piiLevel, setPiiLevel] = useState<PiiLevel>("essential");
   const [secretsEnabled, setSecretsEnabled] = useState(true);
 
@@ -430,24 +415,11 @@ function AddPrivacyRuleDrawer({
   const anyRestrict = CONTENT_CATEGORIES.some((c) => dispositions[c] === "restrict");
   const canTogglePersonal = scope?.scopeType === "ORGANIZATION" || scope?.scopeType === "DEPARTMENT";
 
-  const config = useMemo<DataPrivacyConfig>(() => {
-    const categories: DataPrivacyConfig["categories"] = {};
-    for (const category of CONTENT_CATEGORIES) {
-      const disposition = dispositions[category];
-      if (disposition === "drop") {
-        categories[category] = { disposition: "drop" };
-      } else if (disposition === "restrict") {
-        categories[category] = { disposition: "restrict", audience: audienceConfig(audience) };
-      }
-    }
-    const result: DataPrivacyConfig = {};
-    if (Object.keys(categories).length > 0) result.categories = categories;
-    if (piiLevel !== "essential") result.pii = { level: piiLevel };
-    if (!secretsEnabled) result.secrets = { enabled: false };
-    return result;
-  }, [dispositions, audience, piiLevel, secretsEnabled]);
-
-  const isEmpty = Object.keys(config).length === 0;
+  const config = useMemo<DataPrivacyConfig>(
+    () => buildRuleConfig({ dispositions, audience, piiLevel, secretsEnabled }),
+    [dispositions, audience, piiLevel, secretsEnabled],
+  );
+  const isEmpty = isEmptyRuleConfig(config);
   const canSave = !!scope && !isEmpty && !isSaving;
 
   return (
@@ -531,7 +503,7 @@ function AddPrivacyRuleDrawer({
                   <Select.Root
                     collection={audienceCollection}
                     value={[audience]}
-                    onValueChange={(d) => setAudience((d.value[0] as Audience) ?? "admins")}
+                    onValueChange={(d) => setAudience((d.value[0] as RuleAudience) ?? "admins")}
                   >
                     <Select.Trigger background="bg">
                       <Select.ValueText />
