@@ -32,6 +32,13 @@ import { useLatestRef } from "./useLatestRef";
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
+// Upper bound on what a single paste can insert into the editor. Picked
+// to match the AI prompt input cap (2000) — anything longer is almost
+// certainly an accidental log dump rather than a real filter, and lets
+// the bar grow tall enough to push the page around even with the CSS
+// height cap as a safety net.
+const PASTE_MAX_CHARS = 2000;
+
 /**
  * Remove the chars at `[start, end)` from `text` and clean up any operator
  * glue we left behind. Used by the X widget when the parser is currently
@@ -49,15 +56,6 @@ function sliceFallbackTokenRange(
   const after = text.slice(end).replace(/^\s*(AND|OR)\s+/i, "");
   const joined = (before + " " + after).replace(/\s{2,}/g, " ").trim();
   return joined;
-}
-
-function arraysShallowEqual<T>(a: readonly T[], b: readonly T[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
 }
 
 function suggestionRowsEqual(
@@ -129,6 +127,14 @@ function suggestionFromTrigger(
 export interface DynamicSuggestionItems {
   items: string[];
   counts?: Record<string, number>;
+  /**
+   * Optional human-readable labels keyed by value id. When set, the
+   * suggestion dropdown renders the label as the primary text and the
+   * id muted underneath; the inserted token is still the raw `value`
+   * so the query language stays ID-only (search-by-name is not a goal —
+   * the value is the canonical identifier).
+   */
+  labels?: Record<string, string>;
 }
 
 export type ValueResolver = (
@@ -348,12 +354,18 @@ export function useFilterEditor({
             );
             // Dynamic value-mode rows have no group (values aren't grouped)
             // and aren't prefix entries — wrap the bare strings into the
-            // SuggestionRow shape that the dropdown renderer now expects.
+            // SuggestionRow shape that the dropdown renderer expects.
+            // `label` carries the human-readable name when the resolver
+            // emitted one (evaluator: "Faithfulness" for the id
+            // "ragas/faithfulness"); the dropdown renders the label as
+            // the primary row and the raw id as a muted secondary line.
+            // Without this the dropdown only ever showed ids, which is
+            // what the operator was complaining about for evaluators.
             next = {
               state: base.state,
               items: dynamic.items.map((value) => ({
                 value,
-                label: value,
+                label: dynamic.labels?.[value] ?? value,
                 group: null,
               })),
               itemCounts: dynamic.counts,
@@ -412,6 +424,25 @@ export function useFilterEditor({
     },
     editorProps: {
       attributes: { spellcheck: "false" },
+      // Coerce paste into one flat line. The editor's schema technically
+      // allows multiple Paragraph nodes, so pasting a multi-line error
+      // creates 10+ `<p>`s and balloons the bar to push the rest of the
+      // page off-screen. Strip control chars, collapse newlines + tabs
+      // to spaces, and cap the inserted text at PASTE_MAX_CHARS so a
+      // megabyte paste can't lock the parser up. The editor's
+      // overflow-x scroll still handles wide content.
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData("text/plain");
+        if (!text) return false;
+        const flattened = text
+          .replace(/[\r\n\t]+/g, " ")
+          .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+          .slice(0, PASTE_MAX_CHARS);
+        if (flattened === text) return false;
+        event.preventDefault();
+        view.dispatch(view.state.tr.insertText(flattened));
+        return true;
+      },
       // Suppress PM's default cursor placement when the user clicks on a
       // chip pill or its X widget. PM otherwise drops the caret into the
       // text node *inside* the chip (between "value" and the widget), so
@@ -558,9 +589,9 @@ export function useFilterEditor({
       // decoration pass; the parent receives the click rect to anchor
       // the popover. Skip when no callback is wired so chip clicks
       // still place the cursor as before.
-      const chipEl = target?.closest("[data-filter-chip-start]") as
-        | HTMLElement
-        | null;
+      const chipEl = target?.closest(
+        "[data-filter-chip-start]",
+      ) as HTMLElement | null;
       if (chipEl && onTokenClick) {
         event.preventDefault();
         event.stopPropagation();
@@ -568,12 +599,7 @@ export function useFilterEditor({
         const end = Number(chipEl.dataset.filterChipEnd);
         const field = chipEl.dataset.filterChipField ?? "";
         const value = chipEl.dataset.filterChipValue ?? "";
-        if (
-          Number.isFinite(start) &&
-          Number.isFinite(end) &&
-          field &&
-          value
-        ) {
+        if (Number.isFinite(start) && Number.isFinite(end) && field && value) {
           onTokenClick({
             rect: chipEl.getBoundingClientRect(),
             field,
@@ -588,9 +614,9 @@ export function useFilterEditor({
       // span carries the liqe-text coordinates as data attributes (set
       // by `filterHighlight`'s decoration pass) so we can flip without
       // re-parsing the AST here.
-      const opEl = target?.closest("[data-filter-op-start]") as
-        | HTMLElement
-        | null;
+      const opEl = target?.closest(
+        "[data-filter-op-start]",
+      ) as HTMLElement | null;
       if (opEl) {
         event.preventDefault();
         event.stopPropagation();
@@ -673,7 +699,9 @@ export function useFilterEditor({
       const { text, cursorPos } = readEditorContext(editor);
       // Look up whether the clicked label corresponds to a prefix row so
       // the accept handler doesn't auto-append `:` to `trace.attribute.`.
-      const matched = suggestionRef.current.items.find((r) => r.value === label);
+      const matched = suggestionRef.current.items.find(
+        (r) => r.value === label,
+      );
       const action = handleKey(
         {
           text,

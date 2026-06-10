@@ -26,7 +26,14 @@ export function ColumnResizeGrip<T>({
 
   return (
     <Box
-      onMouseDown={header.getResizeHandler()}
+      // Marker the header-cell drag detector reads to skip drags that
+      // originate here — resizing a column should never open the
+      // reorder-education dialog.
+      data-column-resize-grip="true"
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        header.getResizeHandler()(e);
+      }}
       onTouchStart={header.getResizeHandler()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => {

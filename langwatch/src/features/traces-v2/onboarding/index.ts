@@ -15,3 +15,4 @@ export { useSamplePreview } from "./hooks/useSamplePreview";
 export type { OnboardingEntryState } from "./hooks/useTourEntryPoints";
 export { useTourEntryPoints } from "./hooks/useTourEntryPoints";
 export { OnboardingHost } from "./OnboardingHost";
+export { SpotlightOverlay } from "./spotlights/SpotlightOverlay";

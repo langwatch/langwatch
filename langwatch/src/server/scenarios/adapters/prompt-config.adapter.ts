@@ -64,7 +64,7 @@ export class PromptConfigAdapter extends AgentAdapter {
         "Fetching Vercel AI model with project provider configuration",
       );
 
-      const model = await getVercelAIModel(this.projectId, prompt.model);
+      const model = await getVercelAIModel({ projectId: this.projectId, model: prompt.model });
 
       // 4. Generate response using Vercel AI SDK
       const result = await generateText({

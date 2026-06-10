@@ -41,6 +41,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
@@ -178,12 +179,25 @@ export function errorFormatterForTesting({
         }
       : null;
 
+  // Surface ModelProviderDisabledError on the wire so the frontend
+  // can render a swap-to-parent toast. Carries the cascade-next
+  // alternate so the toast's primary CTA can be a one-click swap
+  // rather than a generic "open settings" deep link.
+  const providerDisabledCause =
+    error.cause instanceof ModelProviderDisabledError
+      ? error.cause.toResponseBody()
+      : null;
+
   return {
     ...shape,
     data: {
       ...shape.data,
       zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
-      cause: missingModelCause ?? aiCallFailedCause ?? limitInfo,
+      cause:
+        missingModelCause ??
+        providerDisabledCause ??
+        aiCallFailedCause ??
+        limitInfo,
       domainError,
     },
   };
@@ -359,12 +373,32 @@ function findFirstId(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
+ * recording in the audit log. `presence.*` runs every ~15s per open tab
+ * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
+ * buries every genuine action — project edits, deletions, role changes —
+ * under a wall of `presence.update` rows. They're already silenced from
+ * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
+ * equivalent.
+ *
+ * Add new entries here when a router's mutations exist purely for
+ * ephemeral session state that doesn't need a permanent forensic record.
+ */
+const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
+const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
+
+function isAuditLogExempt(path: string): boolean {
+  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
+  return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
     if (
       type !== "mutation" ||
       !ctx.session?.user ||
-      path === "user.updateLastLogin"
+      isAuditLogExempt(path)
     ) {
       return next();
     }
@@ -492,6 +526,18 @@ const domainErrorMiddleware = t.middleware(async ({ next }) => {
     // ("double-check your model configuration") instead of falling
     // through as a generic 500 that monitoring + retry policies treat
     // as a server fault.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof ModelProviderDisabledError) {
+    // Same shape as the other typed model errors: BAD_REQUEST so the
+    // errorFormatter serialises `cause` and the frontend interceptor
+    // opens the swap-to-parent toast. Without this re-raise the error
+    // bubbles up as a generic INTERNAL_SERVER_ERROR and the user only
+    // sees a red "something went wrong" toast.
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: result.error.cause.message,

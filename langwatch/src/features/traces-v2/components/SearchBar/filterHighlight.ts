@@ -1,5 +1,6 @@
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 import type {
   LiqeQuery,
@@ -156,7 +157,8 @@ function tagClassName({
   // Unknown field — the query parses, but no part of the platform knows
   // how to filter on it. Yellow/dashed treatment makes the typo obvious
   // before the user submits and gets zero rows.
-  if (!isKnownField(fieldName)) return "filter-token filter-token-unknown-field";
+  if (!isKnownField(fieldName))
+    return "filter-token filter-token-unknown-field";
   if (negated) return "filter-token filter-token-exclude";
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
@@ -442,9 +444,42 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   return btn;
 }
 
-function computeDecorations(
-  doc: import("@tiptap/pm/model").Node,
-): DecorationSet {
+/**
+ * Module-level lookup table: `field → value → human-readable label`. The
+ * editor doesn't own this data (the facet sidebar does) and we don't
+ * want to thread it through every render of the SearchBar, so the
+ * SearchBar republishes the current map via `setFilterChipLabels`
+ * whenever facets change. `computeDecorations` reads it at recompute
+ * time; the plugin's `state.apply` triggers a recompute on the
+ * `LABEL_REFRESH` meta so a labels update with no doc change still
+ * rerenders the chips.
+ *
+ * Defaults to an empty map so a chip rendered before facets land
+ * gracefully falls back to ID-only (the prior behaviour).
+ */
+let chipLabelLookup: Record<string, Record<string, string>> = {};
+
+/**
+ * Editor views the plugin is currently mounted in. Tracked so the
+ * label-refresh side of `setFilterChipLabels` can poke each one with a
+ * `LABEL_REFRESH_META` transaction — there's typically just one search
+ * bar, but rendering two in a single page (test harness, side-by-side
+ * design experiments) shouldn't drop refreshes on the second one.
+ */
+const subscribedViews = new Set<EditorView>();
+
+export const LABEL_REFRESH_META = "filterHighlight:labelRefresh" as const;
+
+export function setFilterChipLabels(
+  next: Record<string, Record<string, string>>,
+): void {
+  chipLabelLookup = next;
+  for (const view of subscribedViews) {
+    view.dispatch(view.state.tr.setMeta(LABEL_REFRESH_META, true));
+  }
+}
+
+function computeDecorations(doc: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
@@ -454,13 +489,23 @@ function computeDecorations(
       if (slot.opLoc) {
         attrs["data-filter-op-start"] = String(slot.opLoc.start);
         attrs["data-filter-op-end"] = String(slot.opLoc.end);
-        attrs["title"] = "Click to switch AND ↔ OR";
+        attrs.title = "Click to switch AND ↔ OR";
       }
       if (slot.chipToken) {
         attrs["data-filter-chip-start"] = String(slot.chipToken.start);
         attrs["data-filter-chip-end"] = String(slot.chipToken.end);
         attrs["data-filter-chip-field"] = slot.chipToken.field;
         attrs["data-filter-chip-value"] = slot.chipToken.value;
+        const label =
+          chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value];
+        // Drop the label attr when it equals the value (no real
+        // benefit overlaying "openai" on top of "openai"; the chip
+        // would just flicker on hover). The CSS overlay only fires
+        // when the attr is set, so omission keeps the chip in its
+        // raw text-render mode.
+        if (label && label !== slot.chipToken.value) {
+          attrs["data-filter-chip-label"] = label;
+        }
       }
       decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }
@@ -513,7 +558,12 @@ export const FilterHighlight = Extension.create({
             return computeDecorations(state.doc);
           },
           apply(tr, prev) {
-            if (!tr.docChanged) return prev;
+            // Recompute on doc changes (normal path) AND on label-only
+            // refreshes (facets arrived, chip labels need to materialise
+            // even though the typed text didn't move). Without the meta
+            // check, a no-op transaction wouldn't redraw and the chip
+            // overlay would stay stale until the next keystroke.
+            if (!tr.docChanged && !tr.getMeta(LABEL_REFRESH_META)) return prev;
             return computeDecorations(tr.doc);
           },
         },
@@ -521,6 +571,14 @@ export const FilterHighlight = Extension.create({
           decorations(state) {
             return key.getState(state) ?? DecorationSet.empty;
           },
+        },
+        view(view) {
+          subscribedViews.add(view);
+          return {
+            destroy() {
+              subscribedViews.delete(view);
+            },
+          };
         },
       }),
     ];

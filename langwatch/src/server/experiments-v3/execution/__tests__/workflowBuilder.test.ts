@@ -769,6 +769,7 @@ describe("buildSignatureNodeFromPrompt", () => {
     tags: [],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    parameters: {},
   });
 
   const createPromptTargetConfig = (): TargetConfig => ({
@@ -849,6 +850,7 @@ describe("buildSignatureNodeFromLocalConfig", () => {
     tags: [],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    parameters: {},
   });
 
   const createLocalPromptConfig = (): LocalPromptConfig => ({

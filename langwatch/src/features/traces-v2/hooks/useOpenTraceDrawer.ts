@@ -4,6 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import {
+  buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
   isPreviewTraceId,
   RICH_ARRIVAL_TRACE_ID,
@@ -79,15 +80,23 @@ export function useOpenTraceDrawer() {
           seed,
         );
 
-        // Preview-mode rich seeding. When the user clicks the synthetic
-        // "juicy one" arrival trace from the empty-state table, there's
-        // nothing in ClickHouse to fetch — but we still want every drawer
-        // tab to render with realistic content. Seed the spans, eval
-        // results, and conversation context caches so the waterfall, span
-        // list, sequence, topology, conversation, and evaluations tabs
-        // hydrate from local fixtures the moment the drawer opens.
-        if (trace.traceId === RICH_ARRIVAL_TRACE_ID) {
-          const detail = buildRichArrivalTraceDetail();
+        // Preview-mode seeding. Every sample-preview trace lives entirely
+        // client-side — ClickHouse has nothing — and the drawer's data
+        // hooks (header, spanTree, spansFull, spanDetail, signals,
+        // events, evals, conversationContext) are all gated off for
+        // preview ids. Without seeding, opening the drawer leaves every
+        // tab spinning forever. Two builders: the rich-arrival trace
+        // gets its hand-built showpiece detail (multi-span waterfall,
+        // full eval set, multi-turn conversation), every other sample
+        // trace gets a synthesised single-root-span detail derived from
+        // the TraceListItem itself. Both share the same seeding code
+        // path below so we can't accidentally seed one cache but skip
+        // another.
+        if (isPreviewTraceId(trace.traceId)) {
+          const detail =
+            trace.traceId === RICH_ARRIVAL_TRACE_ID
+              ? buildRichArrivalTraceDetail()
+              : buildPreviewTraceDetail(trace);
 
           utils.tracesV2.header.setData(
             { projectId: project.id, traceId: trace.traceId },
@@ -214,7 +223,13 @@ export function useOpenTraceDrawer() {
       }
       // Push into the store before route change so drawer hooks render
       // with the right traceId/occurredAtMs on the very next frame.
-      useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
+      // Pass the row's spanCount through so the drawer skeleton can
+      // size its accordion / span list section before the spanTree
+      // query resolves — eliminates the noticeable reflow that
+      // happened once the real data landed.
+      useDrawerStore
+        .getState()
+        .openTrace(trace.traceId, trace.timestamp, trace.spanCount);
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
       // teaches, and the only one we want demos / videos / first
