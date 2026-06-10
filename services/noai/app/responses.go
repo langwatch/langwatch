@@ -20,13 +20,13 @@ type ResponsesRequest struct {
 
 // ResponsesResult is the non-streaming /v1/responses response shape.
 type ResponsesResult struct {
-	ID        string           `json:"id"`
-	Object    string           `json:"object"`
-	CreatedAt int64            `json:"created_at"`
-	Status    string           `json:"status"`
-	Model     string           `json:"model"`
-	Output    []ResponsesMsg   `json:"output"`
-	Usage     ResponsesUsage   `json:"usage"`
+	ID        string         `json:"id"`
+	Object    string         `json:"object"`
+	CreatedAt int64          `json:"created_at"`
+	Status    string         `json:"status"`
+	Model     string         `json:"model"`
+	Output    []ResponsesMsg `json:"output"`
+	Usage     ResponsesUsage `json:"usage"`
 	// OpenAI's library reads `output_text` as a derived convenience field.
 	// Including it directly is harmless and saves callers a fold.
 	OutputText string `json:"output_text,omitempty"`
@@ -59,7 +59,9 @@ type ResponsesUsage struct {
 }
 
 // BuildResponsesResult assembles a deterministic ResponsesResult for the
-// given request. Response + message item ids are KSUIDs (env-prefixed
+// given request. The caller guarantees req.Model is a known noai model
+// (the transport returns a 404 model_not_found for anything else before
+// reaching here). Response + message item ids are KSUIDs (env-prefixed
 // via ctx).
 func BuildResponsesResult(ctx context.Context, req ResponsesRequest, now time.Time) ResponsesResult {
 	model, _ := Normalize(req.Model)
@@ -67,7 +69,7 @@ func BuildResponsesResult(ctx context.Context, req ResponsesRequest, now time.Ti
 	reply := model.Reply(last)
 
 	parts := []ResponsesContent{{Type: "output_text", Text: reply}}
-	if model.HasAudioOutput() || responsesAsksForAudio(req) {
+	if model.HasAudioOutput() || asksForAudio(req.Modalities) {
 		parts = append(parts, ResponsesContent{
 			Type:       "output_audio",
 			Audio:      SilentWavBase64,
@@ -75,6 +77,9 @@ func BuildResponsesResult(ctx context.Context, req ResponsesRequest, now time.Ti
 			Format:     AudioFormat,
 		})
 	}
+
+	inputTokens := countTokens(last)
+	outputTokens := countTokens(reply)
 
 	return ResponsesResult{
 		ID:        ksuid.Generate(ctx, ResourceResponses).String(),
@@ -88,16 +93,11 @@ func BuildResponsesResult(ctx context.Context, req ResponsesRequest, now time.Ti
 			Role:    "assistant",
 			Content: parts,
 		}},
-		Usage:      ResponsesUsage{},
+		Usage: ResponsesUsage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  inputTokens + outputTokens,
+		},
 		OutputText: reply,
 	}
-}
-
-func responsesAsksForAudio(req ResponsesRequest) bool {
-	for _, m := range req.Modalities {
-		if m == "audio" {
-			return true
-		}
-	}
-	return false
 }

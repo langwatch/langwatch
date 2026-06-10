@@ -34,17 +34,18 @@ any parser without us shipping a binary asset.
 
 ## Base URL
 
-`http://localhost:5577/`
+`http://localhost:5977/`
 
 ## Endpoints
 
-| Method | Path                       | Purpose                                          |
-|--------|----------------------------|--------------------------------------------------|
-| `POST` | `/v1/chat/completions`     | OpenAI chat completion (stream-capable)          |
-| `POST` | `/v1/responses`            | OpenAI Responses API (stream-capable)            |
-| `GET`  | `/v1/models`               | Lists every noai model                           |
-| `GET`  | `/healthz`                 | Liveness probe (always 200)                      |
-| `GET`  | `/readyz`                  | Readiness probe (always 200)                     |
+| Method | Path                   | Purpose                                 |
+|--------|------------------------|-----------------------------------------|
+| `POST` | `/v1/chat/completions` | OpenAI chat completion (stream-capable) |
+| `POST` | `/v1/responses`        | OpenAI Responses API (stream-capable)   |
+| `GET`  | `/v1/models`           | Lists every noai model                  |
+| `GET`  | `/healthz`             | Liveness probe (always 200)             |
+| `GET`  | `/readyz`              | Readiness probe (always 200)            |
+| `GET`  | `/startupz`            | Startup probe                           |
 
 ## Running locally
 
@@ -53,16 +54,16 @@ make service svc=noai             # run once
 make service-watch svc=noai       # live reload via air
 ```
 
-The service listens on `NOAI_SERVER_ADDR` (default `:5577`).
+The service listens on `NOAI_SERVER_ADDR` (default `:5977`).
 
 ## Configuration
 
-| Variable                  | Required | Default | Description                |
-|---------------------------|----------|---------|----------------------------|
-| `NOAI_SERVER_ADDR`        | no       | `:5577` | Listen address             |
-| `NOAI_GRACEFUL_SECONDS`   | no       | `5`     | Shutdown grace period      |
-| `LOG_LEVEL`               | no       | `info`  | Log level                  |
-| `LOG_FORMAT`              | no       | `json`  | `json` or `pretty`         |
+| Variable                | Required | Default | Description           |
+|-------------------------|----------|---------|-----------------------|
+| `NOAI_SERVER_ADDR`      | no       | `:5977` | Listen address        |
+| `NOAI_GRACEFUL_SECONDS` | no       | `5`     | Shutdown grace period |
+| `LOG_LEVEL`             | no       | `info`  | Log level             |
+| `LOG_FORMAT`            | no       | `json`  | `json` or `pretty`    |
 
 ## Wiring into the platform
 
@@ -71,6 +72,6 @@ The matching TS provider entry lives in
 `langwatch_noai`, with `devOnly: true` so it is filtered out of the registry
 seeder and the UI in production. The provider exposes
 `LANGWATCH_NOAI_BASE_URL` as an endpoint override — point it at this
-service's URL (default `http://localhost:5577`) and every part of the
+service's URL (default `http://localhost:5977`) and every part of the
 platform — playground, workflows, evaluators, scenarios, gateway — treats it
 as an ordinary OpenAI-compatible upstream.

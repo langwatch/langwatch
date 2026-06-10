@@ -12,7 +12,7 @@ import (
 
 // writeChatStream writes the /v1/chat/completions SSE response. Matches
 // the OpenAI shape: `data: <json>` per chunk, terminated by `data: [DONE]`.
-func writeChatStream(w http.ResponseWriter, ctx context.Context, req app.ChatRequest, now time.Time) {
+func writeChatStream(ctx context.Context, w http.ResponseWriter, req app.ChatRequest, now time.Time) {
 	prepareSSEHeaders(w)
 	flusher, _ := w.(http.Flusher)
 	chunks := app.BuildChatStreamChunks(ctx, req, now)
@@ -31,7 +31,7 @@ func writeChatStream(w http.ResponseWriter, ctx context.Context, req app.ChatReq
 // writeResponsesStream writes the /v1/responses SSE response. The
 // Responses API uses typed `event:` lines (no terminal sentinel —
 // `response.completed` is the cue).
-func writeResponsesStream(w http.ResponseWriter, ctx context.Context, req app.ResponsesRequest, now time.Time) {
+func writeResponsesStream(ctx context.Context, w http.ResponseWriter, req app.ResponsesRequest, now time.Time) {
 	prepareSSEHeaders(w)
 	flusher, _ := w.(http.Flusher)
 	for _, ev := range app.BuildResponsesStreamEvents(ctx, req, now) {

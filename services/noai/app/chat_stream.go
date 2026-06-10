@@ -16,6 +16,9 @@ type ChatStreamChunk struct {
 	Created int64              `json:"created"`
 	Model   string             `json:"model"`
 	Choices []ChatStreamChoice `json:"choices"`
+	// Usage rides the final chunk only (OpenAI emits it on the terminal
+	// chunk when stream_options.include_usage is set); nil elsewhere.
+	Usage *Usage `json:"usage,omitempty"`
 }
 
 // ChatStreamChoice is one choice slice of an SSE chunk.
@@ -60,7 +63,7 @@ func BuildChatStreamChunks(ctx context.Context, req ChatRequest, now time.Time) 
 		base(ChatStreamDelta{Role: "assistant"}, nil),
 		base(ChatStreamDelta{Content: reply}, nil),
 	}
-	if model.HasAudioOutput() || requestAsksForAudio(req) {
+	if model.HasAudioOutput() || asksForAudio(req.Modalities) {
 		chunks = append(chunks, base(ChatStreamDelta{Audio: &AssistantAudio{
 			ID:         ksuid.Generate(ctx, ResourceAudio).String(),
 			Data:       SilentWavBase64,
@@ -70,6 +73,9 @@ func BuildChatStreamChunks(ctx context.Context, req ChatRequest, now time.Time) 
 		}}, nil))
 	}
 	stop := "stop"
-	chunks = append(chunks, base(ChatStreamDelta{}, &stop))
+	final := base(ChatStreamDelta{}, &stop)
+	usage := usageFor(last, reply)
+	final.Usage = &usage
+	chunks = append(chunks, final)
 	return chunks
 }

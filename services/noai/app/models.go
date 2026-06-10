@@ -23,14 +23,14 @@ const (
 type ModelID string
 
 const (
-	ModelEchoText             ModelID = "echo-text"
-	ModelEchoAudio            ModelID = "echo-audio"
-	ModelJudgeTextPass        ModelID = "judge-text-pass"
-	ModelJudgeTextFail        ModelID = "judge-text-fail"
-	ModelJudgeAudioPass       ModelID = "judge-audio-pass"
-	ModelJudgeAudioFail       ModelID = "judge-audio-fail"
-	ModelUserSimulationText   ModelID = "user-simulation-text"
-	ModelUserSimulationAudio  ModelID = "user-simulation-audio"
+	ModelEchoText            ModelID = "echo-text"
+	ModelEchoAudio           ModelID = "echo-audio"
+	ModelJudgeTextPass       ModelID = "judge-text-pass"
+	ModelJudgeTextFail       ModelID = "judge-text-fail"
+	ModelJudgeAudioPass      ModelID = "judge-audio-pass"
+	ModelJudgeAudioFail      ModelID = "judge-audio-fail"
+	ModelUserSimulationText  ModelID = "user-simulation-text"
+	ModelUserSimulationAudio ModelID = "user-simulation-audio"
 )
 
 // All returns every model the service knows about, in a stable order.
@@ -87,6 +87,19 @@ func (m ModelID) HasAudioOutput() bool {
 	}
 }
 
+// asksForAudio reports whether the caller's `modalities` list includes
+// "audio". This lets text-typed models still emit an audio blob when the
+// caller explicitly asks for one (mirrors real OpenAI behavior for
+// gpt-4o-audio-preview). Shared by the chat and responses paths.
+func asksForAudio(modalities []string) bool {
+	for _, m := range modalities {
+		if m == "audio" {
+			return true
+		}
+	}
+	return false
+}
+
 // Reply builds the assistant text the model produces for the given last
 // user turn. Audio output (when applicable) is handled separately by the
 // transport layer because the framing differs between /v1/chat/completions
@@ -108,6 +121,13 @@ func (m ModelID) Reply(lastUserText string) string {
 	}
 	// Fallback for additions to the enum that haven't been wired here yet.
 	return echoString(lastUserText)
+}
+
+// countTokens approximates token usage as a whitespace word count. The
+// fake server has no real tokenizer; word counts give callers small,
+// deterministic, non-zero usage numbers to assert against.
+func countTokens(text string) int {
+	return len(strings.Fields(text))
 }
 
 func echoString(lastUserText string) string {

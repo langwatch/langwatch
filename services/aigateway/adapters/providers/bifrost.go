@@ -672,32 +672,39 @@ type account struct{}
 
 // providerLangwatchNoai is the Bifrost provider key for the local-dev
 // `langwatch_noai` fake LLM. It's registered as a CustomProvider on top
-// of Bifrost's OpenAI provider client, with its BaseURL pulled from
-// `LANGWATCH_NOAI_BASE_URL`. In non-production the URL falls back to
-// `http://localhost:5577`; in production the fallback is suppressed —
-// operators have to opt in by setting LANGWATCH_NOAI_BASE_URL
-// explicitly, so prod gateways don't carry it by accident.
+// of Bifrost's OpenAI provider client. Registration is gated by the
+// explicit opt-in flag LW_GATEWAY_NOAI_ENABLED and fails closed: unless
+// the flag is truthy the provider is absent everywhere, so prod gateways
+// never carry it by accident. When enabled, its BaseURL is pulled from
+// LANGWATCH_NOAI_BASE_URL, defaulting to http://localhost:5977.
 const providerLangwatchNoai bfschemas.ModelProvider = "langwatch_noai"
 
+// langwatchNoaiEnabled reports whether the langwatch_noai provider should
+// be registered. It is an explicit opt-in: only the truthy values "true"
+// and "1" for LW_GATEWAY_NOAI_ENABLED enable it; anything else (including
+// unset) leaves it disabled.
+func langwatchNoaiEnabled() bool {
+	switch os.Getenv("LW_GATEWAY_NOAI_ENABLED") {
+	case "true", "1":
+		return true
+	default:
+		return false
+	}
+}
+
 // langwatchNoaiBaseURL returns the URL the fake LLM service listens on,
-// falling back to the documented dev default. Returns "" when noai
-// support should be disabled (handled by the caller).
+// defaulting to the documented dev address when LANGWATCH_NOAI_BASE_URL
+// is unset. Only consulted when langwatchNoaiEnabled() is true.
 func langwatchNoaiBaseURL() string {
 	if v := os.Getenv("LANGWATCH_NOAI_BASE_URL"); v != "" {
 		return v
 	}
-	// In production this env var is never set (the TS-side provider is
-	// `devOnly`), so we only fall back in development-style processes
-	// that haven't bothered to set it.
-	if os.Getenv("ENVIRONMENT") == "production" {
-		return ""
-	}
-	return "http://localhost:5577"
+	return "http://localhost:5977"
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
 	providers := append([]bfschemas.ModelProvider{}, bfschemas.StandardProviders...)
-	if langwatchNoaiBaseURL() != "" {
+	if langwatchNoaiEnabled() {
 		providers = append(providers, providerLangwatchNoai)
 	}
 	return providers, nil
@@ -705,6 +712,9 @@ func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
 
 func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.ModelProvider) ([]bfschemas.Key, error) {
 	if provider == providerLangwatchNoai {
+		if !langwatchNoaiEnabled() {
+			return nil, fmt.Errorf("langwatch_noai provider not configured (LW_GATEWAY_NOAI_ENABLED unset)")
+		}
 		// Keyless. Bifrost still expects a Key with a non-empty ID; the
 		// value is ignored by the noai server.
 		return []bfschemas.Key{{ID: "langwatch-noai", Name: "langwatch-noai", Weight: 1}}, nil
@@ -732,11 +742,10 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		}
 	}
 	if provider == providerLangwatchNoai {
-		base := langwatchNoaiBaseURL()
-		if base == "" {
-			return nil, fmt.Errorf("langwatch_noai provider not configured (LANGWATCH_NOAI_BASE_URL unset)")
+		if !langwatchNoaiEnabled() {
+			return nil, fmt.Errorf("langwatch_noai provider not configured (LW_GATEWAY_NOAI_ENABLED unset)")
 		}
-		cfg.NetworkConfig = bfschemas.NetworkConfig{BaseURL: base}
+		cfg.NetworkConfig = bfschemas.NetworkConfig{BaseURL: langwatchNoaiBaseURL()}
 		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
 			BaseProviderType: bfschemas.OpenAI,
 			IsKeyLess:        true,

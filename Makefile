@@ -92,7 +92,7 @@ service:
 		exec go run ./cmd/service $(svc)
 
 # Shortcut for the NoAI fake LLM (services/noai). Dev only — runs on
-# :5577, speaks /v1/chat/completions and /v1/responses with deterministic
+# :5977, speaks /v1/chat/completions and /v1/responses with deterministic
 # responses keyed off the requested langwatch_noai/* model id.
 noai:
 	@$(MAKE) service svc=noai

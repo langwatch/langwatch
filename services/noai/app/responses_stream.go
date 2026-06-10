@@ -11,8 +11,8 @@ import (
 // minimal sequence needed for clients to reconstruct the same payload as
 // the non-stream call.
 type ResponsesStreamEvent struct {
-	Event string         `json:"-"`
-	Data  map[string]any `json:"-"`
+	Event string
+	Data  map[string]any
 }
 
 // BuildResponsesStreamEvents returns the SSE event sequence for a
@@ -52,7 +52,7 @@ func BuildResponsesStreamEvents(ctx context.Context, req ResponsesRequest, now t
 		}},
 	}
 
-	if model.HasAudioOutput() || responsesAsksForAudio(req) {
+	if model.HasAudioOutput() || asksForAudio(req.Modalities) {
 		events = append(events, ResponsesStreamEvent{
 			Event: "response.output_audio.delta",
 			Data: map[string]any{

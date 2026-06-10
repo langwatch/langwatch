@@ -1,10 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -18,7 +14,7 @@ import (
 func chatCompletionsHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req app.ChatRequest
-		if err := decodeJSON(r, maxBody, &req); err != nil {
+		if err := decodeJSON(w, r, maxBody, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return
 		}
@@ -28,10 +24,13 @@ func chatCompletionsHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc 
 		}
 		if !app.IsKnown(req.Model) {
 			logger.Warn("noai_unknown_model_chat", zap.String("model", req.Model))
+			writeError(w, http.StatusNotFound, "model_not_found",
+				"The model `"+req.Model+"` does not exist or you do not have access to it.")
+			return
 		}
 		now := time.Now()
 		if req.Stream {
-			writeChatStream(w, r.Context(), req, now)
+			writeChatStream(r.Context(), w, req, now)
 			return
 		}
 		writeJSON(w, http.StatusOK, app.BuildChatResponse(r.Context(), req, now))
@@ -42,7 +41,7 @@ func chatCompletionsHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc 
 func responsesHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req app.ResponsesRequest
-		if err := decodeJSON(r, maxBody, &req); err != nil {
+		if err := decodeJSON(w, r, maxBody, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return
 		}
@@ -52,10 +51,13 @@ func responsesHandler(logger *zap.Logger, maxBody int64) http.HandlerFunc {
 		}
 		if !app.IsKnown(req.Model) {
 			logger.Warn("noai_unknown_model_responses", zap.String("model", req.Model))
+			writeError(w, http.StatusNotFound, "model_not_found",
+				"The model `"+req.Model+"` does not exist or you do not have access to it.")
+			return
 		}
 		now := time.Now()
 		if req.Stream {
-			writeResponsesStream(w, r.Context(), req, now)
+			writeResponsesStream(r.Context(), w, req, now)
 			return
 		}
 		writeJSON(w, http.StatusOK, app.BuildResponsesResult(r.Context(), req, now))
@@ -87,39 +89,4 @@ func listModelsHandler() http.HandlerFunc {
 			"data":   entries,
 		})
 	}
-}
-
-// ---------- helpers ----------
-
-func decodeJSON(r *http.Request, maxBody int64, dst any) error {
-	// http.MaxBytesReader requires a non-nil ResponseWriter (it calls
-	// WriteHeader on overflow). io.LimitReader gives the same cap with
-	// a clean io.EOF instead of a panic — fine for this dev-only service.
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
-	if err != nil {
-		return err
-	}
-	if int64(len(body)) > maxBody {
-		return fmt.Errorf("request body exceeds %d bytes", maxBody)
-	}
-	if len(body) == 0 {
-		return errors.New("empty request body")
-	}
-	return json.Unmarshal(body, dst)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, map[string]any{
-		"error": map[string]any{
-			"message": message,
-			"type":    code,
-			"code":    code,
-		},
-	})
 }

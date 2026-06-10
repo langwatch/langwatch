@@ -204,6 +204,25 @@ func TestCredentialFromHeaders_Custom(t *testing.T) {
 	}
 }
 
+func TestCredentialFromHeaders_LangwatchNoAI(t *testing.T) {
+	hdr := encodeCreds(t, inlineCreds{
+		Provider: "langwatch_noai",
+	})
+	cred, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cred.ProviderID != domain.ProviderID("langwatch_noai") {
+		t.Errorf("ProviderID: got %q want langwatch_noai", cred.ProviderID)
+	}
+	if cred.ID == "" {
+		t.Errorf("ID: expected non-empty synthetic id")
+	}
+	if cred.APIKey != "" {
+		t.Errorf("APIKey: expected empty, got %q", cred.APIKey)
+	}
+}
+
 func TestCredentialFromHeaders_MissingHeader(t *testing.T) {
 	_, err := credentialFromHeaders(map[string]string{})
 	if err == nil || !strings.Contains(err.Error(), "missing") {

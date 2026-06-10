@@ -21,9 +21,9 @@ type RouterDeps struct {
 // NewRouter wires the chi router with health + the OpenAI-compatible
 // fake LLM endpoints.
 func NewRouter(deps RouterDeps) http.Handler {
-	cap := deps.MaxRequestBodyBytes
-	if cap == 0 {
-		cap = config.DefaultMaxRequestBodyBytes
+	maxBody := deps.MaxRequestBodyBytes
+	if maxBody == 0 {
+		maxBody = config.DefaultMaxRequestBodyBytes
 	}
 
 	r := chi.NewRouter()
@@ -33,8 +33,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/startupz", deps.Health.Startup)
 
 	r.Get("/v1/models", listModelsHandler())
-	r.Post("/v1/chat/completions", chatCompletionsHandler(deps.Logger, cap))
-	r.Post("/v1/responses", responsesHandler(deps.Logger, cap))
+	r.Post("/v1/chat/completions", chatCompletionsHandler(deps.Logger, maxBody))
+	r.Post("/v1/responses", responsesHandler(deps.Logger, maxBody))
 
 	return r
 }

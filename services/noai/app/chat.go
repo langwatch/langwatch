@@ -11,14 +11,12 @@ import (
 // ChatRequest is the (subset of the) OpenAI /v1/chat/completions request
 // body the noai service inspects. Unknown fields are ignored.
 type ChatRequest struct {
-	Model    string          `json:"model"`
-	Messages []ChatMessage   `json:"messages"`
-	Stream   bool            `json:"stream"`
-	// Audio request flag — OpenAI uses `modalities: ["text","audio"]` plus
-	// an `audio` object to request audio output. We don't care about the
-	// voice / format choices for the fake, just whether audio is asked for.
-	Modalities []string        `json:"modalities,omitempty"`
-	Audio      json.RawMessage `json:"audio,omitempty"`
+	Model    string        `json:"model"`
+	Messages []ChatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
+	// Modalities mirrors OpenAI's `modalities: ["text","audio"]`. It is the
+	// sole signal noai uses to decide whether to emit an audio output.
+	Modalities []string `json:"modalities,omitempty"`
 }
 
 // ChatMessage is a single chat-completions message. Content can be a
@@ -49,8 +47,8 @@ type ChatChoice struct {
 // audio blob. OpenAI puts audio under the `audio` field, alongside text
 // content rather than inside the content array.
 type ChatAssistantMessage struct {
-	Role    string         `json:"role"`
-	Content string         `json:"content"`
+	Role    string          `json:"role"`
+	Content string          `json:"content"`
 	Audio   *AssistantAudio `json:"audio,omitempty"`
 }
 
@@ -63,7 +61,7 @@ type AssistantAudio struct {
 	Format     string `json:"format,omitempty"`
 }
 
-// Usage is the OpenAI usage shape, zeroed out for the fake.
+// Usage is the OpenAI usage shape, filled with deterministic word counts.
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
@@ -71,8 +69,9 @@ type Usage struct {
 }
 
 // BuildChatResponse assembles a deterministic ChatResponse for the given
-// request. Unknown models fall through to echo-text behavior so a typo
-// produces a recognizable response rather than an opaque 4xx.
+// request. The caller guarantees req.Model is a known noai model (the
+// transport returns a 404 model_not_found for anything else before
+// reaching here).
 //
 // Response, audio, and message ids are KSUIDs (env-prefixed via ctx), so
 // concurrent requests get unique ids and the surfaces are traceable from
@@ -83,7 +82,7 @@ func BuildChatResponse(ctx context.Context, req ChatRequest, now time.Time) Chat
 	reply := model.Reply(last)
 
 	msg := ChatAssistantMessage{Role: "assistant", Content: reply}
-	if model.HasAudioOutput() || requestAsksForAudio(req) {
+	if model.HasAudioOutput() || asksForAudio(req.Modalities) {
 		msg.Audio = &AssistantAudio{
 			ID:         ksuid.Generate(ctx, ResourceAudio).String(),
 			Data:       SilentWavBase64,
@@ -99,19 +98,17 @@ func BuildChatResponse(ctx context.Context, req ChatRequest, now time.Time) Chat
 		Created: now.Unix(),
 		Model:   req.Model,
 		Choices: []ChatChoice{{Index: 0, Message: msg, FinishReason: "stop"}},
-		Usage:   Usage{},
+		Usage:   usageFor(last, reply),
 	}
 }
 
-// requestAsksForAudio returns true when the caller set `modalities`
-// including "audio". This lets text-typed models still emit an audio
-// blob when the caller explicitly asks for one (mirrors real OpenAI
-// behavior for gpt-4o-audio-preview).
-func requestAsksForAudio(req ChatRequest) bool {
-	for _, m := range req.Modalities {
-		if m == "audio" {
-			return true
-		}
+// usageFor returns deterministic word-count token usage for a chat reply.
+func usageFor(input, reply string) Usage {
+	prompt := countTokens(input)
+	completion := countTokens(reply)
+	return Usage{
+		PromptTokens:     prompt,
+		CompletionTokens: completion,
+		TotalTokens:      prompt + completion,
 	}
-	return false
 }

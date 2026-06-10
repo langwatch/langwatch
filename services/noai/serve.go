@@ -26,6 +26,9 @@ func Serve(ctx context.Context, deps *Deps, cfg Config) error {
 		Handler:           handler,
 		Addr:              cfg.Server.Addr,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	g := lifecycle.New(

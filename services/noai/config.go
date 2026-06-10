@@ -21,8 +21,13 @@ type Config struct {
 	Log         clog.Config   `env:"NOAI_LOG"`
 }
 
+// defaultMaxRequestBodyBytes caps request bodies at 4MB. The fake server
+// only echoes the last user turn, so it never needs the 128MB
+// large-context default the shared config exposes.
+const defaultMaxRequestBodyBytes int64 = 4 * 1024 * 1024
+
 // LoadConfig hydrates Config from environment variables. The server
-// address falls back to ":5577" — the convention reserved for the noai
+// address falls back to ":5977" — the convention reserved for the noai
 // service in dev compose.
 func LoadConfig(_ context.Context) (Config, error) {
 	cfg := Config{}
@@ -30,13 +35,13 @@ func LoadConfig(_ context.Context) (Config, error) {
 		return Config{}, err
 	}
 	if cfg.Server.Addr == "" {
-		cfg.Server.Addr = ":5577"
+		cfg.Server.Addr = ":5977"
 	}
 	if cfg.Server.GracefulSeconds == 0 {
 		cfg.Server.GracefulSeconds = config.DefaultGracefulSeconds
 	}
 	if cfg.Server.MaxRequestBodyBytes == 0 {
-		cfg.Server.MaxRequestBodyBytes = config.DefaultMaxRequestBodyBytes
+		cfg.Server.MaxRequestBodyBytes = defaultMaxRequestBodyBytes
 	}
 	return cfg, nil
 }

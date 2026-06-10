@@ -379,29 +379,28 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 	}
 }
 
-// LangwatchNoai is a dev-only fake LLM. When LANGWATCH_NOAI_BASE_URL is
-// set, the account adapter must register it as a CustomProvider over
-// OpenAI with the configured BaseURL, keyless. In production the
-// localhost fallback is suppressed — the operator must opt in by
-// setting LANGWATCH_NOAI_BASE_URL explicitly (covered by the
-// suppression test below).
-func TestLangwatchNoaiAccountRegistration(t *testing.T) {
-	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5577")
-	t.Setenv("ENVIRONMENT", "development")
+func noaiConfigured(providers []bfschemas.ModelProvider) bool {
+	for _, p := range providers {
+		if p == providerLangwatchNoai {
+			return true
+		}
+	}
+	return false
+}
+
+// langwatch_noai is a dev-only fake LLM gated by the explicit opt-in flag
+// LW_GATEWAY_NOAI_ENABLED. When enabled, the account adapter registers it
+// as a keyless CustomProvider over OpenAI, with its BaseURL defaulting to
+// http://localhost:5977.
+func TestLangwatchNoaiEnabledDefaultURL(t *testing.T) {
+	t.Setenv("LW_GATEWAY_NOAI_ENABLED", "true")
 
 	a := &account{}
 	providers, err := a.GetConfiguredProviders()
 	if err != nil {
 		t.Fatalf("GetConfiguredProviders: %v", err)
 	}
-	found := false
-	for _, p := range providers {
-		if p == providerLangwatchNoai {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !noaiConfigured(providers) {
 		t.Fatalf("expected providerLangwatchNoai in configured providers, got %v", providers)
 	}
 
@@ -409,8 +408,8 @@ func TestLangwatchNoaiAccountRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetConfigForProvider: %v", err)
 	}
-	if cfg.NetworkConfig.BaseURL != "http://fake-host:5577" {
-		t.Fatalf("BaseURL mismatch: got %q", cfg.NetworkConfig.BaseURL)
+	if cfg.NetworkConfig.BaseURL != "http://localhost:5977" {
+		t.Fatalf("BaseURL mismatch: got %q want default http://localhost:5977", cfg.NetworkConfig.BaseURL)
 	}
 	if cfg.CustomProviderConfig == nil {
 		t.Fatalf("expected CustomProviderConfig to be set")
@@ -431,42 +430,60 @@ func TestLangwatchNoaiAccountRegistration(t *testing.T) {
 	}
 }
 
-func TestLangwatchNoaiSuppressedInProduction(t *testing.T) {
-	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://anywhere:5577")
-	t.Setenv("ENVIRONMENT", "production")
+// When enabled, LANGWATCH_NOAI_BASE_URL overrides the default address.
+func TestLangwatchNoaiEnabledURLOverride(t *testing.T) {
+	t.Setenv("LW_GATEWAY_NOAI_ENABLED", "1")
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5977")
 
-	// Production behavior: noai is only registered when the operator
-	// explicitly opts in. There is no localhost fallback in production —
-	// the env var must be set. An explicit URL therefore registers the
-	// provider even in prod (which is intentional: an operator setting
-	// the var has consciously opted in). Producers should still not
-	// set the var in prod images; the TS-side `devOnly` gate already
-	// hides the provider from project configs there.
+	a := &account{}
+	cfg, err := a.GetConfigForProvider(providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetConfigForProvider: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "http://fake-host:5977" {
+		t.Fatalf("BaseURL mismatch: got %q want http://fake-host:5977", cfg.NetworkConfig.BaseURL)
+	}
+}
+
+// Fail-closed: a configured LANGWATCH_NOAI_BASE_URL is NOT enough — without
+// the LW_GATEWAY_NOAI_ENABLED opt-in the provider must be absent from
+// GetConfiguredProviders and both per-provider methods must error.
+func TestLangwatchNoaiDisabledIgnoresBaseURL(t *testing.T) {
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5977")
+
 	a := &account{}
 	providers, err := a.GetConfiguredProviders()
 	if err != nil {
 		t.Fatalf("GetConfiguredProviders: %v", err)
 	}
-	found := false
-	for _, p := range providers {
-		if p == providerLangwatchNoai {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected explicit LANGWATCH_NOAI_BASE_URL to register noai even in production")
+	if noaiConfigured(providers) {
+		t.Fatalf("expected noai to be absent without the opt-in flag, got %v", providers)
 	}
 
-	// Unset and confirm the prod gate suppresses noai when nobody opted in.
-	t.Setenv("LANGWATCH_NOAI_BASE_URL", "")
-	providers, err = a.GetConfiguredProviders()
-	if err != nil {
-		t.Fatalf("GetConfiguredProviders after unset: %v", err)
+	if _, err := a.GetConfigForProvider(providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetConfigForProvider to error when noai disabled")
 	}
-	for _, p := range providers {
-		if p == providerLangwatchNoai {
-			t.Fatalf("expected noai to be suppressed when env unset in production")
-		}
+	if _, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetKeysForProvider to error when noai disabled")
+	}
+}
+
+// Fail-closed by default: with nothing set the provider is absent and both
+// per-provider methods error.
+func TestLangwatchNoaiDisabledByDefault(t *testing.T) {
+	a := &account{}
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
+	if noaiConfigured(providers) {
+		t.Fatalf("expected noai to be absent by default, got %v", providers)
+	}
+
+	if _, err := a.GetConfigForProvider(providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetConfigForProvider to error when noai disabled")
+	}
+	if _, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetKeysForProvider to error when noai disabled")
 	}
 }
