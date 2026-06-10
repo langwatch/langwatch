@@ -82,6 +82,14 @@ export class UserService {
     return updated;
   }
 
+  async getAccountInfo({ id }: { id: string }): Promise<{ createdAt: Date } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { createdAt: true },
+    });
+    return user ? { createdAt: user.createdAt } : null;
+  }
+
   async getSsoStatus({ id }: { id: string }): Promise<{ pendingSsoSetup: boolean }> {
     const user = await this.prisma.user.findUnique({
       where: { id },

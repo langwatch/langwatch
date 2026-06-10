@@ -9,6 +9,7 @@ import {
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../../stores/drawerStore";
+import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
@@ -65,6 +66,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
   const pinned = useDrawerStore((s) => s.pinned);
   const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
+  const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
+  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s
@@ -282,6 +285,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           </Box>
                         </IsolatedErrorBoundary>
                       ) : viewMode === "summary" ? (
+                        // Summary mode shows the same conversation-context
+                        // strip the Trace view renders (via PaneLayout) so
+                        // multi-turn context isn't lost when reading the
+                        // summary. Same store-backed collapse state, so
+                        // collapsing it in one view collapses it in both.
                         // Summary mode: render the trace-scope accordion stack
                         // full-bleed (I/O, metadata, evals, events, exceptions
                         // — whatever the current `TraceSummaryAccordions`
@@ -293,6 +301,21 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           scope="Couldn't render trace summary"
                           resetKeys={[trace.traceId]}
                         >
+                          {trace.conversationId && (
+                            <IsolatedErrorBoundary
+                              scope="Couldn't render conversation context"
+                              resetKeys={[trace.conversationId, trace.traceId]}
+                            >
+                              <ConversationContext
+                                conversationId={trace.conversationId}
+                                traceId={trace.traceId}
+                                collapsed={ctxPaneState.collapsed}
+                                onToggleCollapsed={() =>
+                                  togglePaneCollapsed("conversationContext")
+                                }
+                              />
+                            </IsolatedErrorBoundary>
+                          )}
                           <Box flex={1} minHeight={0} overflow="auto">
                             <TraceAccordions
                               trace={trace}

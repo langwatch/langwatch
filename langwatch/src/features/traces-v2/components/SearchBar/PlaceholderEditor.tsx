@@ -5,6 +5,7 @@ import {
   removeNodeAtLocation,
   swapOperatorAtLocation,
 } from "~/server/app-layer/traces/query-language/mutations";
+import { useFacetValueLabelResolver } from "../../hooks/useFacetValueLabels";
 import { buildDecorationPlan, type TokenRef } from "./filterHighlight";
 
 const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
@@ -141,6 +142,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
 
   const isEmpty = queryText.length === 0;
   const segments = useMemo(() => buildSegments(queryText), [queryText]);
+  // Chips store the raw id (unique) but display the resolved facet label
+  // (readable) — same source the sidebar uses. The id stays one hover
+  // away via `title`, and clicking into the bar mounts the live editor,
+  // which shows the underlying query text verbatim.
+  const resolveLabel = useFacetValueLabelResolver();
 
   return (
     <Box
@@ -241,6 +247,13 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
             // simultaneously activate the heavier ProseMirror editor.
             if (seg.token && onTokenClick && seg.token.value !== null) {
               const tok = seg.token;
+              const richLabel = resolveLabel(tok.field, tok.value!);
+              // Swap the id for its display name in the rendered chip
+              // only — token coords, data-attrs, and the query text all
+              // keep the unique id.
+              const display = richLabel
+                ? seg.text.replace(tok.value!, richLabel)
+                : seg.text;
               return (
                 <span
                   key={i}
@@ -250,7 +263,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   data-filter-chip-field={tok.field}
                   data-filter-chip-value={tok.value}
                   style={{ cursor: "pointer" }}
-                  title="Click to change value"
+                  title={
+                    richLabel
+                      ? `${tok.field}:${tok.value} — click to change value`
+                      : "Click to change value"
+                  }
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -265,7 +282,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     });
                   }}
                 >
-                  {seg.text}
+                  {display}
                 </span>
               );
             }

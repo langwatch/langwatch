@@ -475,6 +475,6 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "skipped",
     "error",
   ],
-  evaluatorVerdict: ["pass", "fail", "unknown"],
+  evaluatorVerdict: ["pass", "fail", "error", "unknown"],
   spanStatus: ["ok", "error", "unset"],
 };

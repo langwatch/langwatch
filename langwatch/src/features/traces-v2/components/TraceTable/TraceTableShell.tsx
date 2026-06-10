@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import {
@@ -391,20 +391,6 @@ function HeaderCell<T>({
       letterSpacing="0.06em"
       whiteSpace="nowrap"
       transition="none"
-      // Th-scoped CSS reveals the drag grip on hover. `_groupHover` via
-      // `role="group"` was unreliable across our chakra("th") wrapper —
-      // the raw `&:hover` descendant selector is simpler and works
-      // regardless of how the parent's group plumbing resolves.
-      css={{
-        "& [data-column-drag-handle]": {
-          opacity: 0,
-          transition: "opacity 100ms ease",
-        },
-        "&:hover [data-column-drag-handle], & [data-column-drag-handle]:focus-visible":
-          {
-            opacity: 1,
-          },
-      }}
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
@@ -437,81 +423,32 @@ function HeaderCell<T>({
       onMouseDown={onHeaderMouseDown}
       onDoubleClick={onHeaderDoubleClick}
     >
-      {reorderable && (
-        // Drag handle floats on the cell's left edge, hidden until the
-        // user hovers (or focuses) the header. The header label/sort
-        // chrome owns the cell's full width so labels like "TIME" no
-        // longer get squeezed by a permanently-rendered grip — the grip
-        // appears only when the operator is reaching for it. On hover
-        // it sits over the leftmost few pixels of the label; on a
-        // narrow column the label dims behind it, which is fine since
-        // the user is actively about to drag the column.
-        // GripVertical (vertical-dot orientation) reads as the "grab to
-        // move horizontally" gesture, matching every other table
-        // reorder UI users have seen.
-        <Box
-          data-column-drag-handle="true"
-          position="absolute"
-          top="50%"
-          left="2px"
-          transform="translateY(-50%)"
-          display="inline-flex"
-          alignItems="center"
-          justifyContent="center"
-          width="14px"
-          height="14px"
-          color="fg.subtle"
-          cursor="grab"
-          // Opacity is controlled by the Th-scoped CSS above; keyboard
-          // focus also reveals the handle via the `:focus-visible`
-          // selector. We still paint a focus ring locally for the
-          // keyboard path so the handle is unambiguously the focused
-          // element.
-          _focusVisible={{
-            outline: "2px solid",
-            outlineColor: "blue.focusRing",
-            outlineOffset: "1px",
-            borderRadius: "sm",
-          }}
-          _active={{ cursor: "grabbing" }}
-          // Backdrop so the grip stays legible when overlaying short
-          // labels in narrow columns. Picks up the active-sort tint
-          // so it doesn't clash with the cell's own background.
-          bg={
-            isActiveSort
-              ? { base: "bg.muted", _dark: "bg.muted" }
-              : { base: "bg.subtle/85", _dark: "bg.surface/85" }
-          }
-          borderRadius="sm"
-          zIndex={1}
-          aria-label="Drag to reorder column"
-          title="Drag to reorder column"
-          {...dragHandleProps}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icon boxSize="10px">
-            <GripVertical />
-          </Icon>
-        </Box>
-      )}
-      {/* Reserve room for the (hover-revealed) drag grip on reorderable
-          columns so the first character of the label never sits under
-          the grip. The previous "label owns full width, grip overlays"
-          rule clipped letters like the "D" of "DURATION" the instant
-          the user hovered. Trade-off: the label starts ~16px from the
-          left edge always, even when the grip is invisible — minor
-          indent for guaranteed legibility, no hover-shift jitter, and
-          ellipsis still handles the right side cleanly on narrow
-          columns. */}
-      <Box flex={1} minWidth={0} paddingLeft={reorderable ? "16px" : 0}>
+      {/* No grip — the label itself is the drag zone (grab cursor on
+          hover). The sort chevron sits outside the drag zone so it
+          keeps the pointer cursor and never starts a reorder. Labels
+          own the cell's full width again, so narrow columns ("TIME")
+          aren't squeezed by handle chrome. */}
+      <Box flex={1} minWidth={0}>
         {canSort ? (
           <SortableHeaderButton
             align={align}
             sortDirection={sortDirection}
             onToggle={header.column.getToggleSortingHandler()}
+            dragZoneProps={reorderable ? dragHandleProps : undefined}
           >
             {flexRender(header.column.columnDef.header, header.getContext())}
           </SortableHeaderButton>
+        ) : reorderable ? (
+          <Box
+            data-column-drag-handle="true"
+            cursor="grab"
+            _active={{ cursor: "grabbing" }}
+            truncate
+            title="Drag to reorder column"
+            {...dragHandleProps}
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </Box>
         ) : (
           flexRender(header.column.columnDef.header, header.getContext())
         )}
@@ -526,6 +463,15 @@ interface SortableHeaderButtonProps {
   sortDirection: false | "asc" | "desc";
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
+  /**
+   * dnd-kit sortable attributes + listeners. When set, the label text
+   * becomes the drag-to-reorder zone (grab cursor); the sort chevron
+   * stays outside it so sorting keeps priority — hovering the chevron
+   * shows a pointer, not a grab. The PointerSensor's 5px activation
+   * distance means a plain click on the label still falls through to
+   * the button's sort toggle.
+   */
+  dragZoneProps?: React.HTMLAttributes<HTMLElement>;
 }
 
 function SortableHeaderButton({
@@ -533,6 +479,7 @@ function SortableHeaderButton({
   sortDirection,
   onToggle,
   children,
+  dragZoneProps,
 }: SortableHeaderButtonProps): React.ReactElement {
   const isActive = sortDirection !== false;
   return (
@@ -561,7 +508,21 @@ function SortableHeaderButton({
       role="group"
     >
       <HStack gap={1} minWidth={0} flex={1}>
-        <Box truncate flex={1} minWidth={0} textAlign={align}>
+        <Box
+          truncate
+          flex={1}
+          minWidth={0}
+          textAlign={align}
+          {...(dragZoneProps
+            ? {
+                "data-column-drag-handle": "true",
+                cursor: "grab",
+                _active: { cursor: "grabbing" },
+                title: "Drag to reorder · click to sort",
+                ...dragZoneProps,
+              }
+            : {})}
+        >
           {children}
         </Box>
         {isActive ? (

@@ -149,6 +149,14 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       return UserService.create(ctx.prisma).getSsoStatus({ id: ctx.session.user.id });
     }),
+  getAccountInfo: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      return UserService.create(ctx.prisma).getAccountInfo({
+        id: ctx.session.user.id,
+      });
+    }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
     .use(skipPermissionCheck)

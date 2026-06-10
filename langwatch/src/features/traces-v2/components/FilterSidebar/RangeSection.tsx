@@ -399,7 +399,7 @@ const DisabledRangeVisual: React.FC<{
   </VStack>
 );
 
-const RangeEndpointInput: React.FC<RangeEndpointInputProps> = ({
+export const RangeEndpointInput: React.FC<RangeEndpointInputProps> = ({
   value,
   format,
   ariaLabel,

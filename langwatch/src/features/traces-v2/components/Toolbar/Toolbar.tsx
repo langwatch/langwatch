@@ -3,6 +3,7 @@ import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useIsNewAccount } from "../../hooks/useIsNewAccount";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
@@ -58,6 +59,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   // continue to leave `firstMessage` false, so the toggle remains
   // available during sample-data exploration.
   const { hasAnyTraces } = useProjectHasTraces();
+  const isNewAccount = useIsNewAccount();
   const showSampleDataToggle = hasAnyTraces === false;
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
@@ -187,16 +189,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             defaultName={`${activeLensName} (copy)`}
             onSubmit={(name) => createLens(name)}
           >
+            {/* Icon-only at rest — the full "Save current filtered view"
+                label made this the widest control in the toolbar. The
+                label slides out leftwards on hover (it precedes the icon
+                in DOM order, and the right-anchored cluster absorbs the
+                growth on the left edge), so the affordance still explains
+                itself before commit. */}
             <Button
               size="xs"
               variant="outline"
               colorPalette="orange"
               aria-label="Save current filtered view as a new lens"
+              className="group"
             >
+              <Box
+                as="span"
+                maxWidth={0}
+                opacity={0}
+                overflow="hidden"
+                whiteSpace="nowrap"
+                transition="max-width 0.25s ease, opacity 0.2s ease"
+                _groupHover={{ maxWidth: "170px", opacity: 1 }}
+                _groupFocusVisible={{ maxWidth: "170px", opacity: 1 }}
+              >
+                Save current filtered view
+              </Box>
               <Icon boxSize={3.5}>
                 <Bookmark />
               </Icon>
-              Save current filtered view
             </Button>
           </LensNamePopover>
         )}
@@ -208,26 +228,47 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           }
           positioning={{ placement: "bottom" }}
         >
-          <Button
-            size="xs"
-            variant={spotlightsActive ? "subtle" : "ghost"}
-            colorPalette={spotlightsActive ? "blue" : undefined}
-            onClick={handleShowMeAround}
-            aria-label={spotlightsActive ? "End tour" : "Show me around"}
-            aria-pressed={spotlightsActive}
-          >
-            <Icon
-              boxSize={3.5}
-              color={
-                spotlightsActive
-                  ? "blue.fg"
-                  : { base: "fg.muted", _dark: "fg.subtle" }
-              }
+          {/* Full "Show me around" label only for accounts younger than
+              7 days — the tour is an onboarding affordance, and the wide
+              label is wasted toolbar room for everyone who's already
+              been around. "End tour" always shows in full while a tour
+              is running so the escape hatch stays obvious. */}
+          {isNewAccount || spotlightsActive ? (
+            <Button
+              size="xs"
+              variant={spotlightsActive ? "subtle" : "ghost"}
+              colorPalette={spotlightsActive ? "blue" : undefined}
+              onClick={handleShowMeAround}
+              aria-label={spotlightsActive ? "End tour" : "Show me around"}
+              aria-pressed={spotlightsActive}
             >
-              <Map />
-            </Icon>
-            {spotlightsActive ? "End tour" : "Show me around"}
-          </Button>
+              <Icon
+                boxSize={3.5}
+                color={
+                  spotlightsActive
+                    ? "blue.fg"
+                    : { base: "fg.muted", _dark: "fg.subtle" }
+                }
+              >
+                <Map />
+              </Icon>
+              {spotlightsActive ? "End tour" : "Show me around"}
+            </Button>
+          ) : (
+            <IconButton
+              size="xs"
+              variant="ghost"
+              onClick={handleShowMeAround}
+              aria-label="Show me around"
+            >
+              <Icon
+                boxSize={3.5}
+                color={{ base: "fg.muted", _dark: "fg.subtle" }}
+              >
+                <Map />
+              </Icon>
+            </IconButton>
+          )}
         </Tooltip>
         <LiveIndicator />
         {/* Vertical separator clusters the toolbar into:

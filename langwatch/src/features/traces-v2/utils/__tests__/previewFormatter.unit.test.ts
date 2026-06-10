@@ -346,6 +346,42 @@ describe("formatPreview", () => {
     });
   });
 
+  describe("given a Python-repr payload (single quotes)", () => {
+    it("unwraps a repr content-part array into text plus media glyphs", () => {
+      const input =
+        "[{'type': 'text', 'text': '[shouting] you charged me twice'}, {'type': 'input_audio', 'input_audio': 'UklGRiS'}]";
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe(
+        "[shouting] you charged me twice \u{1F399}️",
+      );
+    });
+
+    it("unwraps a repr chat array with None/True literals", () => {
+      const input =
+        "[{'role': 'user', 'content': 'hello there', 'name': None, 'cached': True}]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("hello there");
+      expect(result.role).toBe("user");
+    });
+
+    it("keeps escaped apostrophes inside repr strings", () => {
+      const input = "[{'type': 'text', 'text': 'it\\'s fine'}]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("it's fine");
+    });
+  });
+
+  describe("given a JSON content-part array without roles", () => {
+    it("joins text parts and shows a glyph per non-text part", () => {
+      const input = JSON.stringify([
+        { type: "text", text: "describe this" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,xyz" } },
+      ]);
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("describe this \u{1F4F7}");
+    });
+  });
+
   describe("given stripMarkdownNoise: false", () => {
     it("leaves fences and images intact", () => {
       const result = formatPreview("```python\nfoo\n```", {
