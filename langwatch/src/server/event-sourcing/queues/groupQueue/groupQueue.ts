@@ -519,13 +519,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         drainedSiblings = [];
       }
       if (drainedSiblings.length > 0) {
-        const siblingPayloads = (
-          await Promise.all(
-            drainedSiblings.map((sibling) =>
-              this.parseDrainedPayload(sibling, groupId),
-            ),
-          )
-        ).filter((parsed): parsed is Payload => parsed !== null);
+        const parsedSiblings = await Promise.all(
+          drainedSiblings.map((sibling) =>
+            this.parseDrainedPayload(sibling, groupId),
+          ),
+        );
+        const siblingPayloads = parsedSiblings.filter(
+          (parsed) => parsed !== null,
+        ) as Payload[];
         if (siblingPayloads.length > 0) {
           batchPayloads = [payload, ...siblingPayloads];
         }
