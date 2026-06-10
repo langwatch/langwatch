@@ -1,6 +1,7 @@
 import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
+import { useDebounce } from "use-debounce";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
@@ -8,20 +9,31 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
 import { api } from "../../utils/api";
+import { exactModelMatchRegex } from "../../utils/modelCostRegex";
 import { isSafeRegex } from "../../utils/safeRegex";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "./ScopeChipPicker";
+  LLMModelCostMatchingSpans,
+  type MatchingSpansPreviewInput,
+} from "./LLMModelCostMatchingSpans";
+import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";
 
 export function LLMModelCostDrawer({
   id,
   cloneModel,
+  prefillModel,
+  prefillRegex,
 }: {
   id?: string;
   cloneModel?: string;
+  /**
+   * Pre-populate the form for the "add cost mapping" deep link from the
+   * trace drawer (arrives via `drawer.prefillModel` / `drawer.prefillRegex`
+   * URL params). Ignored when editing an existing row.
+   */
+  prefillModel?: string;
+  prefillRegex?: string;
 }) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -48,6 +60,8 @@ export function LLMModelCostDrawer({
             <LLMModelCostForm
               id={id}
               cloneModel={cloneModel}
+              prefillModel={prefillModel}
+              prefillRegex={prefillRegex}
               llmModelCosts={llmModelCosts.data}
             />
           )}
@@ -60,10 +74,14 @@ export function LLMModelCostDrawer({
 function LLMModelCostForm({
   id,
   cloneModel,
+  prefillModel,
+  prefillRegex,
   llmModelCosts,
 }: {
   id?: string;
   cloneModel?: string;
+  prefillModel?: string;
+  prefillRegex?: string;
   llmModelCosts: MaybeStoredLLMModelCost[];
 }) {
   const { organization, team, project } = useOrganizationTeamProject();
@@ -107,25 +125,51 @@ function LLMModelCostForm({
         },
       ];
     }
-    return project?.id
-      ? [{ scopeType: "PROJECT", scopeId: project.id }]
-      : [];
+    return project?.id ? [{ scopeType: "PROJECT", scopeId: project.id }] : [];
   });
 
   const {
     register,
     handleSubmit,
+    control,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<LLMModelCostForm>({
     defaultValues: {
-      model: currentLLMModelCost?.model,
+      model: currentLLMModelCost?.model ?? prefillModel,
       inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
       outputCostPerToken: currentLLMModelCost?.outputCostPerToken,
       cacheReadCostPerToken: currentLLMModelCost?.cacheReadCostPerToken,
       cacheCreationCostPerToken: currentLLMModelCost?.cacheCreationCostPerToken,
-      regex: currentLLMModelCost?.regex,
+      regex: currentLLMModelCost?.regex ?? prefillRegex,
     },
   });
+
+  // Live values feeding the matching-spans preview. Debounced so the
+  // ClickHouse-backed preview doesn't fire on every keystroke; rates pass
+  // through a finite-number gate because react-hook-form yields NaN /
+  // empty-string while a numeric field is being edited.
+  const liveValues = useWatch({ control });
+  const [debouncedValues] = useDebounce(liveValues, 400);
+  const finiteOrUndefined = (value: unknown): number | undefined => {
+    const num = typeof value === "string" ? Number(value) : (value as number);
+    return typeof num === "number" && Number.isFinite(num) && num >= 0
+      ? num
+      : undefined;
+  };
+  const previewInput: MatchingSpansPreviewInput = {
+    regex: debouncedValues.regex ?? "",
+    model: debouncedValues.model || undefined,
+    inputCostPerToken: finiteOrUndefined(debouncedValues.inputCostPerToken),
+    outputCostPerToken: finiteOrUndefined(debouncedValues.outputCostPerToken),
+    cacheReadCostPerToken: finiteOrUndefined(
+      debouncedValues.cacheReadCostPerToken,
+    ),
+    cacheCreationCostPerToken: finiteOrUndefined(
+      debouncedValues.cacheCreationCostPerToken,
+    ),
+  };
 
   const onSubmit = (data: LLMModelCostForm) => {
     if (!project?.id) return;
@@ -240,6 +284,18 @@ function LLMModelCostForm({
           </InputGroup>
           <Field.ErrorText>{errors.regex?.message}</Field.ErrorText>
         </HorizontalFormControl>
+        <LLMModelCostMatchingSpans
+          input={previewInput}
+          onPickModel={(model) => {
+            setValue("regex", exactModelMatchRegex(model), {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+            if (!getValues("model")) {
+              setValue("model", model, { shouldDirty: true });
+            }
+          }}
+        />
         <HorizontalFormControl
           label="Input Cost Per Token"
           helper="Cost per input token in USD"
@@ -325,4 +381,3 @@ function LLMModelCostForm({
     </>
   );
 }
-

@@ -1,12 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import safe from "safe-regex2";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import { prisma } from "~/server/db";
 import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
 import { resolveOrganizationForScope as resolveOrganizationForScopeOrNull } from "~/server/scopes/resolveOrganizationForScope";
 import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
+import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
 import { authorizeInResolver, checkProjectPermission } from "../rbac";
@@ -185,13 +187,34 @@ export const llmModelCostsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), model: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => getModelLimits(input.model)),
-});
 
-const isSafeRegex = (pattern: string): boolean => {
-  try {
-    const re = new RegExp(pattern);
-    return safe(re);
-  } catch {
-    return false;
-  }
-};
+  /**
+   * Live preview for the cost rule drawer: which recently-seen models (and
+   * sample spans) would this regex match, and what would those spans cost at
+   * the rates being edited. Gated on traces:view — the response exposes span
+   * metadata (model names, token counts, trace ids), not cost-rule config.
+   */
+  previewMatchingSpans: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        model: z.string().max(512).optional(),
+        regex: z
+          .string()
+          .min(1)
+          .max(512)
+          .refine((value) => isSafeRegex(value), {
+            message:
+              "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
+          }),
+        inputCostPerToken: z.number().nonnegative().optional(),
+        outputCostPerToken: z.number().nonnegative().optional(),
+        cacheReadCostPerToken: z.number().nonnegative().optional(),
+        cacheCreationCostPerToken: z.number().nonnegative().optional(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) =>
+      previewCostRuleMatchingSpans(getApp().traces.spans, input),
+    ),
+});

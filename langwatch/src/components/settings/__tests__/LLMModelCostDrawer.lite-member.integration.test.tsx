@@ -96,6 +96,18 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      previewMatchingSpans: {
+        useQuery: () => ({
+          data: {
+            windowDays: 7,
+            totalMatchedSpans: 0,
+            matchedModels: [],
+            sampleSpans: [],
+            unmatchedModels: [],
+          },
+          isLoading: false,
+        }),
+      },
     },
   },
 }));

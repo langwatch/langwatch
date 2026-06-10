@@ -21,6 +21,7 @@ import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
 import { SectionFocusGlow } from "./SectionFocusGlow";
 import { useAutoOpenSections } from "./sectionPresence";
+import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
@@ -124,6 +125,9 @@ export function SpanAccordions({
           onDone={handleGlowDone}
         />
       ) : null}
+      {!detailQuery.isLoading && detail?.costSuggestion && (
+        <UnmappedCostSuggestion model={detail.costSuggestion.model} />
+      )}
       {detailQuery.isLoading ? (
         <VStack align="stretch" gap={2} padding={4}>
           <Skeleton height="32px" borderRadius="md" />

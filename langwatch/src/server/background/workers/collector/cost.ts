@@ -133,6 +133,13 @@ export const normalizeModelName = (model: string): string => {
 const regexCache = new Map<string, RegExp | null>();
 
 /**
+ * The cost-rule preview feeds user keystrokes through the matcher, so the
+ * pattern space is unbounded — reset the cache when it grows past any
+ * plausible working set instead of leaking entries forever.
+ */
+const REGEX_CACHE_MAX_ENTRIES = 5_000;
+
+/**
  * Returns a cached, safe-checked RegExp for the given pattern.
  * Unsafe or invalid patterns are cached as null and warned once.
  */
@@ -143,6 +150,9 @@ const getSafeRegex = (pattern: string): RegExp | null => {
   const re = compileSafeRegex(pattern);
   if (!re) {
     logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
+  }
+  if (regexCache.size >= REGEX_CACHE_MAX_ENTRIES) {
+    regexCache.clear();
   }
   regexCache.set(pattern, re);
   return re;
@@ -155,7 +165,7 @@ const getSafeRegex = (pattern: string): RegExp | null => {
  */
 const safeRegexTest = (pattern: string, input: string): boolean => {
   const re = getSafeRegex(pattern);
-  return re !== null && re.test(input);
+  return re?.test(input) ?? false;
 };
 
 /**
@@ -192,12 +202,16 @@ export function normalizeBedrockModelId(model: string): string {
   // 3. Strip cross-region inference prefix (`eu.`, `us.`, `apac.`,
   //    `ap.`, `eu-west-*.`, ...). Only the leading region segment;
   //    vendor segment keeps its own dots untouched.
-  normalized = normalized.replace(/^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i, "");
+  normalized = normalized.replace(
+    /^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i,
+    "",
+  );
   // 4. Vendor-dot → vendor-slash. First dot only — any dots in the
   //    vendor-model half (e.g. `claude-opus-4.5`) stay.
   const firstDot = normalized.indexOf(".");
   if (firstDot > 0 && !normalized.slice(0, firstDot).includes("/")) {
-    normalized = normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
+    normalized =
+      normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
   }
   return normalized;
 }
