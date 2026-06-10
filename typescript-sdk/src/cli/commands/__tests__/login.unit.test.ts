@@ -52,34 +52,38 @@ describe("loginCommand", () => {
   describe("given no flags in a non-TTY context", () => {
     beforeEach(() => setTTY(false));
 
-    it("defaults to project login, never the AI-tools device session", async () => {
-      await loginCommand({});
+    describe("when the command is invoked with no flags", () => {
+      it("defaults to project login, never the AI-tools device session", async () => {
+        await loginCommand({});
 
-      expect(runUnifiedLoginFlow).toHaveBeenCalledTimes(1);
-      expect(runUnifiedLoginFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ kind: "project_api_key" }),
-      );
-      expect(runDeviceFlowLogin).not.toHaveBeenCalled();
-    });
+        expect(runUnifiedLoginFlow).toHaveBeenCalledTimes(1);
+        expect(runUnifiedLoginFlow).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "project_api_key" }),
+        );
+        expect(runDeviceFlowLogin).not.toHaveBeenCalled();
+      });
 
-    it("prints the project-login default and the --device escape hatch", async () => {
-      const logSpy = console.log as unknown as ReturnType<typeof vi.fn>;
-      await loginCommand({});
+      it("prints the project-login default and the --device escape hatch", async () => {
+        const logSpy = console.log as unknown as ReturnType<typeof vi.fn>;
+        await loginCommand({});
 
-      const printed = logSpy.mock.calls.flat().join("\n");
-      expect(printed).toContain("project login");
-      expect(printed).toContain("--device");
+        const printed = logSpy.mock.calls.flat().join("\n");
+        expect(printed).toContain("project login");
+        expect(printed).toContain("--device");
+      });
     });
   });
 
   describe("given the --device flag", () => {
     beforeEach(() => setTTY(false));
 
-    it("runs the AI-tools device session, not project login", async () => {
-      await loginCommand({ device: true });
+    describe("when the command is invoked with --device", () => {
+      it("runs the AI-tools device session, not project login", async () => {
+        await loginCommand({ device: true });
 
-      expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
-      expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
+        expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
+        expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -16,7 +16,7 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
@@ -122,6 +122,14 @@ describe("CLI login personal-project guards", () => {
     });
   });
 
+  // Reset the governance baseline (off) before every test: the dev .env
+  // force-enables the flag, so clearing it BEFORE each case is what guarantees
+  // isolation — and a failed assertion can never leak the forced flag forward.
+  // The one governance-on case opts in explicitly in its own body.
+  beforeEach(() => {
+    delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+  });
+
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     await prisma.virtualKey.deleteMany({ where: { principalUserId: USER_ID } }).catch(() => {});
@@ -135,61 +143,67 @@ describe("CLI login personal-project guards", () => {
   });
 
   describe("given an organization without governance enabled", () => {
-    /** @scenario device-session approval is refused when governance is disabled */
-    it("refuses a device-session approval with governance_required and mints no personal VK", async () => {
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-      const userCode = await mintDeviceCode("device_session");
+    describe("when a device-session approval is requested", () => {
+      /** @scenario device-session approval is refused when governance is disabled */
+      it("refuses it with governance_required and mints no personal VK", async () => {
+        const userCode = await mintDeviceCode("device_session");
 
-      const { status, json } = await approve({ user_code: userCode });
+        const { status, json } = await approve({ user_code: userCode });
 
-      expect(status).toBe(403);
-      expect(json.error).toBe("governance_required");
-      const vks = await prisma.virtualKey.findMany({ where: { principalUserId: USER_ID } });
-      expect(vks).toHaveLength(0);
+        expect(status).toBe(403);
+        expect(json.error).toBe("governance_required");
+        const vks = await prisma.virtualKey.findMany({ where: { principalUserId: USER_ID } });
+        expect(vks).toHaveLength(0);
+      });
     });
   });
 
   describe("given an organization with governance enabled", () => {
-    /** @scenario device-session approval succeeds when governance is enabled */
-    it("does not refuse the device-session approval", async () => {
-      process.env.FEATURE_FLAG_FORCE_ENABLE = GOV_FLAG;
-      const userCode = await mintDeviceCode("device_session");
+    describe("when a device-session approval is requested", () => {
+      /** @scenario device-session approval succeeds when governance is enabled */
+      it("does not refuse the device-session approval", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = GOV_FLAG;
+        const userCode = await mintDeviceCode("device_session");
 
-      const { status } = await approve({ user_code: userCode });
+        const { status } = await approve({ user_code: userCode });
 
-      // Either a VK is issued (200) or the no-provider graceful fallback (200);
-      // the gate must NOT block it.
-      expect(status).not.toBe(403);
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+        // Either a VK is issued (200) or the no-provider graceful fallback (200);
+        // the gate must NOT block it.
+        expect(status).not.toBe(403);
+      });
     });
   });
 
   describe("given a project-login (project_api_key) approval", () => {
-    /** @scenario project-login approval rejects a personal project id */
-    it("rejects a personal project id and does not return its API key", async () => {
-      const userCode = await mintDeviceCode("project_api_key");
+    describe("when the approval targets a personal project id", () => {
+      /** @scenario project-login approval rejects a personal project id */
+      it("rejects it and does not return its API key", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
 
-      const { status, json } = await approve({
-        user_code: userCode,
-        project_id: PERSONAL_PROJECT_ID,
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: PERSONAL_PROJECT_ID,
+        });
+
+        expect(status).toBe(400);
+        expect(json.error).toBe("personal_project_not_allowed");
+        expect(JSON.stringify(json)).not.toContain(PERSONAL_API_KEY);
       });
-
-      expect(status).toBe(400);
-      expect(json.error).toBe("personal_project_not_allowed");
-      expect(JSON.stringify(json)).not.toContain(PERSONAL_API_KEY);
     });
 
-    /** @scenario project-login approval returns the shared project's key */
-    it("approves a shared team project", async () => {
-      const userCode = await mintDeviceCode("project_api_key");
+    describe("when the approval targets a shared team project id", () => {
+      /** @scenario project-login approval returns the shared project's key */
+      it("approves it and returns that project", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
 
-      const { status, json } = await approve({
-        user_code: userCode,
-        project_id: SHARED_PROJECT_ID,
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+
+        expect(status).toBe(200);
+        expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
       });
-
-      expect(status).toBe(200);
-      expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
     });
   });
 });

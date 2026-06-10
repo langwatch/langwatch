@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -91,10 +90,17 @@ describe("LangWatch CLI Auth — skill setup stays on a real project", () => {
         path.join(os.tmpdir(), "langwatch-cli-auth-project-"),
       );
       // A real minimal agent with a project API key already present in .env.
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
+      fs.cpSync(
+        path.resolve(__dirname, "fixtures/python-openai"),
+        tempFolder,
+        { recursive: true },
       );
-      const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+      const apiKey = process.env.LANGWATCH_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "LANGWATCH_API_KEY is required for this scenario test",
+        );
+      }
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${apiKey}\n`,

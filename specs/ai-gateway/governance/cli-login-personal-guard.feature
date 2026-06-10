@@ -19,12 +19,13 @@ Feature: CLI login never lands a user on a personal project
   Background:
     Given a user who is a member of an organization
     And the CLI device-code approval endpoint `POST /api/auth/cli/approve`
+    And governance for an organization is gated by the `release_ui_ai_governance_enabled` feature flag
 
   Rule: device-session (AI-tools) login requires governance enabled
 
     @integration @governance-gate
     Scenario: device-session approval is refused when governance is disabled
-      Given the organization does NOT have `release_ui_ai_governance_enabled`
+      Given governance is disabled for the organization
       And a pending device code with credential_type "device_session"
       When the user approves it
       Then the response is 403 with error "governance_required"
@@ -32,7 +33,7 @@ Feature: CLI login never lands a user on a personal project
 
     @integration @governance-gate
     Scenario: device-session approval succeeds when governance is enabled
-      Given the organization HAS `release_ui_ai_governance_enabled`
+      Given governance is enabled for the organization
       And a pending device code with credential_type "device_session"
       When the user approves it
       Then the response is 200 and a personal virtual key is issued

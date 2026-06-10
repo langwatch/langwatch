@@ -14,13 +14,15 @@ describe("resolveCliAuthProjects", () => {
   ];
 
   describe("given a team with a personal, an internal-governance, and a shared project", () => {
-    /** @scenario the project picker omits personal and internal-governance projects */
-    it("offers only the shared project", () => {
-      const { projects } = resolveCliAuthProjects({ teams });
+    describe("when the CLI-auth project list is resolved", () => {
+      /** @scenario the project picker omits personal and internal-governance projects */
+      it("offers only the shared project", () => {
+        const { projects } = resolveCliAuthProjects({ teams });
 
-      expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
-      expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
-      expect(projects.map((p) => p.slug)).not.toContain("internal_governance");
+        expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
+        expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
+        expect(projects.map((p) => p.slug)).not.toContain("internal_governance");
+      });
     });
   });
 
@@ -36,30 +38,36 @@ describe("resolveCliAuthProjects", () => {
       },
     ];
 
-    /** @scenario the project picker pre-selects the user's last project when it is offered */
-    it("pre-selects the last project the user worked in", () => {
-      const { defaultProjectId } = resolveCliAuthProjects({
-        teams: multi,
-        lastProjectSlug: "acme-prod",
-      });
+    describe("when the last project slug matches an offered project", () => {
+      /** @scenario the project picker pre-selects the user's last project when it is offered */
+      it("pre-selects the last project the user worked in", () => {
+        const { defaultProjectId } = resolveCliAuthProjects({
+          teams: multi,
+          lastProjectSlug: "acme-prod",
+        });
 
-      expect(defaultProjectId).toBe("p-prod");
+        expect(defaultProjectId).toBe("p-prod");
+      });
     });
 
-    it("falls back to no default when the last project is not offered", () => {
-      const { defaultProjectId } = resolveCliAuthProjects({
-        teams: multi,
-        lastProjectSlug: "jane-personal",
-      });
+    describe("when the last project slug is not among the offered projects", () => {
+      it("falls back to no default", () => {
+        const { defaultProjectId } = resolveCliAuthProjects({
+          teams: multi,
+          lastProjectSlug: "jane-personal",
+        });
 
-      expect(defaultProjectId).toBeNull();
+        expect(defaultProjectId).toBeNull();
+      });
     });
   });
 
   describe("given a single offered project", () => {
-    it("auto-selects it", () => {
-      const { defaultProjectId } = resolveCliAuthProjects({ teams });
-      expect(defaultProjectId).toBe("p-shared");
+    describe("when the default project is computed", () => {
+      it("auto-selects it", () => {
+        const { defaultProjectId } = resolveCliAuthProjects({ teams });
+        expect(defaultProjectId).toBe("p-shared");
+      });
     });
   });
 });
