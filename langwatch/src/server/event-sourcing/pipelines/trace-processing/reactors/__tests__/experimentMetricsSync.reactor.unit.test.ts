@@ -236,4 +236,57 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe("shouldReact predicate", () => {
+    describe("when trace has evaluation.run_id and cost data", () => {
+      it("returns true", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: 0.003,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when trace has no evaluation.run_id", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({ attributes: {} });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when trace has no cost data", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: null,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
 });

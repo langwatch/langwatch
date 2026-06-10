@@ -67,13 +67,19 @@ Constraints on the predicate, enforced by convention and review:
   A reactor whose relevance can only be decided with dependencies simply
   omits `shouldReact` and filters in the handler as before.
 
-The event-intrinsic guards migrate out of these trace-pipeline handlers
-into `shouldReact`: `customEvaluationSync` (span-event type + stale-trace
-cutoff + "span actually contains custom-evaluation events"),
+The event-intrinsic guards of these trace-pipeline reactors become
+`shouldReact` predicates: `customEvaluationSync` (span-event type +
+stale-trace cutoff + "span actually contains custom-evaluation events"),
 `simulationMetricsSync` (`scenario.run_id` presence + has data to
 aggregate), `experimentMetricsSync` (`evaluation.run_id` presence + has
 cost), `originGate` (stale cutoff + origin already resolved),
 `projectMetadata` (sample-origin seed traces).
+
+Because the predicate fails open, a handler can still occasionally
+receive an event its predicate would have rejected. Handlers therefore
+keep their guards — the guard logic lives in a shared pure helper per
+reactor, referenced by both `shouldReact` and `handle()`, so the two can
+never drift.
 
 ## Rationale / Trade-offs
 

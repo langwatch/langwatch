@@ -190,6 +190,61 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
     });
   });
 
+  describe("shouldReact predicate", () => {
+    describe("when trace has scenario.run_id and data to aggregate", () => {
+      it("returns true", () => {
+        const reactor = createSimulationMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "scenario.run_id": "run-1" },
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when trace has no scenario.run_id", () => {
+      it("returns false", () => {
+        const reactor = createSimulationMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "langwatch.origin": "sdk" },
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when trace has no spans and no cost", () => {
+      it("returns false", () => {
+        const reactor = createSimulationMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "scenario.run_id": "run-1" },
+          spanCount: 0,
+          totalCost: null,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
   describe("when totalCost is zero but the trace has spans", () => {
     it("dispatches computeRunMetrics", async () => {
       const deps = createDeps();

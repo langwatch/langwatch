@@ -185,6 +185,46 @@ describe("originGate reactor", () => {
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
+
+  describe("shouldReact predicate", () => {
+    describe("when origin is absent on a recent trace", () => {
+      it("returns true", () => {
+        const reactor = createOriginGateReactor(createDeps());
+        const state = createFoldState({ attributes: {} });
+
+        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("when origin is already resolved", () => {
+      it("returns false", () => {
+        const reactor = createOriginGateReactor(createDeps());
+        const state = createFoldState({
+          attributes: { "langwatch.origin": "application" },
+        });
+
+        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
+          false,
+        );
+      });
+    });
+
+    describe("when the trace is old (resyncing)", () => {
+      it("returns false", () => {
+        const reactor = createOriginGateReactor(createDeps());
+        const state = createFoldState({ attributes: {} });
+        const oldEvent = createEvent({
+          occurredAt: Date.now() - 2 * 60 * 60 * 1000,
+        });
+
+        expect(reactor.shouldReact!(oldEvent, createContext(state))).toBe(
+          false,
+        );
+      });
+    });
+  });
 });
 
 describe("createDeferredOriginHandler()", () => {

@@ -2,6 +2,7 @@ import type { ResolveOriginCommandData } from "../schemas/commands";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
+import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
@@ -32,11 +33,26 @@ export interface OriginGateReactorDeps {
  * Completely decoupled from evaluation dispatch — evaluationTrigger
  * handles that independently.
  */
+/**
+ * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * (fail-open path): skip stale resync traces and traces whose origin is
+ * already resolved.
+ */
+function needsOriginResolution(
+  event: TraceProcessingEvent,
+  foldState: TraceSummaryData,
+): boolean {
+  if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+  return !(foldState.attributes ?? {})["langwatch.origin"];
+}
+
 export function createOriginGateReactor(
   deps: OriginGateReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "originGate",
+    shouldReact: (event, context) =>
+      needsOriginResolution(event, context.foldState),
     options: {
       makeJobId: (payload) =>
         `origin-gate:${payload.event.tenantId}:${payload.event.aggregateId}`,
@@ -50,11 +66,7 @@ export function createOriginGateReactor(
     ): Promise<void> {
       const { tenantId, aggregateId: traceId, foldState } = context;
 
-      // Guard: skip old traces (resyncing)
-      if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
-
-      const attrs = foldState.attributes ?? {};
-      if (attrs["langwatch.origin"]) return; // origin already resolved
+      if (!needsOriginResolution(event, foldState)) return;
 
       // No origin — schedule deferred resolution (5-min delay)
       logger.debug(
