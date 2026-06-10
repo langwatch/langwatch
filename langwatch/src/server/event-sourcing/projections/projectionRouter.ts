@@ -743,7 +743,13 @@ export class ProjectionRouter<
    * Builds the context a reactor receives. Used for both shouldReact and
    * handle so the predicate can never see a different shape than the handler.
    */
-  private buildReactorContext(event: EventType, foldState: unknown) {
+  private buildReactorContext({
+    event,
+    foldState,
+  }: {
+    event: EventType;
+    foldState: unknown;
+  }) {
     return {
       tenantId: event.tenantId,
       aggregateId: String(event.aggregateId),
@@ -764,7 +770,10 @@ export class ProjectionRouter<
     if (!reactor.shouldReact) return true;
 
     try {
-      return reactor.shouldReact(event, this.buildReactorContext(event, foldState));
+      return reactor.shouldReact(
+        event,
+        this.buildReactorContext({ event, foldState }),
+      );
     } catch (error) {
       this.logger.error(
         {
@@ -831,7 +840,10 @@ export class ProjectionRouter<
           try {
             await withMetrics({
               fn: () =>
-                reactor.handle(event, this.buildReactorContext(event, foldState)),
+                reactor.handle(
+                  event,
+                  this.buildReactorContext({ event, foldState }),
+                ),
               onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
               onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             });
@@ -856,7 +868,10 @@ export class ProjectionRouter<
         try {
           await withMetrics({
             fn: () =>
-              reactor.handle(event, this.buildReactorContext(event, foldState)),
+              reactor.handle(
+                event,
+                this.buildReactorContext({ event, foldState }),
+              ),
             onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
           });
