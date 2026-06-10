@@ -4,7 +4,6 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
