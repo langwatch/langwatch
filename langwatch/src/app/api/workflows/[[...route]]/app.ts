@@ -7,6 +7,11 @@ import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import { createProjectApp, requires } from "~/server/api/security";
+import {
+  NoCommittedVersionError,
+  WorkflowEvaluationService,
+  WorkflowNotFoundError,
+} from "~/server/workflows/workflowEvaluation.service";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -221,6 +226,97 @@ secured.access(requires("workflows:manage")).delete(
       });
 
       return c.json({ id, archived: true });
+    },
+  );
+
+const evaluateBodySchema = z.object({
+  version_id: z
+    .string()
+    .optional()
+    .describe("Committed version to evaluate; defaults to the latest commit"),
+  evaluate_on: z
+    .enum(["full", "test", "train"])
+    .optional()
+    .describe("Which dataset slice to evaluate; defaults to full"),
+  parameters: z
+    .record(z.union([z.string(), z.number(), z.boolean()]))
+    .optional()
+    .describe(
+      "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
+    ),
+});
+
+secured.access(requires("workflows:manage")).post(
+    "/:id/evaluate",
+    describeRoute({
+      description:
+        "Trigger an evaluation run of a workflow's committed version. " +
+        "Parameters bind as constant entry inputs on every dataset row; " +
+        "results land on the workflow's experiment like studio-triggered runs.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Evaluation started",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  run_id: z.string(),
+                  workflow_version_id: z.string(),
+                  version: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+        400: {
+          description: "No committed version to evaluate",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+        404: {
+          description: "Workflow not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("json", evaluateBodySchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      logger.info(
+        { projectId: project.id, workflowId: id },
+        "Triggering workflow evaluation via API",
+      );
+
+      try {
+        const result = await WorkflowEvaluationService.create(
+          prisma,
+        ).triggerEvaluation({
+          projectId: project.id,
+          workflowId: id,
+          versionId: body.version_id,
+          evaluateOn: body.evaluate_on,
+          parameters: body.parameters,
+        });
+        return c.json({
+          run_id: result.runId,
+          workflow_version_id: result.workflowVersionId,
+          version: result.version,
+        });
+      } catch (error) {
+        if (error instanceof WorkflowNotFoundError) {
+          return c.json({ error: "Workflow not found" }, 404);
+        }
+        if (error instanceof NoCommittedVersionError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
     },
   );
 
