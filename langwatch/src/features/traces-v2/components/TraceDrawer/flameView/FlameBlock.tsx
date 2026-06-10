@@ -217,7 +217,9 @@ export function FlameBlock({
           filter: "brightness(1.08)",
           boxShadow:
             "0 0 0 1px var(--chakra-colors-fg-muted), var(--chakra-shadows-sm)",
-          zIndex: 2,
+          // Never demote a selected block below its resting priority —
+          // the hover lift only applies to unselected blocks.
+          zIndex: isSelected ? 3 : 2,
         }}
       >
         <Text

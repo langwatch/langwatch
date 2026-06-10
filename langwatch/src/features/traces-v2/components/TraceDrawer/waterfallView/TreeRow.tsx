@@ -208,7 +208,7 @@ export const TreeRow = memo(function TreeRow({
         {span.parentSpanId ? (
           <TipCell label="Parent" value={span.parentSpanId.slice(0, 16)} mono />
         ) : (
-          <TipCell label="Parent" value="none" subtle />
+          <TipCell label="Parent" value="none" isSubtle />
         )}
       </Box>
     </Box>

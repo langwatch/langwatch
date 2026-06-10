@@ -373,7 +373,13 @@ const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
  * key can't be safely round-tripped as a bare Liqe field, or the value
  * collapses to empty after escape.
  */
-function formatMetadataFilterQuery(key: string, value: string): string | null {
+function formatMetadataFilterQuery({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): string | null {
   if (!SAFE_METADATA_KEY_RE.test(key)) return null;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   if (!escaped) return null;
@@ -721,7 +727,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       // field names and the backend's text search treats them as
       // attribute-key filters (same behaviour the search bar uses for
       // hand-typed `metadata.tenant:"org-acme"` queries).
-      const filterQuery = formatMetadataFilterQuery(key, value);
+      const filterQuery = formatMetadataFilterQuery({ key, value });
       out.push({
         pin: { source: "attribute", key, label },
         value,

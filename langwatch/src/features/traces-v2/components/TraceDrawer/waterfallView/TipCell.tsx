@@ -4,13 +4,13 @@ export function TipCell({
   label,
   value,
   mono,
-  subtle,
+  isSubtle,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   /** Render the value in `fg.subtle` — for placeholder values like "none". */
-  subtle?: boolean;
+  isSubtle?: boolean;
 }) {
   return (
     <>
@@ -19,7 +19,7 @@ export function TipCell({
       </Text>
       <Text
         textStyle="2xs"
-        color={subtle ? "fg.subtle" : "fg"}
+        color={isSubtle ? "fg.subtle" : "fg"}
         fontFamily={mono ? "mono" : undefined}
         textAlign="right"
         wordBreak="break-all"
