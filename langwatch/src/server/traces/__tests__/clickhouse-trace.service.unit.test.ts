@@ -984,9 +984,14 @@ describe("ClickHouseTraceService", () => {
         });
 
         const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
-        // Predicate present in both the outer scan and the inner dedup subquery.
+        // Both bounds present in both the outer scan and the inner dedup
+        // subquery (a dropped upper bound would leave the read half-open).
         expect(
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
+            [],
+        ).toHaveLength(2);
+        expect(
+          summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
         expect(summaryCall.query_params.sumFromMs).toBe(
@@ -1013,6 +1018,9 @@ describe("ClickHouseTraceService", () => {
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
 
         const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
+        // No OccurredAt predicate inlined at all, and no window params.
+        expect(summaryCall.query).not.toContain("OccurredAt >=");
+        expect(summaryCall.query).not.toContain("OccurredAt <=");
         expect(summaryCall.query).not.toContain("sumFromMs");
         expect(summaryCall.query_params.sumFromMs).toBeUndefined();
         expect(summaryCall.query_params.sumToMs).toBeUndefined();
