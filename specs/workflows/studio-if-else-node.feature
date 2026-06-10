@@ -44,7 +44,7 @@ Feature: If/Else conditional branch node in workflows
   # Execution: routing + skipping (engine behavior)
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: True condition executes only the true branch
     Given an if/else node whose condition evaluates to true for the input
     And a "Faithfulness" evaluator connected to the "true" branch
@@ -54,7 +54,7 @@ Feature: If/Else conditional branch node in workflows
     And the code node on the false branch is skipped
     And the skipped node reports status "skipped" with zero cost
 
-  @integration @unimplemented
+  @integration
   Scenario: False condition executes only the false branch
     Given an if/else node whose condition evaluates to false for the input
     And a "Faithfulness" evaluator connected to the "true" branch
@@ -63,7 +63,7 @@ Feature: If/Else conditional branch node in workflows
     Then the evaluator on the true branch is skipped
     And the code node on the false branch runs
 
-  @integration @unimplemented
+  @integration
   Scenario: Skipping cascades to downstream-only nodes of the skipped branch
     Given a chain of two nodes connected after the "false" branch
     And the condition evaluates to true
@@ -71,18 +71,18 @@ Feature: If/Else conditional branch node in workflows
     Then both nodes of the false-branch chain are skipped
     And nodes reachable from the true branch all execute
 
-  @integration @unimplemented
+  @integration
   Scenario: A node fed by both branches runs when either branch is taken
     Given an end node receiving inputs from both the true and false branches
     When the workflow executes with the condition evaluating to true
     Then the end node executes using the outputs of the true branch
 
-  @integration @unimplemented
+  @integration
   Scenario: Condition errors fail the if/else node, not the whole engine
     Given an if/else node whose condition references a missing field
     When the workflow executes
-    Then the if/else node reports an error state with a clear message
-    And downstream nodes of both branches are skipped
+    Then the if/else node reports an error state naming the missing field
+    And no downstream node executes
 
   # ============================================================================
   # Studio feedback

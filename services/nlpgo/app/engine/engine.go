@@ -231,6 +231,15 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 		go func() {
 			defer wg.Done()
 			node := state.nodes[nodeID]
+			// Branch gating: nodes behind a not-taken if/else branch are
+			// never dispatched — no cost, no latency, status "skipped".
+			if state.shouldSkip(nodeID) {
+				state.recordState(nodeID, &NodeState{
+					ID:     nodeID,
+					Status: string(dsl.StatusSkipped),
+				})
+				return
+			}
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			// Skip the span for pass-through node kinds (Entry, End,
@@ -293,9 +302,25 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 		return e.runAgent(ctx, req, node, inputs, ns)
 	case dsl.ComponentCustom:
 		return e.runCustom(ctx, req, node, inputs, ns)
+	case dsl.ComponentIfElse:
+		return runIfElse(node, inputs)
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
+}
+
+// runIfElse evaluates the node's `condition` parameter (a Liquid
+// boolean expression over its inputs) and emits the two branch
+// outputs. The engine's branch gating (runState.shouldSkip) reads the
+// emitted booleans through the node's `outputs.true` / `outputs.false`
+// edges to decide which downstream nodes to skip.
+func runIfElse(node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+	condition := paramString(node.Data.Parameters, "condition")
+	result, err := template.EvaluateCondition(condition, inputs)
+	if err != nil {
+		return nil, &NodeError{Type: "invalid_condition", Message: err.Error()}
+	}
+	return map[string]any{"true": result, "false": !result}, nil
 }
 
 func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *NodeError) {
@@ -1072,6 +1097,66 @@ func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 		}
 	}
 	return out
+}
+
+// shouldSkip reports whether a node must not be dispatched because it
+// sits behind an if/else branch that was not taken, or because nothing
+// feeding it actually ran (cascade behind a skipped/errored upstream).
+//
+// Rules:
+//   - Inbound edges from an if/else node's branch handles
+//     (outputs.true / outputs.false) are gates: grouped by source
+//     if/else node, at least one branch edge per gate must have fired
+//     true, else the node is skipped. Connecting BOTH handles of the
+//     same gate makes the node a merge point that runs either way.
+//   - Data edges from skipped or errored sources are inactive. A node
+//     whose inbound edges are ALL inactive is skipped (cascade); a node
+//     with at least one live data edge still runs and simply misses the
+//     dead inputs (merge-at-end pattern).
+func (r *runState) shouldSkip(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// Single-node execution (Studio "run with manual input") bypasses
+	// edge resolution entirely — never gate it.
+	if id == r.manualInputsTarget && r.manualInputs != nil {
+		return false
+	}
+	edges := r.edgesByTarget[id]
+	if len(edges) == 0 {
+		return false
+	}
+	branchSeen := map[string]bool{}
+	branchTaken := map[string]bool{}
+	anyActive := false
+	for _, e := range edges {
+		src := r.nodes[e.Source]
+		srcState := r.states[e.Source]
+		srcDead := srcState != nil &&
+			(srcState.Status == "skipped" || srcState.Status == "error")
+		srcKey := stripHandlePrefix(e.SourceHandle, "outputs.")
+		if src != nil && src.Type == dsl.ComponentIfElse &&
+			(srcKey == "true" || srcKey == "false") {
+			branchSeen[e.Source] = true
+			if !srcDead {
+				if out, ok := r.outputs[e.Source]; ok {
+					if v, isBool := out[srcKey].(bool); isBool && v {
+						branchTaken[e.Source] = true
+						anyActive = true
+					}
+				}
+			}
+			continue
+		}
+		if !srcDead {
+			anyActive = true
+		}
+	}
+	for gate := range branchSeen {
+		if !branchTaken[gate] {
+			return true
+		}
+	}
+	return !anyActive
 }
 
 // stripHandlePrefix removes a leading "outputs." or "inputs." from a

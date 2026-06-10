@@ -9,6 +9,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/planner"
 )
 
@@ -168,6 +169,15 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 		go func() {
 			defer wg.Done()
 			node := state.nodes[nodeID]
+			// Branch gating: see runLayer's twin branch. The skipped
+			// state is still emitted so Studio paints the node as
+			// skipped instead of leaving it idle.
+			if state.shouldSkip(nodeID) {
+				ns := &NodeState{ID: nodeID, Status: string(dsl.StatusSkipped)}
+				state.recordState(nodeID, ns)
+				emit(ctx, out, stateEvent(traceID, nodeID, ns))
+				return
+			}
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
