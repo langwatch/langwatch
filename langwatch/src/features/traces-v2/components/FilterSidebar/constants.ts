@@ -31,7 +31,8 @@ import {
   Workflow,
 } from "lucide-react";
 import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/metadata";
-import { ORIGIN_COLORS, STATUS_COLORS } from "../../utils/formatters";
+import { STATUS_COLORS } from "../../utils/formatters";
+import { ORIGIN_DISPLAY } from "../../utils/originDisplay";
 
 /** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
@@ -65,14 +66,20 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
- * Status keeps a fixed traffic-light mapping. Origin uses a curated
- * mapping shared with the rest of the app (`~/utils/originColors.ts`)
- * so "evaluation" is always green, "application" always blue, etc.
+ * Status keeps a fixed traffic-light mapping. Origin derives its dot
+ * colours from the shared `ORIGIN_DISPLAY` table — the same one the
+ * Origin column badge consumes — so "evaluation" is always green,
+ * "application" always blue, in both the sidebar and the table.
  * Span Type still hashes — the value set is open-ended.
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
-  origin: ORIGIN_COLORS,
+  origin: Object.fromEntries(
+    Object.entries(ORIGIN_DISPLAY).map(([value, { colorPalette }]) => [
+      value,
+      `${colorPalette}.solid`,
+    ]),
+  ),
 };
 
 export const SPAN_TYPE_DEFAULTS = [

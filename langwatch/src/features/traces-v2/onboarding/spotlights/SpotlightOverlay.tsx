@@ -23,8 +23,8 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnboardingStore } from "../store/onboardingStore";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "./spotlights";
 import type { Spotlight, SpotlightContext } from "./spotlights";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "./spotlights";
 
 // ---------------------------------------------------------------------------
 // URL fragment helpers (scoped to sp= prefix so we don't clobber the
@@ -240,11 +240,21 @@ function SpotlightPopover({
       bg="bg.panel"
       borderWidth="1px"
       borderColor="border"
-      borderRadius="lg"
-      boxShadow="lg"
+      borderRadius="xl"
+      boxShadow="xl"
       zIndex={1500}
       overflow="hidden"
     >
+      {/* Brand hairline — the same warm gradient family as the Ask AI
+          chip, so the tour chrome reads as part of the product's voice
+          rather than a generic library popover. */}
+      <Box
+        height="3px"
+        bgGradient="to-r"
+        gradientFrom="orange.solid"
+        gradientVia="pink.solid"
+        gradientTo="purple.solid"
+      />
       {/* Header strip */}
       <Flex
         align="center"
@@ -260,10 +270,22 @@ function SpotlightPopover({
         ) : (
           <Box />
         )}
-        <HStack gap={1} align="center">
-          <Text textStyle="2xs" color="fg.subtle">
-            {index + 1} / {total}
-          </Text>
+        <HStack gap={1.5} align="center">
+          {/* Progress dots — one per step, filled up to the current.
+              Scannable at a glance where "2 / 4" required reading. */}
+          <HStack gap={1} aria-label={`Step ${index + 1} of ${total}`}>
+            {Array.from({ length: total }, (_, i) => (
+              <Box
+                // biome-ignore lint/suspicious/noArrayIndexKey: dots are positional by definition
+                key={i}
+                width={i === index ? "14px" : "5px"}
+                height="5px"
+                borderRadius="full"
+                bg={i <= index ? "orange.solid" : "border.emphasized"}
+                transition="width 0.2s ease, background 0.2s ease"
+              />
+            ))}
+          </HStack>
           <Button
             size="2xs"
             variant="ghost"
@@ -364,25 +386,42 @@ function HighlightRing({
   // affordances (the Next/Done buttons in the popover footer, primary
   // action chips, etc.). Using it as a passive "look here" indicator
   // around an arbitrary anchor steals semantic weight from those real
-  // CTAs — and on elements that already carry their own treatment
-  // (e.g. the search bar's red Ask-AI glow) the blue ring stacks
-  // visually for no benefit. A 1px orange outline at low opacity plus
-  // a very soft glow is enough to draw the eye without fighting any
-  // existing chrome.
+  // CTAs. The ring now does the full stage-light treatment: a huge
+  // outer shadow dims the rest of the page (~12%) so the anchor reads
+  // as a literal spotlight cutout, and a gentle breathing pulse keeps
+  // the eye anchored without strobing. Pointer events stay off — the
+  // tour is non-modal and the dim is cosmetic, not a click shield.
   return (
     <Box
       data-testid="spotlight-highlight"
       position="fixed"
-      top={`${anchorRect.top - 2}px`}
-      left={`${anchorRect.left - 2}px`}
-      width={`${anchorRect.width + 4}px`}
-      height={`${anchorRect.height + 4}px`}
+      top={`${anchorRect.top - 3}px`}
+      left={`${anchorRect.left - 3}px`}
+      width={`${anchorRect.width + 6}px`}
+      height={`${anchorRect.height + 6}px`}
       borderRadius="md"
-      borderWidth="1px"
-      borderColor="orange.muted"
+      borderWidth="1.5px"
+      borderColor="orange.solid"
       pointerEvents="none"
       zIndex={1499}
-      boxShadow="0 0 0 3px color-mix(in oklab, var(--chakra-colors-orange-solid) 14%, transparent)"
+      // Resting shadow comes from the 0%/100% keyframe; reduced-motion
+      // users get it from the explicit boxShadow below instead of the
+      // animation.
+      boxShadow="0 0 0 4px color-mix(in oklab, var(--chakra-colors-orange-solid) 18%, transparent), 0 0 0 100vmax color-mix(in oklab, var(--chakra-colors-fg) 12%, transparent)"
+      css={{
+        animation: "lw-spotlight-breathe 2.4s ease-in-out infinite",
+        "@keyframes lw-spotlight-breathe": {
+          "0%, 100%": {
+            boxShadow:
+              "0 0 0 4px color-mix(in oklab, var(--chakra-colors-orange-solid) 18%, transparent), 0 0 0 100vmax color-mix(in oklab, var(--chakra-colors-fg) 12%, transparent)",
+          },
+          "50%": {
+            boxShadow:
+              "0 0 0 7px color-mix(in oklab, var(--chakra-colors-orange-solid) 30%, transparent), 0 0 0 100vmax color-mix(in oklab, var(--chakra-colors-fg) 12%, transparent)",
+          },
+        },
+        "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+      }}
     />
   );
 }
@@ -432,7 +471,9 @@ export function SpotlightOverlay(): React.ReactElement | null {
       setAnchorRect(null);
       return;
     }
-    const rect = measureAnchor(resolved.anchor);
+    const rect =
+      measureAnchor(resolved.anchor) ??
+      (resolved.fallbackAnchor ? measureAnchor(resolved.fallbackAnchor) : null);
     if (!rect) {
       // Anchor not in the DOM — skip to the next applicable spotlight.
       const nxt = nextSpotlight({ currentId: resolved.id, ctx });
@@ -449,7 +490,7 @@ export function SpotlightOverlay(): React.ReactElement | null {
       setAnchorRect(rect);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved?.anchor, resolved?.id]);
+  }, [resolved?.anchor, resolved?.fallbackAnchor, resolved?.id]);
 
   // Measure immediately after DOM paint so absolutely-positioned elements
   // have finished laying out. `useLayoutEffect` would fire synchronously
@@ -532,7 +573,12 @@ export function SpotlightOverlay(): React.ReactElement | null {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -4 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          style={{ pointerEvents: "none", position: "fixed", inset: 0, zIndex: 1498 }}
+          style={{
+            pointerEvents: "none",
+            position: "fixed",
+            inset: 0,
+            zIndex: 1498,
+          }}
         >
           <HighlightRing anchorRect={anchorRect} />
         </motion.div>
