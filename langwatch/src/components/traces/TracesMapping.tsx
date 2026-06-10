@@ -371,6 +371,10 @@ export const TracesMapping = ({
 
   const now = useMemo(() => new Date().getTime(), []);
   const isInitializedRef = React.useRef(false);
+  // The entries effect rebuilds a fresh array on every run; without this guard
+  // it pushes a new reference to the parent on every render and the parent's
+  // re-render feeds back into the effect, exceeding React's update depth.
+  const lastEntriesRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     // Build the default mapping state with targetFields
@@ -524,6 +528,9 @@ export const TracesMapping = ({
       }
     }
 
+    const serialized = JSON.stringify(entries);
+    if (serialized === lastEntriesRef.current) return;
+    lastEntriesRef.current = serialized;
     setDatasetEntries?.(entries);
   }, [
     expansions,

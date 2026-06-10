@@ -4,7 +4,6 @@
  * add-to-dataset mapping preview (which adds a selection checkbox column via
  * `selectable`).
  */
-import { Checkbox } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import type { DatasetColumns } from "~/server/datasets/types";
@@ -53,17 +52,12 @@ export function DatasetPreviewTable({
         <tr>
           {selectable ? (
             <th style={previewHeaderStyle({ width: 46 })}>
-              <Checkbox.Root
-                size="sm"
+              <input
+                type="checkbox"
                 aria-label="Select all rows"
                 checked={allSelected}
-                onCheckedChange={({ checked }) =>
-                  onToggleAll?.(checked === true)
-                }
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-              </Checkbox.Root>
+                onChange={(e) => onToggleAll?.(e.target.checked)}
+              />
             </th>
           ) : (
             <th style={previewHeaderStyle({ width: 48 })}>#</th>
@@ -80,17 +74,12 @@ export function DatasetPreviewTable({
           <tr key={row.id ?? rowIndex}>
             {selectable ? (
               <td style={previewCellStyle({ width: 46 })}>
-                <Checkbox.Root
-                  size="sm"
+                <input
+                  type="checkbox"
                   aria-label={`Select row ${rowIndex + 1}`}
                   checked={!!row.selected}
-                  onCheckedChange={({ checked }) =>
-                    onToggleRow?.(rowIndex, checked === true)
-                  }
-                >
-                  <Checkbox.HiddenInput />
-                  <Checkbox.Control />
-                </Checkbox.Root>
+                  onChange={(e) => onToggleRow?.(rowIndex, e.target.checked)}
+                />
               </td>
             ) : (
               <td style={previewCellStyle({ width: 48, muted: true })}>
