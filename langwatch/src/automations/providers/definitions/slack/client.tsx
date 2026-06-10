@@ -1,5 +1,5 @@
 import { Button, createListCollection, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { SiSlack } from "react-icons/si";
 import { Select } from "~/components/ui/select";
 import { api } from "~/utils/api";
@@ -24,6 +24,7 @@ import type {
   SummaryIdentity,
 } from "../../types";
 import { type SlackActionParams, type SlackPreview } from "./shared";
+import { findTemplateOptionBySource } from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
 interface FieldDraft {
@@ -110,6 +111,20 @@ function SlackConfigForm({
     () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
     [ctx.variables, ctx.cadenceMode],
   );
+
+  // If the cadence switches away from the one the picked preset was built
+  // for (immediate template on a digest dispatch or vice versa), the source
+  // would render empty/first-match-only bodies. Reset to the framework
+  // default so the editor shows a template that fits the new cadence.
+  useEffect(() => {
+    if (slice.template.usingDefault) return;
+    const preset = findTemplateOptionBySource(slice.template.value);
+    if (!preset) return;
+    if (preset.cadenceFit === "both" || preset.cadenceFit === ctx.cadenceMode)
+      return;
+    onChange({ ...slice, template: EMPTY_FIELD });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.cadenceMode]);
 
   return (
     <VStack align="stretch" gap={4}>
@@ -268,9 +283,10 @@ function ReuseSlackWebhook({
       seen.add(url);
       out.push({
         value: url,
-        // Show the host + the trigger that owns it so the operator can
-        // tell `#alerts` apart from `#oncall` without leaking the full URL.
-        label: `${t.name} — ${hostnameOnly(url)}`,
+        // The owning trigger's name is the only thing that distinguishes
+        // webhooks without leaking the full URL (the hostname is always
+        // hooks.slack.com).
+        label: t.name,
       });
     }
     return out;
@@ -306,15 +322,6 @@ function ReuseSlackWebhook({
       </Select.Content>
     </Select.Root>
   );
-}
-
-function hostnameOnly(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.hostname;
-  } catch {
-    return url;
-  }
 }
 
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {

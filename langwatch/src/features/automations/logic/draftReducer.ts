@@ -9,6 +9,7 @@ import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import {
+  CADENCE_LABELS,
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "~/automations/cadences";
@@ -204,13 +205,6 @@ export function isNotifyAction(draft: AutomationDraft): boolean {
   if (!draft.action) return false;
   return isNotifyEntry(CLIENT_PROVIDERS[draft.action]);
 }
-
-const CADENCE_LABELS: Record<NotificationCadence, string> = {
-  immediate: "Immediate",
-  "5min_digest": "Every 5 minutes",
-  "15min_digest": "Every 15 minutes",
-  hourly_digest: "Every hour",
-};
 
 /** One-line summary of the cadence + settle window, shown on the cadence
  *  section row in the main drawer. Notify actions only — persist actions

@@ -1,4 +1,10 @@
-import { createListCollection, Field, HStack, Input } from "@chakra-ui/react";
+import {
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  Text,
+} from "@chakra-ui/react";
 import { AlertType } from "@prisma/client";
 import { useMemo } from "react";
 import { Select } from "~/components/ui/select";
@@ -43,9 +49,9 @@ export function IdentityFields() {
           Alert type{" "}
           <Field.RequiredIndicator
             fallback={
-              <span style={{ fontSize: "0.7em", opacity: 0.6 }}>
+              <Text as="span" textStyle="xs" color="fg.muted">
                 (optional)
-              </span>
+              </Text>
             }
           />
         </Field.Label>

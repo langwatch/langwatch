@@ -21,8 +21,6 @@ import {
   TestFireUnavailableError,
 } from "./errors";
 
-export { TemplateValidationError, TestFireUnavailableError };
-
 export type TemplateChannel = "email" | "slack";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
@@ -78,9 +76,9 @@ const LIQUID_TEMPLATE_COLUMNS = [
 ] as const satisfies readonly (keyof TemplateDraft)[];
 
 function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
-  if (raw === "block_kit") return "block_kit";
-  if (raw === "string") return "string";
-  return null;
+  return raw != null && (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
+    ? (raw as SlackTemplateType)
+    : null;
 }
 
 /**

@@ -151,7 +151,8 @@ function Automations() {
     fontSize?: string;
   }) => (
     <HStack
-      border="1px solid lightgray"
+      border="1px solid"
+      borderColor="border"
       borderRadius="4px"
       fontSize={fontSize}
       width="100%"
@@ -250,7 +251,7 @@ function Automations() {
           <VStack align="stretch" gap={4}>
             <Box
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
               borderRadius="lg"
               overflow="hidden"
             >
@@ -271,7 +272,7 @@ function Automations() {
               <Table.Body>
               {triggers.isLoading ? (
                 <Table.Row>
-                  <Table.Cell colSpan={5}>Loading...</Table.Cell>
+                  <Table.Cell colSpan={7}>Loading...</Table.Cell>
                 </Table.Row>
               ) : (
                 triggers.data?.map((trigger) => {

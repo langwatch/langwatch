@@ -77,7 +77,6 @@ function findMatchingCloseTag(
   // Allow whitespace and an optional leading `-` between `{%` and the tag
   // name to mirror Liquid's whitespace-trim variants.
   const closerRe = new RegExp(`\\{%-?\\s*${closerName}\\s*-?%\\}`);
-  closerRe.lastIndex = startAfterOpenerEnd;
   const m = closerRe.exec(source.slice(startAfterOpenerEnd));
   if (!m) return -1;
   return startAfterOpenerEnd + m.index + m[0].length;

@@ -15,6 +15,14 @@ export const NOTIFICATION_CADENCES = [
 
 export type NotificationCadence = (typeof NOTIFICATION_CADENCES)[number];
 
+/** Canonical display labels for each cadence, shared by every UI consumer. */
+export const CADENCE_LABELS: Record<NotificationCadence, string> = {
+  immediate: "Immediate",
+  "5min_digest": "Every 5 minutes",
+  "15min_digest": "Every 15 minutes",
+  hourly_digest: "Every hour",
+};
+
 export const CADENCE_WINDOW_MS: Record<NotificationCadence, number> = {
   immediate: 0,
   "5min_digest": 5 * 60 * 1000,
@@ -23,9 +31,10 @@ export const CADENCE_WINDOW_MS: Record<NotificationCadence, number> = {
 };
 
 /**
- * Default trace-readiness debounce in milliseconds (ADR-026). The dedup window
- * a notify-class trigger waits before its filters re-evaluate against the
- * settled fold. Matches the `Trigger.traceDebounceMs` schema default so new
+ * Default trace-readiness debounce in milliseconds (ADR-026). The quiet
+ * period after the last span arrives before a trigger's filters re-evaluate
+ * against the settled fold — applied to every trigger regardless of action
+ * class. Matches the `Trigger.traceDebounceMs` schema default so new
  * rows inserted by the UI without a custom value preserve the historical
  * 30s behavior.
  */

@@ -9,14 +9,20 @@ import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   clearLiquidMarkers,
+  clearModelVariables,
   LIQUID_JSON_LANGUAGE_ID,
   LIQUID_LANGUAGE_ID,
   type MonacoTextModel,
   registerLiquidLanguage,
+  setModelVariables,
   setupLiquidJsonSchema,
   validateLiquidModel,
   type VariableInfo,
 } from "./liquidMonaco";
+import {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+} from "./monacoEditorChrome";
 import { useMonacoTheme } from "./useMonacoTheme";
 
 export type { VariableInfo };
@@ -128,6 +134,9 @@ export function LiquidEditor({
     () => () => {
       changeSubscription.current?.dispose();
       schemaSubscription.current?.dispose();
+      if (modelRef.current) {
+        clearModelVariables(modelRef.current);
+      }
       if (monacoRef.current && modelRef.current) {
         clearLiquidMarkers(monacoRef.current, modelRef.current);
       }
@@ -158,6 +167,7 @@ export function LiquidEditor({
     monacoRef.current = monaco;
     const model = editor.getModel();
     modelRef.current = model;
+    if (model) setModelVariables(model, variables);
     if (isLiquid && model) validateLiquidModel(monaco, model, variables);
     if (isLiquid) {
       changeSubscription.current = editor.onDidChangeModelContent(() => {
@@ -165,25 +175,7 @@ export function LiquidEditor({
         if (current) validateLiquidModel(monaco, current, variables);
       });
     }
-    // Escape inside Monaco normally bubbles up to the surrounding Drawer and
-    // closes it, which costs the author every unsaved edit in one keystroke.
-    // Trap Escape at the editor's DOM root and stop propagation; Monaco's
-    // own handlers (close completion popup, exit suggest) still fire because
-    // they run on the editor's command bus, not on the bubbling DOM event.
-    const editorEl = editor.getDomNode();
-    if (editorEl) {
-      editorEl.addEventListener(
-        "keydown",
-        (event) => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-          }
-        },
-        // `capture: true` so Chakra/Radix `Dialog.Content`'s own bubble-phase
-        // Escape handler (which closes the drawer) never sees it.
-        { capture: true },
-      );
-    }
+    trapEscapeInsideEditor(editor);
     setMounted(true);
   };
 
@@ -194,7 +186,7 @@ export function LiquidEditor({
       borderRadius="md"
       overflow="hidden"
       height={height}
-      background={theme === "vs-dark" ? "#1e1e1e" : "white"}
+      background={monacoBackgroundFor(theme)}
     >
       <MonacoEditor
         height="100%"
@@ -202,7 +194,7 @@ export function LiquidEditor({
         value={value}
         theme={theme}
         beforeMount={(monaco: Monaco) => {
-          registerLiquidLanguage(monaco, variables);
+          registerLiquidLanguage(monaco);
         }}
         onMount={onMount}
         onChange={(next: string | undefined) => onChange(next ?? "")}

@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
@@ -108,8 +108,7 @@ function TypeCard({
 }) {
   const Icon = entry.client.Icon;
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       textAlign="left"
       padding={3}
@@ -127,7 +126,7 @@ function TypeCard({
       <Text textStyle="xs" color="fg.muted">
         {entry.shared.description}
       </Text>
-    </Box>
+    </chakra.button>
   );
 }
 

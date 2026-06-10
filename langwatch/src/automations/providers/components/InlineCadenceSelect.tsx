@@ -2,16 +2,10 @@ import { createListCollection, Field, HStack, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Select } from "~/components/ui/select";
 import {
+  CADENCE_LABELS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "~/automations/cadences";
-
-const CADENCE_LABELS: Record<NotificationCadence, string> = {
-  immediate: "Immediate",
-  "5min_digest": "Every 5 minutes",
-  "15min_digest": "Every 15 minutes",
-  hourly_digest: "Every hour",
-};
 
 const CADENCE_OPTIONS = NOTIFICATION_CADENCES.map((value) => ({
   value,
@@ -30,8 +24,8 @@ export function InlineCadenceSelect({
   value,
   onChange,
 }: {
-  value: string;
-  onChange: (next: string) => void;
+  value: NotificationCadence;
+  onChange: (next: NotificationCadence) => void;
 }) {
   const collection = useMemo(
     () => createListCollection({ items: CADENCE_OPTIONS }),
@@ -52,7 +46,7 @@ export function InlineCadenceSelect({
         collection={collection}
         value={[value]}
         onValueChange={({ value: next }) => {
-          const picked = next[0];
+          const picked = next[0] as NotificationCadence | undefined;
           if (picked) onChange(picked);
         }}
       >

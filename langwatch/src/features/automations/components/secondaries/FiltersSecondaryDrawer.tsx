@@ -16,6 +16,10 @@ import {
   CONDITIONS_MODEL_URI,
   registerJsonSchema,
 } from "../../editors/monacoSchemas";
+import {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+} from "../../editors/monacoEditorChrome";
 import { useMonacoTheme } from "../../editors/useMonacoTheme";
 import type { ConditionSource } from "../../logic/draftReducer";
 import { SourceCard } from "../SourceCard";
@@ -211,7 +215,7 @@ export function FiltersSecondaryDrawer({
             borderRadius="md"
             overflow="hidden"
             height="500px"
-            background={theme === "vs-dark" ? "#1e1e1e" : "white"}
+            background={monacoBackgroundFor(theme)}
           >
             <MonacoEditor
               height="100%"
@@ -226,6 +230,7 @@ export function FiltersSecondaryDrawer({
                   CONDITIONS_JSON_SCHEMA,
                 );
               }}
+              onMount={trapEscapeInsideEditor}
               onChange={(v: string | undefined) => setCode(v ?? "{}")}
               options={{
                 minimap: { enabled: false },

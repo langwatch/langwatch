@@ -2,18 +2,12 @@ import { createListCollection, Field, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Select } from "~/components/ui/select";
 import {
+  CADENCE_LABELS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "~/automations/cadences";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-
-const CADENCE_LABELS: Record<NotificationCadence, string> = {
-  immediate: "Immediate",
-  "5min_digest": "Every 5 minutes",
-  "15min_digest": "Every 15 minutes",
-  hourly_digest: "Every hour",
-};
 
 const CADENCE_OPTIONS = NOTIFICATION_CADENCES.map((value) => ({
   value,

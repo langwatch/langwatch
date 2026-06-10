@@ -1,4 +1,4 @@
-import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import type { VariableInfo } from "~/features/automations/editors/liquidMonaco";
 
@@ -21,8 +21,7 @@ export function VariableInfoIcon({
   return (
     <HoverCard.Root openDelay={150} closeDelay={120}>
       <HoverCard.Trigger asChild>
-        <Box
-          as="button"
+        <chakra.button
           type="button"
           aria-label="Show available variables"
           color="fg.muted"
@@ -35,7 +34,7 @@ export function VariableInfoIcon({
           _hover={{ color: "fg" }}
         >
           <Info size={13} />
-        </Box>
+        </chakra.button>
       </HoverCard.Trigger>
       <Portal>
         <HoverCard.Positioner>

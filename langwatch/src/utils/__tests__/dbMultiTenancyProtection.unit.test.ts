@@ -626,6 +626,93 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
   });
 });
 
+describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
+  describe("when a raw query carries a tenancy predicate", () => {
+    it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: {
+            query: `SELECT id FROM "Trace" WHERE "projectId" = $1`,
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("does NOT throw — TemplateStringsArray shape (strings) is also recognised", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: {
+            strings: [
+              `UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = `,
+              ``,
+            ],
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a raw query has no tenancy predicate", () => {
+    it("THROWS — a scope-less raw query must not walk every tenant", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: { query: `SELECT id FROM "Trace" WHERE "deletedAt" IS NULL` },
+        }),
+      ).rejects.toThrow(/missing a tenancy predicate/);
+    });
+
+    it("THROWS on executeRaw too — writes are guarded the same way", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: { query: `DELETE FROM "Trace"` },
+        }),
+      ).rejects.toThrow(/missing a tenancy predicate/);
+    });
+  });
+
+  describe("when a raw query opts out via the -- @tenancy: marker", () => {
+    it("does NOT throw — explicit grep-able marker bypasses the predicate check", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: {
+            query: `-- @tenancy: global recovery sweep\nSELECT id FROM "Outbox" WHERE "status" = 'stuck'`,
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the raw SQL cannot be extracted from the args", () => {
+    it("falls through without throwing — unknown args shape is not the guard's job", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: { somethingElse: true },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("falls through when args is undefined", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: undefined,
+        }),
+      ).resolves.toBe("ok");
+    });
+
 /**
  * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
  * WITHOUT a projectId column must be classified into exactly one regime, so a

@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
-import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { clearCustomClientCache, getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
@@ -379,7 +380,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const triggerTemplates = new TriggerTemplateService({
-    baseHost: env.BASE_HOST,
+    baseHost: config.baseHost ?? env.BASE_HOST,
     notifier: liveTriggerNotifier,
   });
   const tokenizer = new TokenizerService(
@@ -622,8 +623,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => Promise<void>;
   }> = [];
   if (clickhouseEnabled) {
-    const { clearCustomClientCache } = require("~/server/clickhouse/clickhouseClient");
-    const { closeClickHouseClient } = require("~/server/clickhouse/client");
     gracefulCloseables.push({
       name: "clickhouse",
       close: async () => { await clearCustomClientCache(); await closeClickHouseClient(); },
@@ -812,7 +811,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
     triggerTemplates: new TriggerTemplateService({
-      baseHost: env.BASE_HOST,
+      baseHost: config.baseHost ?? env.BASE_HOST,
       notifier: {
         sendEmail: async () => {},
         sendSlack: async () => {},

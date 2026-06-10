@@ -139,6 +139,14 @@ export function AutomationDrawer({
     const row = triggerQuery.data;
     if (!row) return;
     if (hydratedFromServerFor.current === automationId) return;
+    // If the author already started editing while the query was in flight
+    // (any dispatch produces a fresh draft object), hydrating now would
+    // silently revert their keystrokes to the saved row. Keep their edits
+    // and treat the draft as hydrated.
+    if (useAutomationStore.getState().draft !== INITIAL_DRAFT) {
+      hydratedFromServerFor.current = automationId;
+      return;
+    }
     const action = row.action as TriggerAction;
     const provider = CLIENT_PROVIDERS[action];
     // `Trigger.filters` is persisted as a JSON string via `JSON.stringify`, but a

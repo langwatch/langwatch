@@ -18,10 +18,10 @@ export function SourceCard({
       textAlign="left"
       padding={3}
       borderRadius="md"
+      colorPalette="orange"
       border="1px solid"
-      borderColor={active ? "orange.400" : "border"}
-      bg={active ? "orange.50" : "bg"}
-      _dark={{ bg: active ? "orange.900" : "bg" }}
+      borderColor={active ? "colorPalette.emphasized" : "border"}
+      bg={active ? "colorPalette.subtle" : "bg"}
       onClick={onClick}
     >
       <Text fontWeight="semibold">{title}</Text>

@@ -62,7 +62,11 @@ const KEYWORDS = new Set([
   "forloop",
 ]);
 
-let knownVariables: VariableInfo[] = [];
+/** Variable lists keyed by model URI so concurrently mounted editors (email
+ *  subject vs body vs Slack template) each complete against their own
+ *  context instead of the last registrant's. Editors attach their list in
+ *  `onMount` via `setModelVariables` and detach on unmount. */
+const variablesByModelUri = new Map<string, VariableInfo[]>();
 let languageRegistered = false;
 let providersRegistered = false;
 
@@ -70,17 +74,31 @@ function rootOf(path: string): string {
   return path.split(/[.[]/)[0] ?? path;
 }
 
-/**
- * Registers the Liquid language and its completion/hover providers (idempotent)
- * and refreshes the variable list the providers offer. Call from Monaco's
- * `beforeMount` so the language exists before the model is created.
- */
-export function registerLiquidLanguage(
-  monaco: Monaco,
+/** Associates the known-variable list with a specific model so the shared
+ *  completion/hover providers can look it up per editor. */
+export function setModelVariables(
+  model: MonacoTextModel,
   variables: VariableInfo[],
 ): void {
-  knownVariables = variables;
+  variablesByModelUri.set(model.uri.toString(), variables);
+}
 
+/** Drops a model's variable association — call on editor unmount. */
+export function clearModelVariables(model: MonacoTextModel): void {
+  variablesByModelUri.delete(model.uri.toString());
+}
+
+function variablesForModel(model: MonacoTextModel): VariableInfo[] {
+  return variablesByModelUri.get(model.uri.toString()) ?? [];
+}
+
+/**
+ * Registers the Liquid language and its completion/hover providers
+ * (idempotent). Call from Monaco's `beforeMount` so the language exists
+ * before the model is created. The providers resolve variables per model
+ * via `setModelVariables`.
+ */
+export function registerLiquidLanguage(monaco: Monaco): void {
   if (!languageRegistered) {
     monaco.languages.register({ id: LIQUID_LANGUAGE_ID });
     monaco.languages.setMonarchTokensProvider(LIQUID_LANGUAGE_ID, {
@@ -197,7 +215,7 @@ export function registerLiquidLanguage(
           endColumn: position.column,
         };
 
-        const variableItems = knownVariables.map((variable) => ({
+        const variableItems = variablesForModel(model).map((variable) => ({
           label: variable.path,
           kind: monaco.languages.CompletionItemKind.Variable,
           insertText: variable.path,
@@ -243,7 +261,7 @@ export function registerLiquidLanguage(
         }
         const word = model.getWordAtPosition(position);
         if (!word) return null;
-        const match = knownVariables.find(
+        const match = variablesForModel(model).find(
           (variable) => rootOf(variable.path) === word.word,
         );
         if (!match) return null;

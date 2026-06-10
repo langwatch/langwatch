@@ -239,7 +239,7 @@ function EmailConfigForm({
           </Button>
         </HStack>
         {addError ? (
-          <Text textStyle="xs" color="red.500" mt={1}>
+          <Text textStyle="xs" color="fg.error" mt={1}>
             {addError}
           </Text>
         ) : null}

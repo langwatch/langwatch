@@ -1,14 +1,13 @@
 import { AlertType } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
 } from "~/shared/templating/banner";
+import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
   type DraftProject,
-  TemplateValidationError,
-  TestFireUnavailableError,
   type TriggerNotifier,
   TriggerTemplateService,
   validateTemplateDraft,
@@ -47,18 +46,41 @@ function makeService(notifier: TriggerNotifier) {
 
 describe("validateTemplateDraft", () => {
   describe("when a Liquid template has invalid syntax", () => {
-    it("throws a validation error", () => {
+    it("throws a validation error targeting the offending field", () => {
       expect(() =>
         validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
       ).toThrowError(TemplateValidationError);
+      expect(() =>
+        validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
+      ).toThrowError(
+        expect.objectContaining({ field: "emailBodyTemplate" }),
+      );
     });
   });
 
   describe("when the Slack template type is not recognised", () => {
-    it("throws a validation error", () => {
+    it("throws a validation error targeting slackTemplateType", () => {
       expect(() =>
         validateTemplateDraft({ slackTemplateType: "carousel" }),
       ).toThrowError(TemplateValidationError);
+      expect(() =>
+        validateTemplateDraft({ slackTemplateType: "carousel" }),
+      ).toThrowError(
+        expect.objectContaining({ field: "slackTemplateType" }),
+      );
+    });
+  });
+
+  describe("when slackTemplate is set without a slackTemplateType", () => {
+    it("throws a validation error targeting slackTemplateType", () => {
+      expect(() =>
+        validateTemplateDraft({ slackTemplate: "Hi {{ project.name }}" }),
+      ).toThrowError(TemplateValidationError);
+      expect(() =>
+        validateTemplateDraft({ slackTemplate: "Hi {{ project.name }}" }),
+      ).toThrowError(
+        expect.objectContaining({ field: "slackTemplateType" }),
+      );
     });
   });
 
@@ -77,10 +99,6 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("TriggerTemplateService", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe("testFire", () => {
     describe("when the channel is email and recipients are configured", () => {
       it("sends a banner-marked email to the recipients", async () => {
@@ -165,6 +183,50 @@ describe("TriggerTemplateService", () => {
           }),
         ).rejects.toBeInstanceOf(TestFireUnavailableError);
         expect(sentSlack).toHaveLength(0);
+      });
+    });
+
+    describe("when the draft has slackTemplate but no slackTemplateType", () => {
+      it("rejects with a validation error and sends nothing", async () => {
+        const { notifier, sentSlack } = makeNotifier();
+        const service = makeService(notifier);
+
+        await expect(
+          service.testFire({
+            channel: "slack",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: { slackTemplate: "Hi {{ project.name }}" },
+            recipients: [],
+            webhook: "https://hooks.slack.com/services/T/B/X",
+          }),
+        ).rejects.toBeInstanceOf(TemplateValidationError);
+        expect(sentSlack).toHaveLength(0);
+      });
+    });
+
+    describe("when the draft carries a custom Slack template", () => {
+      it("renders the custom template instead of the framework default", async () => {
+        const { notifier, sentSlack } = makeNotifier();
+        const service = makeService(notifier);
+
+        const result = await service.testFire({
+          channel: "slack",
+          trigger: TRIGGER,
+          project: PROJECT,
+          draft: {
+            slackTemplateType: "string",
+            slackTemplate: "Custom alert for {{ project.name }}",
+          },
+          recipients: [],
+          webhook: "https://hooks.slack.com/services/T/B/X",
+        });
+
+        expect(result.usedDefault).toBe(false);
+        expect(sentSlack).toHaveLength(1);
+        expect(JSON.stringify(sentSlack[0]!.payload)).toContain(
+          "Custom alert for Acme",
+        );
       });
     });
   });

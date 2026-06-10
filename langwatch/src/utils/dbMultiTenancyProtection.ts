@@ -1,9 +1,9 @@
 import type { Prisma } from "@prisma/client";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
-// the SQL string. The legacy outbox drainer and the advisory-lock
-// helper both already include these — only a genuinely scope-less
-// query would miss them.
+// the SQL string. The legacy outbox drainer carries an explicit
+// identifier; the advisory-lock helper opts out via the `-- @tenancy:`
+// marker below. Only a genuinely scope-less query would miss both.
 const RAW_TENANCY_PREDICATE_RE = /"?(projectId|organizationId|tenantId)"?/i;
 
 // Opt-out marker for the rare query that intentionally scans across
