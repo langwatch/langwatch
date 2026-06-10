@@ -33,6 +33,7 @@ func TestHealthzReturnsOK(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+/** @scenario "/v1/models lists the eight fake models" */
 func TestListModelsReturnsEveryModel(t *testing.T) {
 	r := newTestRouter()
 	rec := httptest.NewRecorder()
@@ -74,6 +75,7 @@ func TestChatCompletionsEchoText(t *testing.T) {
 	assert.Nil(t, resp.Choices[0].Message.Audio)
 }
 
+/** @scenario "streaming chat completions emit SSE chunks ending with [DONE]" */
 func TestChatCompletionsStreamEmitsDoneSentinel(t *testing.T) {
 	r := newTestRouter()
 	body := []byte(`{
@@ -106,6 +108,7 @@ func TestChatCompletionsStreamEmitsDoneSentinel(t *testing.T) {
 	assert.True(t, sawDone, "stream must end with data: [DONE]")
 }
 
+/** @scenario "/v1/responses returns the Responses-API shape" */
 func TestResponsesEchoText(t *testing.T) {
 	r := newTestRouter()
 	body := []byte(`{"model":"langwatch_noai/echo-text","input":"hello"}`)
@@ -123,6 +126,7 @@ func TestResponsesEchoText(t *testing.T) {
 	require.Len(t, resp.Output, 1)
 }
 
+/** @scenario "streaming responses emit typed events ending with response.completed" */
 func TestResponsesStreamReturnsSSEWithEvents(t *testing.T) {
 	r := newTestRouter()
 	body := []byte(`{"model":"langwatch_noai/echo-audio","input":"hi","stream":true}`)
@@ -137,6 +141,7 @@ func TestResponsesStreamReturnsSSEWithEvents(t *testing.T) {
 	assert.Contains(t, body2, "event: response.completed")
 }
 
+/** @scenario "request without a model is rejected with a 400 error" */
 func TestRejectsMissingModel(t *testing.T) {
 	r := newTestRouter()
 	rec := httptest.NewRecorder()

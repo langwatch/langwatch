@@ -66,6 +66,7 @@ func TestOversizeBodyRejected(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "invalid_request_error")
 }
 
+/** @scenario "unknown model is rejected with a 404 model_not_found error" */
 func TestUnknownModelReturns404(t *testing.T) {
 	r := newTestRouter()
 

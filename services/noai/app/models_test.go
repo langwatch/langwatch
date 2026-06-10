@@ -28,6 +28,7 @@ func TestNormalize_UnknownModel(t *testing.T) {
 	assert.False(t, ok)
 }
 
+/** @scenario "echo-text returns the canned echo string with deterministic usage" */
 func TestEchoTextReturnsCannedFormat(t *testing.T) {
 	req := app.ChatRequest{
 		Model:    "langwatch_noai/echo-text",
@@ -39,6 +40,7 @@ func TestEchoTextReturnsCannedFormat(t *testing.T) {
 	assert.Nil(t, resp.Choices[0].Message.Audio, "echo-text must not include audio")
 }
 
+/** @scenario "echo-audio includes a base64 audio/wav blob" */
 func TestEchoAudioIncludesWavStub(t *testing.T) {
 	req := app.ChatRequest{
 		Model:    "langwatch_noai/echo-audio",
@@ -52,6 +54,7 @@ func TestEchoAudioIncludesWavStub(t *testing.T) {
 	assert.Equal(t, `Fake LLM Response to: "hi"`, resp.Choices[0].Message.Content)
 }
 
+/** @scenario "judge-* returns a deterministic JSON verdict" */
 func TestJudgeModelsReturnDeterministicVerdict(t *testing.T) {
 	cases := []struct {
 		model  string
@@ -79,6 +82,7 @@ func TestJudgeModelsReturnDeterministicVerdict(t *testing.T) {
 	}
 }
 
+/** @scenario "user-simulation-text produces a follow-up user line" */
 func TestUserSimulationProducesFollowUp(t *testing.T) {
 	req := app.ChatRequest{
 		Model:    "langwatch_noai/user-simulation-text",
@@ -88,6 +92,7 @@ func TestUserSimulationProducesFollowUp(t *testing.T) {
 	assert.Contains(t, resp.Choices[0].Message.Content, `Fake user follow-up to: "what's your name?"`)
 }
 
+/** @scenario "user-simulation-audio returns the silent-wav stub" */
 func TestUserSimulationAudioIncludesWavStub(t *testing.T) {
 	req := app.ChatRequest{
 		Model:    "langwatch_noai/user-simulation-audio",

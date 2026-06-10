@@ -27,6 +27,7 @@ describe("devOnly provider visibility gate", () => {
 
     describe("given a devOnly provider (langwatch_noai)", () => {
       describe("when NODE_ENV is production", () => {
+        /** @scenario fake provider is hidden in production */
         it("hides the provider", () => {
           vi.stubEnv("NODE_ENV", "production");
 

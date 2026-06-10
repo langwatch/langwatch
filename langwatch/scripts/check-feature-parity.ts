@@ -68,6 +68,7 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
 const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/nlpgo",
   "services/aigateway",
+  "services/noai",
   "pkg",
 ];
 

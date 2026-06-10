@@ -448,6 +448,7 @@ func TestLangwatchNoaiEnabledURLOverride(t *testing.T) {
 // Fail-closed: a configured LANGWATCH_NOAI_BASE_URL is NOT enough — without
 // the LW_GATEWAY_NOAI_ENABLED opt-in the provider must be absent from
 // GetConfiguredProviders and both per-provider methods must error.
+/** @scenario "gateway does not offer the fake provider by default" */
 func TestLangwatchNoaiDisabledIgnoresBaseURL(t *testing.T) {
 	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5977")
 
