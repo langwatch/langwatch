@@ -78,9 +78,9 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
     if (value.startsWith(ENVELOPE_PREFIX)) {
       const { header } = splitEnvelope(value);
       return {
-        pipelineName: header.p ?? null,
-        jobType: header.t ?? null,
-        jobName: header.n ?? null,
+        pipelineName: typeof header.p === "string" ? header.p : null,
+        jobType: typeof header.t === "string" ? header.t : null,
+        jobName: typeof header.n === "string" ? header.n : null,
       };
     }
     const parsed = JSON.parse(value) as Record<string, unknown>;

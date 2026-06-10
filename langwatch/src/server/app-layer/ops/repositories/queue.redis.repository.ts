@@ -546,16 +546,18 @@ export class QueueRedisRepository implements QueueRepository {
       }
       const dataResults = await dataPipeline.exec();
 
-      for (let i = 0; i < jobIds.length; i++) {
-        const raw = dataResults?.[i]?.[1] as string | null;
-        if (raw) {
-          try {
-            jobs[i]!.data = await decodeJobEnvelope(raw);
-          } catch {
-            // ignore undecodable values
+      await Promise.all(
+        jobIds.map(async (_, i) => {
+          const raw = dataResults?.[i]?.[1] as string | null;
+          if (raw) {
+            try {
+              jobs[i]!.data = await decodeJobEnvelope(raw);
+            } catch {
+              // ignore undecodable values
+            }
           }
-        }
-      }
+        }),
+      );
     }
 
     return { jobs, total };

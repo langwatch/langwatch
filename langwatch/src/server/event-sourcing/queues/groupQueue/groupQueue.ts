@@ -1,5 +1,10 @@
 import { performance } from "node:perf_hooks";
-import { context as otelContext, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
+import {
+  context as otelContext,
+  SpanKind,
+  trace,
+  TraceFlags,
+} from "@opentelemetry/api";
 import fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -20,7 +25,12 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues";
-import { categorizeError, ConfigurationError, ErrorCategory, QueueError } from "../../services/errorHandling";
+import {
+  categorizeError,
+  ConfigurationError,
+  ErrorCategory,
+  QueueError,
+} from "../../services/errorHandling";
 import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import {
@@ -38,7 +48,11 @@ import {
   gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
-import { type DispatchResult, type DrainedJob, GroupStagingScripts } from "./scripts";
+import {
+  type DispatchResult,
+  type DrainedJob,
+  GroupStagingScripts,
+} from "./scripts";
 import {
   TenantRateTracker,
   tenantIdFromGroupId,
@@ -50,8 +64,7 @@ import { featureFlagService } from "../../../featureFlag";
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency:
-    Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
+  defaultGlobalConcurrency: Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -70,7 +83,13 @@ const GROUP_QUEUE_CONFIG = {
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
 /** Internal fields attached to job data that must be stripped before processing. */
-const INTERNAL_FIELDS = ["__context", "__groupId", "__stagedJobId", "__dispatchScore", "__attempt"] as const;
+const INTERNAL_FIELDS = [
+  "__context",
+  "__groupId",
+  "__stagedJobId",
+  "__dispatchScore",
+  "__attempt",
+] as const;
 
 /**
  * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
@@ -358,36 +377,38 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
 
-    const jobsToStage = await Promise.all(payloads.map(async (payload, index) => {
-      const groupId = this.groupKey(payload);
-      const stagedJobId = this.generateStagedJobId(payload);
-      const score = this.score?.(payload) ?? now;
-      // Add index to ensure FIFO order within the batch even if timestamps are identical
-      const dispatchAfterMs = score + (delay ?? 0) + index;
+    const jobsToStage = await Promise.all(
+      payloads.map(async (payload, index) => {
+        const groupId = this.groupKey(payload);
+        const stagedJobId = this.generateStagedJobId(payload);
+        const score = this.score?.(payload) ?? now;
+        // Add index to ensure FIFO order within the batch even if timestamps are identical
+        const dispatchAfterMs = score + (delay ?? 0) + index;
 
-      let dedupId = "";
-      let dedupTtlMs = 0;
-      if (dedup) {
-        dedupId = dedup.makeId(payload).replaceAll(":", ".");
-        dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
-      }
+        let dedupId = "";
+        let dedupTtlMs = 0;
+        if (dedup) {
+          dedupId = dedup.makeId(payload).replaceAll(":", ".");
+          dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
+        }
 
-      const payloadWithContext = {
-        ...(payload as Record<string, unknown>),
-        __context: contextMetadata,
-      };
+        const payloadWithContext = {
+          ...(payload as Record<string, unknown>),
+          __context: contextMetadata,
+        };
 
-      return {
-        stagedJobId,
-        groupId,
-        dispatchAfterMs,
-        dedupId,
-        dedupTtlMs,
-        jobDataJson: await encodeJobEnvelope(payloadWithContext),
-        shouldExtend,
-        shouldReplace,
-      };
-    }));
+        return {
+          stagedJobId,
+          groupId,
+          dispatchAfterMs,
+          dedupId,
+          dedupTtlMs,
+          jobDataJson: await encodeJobEnvelope(payloadWithContext),
+          shouldExtend,
+          shouldReplace,
+        };
+      }),
+    );
 
     const newStagedCount = await this.scripts.stageBatch(jobsToStage);
 
@@ -398,7 +419,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (effectiveDelay && effectiveDelay > 0) {
         gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
         for (let i = 0; i < newStagedCount; i++) {
-          gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+          gqJobDelayMilliseconds.observe(
+            { queue_name: this.queueName },
+            effectiveDelay,
+          );
         }
       }
       // Per-tenant rate tracking. The Lua script may have deduped some
@@ -453,11 +477,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
-    const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
+    const attempt =
+      typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
     const jobType = (jobData.__jobType as string) ?? "unknown";
     const jobName = (jobData.__jobName as string) ?? "unknown";
-    const routingLabels = { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType, job_name: jobName };
+    const routingLabels = {
+      queue_name: this.queueName,
+      pipeline_name: pipelineName,
+      job_type: jobType,
+      job_name: jobName,
+    };
     const payload = this.stripInternalFields(jobData);
 
     // Opt-in batch coalescing: if this job type supports it, drain additional
@@ -489,11 +519,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         drainedSiblings = [];
       }
       if (drainedSiblings.length > 0) {
-        const siblingPayloads: Payload[] = [];
-        for (const sibling of drainedSiblings) {
-          const parsed = await this.parseDrainedPayload(sibling, groupId);
-          if (parsed) siblingPayloads.push(parsed);
-        }
+        const siblingPayloads = (
+          await Promise.all(
+            drainedSiblings.map((sibling) =>
+              this.parseDrainedPayload(sibling, groupId),
+            ),
+          )
+        ).filter((parsed): parsed is Payload => parsed !== null);
         if (siblingPayloads.length > 0) {
           batchPayloads = [payload, ...siblingPayloads];
         }
@@ -520,7 +552,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         try {
           const custom = this.spanAttributes(payload);
           for (const [key, value] of Object.entries(custom)) {
-            if (value !== undefined && (typeof value === "string" || typeof value === "number" || typeof value === "boolean")) {
+            if (
+              value !== undefined &&
+              (typeof value === "string" ||
+                typeof value === "number" ||
+                typeof value === "boolean")
+            ) {
               spanAttributes[key] = value;
             }
           }
@@ -550,7 +587,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
             // Add business context attributes
             if (contextMetadata?.organizationId) {
-              span.setAttribute("organization.id", contextMetadata.organizationId);
+              span.setAttribute(
+                "organization.id",
+                contextMetadata.organizationId,
+              );
             }
             if (contextMetadata?.projectId) {
               span.setAttribute("tenant.id", contextMetadata.projectId);
@@ -564,7 +604,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               const requestContext = createContextFromJobData(contextMetadata);
               await runWithContext(requestContext, async () => {
                 if (batchPayloads && this.processBatch) {
-                  span.setAttribute("queue.coalesced_batch_size", batchPayloads.length);
+                  span.setAttribute(
+                    "queue.coalesced_batch_size",
+                    batchPayloads.length,
+                  );
                   await this.processBatch(batchPayloads);
                 } else {
                   await this.process(payload);
@@ -717,13 +760,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * here and recoverable via event replay, mirroring the dispatched job's own
    * parse-failure handling).
    */
-  private async parseDrainedPayload(sibling: DrainedJob, groupId: string): Promise<Payload | null> {
+  private async parseDrainedPayload(
+    sibling: DrainedJob,
+    groupId: string,
+  ): Promise<Payload | null> {
     try {
       const jobData = await decodeJobEnvelope(sibling.jobDataJson);
       return this.stripInternalFields(jobData);
     } catch {
       this.logger.error(
-        { queueName: this.queueName, groupId, stagedJobId: sibling.stagedJobId },
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+        },
         "Failed to parse drained sibling job data — dropping (recoverable via replay)",
       );
       return null;

@@ -40,7 +40,7 @@ for the behavioural contract this decision supports.
 We will store each job's value in the data hash as a **versioned string
 envelope** instead of bare JSON:
 
-```
+```text
 GQ1|<headerLen>|<headerJson><body>
 ```
 
