@@ -10,12 +10,44 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: tkt-actions/add-issue-links@841937371056b3af09cdbdf8c45d8bd48c58fcec # v1.9.1
+      # Inline replacement for tkt-actions/add-issue-links, which is not on
+      # the org Actions allowlist (the workflow startup-failed on every PR).
+      # Branches named issue<number>/<slug> get a "Resolves #<number>"
+      # section in the PR body and the PR author assigned to the issue.
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          repo-token: '${{ secrets.GITHUB_TOKEN }}'
-          branch-prefix: 'issue'
-          link-style: 'body'
-          position: 'body'
-          header: '# Related Issue'
-          resolve: true
-          assign-pr-creator-to-issue: 'true'
+          script: |
+            const pr = context.payload.pull_request;
+            const match = /^issue(\d+)\//.exec(pr.head.ref);
+            if (!match) {
+              core.info("Branch does not follow issue<number>/<slug>; nothing to link");
+              return;
+            }
+            const issueNumber = Number(match[1]);
+            const { owner, repo } = context.repo;
+
+            const marker = `Resolves #${issueNumber}`;
+            const body = pr.body ?? "";
+            if (!body.includes(marker)) {
+              const section = `# Related Issue\n\n- ${marker}`;
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                body: body ? `${body}\n\n${section}` : section,
+              });
+              core.info(`Linked PR #${pr.number} to issue #${issueNumber}`);
+            }
+
+            try {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                assignees: [pr.user.login],
+              });
+            } catch (error) {
+              core.warning(
+                `Could not assign @${pr.user.login} to #${issueNumber}: ${error.message}`,
+              );
+            }
