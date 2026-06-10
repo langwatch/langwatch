@@ -220,3 +220,41 @@ Feature: Prompt textarea with variable chips
     Given I have made changes to the textarea
     When I click outside the textarea
     Then the onChange callback is triggered with the new value
+
+  # ============================================================================
+  # Error banner (variable not found)
+  # ============================================================================
+
+  # Customer context: the "variable not found" banner is overlaid on the
+  # bottom edge of the textarea, hiding the last line of the prompt. The
+  # editor must always reserve room for the banner so every line stays
+  # readable, and the banner itself should offer the one-click fix.
+
+  @integration @unimplemented
+  Scenario: Error banner never covers the last line of the prompt
+    Given the textarea value ends with a line referencing "{{missing}}"
+    And no variable "missing" exists
+    Then the variable-not-found banner is visible
+    And the last line of the prompt remains fully visible above the banner
+
+  @integration @unimplemented
+  Scenario: Variable-not-found banner offers a Create action
+    Given the textarea value is "Judge this: {{response}}"
+    And no variable "response" exists
+    Then the banner reads that "response" is not defined
+    And a "Create" button renders on the right side of the banner
+
+  @integration @unimplemented
+  Scenario: Create button defines the missing variable
+    Given the variable-not-found banner shows for "response"
+    When I click the banner's "Create" button
+    Then a variable "response" of type str is created
+    And the banner disappears
+    And "{{response}}" renders as a valid variable
+
+  @integration @unimplemented
+  Scenario: Create resolves one missing variable at a time
+    Given the textarea references missing variables "query" and "context"
+    When I click the banner's "Create" button
+    Then the first missing variable is created
+    And the banner now reports the remaining missing variable
