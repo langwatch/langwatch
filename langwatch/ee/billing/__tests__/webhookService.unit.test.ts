@@ -19,7 +19,10 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import { SubscriptionStatus } from "../planTypes";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../src/server/data-retention/retentionPolicy.schema";
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  RETENTION_CATEGORIES,
+} from "../../../src/server/data-retention/retentionPolicy.schema";
 import { EEWebhookService } from "../services/webhookService";
 import type { SubscriptionRepository, SubscriptionWithOrg } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
@@ -442,8 +445,8 @@ describe("webhookService", () => {
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
 
-      /** @scenario A first paid Growth Seat activation provisions the organization policy */
-      it("provisions an organization-scoped traces retention policy at the platform default", async () => {
+      /** @scenario A first paid Growth Seat activation provisions the organization policies */
+      it("provisions an organization-scoped retention policy for every category at the platform default", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
         );
@@ -459,11 +462,14 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockSetForScope).toHaveBeenCalledWith({
-          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-          category: "traces",
-          retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        });
+        for (const category of RETENTION_CATEGORIES) {
+          expect(mockSetForScope).toHaveBeenCalledWith({
+            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+            category,
+            retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+          });
+        }
+        expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
       });
 
       /** @scenario A retention failure never fails the billing webhook */
@@ -901,10 +907,13 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockRemoveForScope).toHaveBeenCalledWith({
-          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-          category: "traces",
-        });
+        for (const category of RETENTION_CATEGORIES) {
+          expect(mockRemoveForScope).toHaveBeenCalledWith({
+            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+            category,
+          });
+        }
+        expect(mockRemoveForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
       });
 
       /** @scenario A retention failure never fails the billing webhook */
@@ -1160,10 +1169,13 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
-        expect(mockRemoveForScope).toHaveBeenCalledWith({
-          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-          category: "traces",
-        });
+        for (const category of RETENTION_CATEGORIES) {
+          expect(mockRemoveForScope).toHaveBeenCalledWith({
+            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+            category,
+          });
+        }
+        expect(mockRemoveForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
       });
     });
   });
