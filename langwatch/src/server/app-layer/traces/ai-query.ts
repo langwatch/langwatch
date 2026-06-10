@@ -308,7 +308,7 @@ function summarizeProviderError(err: unknown): AiActionError {
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider = providerMatch ? providerMatch[1].toLowerCase() : undefined;
+  const provider = providerMatch?.[1]?.toLowerCase();
 
   const modelMatch =
     cleaned.match(

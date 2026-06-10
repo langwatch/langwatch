@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Collapsible,
   HStack,
   Icon,
@@ -308,8 +309,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               rows whether or not a search toggle is present. */}
           <Box width="16px" height="16px" flexShrink={0}>
             {searchToggleProps && (
-              <Box
-                as="button"
+              <chakra.button
                 type="button"
                 aria-label={
                   searchToggleProps.open
@@ -347,11 +347,10 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
                 <Icon boxSize="11px">
                   <Search />
                 </Icon>
-              </Box>
+              </chakra.button>
             )}
           </Box>
-          <Box
-            as="button"
+          <chakra.button
             type="button"
             aria-label={effectiveOpen ? `Collapse ${title}` : `Expand ${title}`}
             width="16px"
@@ -373,7 +372,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
             <Icon boxSize="12px">
               {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
             </Icon>
-          </Box>
+          </chakra.button>
           {/* Per-section hover-X retired in Round 3 — removing a section
               is now done exclusively from the FacetManagerPopover.
               The inline X cluttered every section header for an action

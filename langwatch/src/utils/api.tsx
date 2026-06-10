@@ -155,7 +155,13 @@ function providerDisabledSwapHandler(
   if (info.resolvedScope !== "project") return undefined;
   if (!info.alternate?.providerEnabled) return undefined;
   return async () => {
-    await trpcClient.modelProviders.setFeatureOverrideForScope.mutate({
+    // v10 path-type inference collapses on this router (the `subscription`
+    // sub-router collides with the client's built-in method, poisoning the
+    // whole path union to `never`). The runtime call is the plain dotted-path
+    // mutation the non-proxy client supports; cast past the broken inference.
+    await (
+      trpcClient.mutation as (path: string, input: unknown) => Promise<unknown>
+    )("modelProvider.setFeatureOverrideForScope", {
       scopeType: "PROJECT",
       scopeId: info.projectId,
       featureKey: info.featureKey,
@@ -314,7 +320,10 @@ function createQueryClientConfig() {
 export const api = createTRPCReact<AppRouter>();
 
 /**
- * Vanilla tRPC client for use outside of React components.
+ * Vanilla tRPC client for use outside of React components. Non-proxy
+ * variant calling via dotted paths — `createTRPCProxyClient` can't be
+ * used on this router because the `subscription` router name collides
+ * with the proxy client's built-in method in tRPC v10.
  */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: createTRPCLinks(),

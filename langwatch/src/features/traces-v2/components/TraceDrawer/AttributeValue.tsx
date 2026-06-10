@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   HStack,
   Icon,
   IconButton,
@@ -85,8 +86,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
       unmountOnExit
     >
       <Popover.Trigger asChild>
-        <Box
-          as="button"
+        <chakra.button
           type="button"
           display="flex"
           alignItems="center"
@@ -128,7 +128,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
             color="fg.subtle"
             flexShrink={0}
           />
-        </Box>
+        </chakra.button>
       </Popover.Trigger>
       <Popover.Content maxWidth="560px" minWidth="360px">
         <Popover.Arrow />

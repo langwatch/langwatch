@@ -20,6 +20,21 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
+// The discover-freshness subscription opens a real SSE connection when
+// unmocked; these tests only exercise the trace_summary_updated paths.
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "disconnected" as const,
+    retryCount: 0,
+    lastData: null,
+    lastError: null,
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+  }),
+}));
+
 // Control what visibleTraceIds returns — overridden per test group.
 let visibleIdsResult = {
   ids: new Set<string>(),
@@ -43,6 +58,9 @@ const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The hook passes this procedure object to (the mocked)
+    // useSSESubscription — it only needs to exist, not function.
+    tracesV2: { onDiscoverUpdate: {} },
     useContext: () => ({
       tracesV2: {
         list: {

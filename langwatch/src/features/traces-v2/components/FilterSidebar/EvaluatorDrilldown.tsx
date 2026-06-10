@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
 import { useMemo } from "react";
@@ -206,8 +206,7 @@ interface VerdictPillProps {
 }
 
 const VerdictPill: React.FC<VerdictPillProps> = ({ spec, active, onClick }) => (
-  <Box
-    as="button"
+  <chakra.button
     type="button"
     display="inline-flex"
     alignItems="center"
@@ -233,7 +232,7 @@ const VerdictPill: React.FC<VerdictPillProps> = ({ spec, active, onClick }) => (
     <Text textStyle="2xs" fontWeight="500" opacity={0.85}>
       {spec.count.toLocaleString()}
     </Text>
-  </Box>
+  </chakra.button>
 );
 
 interface ScoreSectionProps {
@@ -320,8 +319,7 @@ const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
   const toValue = currentTo !== undefined ? String(currentTo) : "";
   return (
     <HStack gap={1.5} align="center">
-      <Box
-        as="input"
+      <chakra.input
         type="number"
         inputMode="decimal"
         step="0.01"
@@ -360,8 +358,7 @@ const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
       <Text textStyle="2xs" color="fg.subtle">
         →
       </Text>
-      <Box
-        as="input"
+      <chakra.input
         type="number"
         inputMode="decimal"
         step="0.01"
