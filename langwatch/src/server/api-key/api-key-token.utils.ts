@@ -162,12 +162,24 @@ export function verifySecret(
 }
 
 /**
+ * Matches the exact body structure of generated API keys:
+ * {16-char lookupId}_{48-char secret}, both from the alphanumeric ALPHABET.
+ * Legacy project keys were minted from alphabets that include `_` and `-`,
+ * so the mere presence of an underscore does not identify a new-format key.
+ */
+const API_KEY_BODY_REGEX = new RegExp(
+  `^[0-9A-Za-z]{${LOOKUP_ID_LENGTH}}_[0-9A-Za-z]{${SECRET_LENGTH}}$`,
+);
+
+/**
  * Determines the token type from its prefix and structure.
  *
  * - `pat-lw-*` → always an API key (old PAT format, backward compat)
- * - `ik-lw-{16chars}_{48chars}` → API key (ingestion-only key, always split format)
- * - `sk-lw-{16chars}_{48chars}` → API key (new format, has underscore separator)
- * - `sk-lw-*` (no underscore) → legacy project key
+ * - `ik-lw-*` → always an API key (ingestion-only prefix never existed for
+ *   legacy keys)
+ * - `sk-lw-{16chars}_{48chars}` → API key (new format, strict shape)
+ * - any other `sk-lw-*` → legacy project key, whose random body may itself
+ *   contain underscores and dashes
  * - anything else → unknown
  */
 export function getTokenType(
@@ -176,10 +188,8 @@ export function getTokenType(
   if (token.startsWith(LEGACY_PAT_PREFIX)) return "apiKey";
   if (token.startsWith(INGEST_KEY_PREFIX)) return "apiKey";
   if (token.startsWith(API_KEY_PREFIX)) {
-    // Distinguish new-format API keys from legacy project keys by structure:
-    // API keys have an underscore separating lookupId and secret
     const body = token.slice(API_KEY_PREFIX.length);
-    return body.includes("_") ? "apiKey" : "legacyProjectKey";
+    return API_KEY_BODY_REGEX.test(body) ? "apiKey" : "legacyProjectKey";
   }
   return "unknown";
 }
