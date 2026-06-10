@@ -707,6 +707,11 @@ describe("ReplayService tenant-specific ClickHouse", () => {
             EventOccurredAt: 1700000004000,
             EventVersion: "2025-01-01",
             EventPayload: JSON.stringify({ value: 7 }),
+            // Backdated timestamp — without the never-expire sentinel the
+            // platform retention TTL (applied to the shared test DB by the
+            // ttlReconciler) drops the freshly inserted part immediately,
+            // making the map projection discover nothing.
+            _retention_days: 0,
           },
         ],
         format: "JSONEachRow",
