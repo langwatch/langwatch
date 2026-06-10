@@ -288,6 +288,39 @@ function PinToggle({
   );
 }
 
+/**
+ * Pin affordance for synthetic rows (span_id) that can't actually be pinned
+ * to the trace header. Rendered disabled and extra-faded rather than as a
+ * blank gap so the column reads consistently top-to-bottom — every row shows
+ * a pin, this one is just clearly inert. A tooltip explains why.
+ */
+function DisabledPin({ attrKey }: { attrKey: string }) {
+  return (
+    <Tooltip
+      content="The span id can't be pinned to the trace header"
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        width="20px"
+        height="20px"
+        marginLeft={2}
+        marginRight={1.5}
+        flexShrink={0}
+        opacity={0.2}
+        cursor="default"
+        aria-disabled="true"
+        aria-label={`${attrKey} can't be pinned`}
+      >
+        <Icon as={LuPin} boxSize={3} color="fg.subtle" />
+      </Box>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const [copied, setCopied] = useState(false);
   const handleClick = () => {
@@ -358,15 +391,9 @@ function FlatRow({
         />
       ) : (
         // Synthetic leading rows (span_id) aren't real attributes, so they
-        // can't be pinned to the trace header — keep the column aligned with a
-        // spacer matching the PinToggle footprint.
-        <Box
-          width="20px"
-          height="20px"
-          marginLeft={2}
-          marginRight={1.5}
-          flexShrink={0}
-        />
+        // can't be pinned to the trace header — show a disabled, faded pin
+        // (matching the PinToggle footprint) instead of a blank gap.
+        <DisabledPin attrKey={attrKey} />
       )}
       <Tooltip
         content={attrKey}
