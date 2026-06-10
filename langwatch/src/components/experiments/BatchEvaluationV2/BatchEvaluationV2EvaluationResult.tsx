@@ -91,17 +91,16 @@ export function BatchEvaluationV2EvaluationResult({
     0,
   );
 
-  const rowData = useMemo(
-    () =>
-      Array.from({ length: totalRows }).map((_, index) => ({
-        rowNumber: index + 1,
-        datasetEntry: datasetByIndex[index],
-        evaluationsForEntry: {
-          [evaluator]: results.find((r) => r.index === index),
-        },
-      })),
-    [totalRows, datasetByIndex, evaluator, results],
-  );
+  const rowData = useMemo(() => {
+    const resultsByIndex = new Map(results.map((r) => [r.index, r]));
+    return Array.from({ length: totalRows }).map((_, index) => ({
+      rowNumber: index + 1,
+      datasetEntry: datasetByIndex[index],
+      evaluationsForEntry: {
+        [evaluator]: resultsByIndex.get(index),
+      },
+    }));
+  }, [totalRows, datasetByIndex, evaluator, results]);
 
   const columns = useMemo((): ResultColumn[] => {
     const cols: ResultColumn[] = [];

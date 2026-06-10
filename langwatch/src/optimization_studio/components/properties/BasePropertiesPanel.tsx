@@ -256,7 +256,7 @@ export function FieldsDefinition({
                   colorPalette="gray"
                   size="sm"
                   height="40px"
-                  data-testid={`remove-${field}-field`}
+                  data-testid={`remove-${field}-${index}-field`}
                   onClick={() => {
                     remove(index);
                     void handleSubmit(onSubmit)();

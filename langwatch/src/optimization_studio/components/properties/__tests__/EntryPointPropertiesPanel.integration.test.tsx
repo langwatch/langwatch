@@ -190,8 +190,7 @@ describe("EntryPointPropertiesPanel", () => {
     it("removing an input does not touch the dataset", async () => {
       renderPanel(datasetNode());
 
-      const removeButtons = screen.getAllByTestId("remove-outputs-field");
-      fireEvent.click(removeButtons[1]!);
+      fireEvent.click(screen.getByTestId("remove-outputs-1-field"));
 
       // The remove submits through react-hook-form asynchronously; find
       // the node update that carries the shrunken field list.
