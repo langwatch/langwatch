@@ -125,7 +125,9 @@ end
 //
 // Prepends TENANT_ACTIVE_HELPER_LUA so reconcileParked can read the self-healing
 // in-flight count; every script that includes PARK_HELPER_LUA gets both.
-export const PARK_HELPER_LUA = TENANT_ACTIVE_HELPER_LUA + `
+export const PARK_HELPER_LUA =
+  TENANT_ACTIVE_HELPER_LUA +
+  `
 -- Tenant segment of a groupId (everything before the first '/'), else the id.
 local function parkTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
@@ -397,7 +399,10 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
-const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const STAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -486,7 +491,10 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const STAGE_BATCH_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -584,7 +592,11 @@ end
 return newStagedCount
 `;
 
-const DISPATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + ROUTING_META_HELPER_LUA + `
+const DISPATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -801,7 +813,11 @@ end
 return nil
 `;
 
-const DISPATCH_BATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + ROUTING_META_HELPER_LUA + `
+const DISPATCH_BATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -1060,7 +1076,10 @@ end
 return results
 `;
 
-const COMPLETE_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const COMPLETE_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
 local readyKey        = KEYS[3]
@@ -1147,7 +1166,9 @@ redis.call("DEL", errorKey)
 return 1
 `;
 
-const REFRESH_LUA = TTL_HELPER_LUA + `
+const REFRESH_LUA =
+  TTL_HELPER_LUA +
+  `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -1190,7 +1211,9 @@ end
 return 0
 `;
 
-const RESTAGE_AND_BLOCK_LUA = ROUTING_META_HELPER_LUA + `
+const RESTAGE_AND_BLOCK_LUA =
+  ROUTING_META_HELPER_LUA +
+  `
 local blockedKey      = KEYS[1]
 local readyKey        = KEYS[2]
 local statsKey        = KEYS[3]
@@ -1263,7 +1286,10 @@ end
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const RETRY_RESTAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -1482,7 +1508,9 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
     const dedupKey =
-      dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
+      dedupId !== ""
+        ? `${this.keyPrefix}dedup:${dedupId}`
+        : `${this.keyPrefix}dedup:__none__`;
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
@@ -1557,7 +1585,14 @@ export class GroupStagingScripts {
     args.push(String(Date.now()));
     args.push(String(readGlobalBudget()));
 
-    const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
+    const result = await this.redis.eval(
+      STAGE_BATCH_LUA,
+      3,
+      readyKey,
+      signalKey,
+      totalPendingKey,
+      ...args,
+    );
 
     return Number(result);
   }
@@ -1938,4 +1973,3 @@ export class GroupStagingScripts {
     return this.keyPrefix;
   }
 }
-

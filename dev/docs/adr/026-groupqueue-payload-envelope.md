@@ -116,6 +116,8 @@ Redis's thread — which is the point).
 
 ## References
 
-- Related ADRs: ADR-014 (Skynet/BullMQ removal), ADR-023 (orphan sweep
-  reactor chain — GroupQueue dispatch mechanics)
+- Related ADRs: [ADR-014](./014-skynet-bullmq-removal.md)
+  (Skynet/BullMQ removal),
+  [ADR-023](./023-orphan-sweep-reactor-chain.md) (superseded by ADR-025;
+  cited only for its description of GroupQueue dispatch mechanics)
 - Spec: `specs/event-sourcing/payload-envelope.feature`

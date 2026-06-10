@@ -13,6 +13,7 @@ import {
   type DispatchResult,
 } from "../scripts";
 import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
+import { encodeJobEnvelope } from "../jobEnvelope";
 
 let redis: Redis;
 let scripts: GroupStagingScripts;
@@ -1416,6 +1417,102 @@ describe("GroupStagingScripts", () => {
       const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
       expect(result).not.toBeNull();
       expect(result!.stagedJobId).toBe("j1");
+    });
+  });
+
+  // ADR-026: staged values are GQ1 envelopes whose routing fields live in a
+  // tiny header so the Lua pause-check never decodes the (gzipped) body.
+  describe("when head-of-line job is envelope-encoded", () => {
+    async function makeEnvelopeJobData(
+      overrides: Record<string, unknown> = {},
+    ): Promise<string> {
+      // >1 KiB so the body is gzip+base64 — proves Lua reads the header only.
+      return await encodeJobEnvelope({
+        __pipelineName: "ingestion",
+        __jobType: "projection",
+        __jobName: "traceProjection",
+        bulk: "x".repeat(4096),
+        ...overrides,
+      });
+    }
+
+    it("skips group whose envelope header matches a paused pipeline", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: await makeEnvelopeJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("skips group when paused at jobType level via the header", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: await makeEnvelopeJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion/projection");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("skips group when paused at jobType/jobName level via the header", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: await makeEnvelopeJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion/projection/traceProjection");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("dispatches the envelope intact when nothing is paused", async () => {
+      const jobDataJson = await makeEnvelopeJobData();
+      await scripts.stage(
+        makeJob({ stagedJobId: "j1", dispatchAfterMs: 100, jobDataJson }),
+      );
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.jobDataJson).toBe(jobDataJson);
+    });
+
+    it("increments the per-job-name failed counter from the envelope header", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: await makeEnvelopeJobData(),
+        }),
+      );
+      const dispatched = (await scripts.dispatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+      }))!;
+
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/1",
+        score: 100,
+        jobDataJson: dispatched.jobDataJson,
+      });
+
+      const perJobName = await redis.get(
+        `${keyPrefix()}stats:failed:traceProjection`,
+      );
+      expect(perJobName).toBe("1");
     });
   });
 

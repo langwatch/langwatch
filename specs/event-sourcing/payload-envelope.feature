@@ -27,6 +27,8 @@ Feature: GroupQueue payload envelope
 
   # Dispatch-time routing reads
 
+  # Pause hold-back behaviour is owned by specs/queue-pausing/queue-pausing.feature;
+  # this scenario specs only the mechanism (header-only read).
   Scenario: Pause checks read only the envelope header
     Given a pipeline is paused via the queue-pausing kill-switch
     When dispatch evaluates a staged job belonging to that pipeline

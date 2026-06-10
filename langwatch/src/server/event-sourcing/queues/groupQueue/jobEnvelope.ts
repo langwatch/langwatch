@@ -1,5 +1,5 @@
 import { promisify } from "node:util";
-import { gzip, gunzip } from "node:zlib";
+import { gunzip, gzip } from "node:zlib";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -37,7 +37,8 @@ export async function encodeJobEnvelope(
   const json = JSON.stringify(jobData);
 
   const header: EnvelopeHeader = { v: 1, e: "j" };
-  if (typeof jobData.__pipelineName === "string") header.p = jobData.__pipelineName;
+  if (typeof jobData.__pipelineName === "string")
+    header.p = jobData.__pipelineName;
   if (typeof jobData.__jobType === "string") header.t = jobData.__jobType;
   if (typeof jobData.__jobName === "string") header.n = jobData.__jobName;
 
@@ -48,7 +49,9 @@ export async function encodeJobEnvelope(
   }
 
   const headerJson = JSON.stringify(header);
-  return `${ENVELOPE_PREFIX}${headerJson.length}|${headerJson}${body}`;
+  // Header length is in BYTES: the Lua reader slices bytes, and UTF-16 code
+  // units diverge from bytes if a routing field ever carries non-ASCII.
+  return `${ENVELOPE_PREFIX}${Buffer.byteLength(headerJson)}|${headerJson}${body}`;
 }
 
 export async function decodeJobEnvelope(
@@ -82,7 +85,10 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
     }
     const parsed = JSON.parse(value) as Record<string, unknown>;
     return {
-      pipelineName: typeof parsed.__pipelineName === "string" ? parsed.__pipelineName : null,
+      pipelineName:
+        typeof parsed.__pipelineName === "string"
+          ? parsed.__pipelineName
+          : null,
       jobType: typeof parsed.__jobType === "string" ? parsed.__jobType : null,
       jobName: typeof parsed.__jobName === "string" ? parsed.__jobName : null,
     };
@@ -91,16 +97,31 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
   }
 }
 
-function splitEnvelope(value: string): { header: EnvelopeHeader; body: string } {
+function splitEnvelope(value: string): {
+  header: EnvelopeHeader;
+  body: string;
+} {
   const lenEnd = value.indexOf("|", ENVELOPE_PREFIX.length);
   if (lenEnd === -1) {
     throw new Error("Malformed job envelope: missing header length delimiter");
   }
-  const headerLen = Number(value.slice(ENVELOPE_PREFIX.length, lenEnd));
-  if (!Number.isInteger(headerLen) || headerLen <= 0) {
+  const lenDigits = value.slice(ENVELOPE_PREFIX.length, lenEnd);
+  if (!/^\d+$/.test(lenDigits)) {
     throw new Error("Malformed job envelope: invalid header length");
   }
-  const headerJson = value.slice(lenEnd + 1, lenEnd + 1 + headerLen);
+  const headerLen = Number(lenDigits);
+  if (headerLen <= 0) {
+    throw new Error("Malformed job envelope: invalid header length");
+  }
+  // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
+  // and code units; the header itself must be sliced as bytes to match Lua.
+  const buf = Buffer.from(value, "utf8");
+  const headerJson = buf
+    .subarray(lenEnd + 1, lenEnd + 1 + headerLen)
+    .toString("utf8");
   const header = JSON.parse(headerJson) as EnvelopeHeader;
-  return { header, body: value.slice(lenEnd + 1 + headerLen) };
+  return {
+    header,
+    body: buf.subarray(lenEnd + 1 + headerLen).toString("utf8"),
+  };
 }
