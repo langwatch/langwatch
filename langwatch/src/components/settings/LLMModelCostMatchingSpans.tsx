@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  chakra,
   HStack,
   Icon,
   Skeleton,
@@ -156,21 +157,21 @@ export function LLMModelCostMatchingSpans({
           {data.sampleSpans.length > 0 && (
             <VStack align="stretch" gap={1}>
               {data.sampleSpans.map((span) => (
-                <HStack
+                <chakra.button
                   key={`${span.traceId}-${span.spanId}`}
-                  as="button"
+                  type="button"
+                  display="flex"
+                  alignItems="center"
                   gap={2}
                   paddingX={2}
                   paddingY={1.5}
                   borderRadius="sm"
+                  bg="transparent"
                   cursor="pointer"
                   textAlign="left"
                   _hover={{ bg: "bg.emphasized" }}
                   title="Open trace in a new tab"
-                  // preventDefault: this button lives inside the drawer's
-                  // <form>, where the implicit type is submit.
-                  onClick={(event: React.MouseEvent) => {
-                    event.preventDefault();
+                  onClick={() => {
                     if (!project?.slug) return;
                     window.open(
                       traceDrawerUrl(project.slug, span),
@@ -234,7 +235,7 @@ export function LLMModelCostMatchingSpans({
                     color="fg.subtle"
                     flexShrink={0}
                   />
-                </HStack>
+                </chakra.button>
               ))}
             </VStack>
           )}
@@ -252,27 +253,26 @@ export function LLMModelCostMatchingSpans({
                       {data.unmatchedModels.map((m) => (
                         <Badge
                           key={m.model}
-                          as="button"
+                          asChild
                           size="sm"
                           variant="outline"
                           cursor="pointer"
                           gap={1.5}
                           _hover={{ bg: "bg.emphasized" }}
-                          // preventDefault: rendered inside the drawer's
-                          // <form>, where the implicit type is submit.
-                          onClick={(event: React.MouseEvent) => {
-                            event.preventDefault();
-                            onPickModel(m.model);
-                          }}
-                          data-testid="unmatched-model-chip"
                         >
-                          <ProviderIcon model={m.model} size="compact" />
-                          <Text fontFamily="mono" textStyle="xs">
-                            {m.model}
-                          </Text>
-                          <Text textStyle="2xs" color="fg.subtle">
-                            {m.spanCount}
-                          </Text>
+                          <button
+                            type="button"
+                            onClick={() => onPickModel(m.model)}
+                            data-testid="unmatched-model-chip"
+                          >
+                            <ProviderIcon model={m.model} size="compact" />
+                            <Text fontFamily="mono" textStyle="xs">
+                              {m.model}
+                            </Text>
+                            <Text textStyle="2xs" color="fg.subtle">
+                              {m.spanCount}
+                            </Text>
+                          </button>
                         </Badge>
                       ))}
                     </HStack>

@@ -74,10 +74,13 @@ export interface CostRuleMatchingSpansPreview {
  * disagree with what the rule will actually do (vendor-prefix stripping,
  * Bedrock id normalization, lowercase fallback and all).
  */
-export async function previewCostRuleMatchingSpans(
-  spans: SpanStorageService,
-  input: CostRulePreviewInput,
-): Promise<CostRuleMatchingSpansPreview> {
+export async function previewCostRuleMatchingSpans({
+  spans,
+  input,
+}: {
+  spans: SpanStorageService;
+  input: CostRulePreviewInput;
+}): Promise<CostRuleMatchingSpansPreview> {
   if (!compileSafeRegex(input.regex)) {
     throw new ValidationError("Invalid or unsafe regular expression");
   }
@@ -118,17 +121,25 @@ export async function previewCostRuleMatchingSpans(
       perModelLimit: PER_MODEL_SAMPLE_LIMIT,
       limit: MAX_SAMPLE_SPANS,
     });
-    sampleSpans = rows.map((row) => ({
-      ...row,
-      exampleCost:
-        estimateCost({
-          llmModelCost: candidate,
-          inputTokens: row.inputTokens ?? 0,
-          outputTokens: row.outputTokens ?? 0,
-          cacheReadTokens: row.cacheReadTokens ?? 0,
-          cacheCreationTokens: row.cacheCreationTokens ?? 0,
-        }) ?? null,
-    }));
+    sampleSpans = rows.map((row) => {
+      const hasTokenUsage =
+        row.inputTokens !== null ||
+        row.outputTokens !== null ||
+        row.cacheReadTokens !== null ||
+        row.cacheCreationTokens !== null;
+      return {
+        ...row,
+        exampleCost: !hasTokenUsage
+          ? null
+          : (estimateCost({
+              llmModelCost: candidate,
+              inputTokens: row.inputTokens ?? 0,
+              outputTokens: row.outputTokens ?? 0,
+              cacheReadTokens: row.cacheReadTokens ?? 0,
+              cacheCreationTokens: row.cacheCreationTokens ?? 0,
+            }) ?? null),
+      };
+    });
   }
 
   return {

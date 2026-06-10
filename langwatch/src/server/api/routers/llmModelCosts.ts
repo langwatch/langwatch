@@ -215,6 +215,6 @@ export const llmModelCostsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) =>
-      previewCostRuleMatchingSpans(getApp().traces.spans, input),
+      previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
     ),
 });

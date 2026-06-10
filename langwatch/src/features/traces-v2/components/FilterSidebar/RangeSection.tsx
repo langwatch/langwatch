@@ -12,11 +12,13 @@ const CLEAR_EPSILON = 0.01;
 
 /**
  * Slider step sized to the range span. The default step of 1 makes a
- * sub-unit range unusable, a cost facet spanning $0…$0.0139 only lets the
- * thumbs snap to the two endpoints, so no intermediate filter can be set by
- * dragging. Integer-scale spans keep step 1 so token/duration sliders snap
- * to whole units; smaller spans get a fine fraction of the range. Exported
- * for unit testing.
+ * narrow range unusable, a cost facet spanning $0…$0.0139 only lets the
+ * thumbs snap to the two endpoints, so no intermediate filter can be set
+ * by dragging. Spans of 100+ units keep step 1 so wide token and duration
+ * sliders snap to whole units; narrower spans get 1/100 of the span so the
+ * thumbs always have about a hundred usable positions (a $0…$5 cost facet
+ * needs sub-dollar steps just as much as a sub-unit one). Exported for
+ * unit testing.
  */
 export function sliderStepForSpan(span: number): number {
   if (!Number.isFinite(span) || span <= 0) return 1;

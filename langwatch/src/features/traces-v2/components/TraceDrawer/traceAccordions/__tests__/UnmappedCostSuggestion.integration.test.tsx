@@ -16,6 +16,7 @@ import type {
   SpanDetail,
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
+import { SpanAccordions } from "../SpanAccordions";
 
 const { mockDetailState } = vi.hoisted(() => ({
   mockDetailState: { current: null as SpanDetail | null },
@@ -37,8 +38,6 @@ vi.mock("../../../../hooks/useSpanDetail", () => ({
 vi.mock("../../../../hooks/useTraceResources", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
 }));
-
-const { SpanAccordions } = await import("../SpanAccordions");
 
 const span: SpanTreeNode = {
   spanId: "span-1",
@@ -95,6 +94,7 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
   });
 
   describe("when the span has a model and tokens but no cost mapped", () => {
+    /** @scenario Span with model and tokens but no cost shows a cost mapping suggestion */
     it("shows the suggestion with the model name and an add button", () => {
       renderSpanDetail();
 
@@ -106,6 +106,8 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario Suggestion opens the model costs page prefilled in a new window */
+    /** @scenario Generated regex escapes special characters */
     it("opens the model costs page prefilled in a new window", () => {
       renderSpanDetail();
 

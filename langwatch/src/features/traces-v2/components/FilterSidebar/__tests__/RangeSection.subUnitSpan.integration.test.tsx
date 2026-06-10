@@ -7,7 +7,13 @@
  * set by dragging. The slider must get a step sized to the span.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RangeSection, sliderStepForSpan } from "../RangeSection";
 
@@ -15,7 +21,7 @@ describe("RangeSection", () => {
   afterEach(cleanup);
 
   describe("when the facet span is sub-unit", () => {
-    it("mounts the slider with a step smaller than the span", async () => {
+    it("moves the thumb by the span-sized step on a keyboard increment", async () => {
       render(
         <ChakraProvider value={defaultSystem}>
           <RangeSection
@@ -34,10 +40,21 @@ describe("RangeSection", () => {
       fireEvent.click(screen.getByText("Cost"));
 
       const sliders = await screen.findAllByRole("slider");
-      expect(sliders.length).toBeGreaterThan(0);
-      // The step contract itself is asserted on the helper below; this
-      // render proves the component path feeds it to the slider without
-      // breaking the mount.
+      const lowerThumb = sliders[0]!;
+      expect(Number(lowerThumb.getAttribute("aria-valuenow"))).toBe(0);
+
+      // One ArrowRight from the min endpoint must advance by the computed
+      // step. With the default step of 1 the thumb would jump straight to
+      // the max endpoint of this $0…$0.0139 range instead.
+      lowerThumb.focus();
+      fireEvent.keyDown(lowerThumb, { key: "ArrowRight" });
+
+      await waitFor(() => {
+        expect(Number(lowerThumb.getAttribute("aria-valuenow"))).toBeCloseTo(
+          sliderStepForSpan(0.0139),
+          6,
+        );
+      });
     });
   });
 });
@@ -50,7 +67,13 @@ describe("sliderStepForSpan", () => {
     });
   });
 
-  describe("when the span covers whole units", () => {
+  describe("when the span covers a few units", () => {
+    it("still subdivides so narrow cost ranges stay draggable", () => {
+      expect(sliderStepForSpan(5)).toBe(0.05);
+    });
+  });
+
+  describe("when the span covers 100 units or more", () => {
     it("keeps the default step of 1", () => {
       expect(sliderStepForSpan(2100)).toBe(1);
       expect(sliderStepForSpan(100)).toBe(1);

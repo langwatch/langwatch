@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LLMModelCostDrawer } from "~/components/settings/LLMModelCostDrawer";
 
 const { mockPreviewState, mockPreviewQueryInputs } = vi.hoisted(() => ({
   mockPreviewState: {
@@ -82,10 +83,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { LLMModelCostDrawer } = await import(
-  "~/components/settings/LLMModelCostDrawer"
-);
-
 const Wrapper = ({ children }: { children?: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -134,6 +131,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
   });
 
   describe("when recent spans match the regex", () => {
+    /** @scenario Recent spans matching the regex are listed with tokens and an example cost */
     it("lists the spans with model, tokens, and example cost", () => {
       renderDrawer({ prefillRegex: "bedrock/eu\\." });
 
@@ -148,6 +146,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario A span row opens the trace details drawer in a new tab */
     it("opens the trace drawer deep link in a new tab on row click", () => {
       renderDrawer({ prefillRegex: "bedrock/eu\\." });
 
@@ -191,6 +190,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       };
     });
 
+    /** @scenario No matches shows the models that were seen instead */
     it("shows the recently seen models that did not match", () => {
       renderDrawer({ prefillRegex: "nothing-matches-this" });
 
@@ -237,6 +237,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
   });
 
   describe("when a slash appears unescaped in the regex", () => {
+    /** @scenario Slashes in the regex are valid */
     it("treats the regex as valid and previews matches", () => {
       renderDrawer({
         prefillRegex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",

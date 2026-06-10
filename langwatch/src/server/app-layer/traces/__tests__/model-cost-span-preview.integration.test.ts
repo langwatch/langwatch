@@ -188,11 +188,14 @@ afterAll(async () => {
 describe("previewCostRuleMatchingSpans", () => {
   describe("when the regex matches a recorded model exactly", () => {
     it("lists the matching model with sample spans, tokens, and an example cost", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
-        inputCostPerToken: 0.000003,
-        outputCostPerToken: 0.000015,
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
+          inputCostPerToken: 0.000003,
+          outputCostPerToken: 0.000015,
+        },
       });
 
       expect(preview.matchedModels).toHaveLength(1);
@@ -219,11 +222,14 @@ describe("previewCostRuleMatchingSpans", () => {
     });
 
     it("reads token counts from the legacy prompt/completion attribute aliases", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: "^eu\\.anthropic\\.claude-sonnet-4-6-v1:0$",
-        inputCostPerToken: 0.000002,
-        outputCostPerToken: 0.00001,
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: "^eu\\.anthropic\\.claude-sonnet-4-6-v1:0$",
+          inputCostPerToken: 0.000002,
+          outputCostPerToken: 0.00001,
+        },
       });
 
       expect(preview.sampleSpans).toHaveLength(1);
@@ -233,22 +239,48 @@ describe("previewCostRuleMatchingSpans", () => {
     });
 
     it("returns no example cost when no rates were entered yet", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
+        },
       });
 
+      expect(preview.sampleSpans[0]!.exampleCost).toBeNull();
+    });
+
+    it("returns no example cost for a span without token usage even when rates are entered", async () => {
+      // A token-less span priced at the entered rates would read as a
+      // misleading $0.00; the preview shows a dash instead.
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: "^gpt-5-mini$",
+          inputCostPerToken: 0.000003,
+          outputCostPerToken: 0.000015,
+        },
+      });
+
+      expect(preview.sampleSpans).toHaveLength(1);
+      expect(preview.sampleSpans[0]!.spanId).toBe("span-mini");
+      expect(preview.sampleSpans[0]!.inputTokens).toBeNull();
       expect(preview.sampleSpans[0]!.exampleCost).toBeNull();
     });
   });
 
   describe("when the regex relies on the pipeline's matching fallbacks", () => {
+    /** @scenario Matching follows the same fallbacks as cost computation */
     it("matches a raw Bedrock inference-profile id through Bedrock normalization", async () => {
       // `eu.anthropic.claude-sonnet-4-6-v1:0` normalizes to
       // `anthropic/claude-sonnet-4-6` before matching, same as ingestion.
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: "anthropic/claude-sonnet-4-6",
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: "anthropic/claude-sonnet-4-6",
+        },
       });
 
       const matched = preview.matchedModels.map((m) => m.model);
@@ -258,9 +290,12 @@ describe("previewCostRuleMatchingSpans", () => {
 
   describe("when listing the project's recent models", () => {
     it("prefers the response model over the request model", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: `^response-model-${ns}$`,
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: `^response-model-${ns}$`,
+        },
       });
 
       expect(preview.matchedModels.map((m) => m.model)).toContain(
@@ -272,19 +307,26 @@ describe("previewCostRuleMatchingSpans", () => {
     });
 
     it("excludes spans outside the preview window", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: `^stale-model-${ns}$`,
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: `^stale-model-${ns}$`,
+        },
       });
 
       expect(preview.matchedModels).toHaveLength(0);
       expect(preview.totalMatchedSpans).toBe(0);
     });
 
+    /** @scenario Preview is scoped to the current project */
     it("never includes another tenant's spans", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: ".*",
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: ".*",
+        },
       });
 
       const sampleSpanIds = preview.sampleSpans.map((s) => s.spanId);
@@ -293,9 +335,12 @@ describe("previewCostRuleMatchingSpans", () => {
     });
 
     it("ranks token-bearing spans ahead of token-less ones in the sample list", async () => {
-      const preview = await previewCostRuleMatchingSpans(spans, {
-        projectId: tenantId,
-        regex: ".*",
+      const preview = await previewCostRuleMatchingSpans({
+        spans,
+        input: {
+          projectId: tenantId,
+          regex: ".*",
+        },
       });
 
       const tokenless = preview.sampleSpans.findIndex(
@@ -313,9 +358,14 @@ describe("previewCostRuleMatchingSpans", () => {
   describe("when the regex is invalid or unsafe", () => {
     it("throws a validation error", async () => {
       await expect(
-        previewCostRuleMatchingSpans(spans, {
-          projectId: tenantId,
-          regex: "(a+)+$",
+        previewCostRuleMatchingSpans({
+          spans,
+          input: {
+            projectId: tenantId,
+            // Deliberately catastrophic pattern (exponential backtracking):
+            // the assertion is that the service refuses to ever compile it.
+            regex: "(a+)+$",
+          },
         }),
       ).rejects.toBeInstanceOf(ValidationError);
     });
@@ -414,6 +464,7 @@ describe("unmapped cost suggestion + scope-cascade rule resolution", () => {
   });
 
   describe("when the span carries no symptom", () => {
+    /** @scenario Span with a computed cost shows no suggestion */
     it("returns null when a cost was already computed", async () => {
       const suggestion = await deriveUnmappedCostSuggestion({
         projectId,
@@ -426,6 +477,7 @@ describe("unmapped cost suggestion + scope-cascade rule resolution", () => {
       expect(suggestion).toBeNull();
     });
 
+    /** @scenario Span without token counts shows no suggestion */
     it("returns null when the span has no token usage", async () => {
       const suggestion = await deriveUnmappedCostSuggestion({
         projectId,
