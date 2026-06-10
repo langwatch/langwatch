@@ -188,11 +188,16 @@ export const useHandleServerMessage = ({
   } = workflowStore;
 
   const alertOnError = useCallback((message: string | undefined) => {
+    // Keyed by the message so repeated identical failures (e.g.
+    // "LangWatch NLP is unreachable" while the engine is down and the
+    // studio retries) update one toast instead of stacking a wall.
+    const dedupeId = `studio-error-${message?.slice(0, 140) ?? "unknown"}`;
     if (
       !!message?.toLowerCase().includes("stopped") ||
       !!message?.toLowerCase().includes("interrupted")
     ) {
       toaster.create({
+        id: dedupeId,
         title: "Stopped",
         description: message?.slice(0, 140),
         type: "info",
@@ -203,6 +208,7 @@ export const useHandleServerMessage = ({
       });
     } else {
       toaster.create({
+        id: dedupeId,
         title: "Error",
         description: message?.slice(0, 140),
         type: "error",
