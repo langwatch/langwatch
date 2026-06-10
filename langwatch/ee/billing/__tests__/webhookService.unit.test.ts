@@ -1,16 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+const mockSetForScope = vi.fn().mockResolvedValue(undefined);
+const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: () => ({
     notifications: {
       sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
     },
+    dataRetention: {
+      policy: {
+        setForScope: mockSetForScope,
+        removeForScope: mockRemoveForScope,
+      },
+    },
   }),
 }));
 
 import { SubscriptionStatus } from "../planTypes";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { EEWebhookService } from "../services/webhookService";
 import type { SubscriptionRepository, SubscriptionWithOrg } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
@@ -432,6 +441,96 @@ describe("webhookService", () => {
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
+
+      /** @scenario A first paid Growth Seat activation provisions the organization policy */
+      it("provisions an organization-scoped traces retention policy at the platform default", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.migrateToSeatEvent.mockResolvedValue([]);
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSetForScope).toHaveBeenCalledWith({
+          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+          category: "traces",
+          retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        });
+      });
+
+      /** @scenario A retention failure never fails the billing webhook */
+      it("still activates and notifies when retention provisioning throws", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.migrateToSeatEvent.mockResolvedValue([]);
+        mockSetForScope.mockRejectedValueOnce(new Error("retention store down"));
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        // Should not throw — retention failure is swallowed
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ type: "confirmed", organizationId: "org_123" }),
+        );
+      });
+    });
+
+    describe("when subscription is a non-seat plan", () => {
+      /** @scenario A non-seat plan does not provision a policy */
+      it("does not provision a retention policy on first activation", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "LAUNCH" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSetForScope).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an active seat subscription renews", () => {
+      /** @scenario A renewal does not re-provision the policy */
+      it("does not re-provision the retention policy", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSetForScope).not.toHaveBeenCalled();
+      });
     });
 
     describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
@@ -786,6 +885,68 @@ describe("webhookService", () => {
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
       });
     });
+
+    describe("when no active subscription remains", () => {
+      /** @scenario Cancelling the last active subscription removes the organization policy */
+      it("removes the organization-scoped traces retention policy", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockRemoveForScope).toHaveBeenCalledWith({
+          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+          category: "traces",
+        });
+      });
+
+      /** @scenario A retention failure never fails the billing webhook */
+      it("still cancels when retention removal throws", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(null);
+        mockRemoveForScope.mockRejectedValueOnce(new Error("retention store down"));
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        // Should not throw — retention failure is swallowed
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+      });
+    });
+
+    describe("when another active subscription remains", () => {
+      /** @scenario Cancelling one of several subscriptions keeps the policy */
+      it("leaves the organization retention policy in place", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(
+          makeSubscription({ id: "sub_db_2", status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockRemoveForScope).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("handleSubscriptionUpdated()", () => {
@@ -975,6 +1136,34 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a cancel-by-update leaves no active subscription", () => {
+      /** @scenario Cancelling the last active subscription removes the organization policy */
+      it("removes the organization-scoped traces retention policy", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "canceled",
+            ended_at: 1234567890,
+            items: { data: [] },
+          } as any,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+        expect(mockRemoveForScope).toHaveBeenCalledWith({
+          scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
+          category: "traces",
+        });
       });
     });
   });

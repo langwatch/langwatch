@@ -16,6 +16,7 @@ import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from ".
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { traced } from "../../../src/server/app-layer/tracing";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../src/server/data-retention/retentionPolicy.schema";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -617,6 +618,10 @@ export class EEWebhookService implements WebhookService {
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
     });
+
+    if (!remainingActive) {
+      await this.removeSeatRetentionPolicy(existingSubscription.organizationId);
+    }
   }
 
   async handleSubscriptionUpdated({
@@ -655,6 +660,10 @@ export class EEWebhookService implements WebhookService {
         organizationId: existingSubForUpdate.organizationId,
         hasSubscription: !!remainingActive,
       });
+
+      if (!remainingActive) {
+        await this.removeSeatRetentionPolicy(existingSubForUpdate.organizationId);
+      }
     } else if (subscription.status === "active") {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
@@ -815,6 +824,8 @@ export class EEWebhookService implements WebhookService {
             }
           }
         }
+
+        await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
       }
 
       await getApp().notifications.sendSlackSubscriptionEvent({
@@ -832,6 +843,58 @@ export class EEWebhookService implements WebhookService {
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
       });
+    }
+  }
+
+  /**
+   * A paid Growth-Seat subscription entitles the organization to an explicit
+   * organization-scoped traces retention policy at the platform default window
+   * (49 days / 7 weeks). We stamp it on first activation so the entitlement is
+   * recorded rather than implied: an org with no override silently follows the
+   * platform default and would drift down if that default were ever lowered,
+   * whereas an explicit override holds the window. Today the value equals the
+   * platform default, so this has no observable effect yet — it is the
+   * mechanism the paid retention tier hangs off once the default diverges.
+   *
+   * Idempotent (upsert on scope + category) and best-effort: a retention
+   * failure must never fail the Stripe webhook — that would leave the
+   * subscription stuck PENDING and trigger Stripe retries — so we log and
+   * swallow, mirroring the surrounding notification side effects.
+   */
+  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
+    try {
+      await getApp().dataRetention.policy.setForScope({
+        scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
+        category: "traces",
+        retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+    } catch (err) {
+      logger.error(
+        { organizationId, err },
+        "[stripeWebhook] Failed to apply seat retention policy",
+      );
+    }
+  }
+
+  /**
+   * Mirror of {@link applySeatRetentionPolicy}: once an organization has no
+   * active subscription left, drop the organization-scoped traces override so
+   * retention reverts to the platform default. Callers must only invoke this
+   * after confirming no active subscription remains (a still-paying org keeps
+   * its window). Idempotent (no-op when no override exists) and best-effort for
+   * the same reason as provisioning.
+   */
+  private async removeSeatRetentionPolicy(organizationId: string): Promise<void> {
+    try {
+      await getApp().dataRetention.policy.removeForScope({
+        scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
+        category: "traces",
+      });
+    } catch (err) {
+      logger.error(
+        { organizationId, err },
+        "[stripeWebhook] Failed to remove seat retention policy",
+      );
     }
   }
 
