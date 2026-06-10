@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
+
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
 // the SQL string. The legacy outbox drainer carries an explicit
 // identifier; the advisory-lock helper opts out via the `-- @tenancy:`
@@ -22,9 +24,6 @@ function extractRawSql(args: unknown): string | null {
   if (Array.isArray(a.strings)) return a.strings.join(" ? ");
   return null;
 }
-
-
-import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
 
 /**
  * Genuinely global / cross-cutting models with no tenancy column at all: the
@@ -236,15 +235,18 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires a row id or scope predicate in the where clause";
+        return "requires a row id, organizationId, or scope predicate in the where clause";
       }
       const ok = validateRecursive(
         where,
-        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires a row id or scope predicate in the where clause";
+        : "requires a row id, organizationId, or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -284,6 +286,38 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof d.scopeId !== "string"
         ) {
           return "create requires modelProviderId + scopeType + scopeId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  RoutingPolicyScope: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires a row id, routingPolicyId, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.routingPolicyId === "string" ||
+          (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires a row id, routingPolicyId, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.routingPolicyId !== "string" ||
+          typeof d.scopeType !== "string" ||
+          typeof d.scopeId !== "string"
+        ) {
+          return "create requires routingPolicyId + scopeType + scopeId in the data payload";
         }
       }
       return null;
@@ -360,12 +394,17 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id or scope predicate";
+      if (!where) return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
-        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
-      return ok ? null : "requires a row id or scope predicate";
+      return ok
+        ? null
+        : "requires a row id, organizationId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -523,23 +562,10 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   const model = params.model;
 
   // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
-  // inside the SQL string itself — `WHERE "projectId" = ${projectId}` lives
-  // in the template literal, where the structural guard cannot see it.
-  // The guard's promise (refuse a query that doesn't carry a tenancy
-  // predicate) is unmeetable at this layer; the call sites are
-  // responsible for embedding the scope in the SQL, and PG enforces it.
-  //
-  // Still: a blanket exemption lets a raw query that simply *forgets*
-  // a tenancy predicate become a silent cross-tenant read. The two
-  // cheap structural defences this layer CAN apply:
-  //
-  //  1) Require the SQL text to mention `projectId`, `organizationId`,
-  //     or `tenantId` — every raw query in the codebase today carries
-  //     one of these (the outbox drainer and the advisory-lock helper
-  //     both do).
-  //  2) Accept an explicit `-- @tenancy: <reason>` opt-out marker for
-  //     the rare query that genuinely scans across all tenants (e.g.
-  //     a global recovery sweep). The marker is grep-able for review.
+  // inside the SQL string itself, where the structural guard cannot see
+  // it. Two cheap structural defences still apply: require the SQL text
+  // to mention a tenancy column, or accept an explicit grep-able
+  // `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
   if (action === "queryRaw" || action === "executeRaw") {
     const sql = extractRawSql(params.args);
     if (!sql) return;

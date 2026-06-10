@@ -392,6 +392,7 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
+  ReactorOutbox            ReactorOutbox[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
   workflows                Workflow[]

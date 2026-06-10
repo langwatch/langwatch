@@ -712,6 +712,8 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
         }),
       ).resolves.toBe("ok");
     });
+  });
+});
 
 /**
  * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
