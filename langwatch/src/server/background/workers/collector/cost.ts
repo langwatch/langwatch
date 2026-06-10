@@ -176,11 +176,15 @@ export function stripProviderSubtype(model: string): string {
  *   [<region>.]<vendor>.<model>[-v<N>][:<version>]
  * e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0` →
  *      `anthropic/claude-haiku-4-5-20251001`
- * The registry regexes already match dated Claude/Nova slugs, so
- * stripping just the Bedrock envelope is enough.
+ * litellm-style clients report the same id behind a `bedrock/` provider
+ * prefix (`bedrock/eu.anthropic.claude-sonnet-4-6`); that prefix is part
+ * of the envelope and is stripped too. The registry regexes already match
+ * dated Claude/Nova slugs, so stripping just the Bedrock envelope is enough.
  */
 export function normalizeBedrockModelId(model: string): string {
   let normalized = model;
+  // 0. Strip the litellm-style `bedrock/` provider prefix.
+  normalized = normalized.replace(/^bedrock\//i, "");
   // 1. Strip `:<version>` suffix (`:0`, `:1`, `:latest`).
   normalized = normalized.replace(/:[0-9a-z.]+$/i, "");
   // 2. Strip `-v<N>` revision marker (`-v1`, `-v2`).
