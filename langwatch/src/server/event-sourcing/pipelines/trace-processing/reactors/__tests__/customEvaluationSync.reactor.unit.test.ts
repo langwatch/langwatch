@@ -476,7 +476,7 @@ describe("customEvaluationSync reactor", () => {
     });
   });
 
-  describe("shouldReact predicate", () => {
+  describe("when deciding whether to react", () => {
     describe("when span carries evaluation events", () => {
       it("returns true", () => {
         const reactor = createCustomEvaluationSyncReactor(deps);

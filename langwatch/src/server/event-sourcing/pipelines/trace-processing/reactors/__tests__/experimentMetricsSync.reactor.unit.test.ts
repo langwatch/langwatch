@@ -237,7 +237,7 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
     });
   });
 
-  describe("shouldReact predicate", () => {
+  describe("when deciding whether to react", () => {
     describe("when trace has evaluation.run_id and cost data", () => {
       it("returns true", () => {
         const reactor = createExperimentMetricsSyncReactor(createDeps());

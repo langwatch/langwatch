@@ -186,7 +186,7 @@ describe("originGate reactor", () => {
     });
   });
 
-  describe("shouldReact predicate", () => {
+  describe("when deciding whether to react", () => {
     describe("when origin is absent on a recent trace", () => {
       it("returns true", () => {
         const reactor = createOriginGateReactor(createDeps());

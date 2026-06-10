@@ -355,7 +355,7 @@ describe("createProjectMetadataReactor()", () => {
     expect(reactor.options!.runIn).toEqual(["worker"]);
   });
 
-  describe("shouldReact predicate", () => {
+  describe("when deciding whether to react", () => {
     describe("when the trace is a real ingest", () => {
       it("returns true", () => {
         const reactor = createProjectMetadataReactor(deps);

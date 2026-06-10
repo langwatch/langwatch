@@ -190,7 +190,7 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
     });
   });
 
-  describe("shouldReact predicate", () => {
+  describe("when deciding whether to react", () => {
     describe("when trace has scenario.run_id and data to aggregate", () => {
       it("returns true", () => {
         const reactor = createSimulationMetricsSyncReactor(createDeps());
