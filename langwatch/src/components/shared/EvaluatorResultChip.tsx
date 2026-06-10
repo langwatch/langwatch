@@ -174,6 +174,7 @@ export function EvaluatorResultChip({
             content={<DataTooltipContent inputs={inputs} />}
             positioning={{ placement: "right" }}
             openDelay={100}
+            closeOnScroll={false}
             interactive
           >
             <HStack
@@ -228,7 +229,12 @@ export function EvaluatorResultChip({
     </HStack>
   );
 
-  // When we have inputs, use controlled tooltip with interactive behavior
+  // When we have inputs, use controlled tooltip with interactive behavior.
+  // closeOnScroll stays off on both variants: the details box scrolls
+  // internally (long evaluator reasoning) and zag's default scroll
+  // listener would dismiss the popover on the first wheel tick — the
+  // "it disappears when I scroll" customer bug. The positioner keeps
+  // tracking the anchor while the results table scrolls.
   if (hasInputs) {
     return (
       <Tooltip
@@ -239,6 +245,7 @@ export function EvaluatorResultChip({
         }}
         positioning={{ placement: "top" }}
         open={isOpen}
+        closeOnScroll={false}
         interactive
       >
         {chipContent}
@@ -253,6 +260,7 @@ export function EvaluatorResultChip({
       positioning={{ placement: "top" }}
       openDelay={200}
       closeDelay={200}
+      closeOnScroll={false}
       interactive
     >
       {chipContent}
