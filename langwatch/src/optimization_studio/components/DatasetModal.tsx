@@ -1,19 +1,19 @@
 /**
- * Dataset dialog for the workflow entry-point node — same experience as the
+ * Dataset dialog for the workflow entry-point node: same experience as the
  * rest of the platform: the shared dataset picker for choosing, the shared
  * TanStack editor for editing.
  *
  * Two views:
  *  - Choose (no `editingDataset`): searchable picker list + "Upload CSV" +
  *    "New dataset" (drafts an inline dataset on the node and jumps straight
- *    into the editor — no form, no forced CSV upload).
+ *    into the editor: no form, no forced CSV upload).
  *  - Edit (`editingDataset` set): the shared editor. Saved datasets autosave
  *    records and propagate column changes into the node's fields; draft
  *    datasets live in the workflow DSL itself and can be promoted to a real
  *    dataset with "Save as dataset".
  *
  * All node writes go through `attachEntryDataset`, which merges dataset
- * columns into the entry fields without clobbering user-added inputs — the
+ * columns into the entry fields without clobbering user-added inputs; the
  * dataset is a data source, not the definition of the workflow's inputs.
  */
 import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";

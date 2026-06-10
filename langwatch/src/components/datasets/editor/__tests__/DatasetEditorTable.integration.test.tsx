@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the standalone DatasetEditorTable — the shared
+ * Integration tests for the standalone DatasetEditorTable: the shared
  * TanStack dataset editor used by the /datasets pages, the workflow dataset
  * node, and prompt demonstrations. Renders the full component tree (table,
  * cells, portal editor); only the tRPC transport is mocked.

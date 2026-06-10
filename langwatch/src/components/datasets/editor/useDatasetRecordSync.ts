@@ -9,7 +9,7 @@
  *
  * Save status is reported through onStatus so each surface can render its own
  * autosave indicator. A failed sync keeps the pending change around, so a
- * retry happens on the next edit; it must always be VISIBLE — never report
+ * retry happens on the next edit; it must always be VISIBLE; never report
  * silent success on error.
  */
 import { useCallback, useEffect, useRef } from "react";
@@ -151,7 +151,7 @@ export const useDatasetRecordSync = ({
         }
 
         for (const recordId of recordsToUpdate) {
-          // Send the full record — the backend replaces the entire entry
+          // Send the full record: the backend replaces the entire entry
           const fullRecord = resolveFullRecordRef.current(
             dbDatasetId,
             recordId,

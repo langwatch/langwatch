@@ -1,5 +1,5 @@
 /**
- * Demonstrations editor for signature (prompt) nodes in the studio — hosts
+ * Demonstrations editor for signature (prompt) nodes in the studio; hosts
  * the shared dataset editor in in-memory mode; rows live in the node's
  * `demonstrations` parameter and every change writes back into the DSL.
  */

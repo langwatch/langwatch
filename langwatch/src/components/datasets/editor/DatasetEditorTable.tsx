@@ -1,5 +1,5 @@
 /**
- * Standalone spreadsheet editor for a single dataset — the same TanStack
+ * Standalone spreadsheet editor for a single dataset: the same TanStack
  * table experience as the evaluations workbench (inline cell editing, type
  * validation, virtualized rows, trailing phantom row), reusable anywhere a
  * dataset is viewed or edited.
@@ -79,7 +79,7 @@ export type InMemoryDataset = {
 /**
  * Imperative surface for external writers that stream changes into the
  * table (the wizard's AI dataset generation). Rows changed through the
- * controller are display-synced only — the caller owns persistence.
+ * controller are display-synced only; the caller owns persistence.
  */
 export type DatasetEditorController = {
   addRow: (record: EditorRecord) => void;
@@ -187,7 +187,7 @@ export function DatasetEditorTable({
   );
 
   // Load data into the store. For in-memory mode this happens once on mount
-  // (the editor owns the working copy afterwards — parent updates flow the
+  // (the editor owns the working copy afterwards; parent updates flow the
   // other way via onUpdateDataset).
   const loadedRef = useRef(false);
   const lastPropagatedRef = useRef<EditorRecord[] | null>(null);
@@ -776,7 +776,7 @@ function RowCheckbox({
 
 /**
  * Compact autosave indicator: cloud when idle, spinner while saving, check
- * on success, and a loud error with the message when a save fails — a
+ * on success, and a loud error with the message when a save fails: a
  * blocked save must never look like a successful one.
  */
 export function SaveStatusChip({

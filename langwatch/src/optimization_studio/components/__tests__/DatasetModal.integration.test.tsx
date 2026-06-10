@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the workflow dataset dialog — the shared
+ * Integration tests for the workflow dataset dialog: the shared
  * picker/editor experience on the entry-point node. Uses the real workflow
  * store; only the tRPC transport and drawer registry are mocked.
  * See specs/datasets/studio-choose-dataset.feature and

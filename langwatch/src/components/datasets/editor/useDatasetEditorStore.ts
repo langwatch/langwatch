@@ -32,7 +32,7 @@ const generateRecordId = () =>
   `new_${Date.now()}_${(newRecordSeq += 1)}`;
 
 export type DatasetEditorState = {
-  /** Database dataset id — set in saved mode, undefined for in-memory. */
+  /** Database dataset id: set in saved mode, undefined for in-memory. */
   dbDatasetId: string | undefined;
   columns: EditorColumn[];
   records: EditorRecord[];
@@ -52,7 +52,7 @@ export type DatasetEditorActions = {
     dbDatasetId?: string;
   }) => void;
   /** Display-sync upsert from an external writer (e.g. AI dataset
-   *  generation) that persists records itself — bypasses the pending
+   *  generation) that persists records itself; bypasses the pending
    *  queue on purpose. Matches by record id; appends when absent. */
   upsertExternalRecord: (record: EditorRecord) => void;
   /** Display-sync removal counterpart to upsertExternalRecord. */
@@ -179,7 +179,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
       const { columns, records } = get();
       const newRecord = emptyRecordFor(columns);
       set({ records: [...records, newRecord] });
-      // New empty rows are not queued for sync — they only persist once a
+      // New empty rows are not queued for sync: they only persist once a
       // cell gets a value (setCellValue queues them), mirroring the
       // trailing-phantom-row behavior.
       return records.length;
@@ -210,7 +210,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
       const datasetChanges = { ...(pendingSavedChanges[dbDatasetId] ?? {}) };
       for (const record of removed) {
         if (record.id.startsWith("new_")) {
-          // Never reached the server — just drop any queued create
+          // Never reached the server, just drop any queued create
           delete datasetChanges[record.id];
         } else {
           datasetChanges[record.id] = { _delete: true };
