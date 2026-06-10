@@ -34,8 +34,9 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
       And the row carries reactorName, projectId, dedupKey, and payload
       And the dedupKey begins with "${projectId}/" so it is self-describing for operator scans
       And no side effect (email, Slack, dataset write) has fired yet
-      And the `TriggerSent` row is NOT yet written — that claim is the
-      at-most-once gate on the post-dispatch send, not the at-enqueue gate
+      # The TriggerSent claim is the at-most-once gate on the post-dispatch
+      # send, not the at-enqueue gate.
+      And the `TriggerSent` row is NOT yet written
 
     Scenario: A matching evaluation trigger fires on the evaluation pipeline
       Given an active trigger with evaluation filters that match a completed evaluation

@@ -16,13 +16,14 @@ Document **important technical and architectural decisions** — context, trade-
 | [018](./018-form-validation-and-save.md) | Form validation and Save button behavior | Accepted |
 | [021](./021-multi-scope-targeting-and-tenancy.md) | Multi-scope targeting and single-org tenancy enforcement | Accepted |
 | [022](./022-data-retention.md) | Per-tenant per-category data retention enforced by ClickHouse-native TTL | Accepted |
-| [023](./023-orphan-sweep-reactor-chain.md) | Reactor-seeded self-perpetuating chain for retention orphan sweep | Accepted |
+| [023](./023-orphan-sweep-reactor-chain.md) | Reactor-seeded self-perpetuating chain for retention orphan sweep | Superseded by [025](./025-remove-orphan-sweep.md) |
 | [024](./024-cold-path-tiered-storage.md) | Cold-path tiered storage for retention-managed tables | Accepted |
-| [025](./025-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
+| [025](./025-remove-orphan-sweep.md) | Remove the PG orphan sweep entirely | Accepted |
 | [026](./026-per-trigger-dispatch-timing.md) | Per-trigger dispatch timing — cadence and trace-readiness debounce | Accepted |
 | [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
 | [028](./028-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
 | [029](./029-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
+| [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
 
 ## When to Write an ADR
 

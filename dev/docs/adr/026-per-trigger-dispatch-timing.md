@@ -52,7 +52,7 @@ Add **two timing knobs** to the `Trigger` row, both per-trigger and independentl
 | `traceDebounceMs` | Before filter evaluation | Wait for the trace to settle so the filter sees the final state |
 | `notificationCadence` | After dispatch decision | Batch matches inside a wall-clock window into one digest |
 
-Both knobs ride the ADR-025 outbox queue: `traceDebounceMs` drives the `stage: "settle"` dedup TTL; `notificationCadence` drives the `stage: "cadence"` delay snapping.
+Both knobs ride the ADR-030 outbox queue: `traceDebounceMs` drives the `stage: "settle"` dedup TTL; `notificationCadence` drives the `stage: "cadence"` delay snapping.
 
 ### Action classification (the contract `notificationCadence` rides on)
 
@@ -114,7 +114,7 @@ Daily and weekly digests aren't included in v1 — they cross the "is this still
 
 ### How the debounce rides the outbox queue
 
-The debounce lives on the **unified outbox queue** (`langwatch:outbox`, ADR-025) as its `stage: "settle"` payload. There is no separate `langwatch:trigger-evaluation` queue.
+The settle stage rides the **main event-sourcing queue** (`event-sourcing/jobs`) as a stage-discriminated outbox payload, per ADR-030's 2026-06-02 revision — there is no `langwatch:outbox` queue and no separate `langwatch:trigger-evaluation` queue.
 
 The settle payload uses Debounce Mode keyed on `(projectId, triggerId, traceId)`:
 
@@ -164,19 +164,19 @@ When the settle process callback matches, it re-enqueues a `stage: "cadence"` pa
 
 1. Re-reading the (now-settled) trace fold state.
 2. Running `matchesTriggerFilters` / `matchesEvaluationFilters`.
-3. Calling `triggers.claimSend(...)` for the ADR-025 at-most-once gate.
+3. Calling `triggers.claimSend(...)` for the ADR-030 at-most-once gate.
 4. Calling `dispatchTriggerAction(...)` — which itself routes to the outbox or inline path based on action class.
 
 The two reactors (`alertTrigger`, `evaluationAlertTrigger`) keep doing the pre-filter scan that decides *which* triggers are candidates for a given event (trace-only vs evaluation-required), but they no longer own the evaluation itself — they only emit enqueue requests.
 
 ### UI surface
 
-Both knobs are surfaced in the staged authoring drawer (ADR-026):
+Both knobs are surfaced in the staged authoring drawer (ADR-029):
 
 - `notificationCadence`: dropdown, visible only when the action is in `NOTIFY_TRIGGER_ACTIONS`. Persist-action triggers don't see the field.
 - `traceDebounceMs`: integer-seconds field with bounds `[0, 600]`, visible for every action class — persist triggers benefit even more than notify, because a dataset row captured before the trace settles diverges from the trace UI permanently.
 
-Both fields collapse into a single "Cadence" stage on the drawer (the secondary drawer pattern from ADR-026). The current values appear on the automations settings list as columns so an operator scanning the list can see at a glance which triggers are trading latency for completeness.
+Both fields collapse into a single "Cadence" stage on the drawer (the secondary drawer pattern from ADR-029). The current values appear on the automations settings list as columns so an operator scanning the list can see at a glance which triggers are trading latency for completeness.
 
 ## Rationale
 
@@ -215,7 +215,7 @@ A bespoke per-trace "expected span count" or "OTel batch end" signal would be mo
 
 ### Why both knobs ride one queue (stage-discriminated)
 
-The earlier design used a separate `langwatch:trigger-evaluation` queue for settle. They were folded onto the one outbox queue on 2026-06-01 because the maintenance surface (Redis prefixes, metrics, deploy gates, audit adapter wiring) doubles with no behavior gain — a `stage:` field in the payload achieves the same separation with one queue. See ADR-025 for the queue design.
+The earlier design used a separate `langwatch:trigger-evaluation` queue for settle. They were folded onto the one outbox queue on 2026-06-01 because the maintenance surface (Redis prefixes, metrics, deploy gates, audit adapter wiring) doubles with no behavior gain — a `stage:` field in the payload achieves the same separation with one queue. See ADR-030 for the queue design.
 
 ### Why these two knobs are independent
 
@@ -237,21 +237,21 @@ A trigger configured `traceDebounceMs: 60000` + `notificationCadence: 5min_diges
 - **Two new `Trigger` columns.** Single `ALTER TABLE`s with defaults; instant on PG ≥ 11.
 - **Existing triggers default to `immediate` cadence and 30s debounce.** Cadence preserves current behavior; debounce is a one-time change to the half-formed-dispatch default. Operators who were depending on eager evaluation see a one-time change — flip `traceDebounceMs` to 0 if needed. A migration banner / changelog notes both.
 - **Operator default for new notify triggers is `5min_digest` cadence**, which is a behavior change vs today's implicit immediate. Existing triggers don't change.
-- **Dispatcher rendering must handle `payloads[]`.** When `length === 1` (immediate or single-match digest), render as a single message; when `length > 1`, render as a digest with N occurrences. Templates (ADR-024) iterate `{% for m in matches %}` regardless of length.
+- **Dispatcher rendering must handle `payloads[]`.** When `length === 1` (immediate or single-match digest), render as a single message; when `length > 1`, render as a digest with N occurrences. Templates (ADR-028) iterate `{% for m in matches %}` regardless of length.
 - **Reactor shape changes.** `alertTrigger` / `evaluationAlertTrigger` no longer evaluate filters; they emit `outboxQueue.send({ stage: "settle", … })`. The unit tests for those reactors collapse to "the right number of enqueues for the right triggers" — the heavy filter-matching tests move onto the new `evaluateAndDispatchTrigger` function.
 - **Worker-only.** The settle stage runs on the unified outbox queue, part of the outbox-adjacent worker stack. Web is unaffected.
 - **The classification is the contract** for the outbox layer. `computeScheduledFor(action, cadence)` is the single function called by `.withOutbox`-registered reactors' `cadenceWindowMs` resolvers.
 - **Future action types** (a hypothetical `SEND_WEBHOOK`, `OPEN_INCIDENT`) must be classified at the point of introduction. The two sets together must cover every `TriggerAction` enum value — enforced by a unit test that asserts the union has the same size as `allTriggerActions` and that every element is present.
 - **Latency floor.** Operators who set 5min debounce + 1h digest cadence will see notifications up to ~65 minutes after the trace start. This is a deliberate trade-off — settings UI surfaces both numbers so the total budget is visible.
 - **Memory pressure on the dedup index.** Each in-flight (trigger, trace) pair holds one Redis entry for `debounceMs`. At 5-minute debounce + 100K active traces × N triggers, the dedup-index size grows linearly. The existing GroupQueue ops dashboard (`gq:dedup-index:*`) already exposes this — wire an alert on the count, not just a hard cap.
-- **Replay safety unchanged.** ADR-025's `TriggerSent` claim still gates the actual side effect, so a re-fired event after the debounce window (e.g. on a re-ingested trace) still no-ops if the dispatch already happened.
+- **Replay safety unchanged.** ADR-030's `TriggerSent` claim still gates the actual side effect, so a re-fired event after the debounce window (e.g. on a re-ingested trace) still no-ops if the dispatch already happened.
 - **Multi-destination fan-out is a notify-side concern, not persist-side.** NOTIFY actions will eventually want one trigger → multiple destinations, potentially with different cadences each. Today's workaround is duplicating the trigger. PERSIST actions stay 1-destination by design. When fan-out lands, it lives on the notify path; no outbox-framework change required — the schema split (per-trigger row → notify-policy-with-channels) is the work.
 
 ## References
 
-- [ADR-025](./022-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox queue these knobs ride
-- [ADR-024](./024-liquid-templates-for-trigger-notifications.md) — template engine that consumes the digest `matches[]` payload
-- [ADR-026](./026-automation-operator-surfaces.md) — authoring drawer that exposes both fields
+- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox queue these knobs ride
+- [ADR-028](./028-liquid-templates-for-trigger-notifications.md) — template engine that consumes the digest `matches[]` payload
+- [ADR-029](./029-automation-operator-surfaces.md) — authoring drawer that exposes both fields
 - `src/automations/cadences.ts` — where the constants live (shared client/server)
 - `src/server/event-sourcing/pipelines/shared/triggerActionDispatch.ts` — `computeScheduledFor`
 - `src/server/event-sourcing/queues/queue.types.ts` — `DeduplicationConfig` + Debounce Mode

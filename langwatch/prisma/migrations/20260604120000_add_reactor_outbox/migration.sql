@@ -1,7 +1,7 @@
 -- ReactorOutbox: durable dispatch queue for stake-sensitive reactors.
 --
--- See dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md
--- and ADRs 023, 025 for the full rationale. In short: reactors registered
+-- See dev/docs/adr/030-transactional-outbox-for-stake-sensitive-dispatch.md
+-- and ADRs 026, 027 for the full rationale. In short: reactors registered
 -- via `.withOutbox` enqueue rows here instead of dispatching inline. A
 -- drainer leases rows (status → "dispatching"), calls the dispatch
 -- endpoint, and records the outcome. The unique (projectId, reactorName,
@@ -52,7 +52,7 @@ CREATE INDEX "ReactorOutbox_projectId_reactorName_status_nextAttemptAt_idx" ON "
 
 -- Wakeup-driven lease scopes by (projectId, reactorName, groupKey) so
 -- one group's wakeup can't drain another group's ready rows.
-CREATE INDEX "ReactorOutbox_projectId_reactorName_groupKey_status_nextAttemptAt_idx" ON "ReactorOutbox"("projectId", "reactorName", "groupKey", "status", "nextAttemptAt");
+CREATE INDEX "ReactorOutbox_projectId_reactorName_groupKey_status_nextAtt_idx" ON "ReactorOutbox"("projectId", "reactorName", "groupKey", "status", "nextAttemptAt");
 
 -- Operator surface: list stuck/dead dispatches per project.
 CREATE INDEX "ReactorOutbox_projectId_status_updatedAt_idx" ON "ReactorOutbox"("projectId", "status", "updatedAt");

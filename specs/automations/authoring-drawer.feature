@@ -12,7 +12,7 @@ Feature: Staged automation authoring drawer
   test fire) is reachable inside the Configuration secondary drawer for
   notification types.
 
-  See dev/docs/adr/026-automation-operator-surfaces.md.
+  See dev/docs/adr/029-automation-operator-surfaces.md.
 
   Background:
     Given a user authoring an automation in a project
@@ -82,13 +82,13 @@ Feature: Staged automation authoring drawer
     Scenario: The cadence section is hidden for action triggers
       Given the user is authoring an add-to-dataset action
       Then no cadence section is shown
-      And the traceDebounceMs field is still available inside the cadence-equivalent surface
+      And the trace-settle wait setting is still available inside the cadence-equivalent surface
 
     Scenario: The cadence section is shown for notification triggers
       Given the user is authoring an email notification
       Then the cadence section is available
-      And it exposes the notificationCadence dropdown
-      And it exposes the traceDebounceMs setting
+      And it exposes the delivery-cadence dropdown
+      And it exposes the trace-settle wait setting
 
     Scenario: Cadence defaults to a 5-minute digest for new notifications
       Given the user is creating a new email automation

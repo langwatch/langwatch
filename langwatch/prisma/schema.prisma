@@ -2810,7 +2810,9 @@ model ReactorOutbox {
     @@index([projectId, reactorName, status, nextAttemptAt])
     // Wakeup-driven lease scopes by (projectId, reactorName, groupKey)
     // so one group's wakeup can't drain another group's ready rows.
-    @@index([projectId, reactorName, groupKey, status, nextAttemptAt])
+    // `map:` pins the name to ≤63 chars (Postgres identifier limit) so the
+    // migration's hand-written index name matches what Prisma expects.
+    @@index([projectId, reactorName, groupKey, status, nextAttemptAt], map: "ReactorOutbox_projectId_reactorName_groupKey_status_nextAtt_idx")
     // Operator surface: list stuck/dead dispatches per project.
     @@index([projectId, status, updatedAt])
     // Crash recovery scan: find leased rows whose worker never came back.

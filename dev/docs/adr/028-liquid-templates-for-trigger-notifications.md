@@ -17,7 +17,7 @@ Enterprise customers regularly ask for:
 
 Customer-supplied templates are server-evaluated. The security boundary is critical: the template engine must not allow arbitrary code execution, filesystem access, or unbounded recursion. The product also needs the system to degrade gracefully — a customer template that throws or references missing variables must not break the dispatch path.
 
-[ADR-023](./023-per-trigger-dispatch-timing.md) introduces cadence and digest semantics. The template system must work for both single-match (`length === 1`) and digest (`length > 1`) cases without forcing the customer to write two templates.
+[ADR-026](./026-per-trigger-dispatch-timing.md) introduces cadence and digest semantics. The template system must work for both single-match (`length === 1`) and digest (`length > 1`) cases without forcing the customer to write two templates.
 
 ## Decision
 
@@ -61,7 +61,7 @@ Subject is Liquid → string, single line, clipped to 200 chars with `…` on ov
 Explicit type discriminator: `slackTemplateType: 'string' | 'block_kit'`.
 
 - `'string'`: Liquid output sent as a plain `text` payload.
-- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log, surface in operator activity tab (ADR-026).
+- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log, surface in operator activity tab (ADR-029).
 
 Block Kit allowlist v1: `section | divider | context | header | image`. Interactive elements (`button`, `actions`, `input`, etc.) are stripped before sending — Slack accepts callbacks on interactive elements, and we do not want customer-authored Block Kit posting back to LangWatch.
 
@@ -86,7 +86,7 @@ Templates always iterate `{% for m in matches %}`. Immediate dispatches set `mat
 ### Validation
 
 - On `Trigger` save (Hono + tRPC): run `validateLiquid` on every non-null template column. Reject save with a syntax error message.
-- On render: try/catch the Liquid call. On failure, render the default template, log + capture, surface "rendered with the default template due to template error" in the operator activity tab (ADR-026).
+- On render: try/catch the Liquid call. On failure, render the default template, log + capture, surface "rendered with the default template due to template error" in the operator activity tab (ADR-029).
 - On Block Kit JSON parse failure: same fall-back-to-default semantics.
 
 ### Test fire banner
@@ -139,7 +139,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
 - **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
-- **Operator-facing surfaces** (ADR-026):
+- **Operator-facing surfaces** (ADR-029):
   - Split-pane editor with live preview (Monaco + Liquid mode).
   - Email preview: Liquid → Markdown → HTML rendered with the same wrapper as production.
   - Slack preview: in-app renderer for the allowlist + "Open in Slack Block Kit Builder" deep-link.
@@ -150,7 +150,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 
 ## References
 
-- [ADR-025](./025-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
+- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
 - [ADR-029](./029-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)

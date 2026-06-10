@@ -72,12 +72,12 @@ export class OutboxService {
    *
    * Claim-once: when a row already exists, the second call's
    * `payload` / `groupKey` / `maxAttempts` are DISCARDED — the
-   * original row is the source of truth (ADR-025 row-per-match). A
+   * original row is the source of truth (ADR-030 row-per-match). A
    * caller that mutates the payload shape and replays will still
    * dispatch the original payload, by design.
    *
    * Validates that `groupKey` starts with `${projectId}/` so the
-   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-026). A
+   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-030). A
    * misformatted key would silently land in the wrong tenant bucket
    * for fair-scheduling purposes — failing here at enqueue is much
    * cheaper to debug than a starvation bug in production.
@@ -86,7 +86,7 @@ export class OutboxService {
     const required = `${params.projectId}/`;
     if (!params.groupKey.startsWith(required)) {
       throw new Error(
-        `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-026.`,
+        `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-030.`,
       );
     }
     // The PG unique constraint is (projectId, reactorName, dedupKey),
@@ -100,7 +100,7 @@ export class OutboxService {
     // check stays in place as a defence in depth.
     if (!params.dedupKey.startsWith(required)) {
       throw new Error(
-        `OutboxService.enqueue: dedupKey must start with "${required}" (got "${params.dedupKey}"). See ADR-025.`,
+        `OutboxService.enqueue: dedupKey must start with "${required}" (got "${params.dedupKey}"). See ADR-030.`,
       );
     }
     const enqueued = await this.repository.insertIfAbsent({

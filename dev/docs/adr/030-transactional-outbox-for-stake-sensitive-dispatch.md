@@ -1,4 +1,4 @@
-# ADR-025: Transactional outbox for stake-sensitive reactor dispatch
+# ADR-030: Transactional outbox for stake-sensitive reactor dispatch
 
 **Date:** 2026-05-28 (revised 2026-06-01)
 
@@ -17,7 +17,7 @@ Two distinct operational pains today:
 
 The reactor framework currently makes no distinction between these two reactor classes. The default is "best-effort with silent failure," which is the wrong default for half the reactors we run.
 
-Beyond the substrate itself, three sub-decisions sit inside this one design and were originally written as separate ADRs (021/022/023/024); revision unification on 2026-06-01 collapsed them into this single document:
+Beyond the substrate itself, three sub-decisions sit inside this one design and were originally drafted as four separate ADRs (since collapsed; the draft numbers were retired); revision unification on 2026-06-01 collapsed them into this single document:
 
 - How dispatch state and the historical match-claim ledger relate (the `TriggerSent` / `ReactorOutbox` two-tier split).
 - What primitive owns dispatch scheduling and execution (`GroupQueue`, with one queue carrying multiple stages as a payload discriminator).
@@ -244,7 +244,7 @@ A single `.withReactor(..., { durable: true })` flag would force the API to acce
 - **`QueueAuditAdapter` interface** on `GroupQueueProcessor` — a reusable hook that any queue can opt into for PG-backed audit. The `PgOutboxAuditAdapter` is the first implementation; future queues (e.g., a future stake-sensitive command queue) can wire their own.
 - **Phase-0 outbox primitives (`OutboxDrainer`, `OutboxRepository.leaseNext` / `markDispatched` / `markRetry` / `recoverExpiredLeases`, `wakeupQueue`) are deprecated but still present.** Removed in a follow-up cleanup PR once no reactor is registered on them.
 - **Two reactor classes now exist** in the system: best-effort (`.withReactor`) and stake-sensitive (`.withOutbox`). Authors and reviewers must choose at definition time. The default for new reactors should be `.withReactor` unless the side effect is auditable.
-- **Operator surfaces** (activity tab, retry buttons, Grafana alarms on stuck-queue depth) become possible and necessary. Without them the outbox is just an extra hop. ADR-026 places them on the settings page.
+- **Operator surfaces** (activity tab, retry buttons, Grafana alarms on stuck-queue depth) become possible and necessary. Without them the outbox is just an extra hop. ADR-029 places them on the settings page.
 - **`evaluationTrigger.reactor` stays on `.withReactor`.** It dispatches commands (event-sourced, in-band), not side effects.
 - **The per-subject dedupKey is trace-path-only by design.** Aggregate-driven triggers — anything that fires on "metric crossed threshold over window" without a single owning row — don't have such a subject. When those land the natural dedupKey is `${projectId}/${triggerId}:${groupByLabelsHash}:${windowBucket}`, not per-subject. That's a new namespace in the same constraint, not a schema change.
 - **Customer-supplied destinations are out of scope for v1, but the `dispatch` handler is endpoint-agnostic by design.** The moment a customer-defined webhook URL lands as a trigger destination, the framework needs SSRF blocking, HMAC request signing, payload size caps, per-destination secret encryption at rest. These are framework concerns — every future customer-webhook-like dispatch should share one outbound utility rather than each `dispatch` reinventing them.

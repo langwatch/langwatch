@@ -136,11 +136,11 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
 
     Scenario: Default debounce of 30s applies to every new trigger
       When the user creates any automation
-      Then the trigger's traceDebounceMs defaults to 30000
+      Then filter evaluation waits 30 seconds after the last span by default
 
     Scenario: Existing triggers also default to 30s after migration
       Given an automation that existed before the debounce feature shipped
-      Then its traceDebounceMs is 30000
+      Then its filter evaluation waits 30 seconds after the last span
       And the operator can flip it to 0 to restore eager evaluation
 
     Scenario: The debounce window resets on every new span
