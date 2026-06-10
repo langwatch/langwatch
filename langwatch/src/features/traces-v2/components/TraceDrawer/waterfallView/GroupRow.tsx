@@ -123,6 +123,7 @@ export const GroupRow = memo(function GroupRow({
           >
             <Flex
               as="button"
+              aria-label="View in Span List"
               align="center"
               justify="center"
               width="20px"

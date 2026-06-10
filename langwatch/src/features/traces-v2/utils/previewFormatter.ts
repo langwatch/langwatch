@@ -332,9 +332,11 @@ export function pythonReprToJson(input: string): string | null {
 /**
  * Scan one repr string literal starting at `openIndex` (the opening
  * quote) and re-emit its body with JSON escaping: `\'` unescaped, `\xNN`
- * translated to `\u00NN`, raw control characters escaped (repr payloads
- * carry literal tabs/CRs often), double quotes escaped. Returns null on
- * an unterminated literal.
+ * translated to `\u00NN`, literal newline/tab/CR characters escaped
+ * (the control characters repr payloads actually carry — other
+ * sub-0x20 bytes are left as-is and simply fail the JSON.parse retry,
+ * falling back to the raw preview), double quotes escaped. Returns
+ * null on an unterminated literal.
  */
 function scanReprString({
   input,
