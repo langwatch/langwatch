@@ -5,6 +5,7 @@ import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useActivePlan } from "~/hooks/useActivePlan";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -82,6 +83,10 @@ export default function SettingsLayout({
     { enabled: hasOpsAccess, retry: false, refetchOnWindowFocus: false },
   );
   const isAdminUser = adminStatus.data?.isAdmin ?? false;
+  const { enabled: dataPrivacyEnabled } = useFeatureFlag(
+    "release_ui_data_privacy_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   return (
     <DashboardLayout compactMenu>
@@ -161,9 +166,12 @@ export default function SettingsLayout({
 
           <NavSection
             label="Features"
-            paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention"]}
+            paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention", "/settings/data-privacy"]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
+            {dataPrivacyEnabled && (
+              <MenuLink href="/settings/data-privacy">Data Privacy</MenuLink>
+            )}
             <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && project?.slug && (
               <MenuLink href={`/${project.slug}/automations`}>Automations</MenuLink>
