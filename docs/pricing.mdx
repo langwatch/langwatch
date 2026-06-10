@@ -25,7 +25,7 @@ Both contribute to your event count for the billing period. There are no separat
 
 ### What's included
 
-Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more — a longer retention window or higher volume — you can [extend storage](#extending-retention) rather than jumping to a different price tier.
+Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more — a longer retention window or higher volume — you can [extend retention](#extending-retention) with an Enterprise plan or a self-hosted license.
 
 ## Custom data retention
 
@@ -40,12 +40,14 @@ Retention controls how long your events are kept before they're automatically re
 
 ### Extending retention
 
-On the Growth plan, your 200,000 included events are stored for 30 days. If you want to keep more — whether that's a longer window or a higher volume of stored events — you can extend storage for **€3 per GB.** You set this directly in the platform, so you only pay for the additional storage you actually use.
+Going beyond your plan's default window — keeping events longer, or storing a higher volume — is a licensed capability. It's available on **Enterprise plans**, or when you **self-host with a license**; it isn't a self-serve toggle on the standard Cloud tiers.
 
-This keeps the model predictable: your base plan covers normal usage, and retention scales linearly with storage rather than forcing an upgrade.
+On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use. Self-hosted deployments with a license configure retention directly in the platform.
+
+This keeps the model predictable: your base plan covers normal usage at its default window, and longer or higher-volume retention is unlocked through an Enterprise agreement or a self-hosted license.
 
 <Note>
-  If you're on a custom or Enterprise plan, retention is configured as part of your agreement — reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  To extend retention beyond your plan default, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the [self-hosting docs](/self-hosting/overview) to configure retention with a license.
 </Note>
 
 ## Frequently asked questions
@@ -65,6 +67,10 @@ This keeps the model predictable: your base plan covers normal usage, and retent
 
   <Accordion title="What counts as a billable event?">
     A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period.
+  </Accordion>
+
+  <Accordion title="Can I customize how long my data is retained?">
+    Each plan includes a default retention window (see the table above). Extending it — a longer window or a higher volume of stored events — is available on **Enterprise plans** or when you **self-host with a license**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up.
   </Accordion>
 
   <Accordion title="Can I self-host or run a hybrid setup?">
