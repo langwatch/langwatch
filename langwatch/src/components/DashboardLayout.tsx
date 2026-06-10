@@ -40,7 +40,6 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -64,7 +63,7 @@ import { useWorkspaceData } from "./useWorkspaceData";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { SdkRadarBanner } from "./SdkRadarBanner";
-import { UpgradeModal } from "./UpgradeModal";
+import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -1058,10 +1057,3 @@ export const DashboardLayout = ({
     </Box>
   );
 };
-
-
-function GlobalUpgradeModal() {
-  const { isOpen, variant, close } = useUpgradeModalStore();
-  if (!variant) return null;
-  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
-}

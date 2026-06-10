@@ -1169,7 +1169,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
               input:
                 "This is the user message input. It will be sent as the user message to the LLM.",
             }}
-            showAddButton={false}
           />
         </Box>
       </VStack>

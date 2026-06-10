@@ -51,12 +51,12 @@ Feature: Structured outputs section in the prompt editor
   # Inputs section affordances
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Inputs section shows the Add button in the prompt editor
     Then the "Inputs" section shows an "Add" button
     And clicking it lets me add a new typed input variable
 
-  @integration @unimplemented
+  @integration
   Scenario: Input added via the Add button is usable in the template
     When I add an input "query" of type str via the Add button
     Then "{{query}}" is a valid variable in the prompt template

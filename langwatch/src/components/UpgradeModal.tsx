@@ -17,7 +17,10 @@ import { trackEvent } from "../utils/tracking";
 import { LIMIT_TYPE_LABELS } from "../server/license-enforcement/constants";
 import { api } from "../utils/api";
 import { toaster } from "./ui/toaster";
-import type { UpgradeModalVariant } from "../stores/upgradeModalStore";
+import {
+  useUpgradeModalStore,
+  type UpgradeModalVariant,
+} from "../stores/upgradeModalStore";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -54,6 +57,19 @@ export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+/**
+ * Store-driven mount for the upgrade/limit dialog. Every full-screen
+ * surface must render this once: limit-exceeded mutations open the
+ * dialog through `useUpgradeModalStore`, and a surface without this
+ * mount swallows the error into a silent no-op (the studio bug — the
+ * dialog only "appeared" after navigating back to a dashboard page).
+ */
+export function GlobalUpgradeModal() {
+  const { isOpen, variant, close } = useUpgradeModalStore();
+  if (!variant) return null;
+  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
 }
 
 function LimitContent({

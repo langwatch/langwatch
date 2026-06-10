@@ -413,6 +413,27 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
+    /** @scenario Inputs section shows the Add button in the prompt editor */
+    it("shows the add-variable button in the variables section", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+      // Hiding this button confused users into thinking variables were
+      // limited to the suggestions — adding must always be one click away.
+      expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
+    });
+
+    /** @scenario Input added via the Add button is usable in the template */
+    it("adds a typed variable through the add button menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
+
+      // The default "input" variable is locked, so the new one lands as
+      // input_1 — visible as a variable row in the section.
+      expect(await screen.findByText("input_1")).toBeInTheDocument();
+    });
+
     // Outputs are now in the LLM config popover, not as a separate field group
 
     it("shows Saved button initially (no changes)", () => {

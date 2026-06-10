@@ -33,6 +33,7 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { GlobalUpgradeModal } from "../../components/UpgradeModal";
 import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
@@ -394,6 +395,12 @@ export default function OptimizationStudio() {
       </ReactFlowProvider>
 
       <CurrentDrawer marginTop={56} />
+      {/* The studio route doesn't use DashboardLayout, so the
+          limit-exceeded dialog needs its own mount here — without it,
+          plan-limited saves fired from inside the studio fail silently
+          (the dialog only shows after navigating back to a dashboard
+          page). See specs/workflows/studio-usage-limits.feature. */}
+      <GlobalUpgradeModal />
     </div>
   );
 }
