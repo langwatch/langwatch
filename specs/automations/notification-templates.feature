@@ -127,3 +127,20 @@ Feature: Liquid templates for trigger notifications
       Given a template with valid Liquid syntax
       When the template is validated
       Then validation succeeds
+
+  Rule: Saved templates render in delivered notifications
+
+    Scenario: A saved custom email template is rendered in the delivered notification
+      Given the trigger has a saved custom email template
+      When a matched trace triggers an email notification
+      Then the delivered email is rendered from the customer template
+
+    Scenario: A saved custom Slack template is rendered in the delivered notification
+      Given the trigger has a saved custom Slack template
+      When a matched trace triggers a Slack notification
+      Then the delivered Slack message is rendered from the customer template
+
+    Scenario: A trigger with no custom templates delivers the framework default
+      Given the trigger has no custom templates
+      When a matched trace triggers a notification
+      Then the delivered notification is the framework default

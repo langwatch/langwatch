@@ -24,15 +24,33 @@ export class PrismaTriggerRepository implements TriggerRepository {
         customGraphId: true,
         notificationCadence: true,
         traceDebounceMs: true,
+        slackTemplateType: true,
+        slackTemplate: true,
+        emailSubjectTemplate: true,
+        emailBodyTemplate: true,
       },
     });
 
-    return triggers.map((t) => ({
-      ...t,
-      actionParams: t.actionParams ?? {},
-      filters: parseFilters(t.filters),
-      notificationCadence: parseCadence(t.notificationCadence),
-    }));
+    return triggers.map(
+      ({
+        slackTemplateType,
+        slackTemplate,
+        emailSubjectTemplate,
+        emailBodyTemplate,
+        ...t
+      }) => ({
+        ...t,
+        actionParams: t.actionParams ?? {},
+        filters: parseFilters(t.filters),
+        notificationCadence: parseCadence(t.notificationCadence),
+        templates: {
+          slackTemplateType: slackTemplateType ?? null,
+          slackTemplate: slackTemplate ?? null,
+          emailSubjectTemplate: emailSubjectTemplate ?? null,
+          emailBodyTemplate: emailBodyTemplate ?? null,
+        },
+      }),
+    );
   }
 
   async claimSend({

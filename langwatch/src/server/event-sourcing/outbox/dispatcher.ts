@@ -10,9 +10,21 @@ import {
   matchesTriggerFilters,
   triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import {
+  sendRenderedTriggerEmail,
+  sendTriggerEmail,
+} from "~/server/mailer/triggerEmail";
 import type { Trace } from "~/server/tracer/types";
-import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
+import {
+  sendRenderedSlackMessage,
+  sendSlackWebhook,
+} from "~/server/triggers/sendSlackWebhook";
+import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderTriggerSlack } from "~/shared/templating/renderSlack";
+import {
+  buildTemplateContext,
+  type TemplateMatchInput,
+} from "~/shared/templating/templateContext";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
@@ -40,6 +52,10 @@ interface ActionParams {
 export interface OutboxDispatcherDeps {
   triggers: TriggerService;
   projects: ProjectService;
+  /** Base host for building trace/automation deep links inside rendered
+   *  customer templates (ADR-028). Injected, not read from env, so the
+   *  dispatcher stays testable. */
+  baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationRuns: EvaluationRunService;
   deriveEvents: (params: {
@@ -308,9 +324,57 @@ async function handleCadenceBatch(
     }),
   );
 
+  // ADR-028: a trigger with customer-authored templates renders them here;
+  // a NULL template keeps the legacy framework senders byte-for-byte. The
+  // template-vs-legacy decision is per-channel and made BEFORE the legacy
+  // switch so the legacy path is reached only when no custom template exists.
+  const t = trigger.templates;
+  const hasCustomEmail =
+    t.emailSubjectTemplate != null || t.emailBodyTemplate != null;
+  const hasCustomSlack = t.slackTemplate != null;
+
+  const buildContext = () => {
+    const matches: TemplateMatchInput[] = triggerData.map((d) => ({
+      traceId: d.traceId,
+      input: d.input,
+      output: d.output,
+      metadata: d.fullTrace?.metadata ?? {},
+    }));
+    return buildTemplateContext({
+      trigger: {
+        id: trigger.id,
+        name: trigger.name,
+        alertType: trigger.alertType,
+      },
+      project: { name: project.name, slug: project.slug },
+      baseHost: deps.baseHost,
+      matches,
+    });
+  };
+
   try {
     switch (trigger.action) {
       case TriggerAction.SEND_EMAIL:
+        if (hasCustomEmail) {
+          const rendered = await renderTriggerEmail({
+            subjectTemplate: t.emailSubjectTemplate,
+            bodyTemplate: t.emailBodyTemplate,
+            context: buildContext(),
+          });
+          if (rendered.errors.length > 0) {
+            logger.warn(
+              { projectId, triggerId, errors: rendered.errors },
+              "Custom email template render errors — fell back to default for affected parts",
+            );
+          }
+          await sendRenderedTriggerEmail({
+            triggerEmails: params.members ?? [],
+            triggerId,
+            subject: rendered.subject,
+            html: rendered.html,
+          });
+          break;
+        }
         await sendTriggerEmail({
           triggerEmails: params.members ?? [],
           triggerData,
@@ -322,6 +386,26 @@ async function handleCadenceBatch(
         });
         break;
       case TriggerAction.SEND_SLACK_MESSAGE:
+        if (hasCustomSlack) {
+          const rendered = await renderTriggerSlack({
+            templateType:
+              t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+            template: t.slackTemplate,
+            context: buildContext(),
+          });
+          if (rendered.errors.length > 0) {
+            logger.warn(
+              { projectId, triggerId, errors: rendered.errors },
+              "Custom Slack template render errors — fell back to default",
+            );
+          }
+          await sendRenderedSlackMessage({
+            triggerWebhook: params.slackWebhook ?? "",
+            triggerName: trigger.name,
+            payload: rendered.payload,
+          });
+          break;
+        }
         await sendSlackWebhook({
           triggerWebhook: params.slackWebhook ?? "",
           triggerData,

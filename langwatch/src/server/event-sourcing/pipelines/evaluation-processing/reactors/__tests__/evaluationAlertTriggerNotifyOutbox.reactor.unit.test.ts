@@ -67,6 +67,12 @@ function createTrigger(
     customGraphId: null,
     notificationCadence: "immediate",
     traceDebounceMs: 25_000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
     ...overrides,
   };
 }

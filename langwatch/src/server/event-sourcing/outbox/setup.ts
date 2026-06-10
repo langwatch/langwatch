@@ -9,6 +9,7 @@ import type { TriggerService } from "~/server/app-layer/triggers/trigger.service
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
+import { env } from "~/env.mjs";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
@@ -133,6 +134,7 @@ export function buildOutboxRuntime({
   const dispatcher = createOutboxDispatcher({
     triggers,
     projects,
+    baseHost: env.BASE_HOST ?? "",
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),

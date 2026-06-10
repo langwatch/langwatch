@@ -92,6 +92,41 @@ export const sendTriggerEmail = async ({
   }
 };
 
+/**
+ * Sends a pre-rendered (customer-authored, ADR-028) trigger email. Mirrors the
+ * send block of `sendTriggerEmail` exactly — same no-reply `to`, `bcc`
+ * recipients, and DispatchError classification — but takes the subject/html as
+ * already-rendered strings instead of building the legacy React tree.
+ */
+export const sendRenderedTriggerEmail = async ({
+  triggerEmails,
+  triggerId,
+  subject,
+  html,
+}: {
+  triggerEmails: string[];
+  triggerId: string;
+  subject: string;
+  html: string;
+}) => {
+  try {
+    const noReplyTo = buildTriggerNoReplyAddress({
+      defaultFrom: computeDefaultFrom(),
+      triggerId,
+    });
+    await sendEmail({
+      to: noReplyTo,
+      bcc: triggerEmails,
+      subject,
+      html,
+    });
+  } catch (err) {
+    throw toDispatchError(err, {
+      message: `Trigger email dispatch failed for trigger "${triggerId}"`,
+    });
+  }
+};
+
 const TriggerTable = ({
   triggerData,
   projectSlug,

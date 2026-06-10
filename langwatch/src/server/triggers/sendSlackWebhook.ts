@@ -1,5 +1,9 @@
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
-import { IncomingWebhook } from "@slack/webhook";
+import {
+  IncomingWebhook,
+  type IncomingWebhookSendArguments,
+} from "@slack/webhook";
+import type { SlackPayload } from "~/shared/templating/renderSlack";
 import type { Trace } from "~/server/tracer/types";
 import {
   DispatchError,
@@ -139,6 +143,42 @@ export const sendSlackWebhook = async ({
       username: "LangWatch",
       icon_emoji: ":robot_face:",
     });
+  } catch (err) {
+    throw toDispatchError(err, {
+      message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+    });
+  }
+};
+
+/**
+ * Sends a pre-rendered (customer-authored, ADR-028) Slack payload. Mirrors the
+ * guards and DispatchError classification of `sendSlackWebhook` exactly — same
+ * non-retryable webhook-prefix check and the same toDispatchError wrap around
+ * the send — but takes the Block Kit / text payload already rendered.
+ */
+export const sendRenderedSlackMessage = async ({
+  triggerWebhook,
+  triggerName,
+  payload,
+}: {
+  triggerWebhook: string;
+  triggerName: string;
+  /** Rendered text/Block-Kit payload from the templating layer. Slack's
+   *  `IncomingWebhook.send` accepts a looser shape than its typed
+   *  `IncomingWebhookSendArguments`, so we cast at the send boundary. */
+  payload: SlackPayload;
+}) => {
+  if (!triggerWebhook.startsWith(SLACK_WEBHOOK_PREFIX)) {
+    throw new DispatchError({
+      message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a ${SLACK_WEBHOOK_PREFIX} endpoint`,
+      retryable: false,
+    });
+  }
+
+  try {
+    await new IncomingWebhook(triggerWebhook).send(
+      payload as IncomingWebhookSendArguments,
+    );
   } catch (err) {
     throw toDispatchError(err, {
       message: `Slack webhook dispatch failed for trigger "${triggerName}"`,

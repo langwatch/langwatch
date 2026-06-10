@@ -104,6 +104,12 @@ function createTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary 
     customGraphId: null,
     notificationCadence: "immediate",
     traceDebounceMs: 30000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
     ...overrides,
   };
 }
