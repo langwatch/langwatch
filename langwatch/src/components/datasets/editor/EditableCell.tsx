@@ -153,6 +153,7 @@ export function EditableCell({
     expandedCells,
     editingCell,
     toggleCellExpanded,
+    editorPortalRef,
   } = useDatasetTable();
 
   const cellKey = `${row}-${columnId}`;
@@ -556,7 +557,7 @@ export function EditableCell({
 
       {/* Expanded editor (positioned over cell via portal) */}
       {isEditing && (
-        <Portal>
+        <Portal container={editorPortalRef ?? undefined}>
           <Box
             style={editorStyle}
             bg="bg.panel"

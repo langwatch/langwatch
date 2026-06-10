@@ -5,7 +5,7 @@
  * zustand store, the standalone dataset editor backs it with its own store —
  * and only ever talk to this interface.
  */
-import { createContext, useContext } from "react";
+import { createContext, useContext, type RefObject } from "react";
 
 export type CellPosition = {
   row: number;
@@ -43,6 +43,11 @@ export type DatasetTableContextValue = {
   setSelectedCell: (cell: CellPosition | undefined) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleRowSelection: (row: number) => void;
+  /** Where the floating cell editor portals to. Required when the table is
+   *  hosted inside a modal dialog: portaling to document.body would land
+   *  outside the dialog's pointer-events scope and the editor would be
+   *  unclickable. Defaults to document.body. */
+  editorPortalRef?: RefObject<HTMLDivElement | null>;
 };
 
 const DatasetTableContext = createContext<DatasetTableContextValue | null>(

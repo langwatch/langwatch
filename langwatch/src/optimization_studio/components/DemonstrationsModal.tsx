@@ -1,11 +1,20 @@
+/**
+ * Demonstrations editor for signature (prompt) nodes in the studio — hosts
+ * the shared dataset editor in in-memory mode; rows live in the node's
+ * `demonstrations` parameter and every change writes back into the DSL.
+ */
+import { Box, Button, Heading } from "@chakra-ui/react";
 import type { Node, NodeProps } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { Dialog } from "../../components/ui/dialog";
-import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, NodeDataset, Signature } from "../types/dsl";
-import { fieldsToDatasetColumns } from "../utils/datasetUtils";
-import { EditDataset } from "./datasets/EditDataset";
+import {
+  fieldsToDatasetColumns,
+  inMemoryDatasetToNodeDataset,
+  transposeColumnsFirstToRowsFirstWithId,
+} from "../utils/datasetUtils";
 
 export function DemonstrationsModal({
   open,
@@ -19,8 +28,8 @@ export function DemonstrationsModal({
   const [editingDataset, setEditingDataset] = useState<
     NodeDataset | undefined
   >();
+  const editorPortalRef = useRef<HTMLDivElement | null>(null);
 
-  const [rendered, setRendered] = useState(false);
   useEffect(() => {
     const columns = fieldsToDatasetColumns([
       ...(node.data.inputs ?? []),
@@ -52,7 +61,6 @@ export function DemonstrationsModal({
     };
 
     setEditingDataset(open ? demonstrations : undefined);
-    setRendered(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -60,24 +68,10 @@ export function DemonstrationsModal({
     setNodeParameter,
   }));
 
-  const setSelectedDataset = useCallback(
-    (dataset: NodeDataset, _columnTypes: DatasetColumns, close: boolean) => {
-      setNodeParameter(node.id, {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: dataset,
-      });
-      if (close) {
-        onClose();
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [node.data, node.id, setNodeParameter, onClose],
-  );
-
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg"
+      <Dialog.Content
+        bg="bg"
         marginX="32px"
         marginTop="32px"
         width="calc(100vw - 64px)"
@@ -87,25 +81,39 @@ export function DemonstrationsModal({
         overflowY="auto"
       >
         <Dialog.CloseTrigger zIndex={10} />
-        {rendered ? (
-          <>
-            <Dialog.Header></Dialog.Header>
-            <Dialog.Body paddingBottom="32px">
-              {open && editingDataset && (
-                <EditDataset
-                  editingDataset={editingDataset}
-                  setEditingDataset={setEditingDataset}
-                  setSelectedDataset={setSelectedDataset}
-                  title="Demonstrations"
-                  cta="Save"
-                  hideButtons={true}
-                  bottomSpace="268px"
-                  loadingOverlayComponent={null}
-                />
-              )}
-            </Dialog.Body>
-          </>
-        ) : null}
+        <Dialog.Header>
+          <Heading size="md">Edit Demonstrations</Heading>
+        </Dialog.Header>
+        <Dialog.Body paddingBottom="16px">
+          <Box ref={editorPortalRef} width="full" height="full">
+          {open && editingDataset?.inline && (
+            <DatasetEditorTable
+              title="Demonstrations"
+              hideButtons
+              editorPortalRef={editorPortalRef}
+              inMemoryDataset={{
+                name: "Demonstrations",
+                columnTypes: editingDataset.inline.columnTypes,
+                datasetRecords: transposeColumnsFirstToRowsFirstWithId(
+                  editingDataset.inline.records,
+                ),
+              }}
+              onUpdateDataset={(dataset) => {
+                setNodeParameter(node.id, {
+                  identifier: "demonstrations",
+                  type: "dataset",
+                  value: inMemoryDatasetToNodeDataset(dataset),
+                });
+              }}
+            />
+          )}
+          </Box>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button colorPalette="blue" onClick={onClose}>
+            Done
+          </Button>
+        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );

@@ -1,4 +1,5 @@
-import { Button, Heading } from "@chakra-ui/react";
+import { Box, Button, Heading } from "@chakra-ui/react";
+import { useRef } from "react";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { Dialog } from "~/components/ui/dialog";
 import type { PromptConfigFormValues } from "~/prompts";
@@ -21,6 +22,7 @@ export function DemonstrationsModal({
   demonstrations: Demonstrations;
   onChange: (demonstrations: Demonstrations) => void;
 }) {
+  const editorPortalRef = useRef<HTMLDivElement | null>(null);
   const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
     demonstrations?.inline?.records ?? {},
   );
@@ -42,7 +44,9 @@ export function DemonstrationsModal({
           <Heading size="md">Edit Demonstrations</Heading>
         </Dialog.Header>
         <Dialog.Body paddingBottom="16px">
+          <Box ref={editorPortalRef} width="full" height="full">
           <DatasetEditorTable
+            editorPortalRef={editorPortalRef}
             inMemoryDataset={{
               name: "Demonstrations",
               datasetRecords: transposedRecords,
@@ -60,6 +64,7 @@ export function DemonstrationsModal({
             }
             canEditDatasetRecord={false}
           />
+          </Box>
         </Dialog.Body>
         <Dialog.Footer>
           <Button colorPalette="blue" onClick={onClose}>

@@ -1,27 +1,52 @@
-import { Button, Tabs } from "@chakra-ui/react";
+/**
+ * Dataset dialog for the workflow entry-point node — same experience as the
+ * rest of the platform: the shared dataset picker for choosing, the shared
+ * TanStack editor for editing.
+ *
+ * Two views:
+ *  - Choose (no `editingDataset`): searchable picker list + "Upload CSV" +
+ *    "New dataset" (drafts an inline dataset on the node and jumps straight
+ *    into the editor — no form, no forced CSV upload).
+ *  - Edit (`editingDataset` set): the shared editor. Saved datasets autosave
+ *    records and propagate column changes into the node's fields; draft
+ *    datasets live in the workflow DSL itself and can be promoted to a real
+ *    dataset with "Save as dataset".
+ *
+ * All node writes go through `attachEntryDataset`, which merges dataset
+ * columns into the entry fields without clobbering user-added inputs — the
+ * dataset is a data source, not the definition of the workflow's inputs.
+ */
+import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
+import type { Node, NodeProps } from "@xyflow/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Database, Plus, Upload } from "react-feather";
+
+import { DatasetPickerList } from "~/components/datasets/DatasetPickerList";
 import {
-  type Node,
-  type NodeProps,
-  useUpdateNodeInternals,
-} from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "react-feather";
+  DatasetEditorTable,
+  type InMemoryDataset,
+} from "~/components/datasets/editor/DatasetEditorTable";
+import { UploadCSVModal } from "~/components/datasets/UploadCSVModal";
 import { useDrawer } from "~/hooks/useDrawer";
+import type { DatasetColumns } from "~/server/datasets/types";
 import { Dialog } from "../../components/ui/dialog";
-import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";
 import {
   datasetColumnsToFields,
+  inMemoryDatasetToNodeDataset,
   transposeColumnsFirstToRowsFirstWithId,
 } from "../utils/datasetUtils";
-import { DatasetSelection } from "./datasets/DatasetSelection";
-import { DatasetUpload } from "./datasets/DatasetUpload";
-import { EditDataset } from "./datasets/EditDataset";
+
+const DRAFT_DATASET_COLUMNS: DatasetColumns = [
+  { name: "input", type: "string" },
+  { name: "expected_output", type: "string" },
+];
 
 export function DatasetModal({
   open,
-  onClose: onClose_,
+  onClose,
   node,
   editingDataset: editingDataset_ = undefined,
 }: {
@@ -33,11 +58,13 @@ export function DatasetModal({
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
+  const editorPortalRef = useRef<HTMLDivElement | null>(null);
+  const uploadCSVModal = useDisclosure();
+  const { openDrawer } = useDrawer();
+  const updateNodeInternals = useUpdateNodeInternals();
 
-  const [rendered, setRendered] = useState(false);
   useEffect(() => {
     setEditingDataset(open ? editingDataset_ : undefined);
-    setRendered(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -45,89 +72,75 @@ export function DatasetModal({
     ({ attachEntryDataset }) => ({ attachEntryDataset }),
   );
 
-  const updateNodeInternals = useUpdateNodeInternals();
-
-  const { openDrawer } = useDrawer();
-
-  const initialDataset = useMemo(
-    () => (node.data as Entry).dataset,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [(node.data as Entry).dataset?.id],
-  );
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const checkForUnsavedChanges = (
-    newDataset: Entry["dataset"],
+  const attachDataset = (
+    dataset: Entry["dataset"],
     columnTypes: DatasetColumns,
   ) => {
-    if (
-      initialDataset &&
-      newDataset &&
-      !initialDataset?.id &&
-      JSON.stringify(initialDataset.inline) !==
-        JSON.stringify(newDataset.inline) &&
-      confirm("Want to save this draft dataset?")
-    ) {
-      openDrawer("addOrEditDataset", {
-        datasetToSave: {
-          name: newDataset.name,
-          columnTypes: columnTypes ?? [],
-          datasetRecords: transposeColumnsFirstToRowsFirstWithId(
-            newDataset.inline?.records ?? {},
-          ),
-        },
-        onSuccess: (dataset_: {
-          datasetId: string;
-          name: string;
-          columnTypes: DatasetColumns;
-        }) => {
-          setEditingDataset({ id: dataset_.datasetId, name: dataset_.name });
-          setSelectedDataset(
-            { id: dataset_.datasetId, name: dataset_.name },
-            dataset_.columnTypes,
-            false,
-          );
-          onClose_();
-        },
-      });
-      return true;
-    }
-
-    return false;
+    attachEntryDataset(
+      node.id,
+      dataset,
+      datasetColumnsToFields(columnTypes),
+    );
+    updateNodeInternals(node.id);
   };
 
-  const onClose = useCallback(() => {
-    if (
-      editingDataset?.inline &&
-      checkForUnsavedChanges(editingDataset, editingDataset.inline.columnTypes)
-    ) {
-      return;
-    }
-    onClose_();
-  }, [checkForUnsavedChanges, editingDataset, onClose_]);
+  const handlePick = (dataset: {
+    datasetId: string;
+    name: string;
+    columnTypes: DatasetColumns;
+  }) => {
+    attachDataset(
+      { id: dataset.datasetId, name: dataset.name },
+      dataset.columnTypes,
+    );
+    onClose();
+  };
 
-  const setSelectedDataset = useCallback(
-    (
-      dataset: Required<Entry>["dataset"],
-      columnTypes: DatasetColumns,
-      close: boolean,
-    ) => {
-      // Merge semantics: dataset columns are added to the entry's
-      // fields without clobbering user-defined inputs (see
-      // attachEntryDataset). The dataset is a data source, not the
-      // definition of the workflow's inputs.
-      attachEntryDataset(
-        node.id,
-        dataset,
-        datasetColumnsToFields(columnTypes),
-      );
-      updateNodeInternals(node.id);
-      if (close) {
+  const handleNewDraft = () => {
+    const draft: Entry["dataset"] = {
+      name: "Draft Dataset",
+      inline: {
+        records: Object.fromEntries(
+          DRAFT_DATASET_COLUMNS.map((col) => [col.name, ["", "", ""]]),
+        ),
+        columnTypes: DRAFT_DATASET_COLUMNS,
+      },
+    };
+    attachDataset(draft, DRAFT_DATASET_COLUMNS);
+    setEditingDataset(draft);
+  };
+
+  const handleDraftChange = (dataset: InMemoryDataset) => {
+    const nodeDataset = inMemoryDatasetToNodeDataset({
+      ...dataset,
+      name: editingDataset?.name ?? dataset.name,
+    });
+    attachDataset(nodeDataset, dataset.columnTypes);
+    setEditingDataset(nodeDataset);
+  };
+
+  const handleSaveDraftAsDataset = () => {
+    if (!editingDataset?.inline) return;
+    openDrawer("addOrEditDataset", {
+      datasetToSave: {
+        name: editingDataset.name,
+        columnTypes: editingDataset.inline.columnTypes,
+        datasetRecords: transposeColumnsFirstToRowsFirstWithId(
+          editingDataset.inline.records,
+        ),
+      },
+      onSuccess: (saved: {
+        datasetId: string;
+        name: string;
+        columnTypes: DatasetColumns;
+      }) => {
+        attachDataset({ id: saved.datasetId, name: saved.name }, saved.columnTypes);
         onClose();
-      }
-    },
-    [attachEntryDataset, node.id, updateNodeInternals, onClose],
-  );
+      },
+    });
+  };
+
+  const isDraft = !!editingDataset && !editingDataset.id;
 
   return (
     <Dialog.Root
@@ -135,7 +148,8 @@ export function DatasetModal({
       onOpenChange={({ open }) => !open && onClose()}
       size="full"
     >
-      <Dialog.Content bg="bg"
+      <Dialog.Content
+        bg="bg"
         css={{
           marginX: "32px",
           marginTop: "32px",
@@ -145,55 +159,123 @@ export function DatasetModal({
           borderRadius: "8px",
           overflowY: "auto",
         }}
+        data-testid="dataset-modal"
       >
         <Dialog.CloseTrigger zIndex={10} />
-        {rendered && editingDataset ? (
+        {editingDataset ? (
           <>
             <Dialog.Header>
-              <Button
-                fontSize="14px"
-                fontWeight="bold"
-                color="fg.muted"
-                variant="plain"
-                onClick={() => setEditingDataset(undefined)}
-              >
-                <ArrowLeft size={16} /> Datasets
-              </Button>
+              <HStack width="full" paddingRight={10}>
+                <Button
+                  fontSize="14px"
+                  fontWeight="bold"
+                  color="fg.muted"
+                  variant="plain"
+                  data-testid="back-to-datasets"
+                  onClick={() => setEditingDataset(undefined)}
+                >
+                  <ArrowLeft size={16} /> Datasets
+                </Button>
+                <Spacer />
+                {isDraft && (
+                  <Button
+                    size="sm"
+                    colorPalette="blue"
+                    variant="outline"
+                    data-testid="save-draft-as-dataset"
+                    onClick={handleSaveDraftAsDataset}
+                  >
+                    <Database size={14} /> Save as dataset
+                  </Button>
+                )}
+              </HStack>
             </Dialog.Header>
             <Dialog.Body paddingBottom="32px">
+              <Box ref={editorPortalRef} width="full" height="full">
+                {open && editingDataset.id ? (
+                  <DatasetEditorTable
+                    datasetId={editingDataset.id}
+                    editorPortalRef={editorPortalRef}
+                    onColumnsChanged={(columnTypes) => {
+                      attachDataset(editingDataset, columnTypes);
+                    }}
+                  />
+                ) : open && editingDataset.inline ? (
+                  <DatasetEditorTable
+                    title={editingDataset.name ?? "Draft Dataset"}
+                    editorPortalRef={editorPortalRef}
+                    inMemoryDataset={{
+                      name: editingDataset.name,
+                      columnTypes: editingDataset.inline.columnTypes,
+                      datasetRecords: transposeColumnsFirstToRowsFirstWithId(
+                        editingDataset.inline.records,
+                      ),
+                    }}
+                    onUpdateDataset={handleDraftChange}
+                  />
+                ) : null}
+              </Box>
+            </Dialog.Body>
+          </>
+        ) : (
+          <>
+            <Dialog.Header>
+              <HStack gap={2}>
+                <Database size={20} />
+                <Text fontSize="lg" fontWeight="semibold">
+                  Choose dataset
+                </Text>
+              </HStack>
+            </Dialog.Header>
+            <Dialog.Body
+              paddingBottom="32px"
+              display="flex"
+              flexDirection="column"
+            >
+              <HStack paddingBottom={4}>
+                <Text color="fg.muted" fontSize="sm">
+                  Pick an existing dataset for this workflow, upload a CSV, or
+                  start a new draft.
+                </Text>
+                <Spacer />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="upload-csv-dataset"
+                  onClick={() => uploadCSVModal.onOpen()}
+                >
+                  <Upload size={14} /> Upload CSV
+                </Button>
+                <Button
+                  size="sm"
+                  colorPalette="blue"
+                  data-testid="new-draft-dataset"
+                  onClick={handleNewDraft}
+                >
+                  <Plus size={14} /> New dataset
+                </Button>
+              </HStack>
               {open && (
-                <EditDataset
-                  editingDataset={editingDataset}
-                  setEditingDataset={setEditingDataset}
-                  setSelectedDataset={setSelectedDataset}
-                />
+                <DatasetPickerList enabled={open} onSelect={handlePick} />
               )}
             </Dialog.Body>
           </>
-        ) : rendered ? (
-          <>
-            <Tabs.Root defaultValue="datasets" colorPalette="blue">
-              <Dialog.Header>
-                <Tabs.List>
-                  <Tabs.Trigger value="datasets">Datasets</Tabs.Trigger>
-                  <Tabs.Trigger value="upload">Upload</Tabs.Trigger>
-                </Tabs.List>
-              </Dialog.Header>
-              <Dialog.Body paddingBottom="32px">
-                <Tabs.Content value="datasets">
-                  <DatasetSelection
-                    node={node}
-                    setIsEditing={setEditingDataset}
-                  />
-                </Tabs.Content>
-                <Tabs.Content value="upload">
-                  <DatasetUpload setIsEditing={setEditingDataset} />
-                </Tabs.Content>
-              </Dialog.Body>
-            </Tabs.Root>
-          </>
-        ) : null}
+        )}
       </Dialog.Content>
+      {uploadCSVModal.open && (
+        <UploadCSVModal
+          isOpen={uploadCSVModal.open}
+          onClose={uploadCSVModal.onClose}
+          onSuccess={(dataset) => {
+            uploadCSVModal.onClose();
+            handlePick({
+              datasetId: dataset.datasetId,
+              name: dataset.name,
+              columnTypes: dataset.columnTypes,
+            });
+          }}
+        />
+      )}
     </Dialog.Root>
   );
 }

@@ -16,14 +16,14 @@ Feature: Choosing and editing datasets on the workflow dataset node
   # Choosing a dataset
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Choose opens the shared dataset picker
     When I click "Choose dataset" on the dataset node
     Then the dataset picker drawer opens
     And I can search my datasets
     And each dataset shows its entry count, column count, and last edit date
 
-  @integration @unimplemented
+  @integration
   Scenario: Picking a dataset binds it to the node
     Given the dataset picker drawer is open
     When I pick the dataset "turn 10"
@@ -48,7 +48,7 @@ Feature: Choosing and editing datasets on the workflow dataset node
     Then I see the shared dataset editor with the dataset's records
     And edits autosave to the dataset
 
-  @integration @unimplemented
+  @integration
   Scenario: Editing a draft dataset keeps it in the workflow
     Given the dataset node uses a draft dataset that was never saved
     When I open the node's dataset for editing and change some cells

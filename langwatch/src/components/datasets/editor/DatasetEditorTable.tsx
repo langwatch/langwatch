@@ -128,6 +128,8 @@ export function DatasetEditorTable({
   canEditDatasetRecord = true,
   bottomSpace,
   controllerRef,
+  onColumnsChanged,
+  editorPortalRef,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -139,6 +141,13 @@ export function DatasetEditorTable({
   canEditDatasetRecord?: boolean;
   bottomSpace?: string;
   controllerRef?: React.MutableRefObject<DatasetEditorController | null>;
+  /** Called after column changes are saved (saved mode), so hosts can
+   *  propagate the new shape (e.g. the workflow node merges new columns
+   *  into its outputs). */
+  onColumnsChanged?: (columnTypes: DatasetColumns) => void;
+  /** Pass when hosting the editor inside a modal dialog so the floating
+   *  cell editor stays within the dialog's pointer-events scope. */
+  editorPortalRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const { project } = useOrganizationTeamProject();
   const [store] = useState(() => createDatasetEditorStore());
@@ -453,6 +462,7 @@ export function DatasetEditorTable({
       setSelectedCell,
       toggleCellExpanded,
       toggleRowSelection,
+      editorPortalRef,
     }),
     [
       rowHeightMode,
@@ -464,6 +474,7 @@ export function DatasetEditorTable({
       setSelectedCell,
       toggleCellExpanded,
       toggleRowSelection,
+      editorPortalRef,
     ],
   );
 
@@ -705,6 +716,7 @@ export function DatasetEditorTable({
             editColumnsDrawer.onClose();
             if (datasetId) {
               void databaseDataset.refetch();
+              onColumnsChanged?.(updated.columnTypes);
             } else {
               // Re-key in-memory records onto the new columns
               const prevRecords = store.getState().records;
