@@ -314,7 +314,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                                   capped, scrollable slot instead. */}
                               <Box
                                 flexShrink={0}
-                                maxHeight="40%"
+                                maxHeight="48%"
                                 overflow="auto"
                               >
                                 <ConversationContext

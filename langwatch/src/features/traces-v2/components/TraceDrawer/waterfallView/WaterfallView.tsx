@@ -12,10 +12,17 @@ import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
 import { TreeRow } from "./TreeRow";
-import { buildTree, flattenTree, getTimeMarkers, getTraceRange } from "./tree";
+import {
+  buildTree,
+  countDescendants,
+  flattenTree,
+  getTimeMarkers,
+  getTraceRange,
+} from "./tree";
 import {
   DEFAULT_TREE_PCT,
   GROUP_ROW_HEIGHT,
+  INDENT_PX,
   LLM_ROW_HEIGHT,
   MIN_TREE_WIDTH,
   ROW_HEIGHT,
@@ -166,6 +173,22 @@ export const WaterfallView = memo(function WaterfallView({
     const picked = interior.filter((_, i) => i % stride === 0);
     return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
   }, [timeMarkers, timelinePanelWidth]);
+
+  // Horizontal-scroll floor for the tree pane. The virtualizer's rows
+  // are absolutely positioned, so their content can't grow the scroll
+  // width on its own — instead we give the inner (relative) block a
+  // min width of "deepest visible indent + a 240px name floor". When
+  // deep indentation would otherwise crush names to nothing, the pane
+  // becomes horizontally scrollable; shallow trees stay at 100% width
+  // with the usual name truncation.
+  const treeContentMinWidthPx = useMemo(() => {
+    let maxDepth = 0;
+    for (const row of flatRows) {
+      const depth = row.kind === "group" ? row.depth : row.node.depth;
+      if (depth > maxDepth) maxDepth = depth;
+    }
+    return maxDepth * INDENT_PX + 240;
+  }, [flatRows]);
 
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
@@ -442,10 +465,10 @@ export const WaterfallView = memo(function WaterfallView({
           ref={treeScrollRef}
           flex={1}
           overflowY="auto"
-          overflowX="hidden"
+          overflowX="auto"
           onScroll={handleTreeScroll}
           css={{
-            "&::-webkit-scrollbar": { width: "4px" },
+            "&::-webkit-scrollbar": { width: "4px", height: "4px" },
             "&::-webkit-scrollbar-thumb": {
               borderRadius: "4px",
               background: "var(--chakra-colors-border-muted)",
@@ -457,6 +480,7 @@ export const WaterfallView = memo(function WaterfallView({
             position="relative"
             height={`${virtualizer.getTotalSize()}px`}
             width="full"
+            minWidth={`${treeContentMinWidthPx}px`}
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = flatRows[virtualRow.index]!;
@@ -519,6 +543,11 @@ export const WaterfallView = memo(function WaterfallView({
                     isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
+                    hiddenDescendantCount={
+                      collapsedIds.has(node.span.spanId)
+                        ? countDescendants(node)
+                        : 0
+                    }
                     isDimmed={
                       selectedSpanId !== null &&
                       node.span.spanId !== selectedSpanId
@@ -589,13 +618,7 @@ export const WaterfallView = memo(function WaterfallView({
           borderColor="border.subtle"
           bg="bg.subtle/30"
         >
-          <Box
-            position="absolute"
-            top={0}
-            bottom={0}
-            left={2}
-            right={4}
-          >
+          <Box position="absolute" top={0} bottom={0} left={2} right={4}>
             {visibleTimeMarkers.map((ms, idx) => {
               const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
               const isLast = idx === visibleTimeMarkers.length - 1;

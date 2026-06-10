@@ -35,6 +35,7 @@ export function TreeRow({
   isPinned,
   isCollapsed,
   hasChildren,
+  hiddenDescendantCount,
   isDimmed,
   signals,
   onToggleCollapse,
@@ -52,6 +53,11 @@ export function TreeRow({
   isPinned: boolean;
   isCollapsed: boolean;
   hasChildren: boolean;
+  /**
+   * Number of descendants hidden by this row's collapse. Only non-zero
+   * when `isCollapsed` — drives the "+N" count after the span name.
+   */
+  hiddenDescendantCount: number;
   isDimmed: boolean;
   signals: readonly LangwatchSignalBucket[];
   onToggleCollapse: () => void;
@@ -179,6 +185,9 @@ export function TreeRow({
         />
         {sharePct > 0 && <TipCell label="Of trace" value={`${sharePct}%`} />}
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
+        {isCollapsed && hiddenDescendantCount > 0 && (
+          <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
+        )}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {span.parentSpanId && (
           <TipCell label="Parent" value={span.parentSpanId.slice(0, 16)} mono />
@@ -321,15 +330,30 @@ export function TreeRow({
             gap={0}
             justify="center"
           >
-            <Text
-              textStyle="xs"
-              color={isError ? "red.fg" : "fg"}
-              truncate
-              minWidth={0}
-              lineHeight={1.2}
-            >
-              {span.name}
-            </Text>
+            <HStack gap={1} minWidth={0}>
+              <Text
+                textStyle="xs"
+                color={isError ? "red.fg" : "fg"}
+                truncate
+                minWidth={0}
+                lineHeight={1.2}
+              >
+                {span.name}
+              </Text>
+              {/* Hidden-descendant count — a collapsed parent says how
+                  much it's hiding, so plain collapse reads differently
+                  from a GroupRow's "×N repeated" fold. */}
+              {isCollapsed && hiddenDescendantCount > 0 && (
+                <Text
+                  textStyle="2xs"
+                  color="fg.subtle"
+                  flexShrink={0}
+                  lineHeight={1.2}
+                >
+                  +{hiddenDescendantCount}
+                </Text>
+              )}
+            </HStack>
             {isLlm && (
               // Model as a compact pill (one per span) rather than a bare
               // text line — matches the header's Chip-based Models pill
