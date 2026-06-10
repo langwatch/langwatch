@@ -20,7 +20,6 @@ export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const trpcUtils = api.useContext();
   // Sample-preview rows are a client-side fixture with no ClickHouse
   // footprint, so the real `discover` query returns nothing useful.
   // Hand the sidebar a hardcoded descriptor set derived from the

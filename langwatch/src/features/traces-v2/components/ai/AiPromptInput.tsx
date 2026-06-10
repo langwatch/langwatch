@@ -1,4 +1,4 @@
-import { Box, Flex, IconButton, Input, Text } from "@chakra-ui/react";
+import { Box, Flex, IconButton, Input } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
