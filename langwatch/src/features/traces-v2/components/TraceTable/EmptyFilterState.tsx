@@ -8,9 +8,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
-import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -127,23 +124,6 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const activeLensId = useViewStore((s) => s.activeLensId);
   const selectLens = useViewStore((s) => s.selectLens);
-  const { project } = useOrganizationTeamProject();
-  const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissed = !!useOnboardingStore((s) =>
-    project ? s.setupDismissedByProject[project.id] : false,
-  );
-  const setSetupDismissedForProject = useOnboardingStore(
-    (s) => s.setSetupDismissedForProject,
-  );
-  const resetOnboardingStage = useOnboardingStore((s) => s.reset);
-  // Only offer the rewatch link in the "real, but empty" state — the
-  // user dismissed the onboarding card (`setupDismissed`) and the
-  // project hasn't received a real trace yet. Once any real trace
-  // arrives this affordance disappears; education isn't something we
-  // expect users to need, just something we leave out for the
-  // genuinely curious.
-  const showRewatchIntro =
-    hasAnyTraces === false && setupDismissed && !!project;
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
@@ -186,16 +166,15 @@ export const EmptyFilterState: React.FC = () => {
       justify="center"
       height="full"
       paddingX={6}
-      paddingY={16}
+      paddingY={12}
     >
-      <Stack gap={6} align="center" textAlign="center" maxWidth="440px">
+      <Stack gap={5} align="center" textAlign="center" maxWidth="440px">
         <LangWatchMark />
-
-        <Stack gap={2} align="center">
-          <Heading textStyle="xl" fontWeight="semibold" color="fg">
+        <Stack gap={1.5} align="center">
+          <Heading textStyle="lg" fontWeight="semibold" color="fg">
             {content.title}
           </Heading>
-          <Text textStyle="sm" color="fg.muted" lineHeight="1.7">
+          <Text textStyle="sm" color="fg.muted" lineHeight="1.6">
             {content.description}
           </Text>
         </Stack>
@@ -222,23 +201,6 @@ export const EmptyFilterState: React.FC = () => {
             without retyping the whole query, and flags accidental
             non-ASCII glyphs the parser otherwise renders silently. */}
         {hasFilters && <QueryBreakdownChips />}
-
-        {showRewatchIntro && (
-          <Button
-            variant="plain"
-            size="xs"
-            color="fg.subtle"
-            padding={0}
-            minHeight="auto"
-            _hover={{ color: "fg.muted" }}
-            onClick={() => {
-              resetOnboardingStage();
-              setSetupDismissedForProject(project!.id, false);
-            }}
-          >
-            ↻ Rewatch the intro
-          </Button>
-        )}
       </Stack>
     </Flex>
   );

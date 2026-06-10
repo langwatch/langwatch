@@ -46,6 +46,17 @@ export const useFindShortcut = (): void => {
         return;
       }
 
+      // Our in-page find is a table-only affordance. Surrender the
+      // shortcut to the browser's native find whenever the trace
+      // drawer is open or the user's focus is inside an interactive
+      // control (an input, contentEditable, button or link inside the
+      // drawer's span tree, etc.). Without this gate, pressing ⌘F
+      // while reading a span panel would hijack the keystroke and
+      // pop our table-overlay find — which can't even see the text
+      // the user was trying to search.
+      if (useDrawerStore.getState().isOpen) return;
+      if (isInteractiveTarget(e.target)) return;
+
       // Read latest state imperatively so we never operate on stale isOpen
       // captured by an effect closure.
       const { isOpen, open, close } = useFindStore.getState();
@@ -61,6 +72,23 @@ export const useFindShortcut = (): void => {
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, []);
+};
+
+/**
+ * Same idea as `isTextInput`, broadened. Treats anything obviously
+ * "the user is interacting with this" as a reason to surrender a
+ * page-global shortcut — inputs, contentEditable, ARIA roles that
+ * imply text or selection interaction, plus elements inside an open
+ * dialog or drawer. We don't enumerate every interactive role
+ * because the drawer-open guard at the call site catches the
+ * common case; this helper is the belt to that suspenders.
+ */
+const isInteractiveTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return false;
+  if (isTextInput(target)) return true;
+  if (target.closest("[role='dialog'], [role='textbox'], [data-find-bar]"))
+    return true;
+  return false;
 };
 
 /**

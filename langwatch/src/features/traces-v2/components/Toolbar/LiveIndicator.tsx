@@ -1,13 +1,14 @@
 import { Box, Flex, IconButton } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
-import { useRefreshUIStore } from "../../stores/refreshUIStore";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import {
-  useSseStatusStore,
   type LiveUpdatesMode,
+  useSseStatusStore,
 } from "../../stores/sseStatusStore";
 
 const SSE_STATE_STYLE: Record<
@@ -20,13 +21,20 @@ const SSE_STATE_STYLE: Record<
   disconnected: { dotColor: "red.solid", pulse: false },
 };
 
-const REFRESH_SPIN_KEYFRAMES = {
+// Module-level keyframes via @emotion/react. The previous setup nested
+// `@keyframes` inside Chakra's `css` prop which didn't get hoisted into
+// a global stylesheet — the rule existed but the animation never had a
+// `@keyframes` block to reference, so the icon stayed still. Defining
+// it through `keyframes` emits a real, named animation that Emotion
+// guarantees is in the stylesheet before the `animation` rule runs.
+const refreshSpin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const REFRESH_SPIN_CSS = {
   "& svg": {
-    animation: "tracesV2RefreshSpin 0.9s linear infinite",
-  },
-  "@keyframes tracesV2RefreshSpin": {
-    from: { transform: "rotate(0deg)" },
-    to: { transform: "rotate(360deg)" },
+    animation: `${refreshSpin} 0.9s linear infinite`,
   },
 };
 
@@ -35,8 +43,13 @@ export const LiveIndicator: React.FC = () => {
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
-  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
-  const refresh = useTraceListRefresh();
+  const { refresh, isRefreshing } = useTraceListRefresh();
+  // Sample-preview rows are a hardcoded fixture — they don't change
+  // server-side, so a click on Refresh wouldn't fetch anything new and
+  // would just flash the spin icon (and trigger the no-op aurora flash
+  // downstream). Disable it with a tooltip that names the reason
+  // instead of letting the user wonder why nothing happened.
+  const isSamplePreview = usePreviewTracesActive();
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
   // exist) but the user is in charge of when to pull them in. In `live`
@@ -88,16 +101,37 @@ export const LiveIndicator: React.FC = () => {
       </Tooltip>
 
       <Tooltip
-        content={isRefreshing ? "Refreshing…" : "Refresh traces"}
+        content={
+          isSamplePreview
+            ? "Refresh is disabled — sample data doesn't change."
+            : isRefreshing
+              ? "Refreshing…"
+              : "Refresh traces"
+        }
         positioning={{ placement: "bottom" }}
       >
         <IconButton
           aria-label="Refresh traces"
-          variant="ghost"
+          variant={isRefreshing ? "subtle" : "ghost"}
+          // Blue while the fetch is in flight so the operator gets
+          // both motion (the spinning icon) and a colour change as
+          // feedback that their click took effect. Stays on for the
+          // full duration of the fetch — `isRefreshing` is sourced
+          // from React-Query's in-flight count, not a fixed timer,
+          // so it doesn't clear mid-load on slow projects.
+          colorPalette={isRefreshing ? "blue" : undefined}
           size="xs"
           onClick={refresh}
-          disabled={isRefreshing}
-          css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
+          disabled={isSamplePreview}
+          // We don't actually disable the button during a normal fetch
+          // — `useTraceListRefresh` debounces internally and cancels
+          // prior in-flight calls, so a mid-fetch click is a no-op
+          // that costs nothing, and disabling would kill the
+          // affordance for someone who *wants* to re-kick a stalled
+          // fetch. Sample-preview is the exception: there's literally
+          // nothing on the server to refresh, so clicking would just
+          // flash the spinner for no reason. The tooltip explains.
+          css={isRefreshing ? REFRESH_SPIN_CSS : undefined}
         >
           <RefreshCw size={12} />
         </IconButton>

@@ -1,14 +1,10 @@
 import { Badge, Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
-import {
-  formatDuration,
-  formatTokens,
-} from "../../../../../utils/formatters";
+import { formatDuration, formatTokens } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import { StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";
-
-const dash = "—";
+import { dash } from "../dashPlaceholder";
 
 export const StatusCell = {
   id: "status",
@@ -103,6 +99,27 @@ export const OriginCell = {
         colorPalette={palette}
         textTransform="capitalize"
         fontWeight="medium"
+      >
+        {label}
+      </Badge>
+    );
+  },
+  // Compact density: smaller pill (xs badge, lighter weight, tighter
+  // letterspacing) so the Origin column doesn't dominate the row at
+  // high information densities. The Comfortable + default renderers
+  // keep the prominent `sm` badge — operators reading expanded rows
+  // benefit from the bigger colour chip.
+  renderCompact: ({ row }) => {
+    const label = ORIGIN_LABEL[row.origin] ?? row.origin;
+    const palette = ORIGIN_PALETTE[row.origin] ?? "gray";
+    return (
+      <Badge
+        size="xs"
+        variant="subtle"
+        colorPalette={palette}
+        textTransform="capitalize"
+        fontWeight="medium"
+        paddingX={1.5}
       >
         {label}
       </Badge>

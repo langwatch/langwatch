@@ -183,6 +183,96 @@ export function extractMissingModelInfo(
   };
 }
 
+// --- Provider-disabled (ModelProviderDisabledError) dedup ---
+const handledProviderDisabledErrors = new WeakSet<Error>();
+
+export function markAsHandledByProviderDisabledHandler(error: Error): void {
+  handledProviderDisabledErrors.add(error);
+}
+
+export function isHandledByProviderDisabledHandler(error: unknown): boolean {
+  return error instanceof Error && handledProviderDisabledErrors.has(error);
+}
+
+export interface ProviderDisabledExtracted {
+  featureKey: string;
+  featureDisplayName: string;
+  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  projectId: string;
+  resolvedScope: "project" | "team" | "organization";
+  resolvedModel: string;
+  providerKey: string;
+  alternate: {
+    scope: "team" | "organization";
+    model: string;
+    providerKey: string;
+    providerEnabled: boolean;
+  } | null;
+}
+
+/**
+ * Extracts the typed payload from a tRPC error whose cause is
+ * `MODEL_PROVIDER_DISABLED`. The wire shape is set by the server-side
+ * `ModelProviderDisabledError`. The cascade still resolved a model,
+ * but that model's provider is currently disabled — so the toast can
+ * offer a one-click swap to the next cascade candidate (if any).
+ */
+export function extractProviderDisabledInfo(
+  error: unknown,
+): ProviderDisabledExtracted | null {
+  if (!(error instanceof TRPCClientError)) return null;
+  const cause = error.data?.cause as
+    | {
+        code?: string;
+        featureKey?: string;
+        featureDisplayName?: string;
+        role?: string;
+        projectId?: string;
+        resolvedScope?: string;
+        resolvedModel?: string;
+        providerKey?: string;
+        alternate?: ProviderDisabledExtracted["alternate"];
+      }
+    | undefined;
+
+  if (cause?.code !== "MODEL_PROVIDER_DISABLED") return null;
+  if (
+    !cause.featureKey ||
+    !cause.role ||
+    !cause.projectId ||
+    !cause.resolvedScope ||
+    !cause.resolvedModel ||
+    !cause.providerKey
+  ) {
+    return null;
+  }
+
+  const role = cause.role as ProviderDisabledExtracted["role"];
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+    return null;
+  }
+  const resolvedScope =
+    cause.resolvedScope as ProviderDisabledExtracted["resolvedScope"];
+  if (
+    resolvedScope !== "project" &&
+    resolvedScope !== "team" &&
+    resolvedScope !== "organization"
+  ) {
+    return null;
+  }
+
+  return {
+    featureKey: cause.featureKey,
+    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    role,
+    projectId: cause.projectId,
+    resolvedScope,
+    resolvedModel: cause.resolvedModel,
+    providerKey: cause.providerKey,
+    alternate: cause.alternate ?? null,
+  };
+}
+
 /**
  * Wire-side discriminator a server route attaches when a downstream
  * AI call fails for a non-MODEL_NOT_CONFIGURED reason (provider 5xx,

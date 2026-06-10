@@ -1,8 +1,10 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
+import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatRelativeTime } from "../../../../../utils/formatters";
+import { formatCompactAbsolute } from "../../../../../utils/formatters";
+import { useRelativeTime } from "../../../../../utils/useRelativeTime";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./TimeHoverCard";
@@ -22,7 +24,7 @@ export const TimeCell = {
       )}
       <TimeHoverCard timestamp={row.timestamp}>
         <MonoCell color="fg.subtle" cursor="help">
-          {formatRelativeTime(row.timestamp)}
+          <CompactRelative timestamp={row.timestamp} />
         </MonoCell>
       </TimeHoverCard>
     </HStack>
@@ -34,12 +36,29 @@ export const TimeCell = {
       )}
       <TimeHoverCard timestamp={row.timestamp}>
         <Text textStyle="sm" color="fg.muted" cursor="help">
-          {formatRelativeTime(row.timestamp)}
+          <CompactRelative timestamp={row.timestamp} />
         </Text>
       </TimeHoverCard>
     </HStack>
   ),
 } as const satisfies CellDef<TraceListItem>;
+
+/**
+ * Reads the column's current display mode from `timeColumnModeStore`
+ * and renders either:
+ *   - `relative` → "4m", self-updating at the next label boundary
+ *   - `absolute` → "Jun 4 18:32" (compact local form)
+ *
+ * Extracted as a component so the hook isolation is per-row; the
+ * surrounding cell renderers stay pure functions.
+ */
+const CompactRelative: React.FC<{ timestamp: number }> = ({ timestamp }) => {
+  const mode = useTimeColumnModeStore((s) => s.mode);
+  const relative = useRelativeTime(timestamp);
+  return (
+    <>{mode === "absolute" ? formatCompactAbsolute(timestamp) : relative}</>
+  );
+};
 
 const PeekButton: React.FC<{
   isExpanded: boolean;

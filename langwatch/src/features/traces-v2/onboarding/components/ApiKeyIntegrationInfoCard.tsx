@@ -1,17 +1,8 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
@@ -76,17 +67,19 @@ function buildEnvLines({
   endpoint: string;
   showEndpoint: boolean;
 }): EnvLine[] {
-  // Every line in this block is something the user has to copy into
-  // their environment, so all of them get the highlight treatment.
-  // `ENDPOINT` is only emitted (and only highlighted) when self-hosted —
-  // on cloud the SDK falls back to the default URL, so surfacing the
-  // line at all would just be noise.
+  // Only the API key line gets the highlight treatment — the project id
+  // and endpoint are already known to the user (project id is shown in
+  // the URL, endpoint defaults are obvious). Highlighting every line
+  // dilutes the hint and turns the block into a wall of orange.
+  // `ENDPOINT` is only emitted when self-hosted — on cloud the SDK
+  // falls back to the default URL, so surfacing the line at all would
+  // just be noise.
   const lines: EnvLine[] = [
     { key: "LANGWATCH_API_KEY", value: token, highlight: true },
-    { key: "X-Project-Id", value: projectId, highlight: true },
+    { key: "LANGWATCH_PROJECT_ID", value: projectId },
   ];
   if (showEndpoint) {
-    lines.push({ key: "LANGWATCH_ENDPOINT", value: endpoint, highlight: true });
+    lines.push({ key: "LANGWATCH_ENDPOINT", value: endpoint });
   }
   return lines;
 }
@@ -98,7 +91,7 @@ function renderEnv(lines: EnvLine[]): string {
 /**
  * Generate-token card for the traces-v2 empty state. Mints an API key
  * scoped to the caller's role bindings, then renders the
- * `LANGWATCH_API_KEY` / `X-Project-Id` / `LANGWATCH_ENDPOINT`
+ * `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID` / `LANGWATCH_ENDPOINT`
  * env block exactly once. The parent owns the token so other setup
  * paths (Coding Agent, MCP) can render with the same credential.
  *
@@ -183,8 +176,12 @@ export function ApiKeyIntegrationInfoCard({
     return () => window.removeEventListener("keydown", handler);
   }, [token, createMutation.isLoading]);
 
-  // Pre-generation preview uses a non-secret obvious placeholder so the
-  // blurred text doesn't accidentally read as a real key.
+  // Pre-generation preview shows the .env shape with a non-secret
+  // placeholder for the API key. The placeholder is hidden behind a
+  // "Generate access token" overlay so the user can't mistakenly
+  // copy `sk-lw-xxxxx...` and wonder why their SDK rejects it. The
+  // project id and endpoint lines stay readable through the scrim so
+  // the shape of the file is still obvious.
   const PLACEHOLDER_TOKEN = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
   const realLines = buildEnvLines({
     token: token ?? PLACEHOLDER_TOKEN,
@@ -197,82 +194,103 @@ export function ApiKeyIntegrationInfoCard({
     .map((l, i) => (l.highlight ? i + 1 : -1))
     .filter((n) => n > 0);
 
-  // Single advisory: "you just generated, save it now" — fades in
-  // after the user mints a token. `null` reserves no space pre-gen so
-  // the card doesn't reserve a row for an empty advisory.
-  const advisoryKey = token ? "post-gen" : "none";
-
   return (
-    <VStack align="stretch" gap={2}>
-      <Box position="relative">
-        <Box
-          filter={token ? undefined : "blur(5px)"}
-          opacity={token ? undefined : 0.55}
-          pointerEvents={token ? undefined : "none"}
-          userSelect={token ? undefined : "none"}
-          aria-hidden={token ? undefined : "true"}
-          transition="filter 0.2s ease, opacity 0.2s ease"
-        >
-          <CodePreview
-            code={code}
-            filename=".env"
-            codeLanguage="bash"
-            highlightLines={highlightLines}
-            sensitiveValue={token ?? undefined}
-            enableVisibilityToggle={!!token}
-            isVisible={revealed}
-            onToggleVisibility={() => setRevealed((v) => !v)}
-          />
-        </Box>
-        {!token && (
-          <Flex
-            position="absolute"
-            inset={0}
-            align="center"
-            justify="center"
-            paddingX={3}
-          >
-            <Button
-              colorPalette="orange"
-              variant="surface"
-              onClick={handleGenerate}
-              loading={createMutation.isLoading}
-              boxShadow="lg"
-            >
-              <Key size={14} />
-              Generate access token
-              <Kbd>G</Kbd>
-            </Button>
-          </Flex>
-        )}
-      </Box>
+    <VStack align="stretch" gap={3}>
+      {/* Slim, full-width, subtly orange banner sitting directly above
+          the .env code block — this is the single canonical mint CTA
+          for the whole integration surface. It transforms in place
+          after the user mints, becoming the "copy this token now"
+          advisory + Mint-another link. Both .env and mcp.json fill in
+          from the same shared state, so one click is enough. */}
       <AnimatePresence mode="wait" initial={false}>
-        {advisoryKey === "post-gen" && (
-          <motion.div
-            key="post-gen"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-          >
-            <HStack gap={1.5} align="flex-start" color="fg.muted">
-              <Icon
-                as={Sparkles}
-                boxSize={3}
-                color="orange.fg"
-                flexShrink={0}
-                marginTop={0.5}
-              />
-              <Text fontSize="xs" lineHeight="tall">
-                <Text as="span" color="orange.fg" fontWeight="semibold">
-                  Copy this token before you move on.
-                </Text>{" "}
-                If you lose it? You can Mint another from Settings!
-              </Text>
-            </HStack>
-          </motion.div>
-        )}
+        <motion.div
+          key={token ? "post-gen" : "pre-gen"}
+          initial={{ opacity: 0, y: 2 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -2 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+        >
+          {token ? (
+            <Box
+              borderWidth="1px"
+              borderColor="orange.muted"
+              borderRadius="lg"
+              bg="orange.subtle"
+              paddingX={4}
+              paddingY={3}
+            >
+              <HStack justify="space-between" align="center" gap={3}>
+                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
+                  <Icon as={Sparkles} boxSize={4} color="orange.fg" flexShrink={0} />
+                  <Text fontSize="sm" lineHeight="snug">
+                    <Text as="span" color="orange.fg" fontWeight="semibold">
+                      Copy this token before you move on.
+                    </Text>{" "}
+                    <Text as="span" color="fg.muted">
+                      It won&apos;t be shown again.
+                    </Text>
+                  </Text>
+                </HStack>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  colorPalette="orange"
+                  onClick={handleGenerate}
+                  loading={createMutation.isLoading}
+                  flexShrink={0}
+                >
+                  <Key size={12} />
+                  Mint another
+                </Button>
+              </HStack>
+            </Box>
+          ) : (
+            <Box
+              borderWidth="1px"
+              borderColor="orange.muted"
+              borderRadius="lg"
+              bg="orange.subtle"
+              paddingX={4}
+              paddingY={3}
+            >
+              <HStack justify="space-between" align="center" gap={3}>
+                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
+                  <Icon as={Key} boxSize={4} color="orange.fg" flexShrink={0} />
+                  <Text fontSize="sm" lineHeight="snug">
+                    <Text as="span" fontWeight="semibold" color="fg">
+                      Generate an access token
+                    </Text>{" "}
+                    <Text as="span" color="fg.muted">
+                      to fill the snippets below.
+                    </Text>
+                  </Text>
+                </HStack>
+                <Button
+                  size="sm"
+                  colorPalette="orange"
+                  variant="solid"
+                  onClick={handleGenerate}
+                  loading={createMutation.isLoading}
+                  flexShrink={0}
+                >
+                  Generate access token
+                </Button>
+              </HStack>
+            </Box>
+          )}
+        </motion.div>
       </AnimatePresence>
+      <CodePreview
+        code={code}
+        filename=".env"
+        codeLanguage="bash"
+        highlightLines={token ? highlightLines : []}
+        sensitiveValue={token ?? undefined}
+        enableVisibilityToggle={!!token}
+        isVisible={revealed}
+        onToggleVisibility={() => setRevealed((v) => !v)}
+        disableActions={!token}
+      />
     </VStack>
   );
 }

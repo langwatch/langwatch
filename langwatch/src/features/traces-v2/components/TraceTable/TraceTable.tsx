@@ -12,20 +12,20 @@ import { TraceLensBody } from "./TraceLensBody";
 import { TraceTableLayout } from "./TraceTableLayout";
 
 export const TraceTable: React.FC = () => {
-  const { data: traces, totalHits, isLoading, newIds } = useTraceList();
+  const { data: traces, totalHits, isLoading, isFetching, isPreviousData, newIds } = useTraceList();
   const activeLens = useViewStore(getEffectiveLens);
 
   if (!activeLens) return <EmptyFilterState />;
-  // No lens-config / no-results states still get the dedicated empty
-  // surface, but the skeleton path now flows through the *real* lens
-  // body so column widths, addon rows, paddings, and pagination all
-  // match exactly when data lands. No more layout jump on first paint.
-  if (!isLoading && traces.length === 0) return <EmptyFilterState />;
+  // Gate EmptyFilterState on true emptiness: only render it when no fetch is
+  // in flight and the data is settled (not showing previous-key stale rows).
+  // This prevents flashing EmptyFilterState during transitional fetches where
+  // `keepPreviousData` may hold the empty result from a prior key.
+  if (!isFetching && !isPreviousData && traces.length === 0) return <EmptyFilterState />;
 
   const rowKind = rowKindForGrouping(activeLens.grouping);
 
   return (
-    <TraceTableLayout totalHits={totalHits} isLoading={isLoading}>
+    <TraceTableLayout totalHits={totalHits} isLoading={isLoading} isEmpty={traces.length === 0}>
       {rowKind === "conversation" && (
         <ConversationLensBody
           traces={traces}

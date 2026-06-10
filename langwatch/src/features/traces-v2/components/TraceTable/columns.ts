@@ -15,15 +15,15 @@ const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
-    // 68px is enough for the "TIME" header + sort caret + the longest
-    // relative-time strings we render (`16d`, `2m`, `now`, chevron +
-    // relative) without truncating, and tight enough that the trace
-    // name doesn't sit a thumb's width away from the timestamp. 80px
-    // cap prevents a manual resize from walking the column back out.
+    // 68px is the default — enough for the relative-time strings we
+    // typically render (`16d`, `2m`, `now`, chevron + relative). The
+    // column is resizable so an operator who prefers absolute mode
+    // ("Jun 4 18:32") can widen it without fighting the cap; the
+    // previous fixed `maxSize: 80` made absolute-mode unreadable as
+    // soon as the user switched modes from the hover card.
     size: 68,
     minSize: 68,
-    maxSize: 80,
-    enableResizing: false,
+    maxSize: 200,
   }),
   since: traceCol.accessor("timestamp", {
     id: "since",

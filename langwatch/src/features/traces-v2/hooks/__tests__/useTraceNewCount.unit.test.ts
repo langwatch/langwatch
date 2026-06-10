@@ -60,7 +60,7 @@ vi.mock("../stores/sseStatusStore", () => ({
 }));
 
 vi.mock("../useTraceListRefresh", () => ({
-  useTraceListRefresh: () => vi.fn(),
+  useTraceListRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 
 const lastOptions = (): QueryOptions => {
