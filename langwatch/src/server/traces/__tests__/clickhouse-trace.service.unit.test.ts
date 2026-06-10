@@ -961,5 +961,62 @@ describe("ClickHouseTraceService", () => {
         expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
       });
     });
+
+    describe("when an occurredAt range is supplied", () => {
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+
+      it("bounds the summary read to the OccurredAt window (±2 days)", async () => {
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSummaryRow("trace-0")]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getTracesWithSpans("proj_123", ["trace-0"], protections, {
+          from: 1_000_000,
+          to: 2_000_000,
+        });
+
+        const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
+        // Predicate present in both the outer scan and the inner dedup subquery.
+        expect(
+          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
+            [],
+        ).toHaveLength(2);
+        expect(summaryCall.query_params.sumFromMs).toBe(
+          1_000_000 - TWO_DAYS_MS,
+        );
+        expect(summaryCall.query_params.sumToMs).toBe(2_000_000 + TWO_DAYS_MS);
+      });
+    });
+
+    describe("when no occurredAt range is supplied", () => {
+      it("omits the OccurredAt window and keeps the unbounded summary read", async () => {
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSummaryRow("trace-0")]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+
+        const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
+        expect(summaryCall.query).not.toContain("sumFromMs");
+        expect(summaryCall.query_params.sumFromMs).toBeUndefined();
+        expect(summaryCall.query_params.sumToMs).toBeUndefined();
+      });
+    });
   });
 });

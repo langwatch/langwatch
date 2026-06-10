@@ -489,6 +489,26 @@ describe("ClickHouse trace dedup (integration)", () => {
             : trace.output;
         expect(parsedOutput.value).toContain("latest output");
       });
+
+      describe("when an occurredAt window around the trace is supplied", () => {
+        it("returns the same latest trace + span (partition hint is correctness-preserving)", async () => {
+          const traces = await service.getTracesWithSpans(
+            tenantId,
+            [traceId],
+            openProtections,
+            { from: now - 20000, to: now },
+          );
+
+          expect(traces).toHaveLength(1);
+          const trace = traces![0]!;
+          expect(trace.trace_id).toBe(traceId);
+          // Latest summary version (300ms, not the stale 50ms one).
+          expect(trace.metrics?.total_time_ms).toBe(300);
+          // Latest span version, deduped under the bounded read.
+          expect(trace.spans).toHaveLength(1);
+          expect(trace.spans[0]!.name).toBe("latest-span-version");
+        });
+      });
     });
 
     describe("when multiple traces each have multiple span versions", () => {

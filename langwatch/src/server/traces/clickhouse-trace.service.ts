@@ -54,6 +54,22 @@ interface ClickHouseScrollCursor {
 }
 
 /**
+ * Approximate occurrence-time bounds (epoch ms) for a set of traces, used as a
+ * partition-pruning hint on `trace_summaries`. `trace_summaries` is partitioned
+ * on `OccurredAt`, so a read filtered only by `TraceId` cannot prune partitions
+ * and scans every weekly part (incl. cold S3) to locate the rows. Supplying the
+ * traces' time range lets the read prune to the relevant weeks. The window is
+ * widened by a safety margin before use, so callers can pass an exact point
+ * range (`from === to`) for a single trace.
+ */
+interface OccurredAtRange {
+  /** Earliest trace occurrence time in the set (epoch ms). */
+  from: number;
+  /** Latest trace occurrence time in the set (epoch ms). */
+  to: number;
+}
+
+/**
  * Upper bound on distinct field names (span names, metadata keys) returned for
  * the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
  * in healthy projects (hundreds), so this only guards against pathological
@@ -113,12 +129,16 @@ export class ClickHouseTraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param occurredAt - Optional approximate trace time range (epoch ms) used to
+   *   bound the trace_summaries read to its weekly partitions. Without it the
+   *   summary read scans every partition (incl. cold S3) to locate the traceIds.
    * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    occurredAt?: OccurredAtRange,
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
@@ -145,6 +165,7 @@ export class ClickHouseTraceService {
           const tracesWithSpans = await this.fetchTracesWithSpansJoined(
             projectId,
             traceIds,
+            occurredAt,
           );
 
           // Map to legacy Trace format and apply protections
@@ -1757,9 +1778,20 @@ export class ClickHouseTraceService {
     protections: Protections,
   ): Promise<Trace[]> {
     const traceIds = traces.map((t) => t.trace_id);
+    // The traces already carry their own timestamps, so derive the partition
+    // window for free: this bounds the trace_summaries summary read to the
+    // weeks these traces occurred in instead of scanning every partition.
+    const startedAts = traces
+      .map((t) => t.timestamps.started_at)
+      .filter((t): t is number => typeof t === "number" && t > 0);
+    const occurredAt =
+      startedAts.length > 0
+        ? { from: Math.min(...startedAts), to: Math.max(...startedAts) }
+        : undefined;
     const tracesWithSpans = await this.fetchTracesWithSpansJoined(
       projectId,
       traceIds,
+      occurredAt,
     );
 
     return traces.map((trace) => {
@@ -1787,6 +1819,7 @@ export class ClickHouseTraceService {
   private async fetchTracesWithSpansJoined(
     projectId: string,
     traceIds: string[],
+    occurredAt?: OccurredAtRange,
   ): Promise<
     Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
   > {
@@ -1812,6 +1845,30 @@ export class ClickHouseTraceService {
         ): Promise<
           Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
         > => {
+          // When the caller knows the traces' approximate time, bound the
+          // summary read to those weekly partitions. trace_summaries is
+          // partitioned on OccurredAt, so a TraceId-only filter cannot prune
+          // partitions and scans every part (incl. cold S3) to locate the rows.
+          // A ±2-day margin around the caller's range is safe headroom; without
+          // a hint we keep the original unbounded read.
+          const SUMMARY_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+          const hasSummaryWindow =
+            occurredAt !== undefined &&
+            occurredAt.from > 0 &&
+            occurredAt.to > 0;
+          const summaryTimeFilterOuter = hasSummaryWindow
+            ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND t.OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
+            : "";
+          const summaryTimeFilterInner = hasSummaryWindow
+            ? "AND OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
+            : "";
+          const summaryTimeParams = hasSummaryWindow
+            ? {
+                sumFromMs: occurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
+                sumToMs: occurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
+              }
+            : {};
+
           // Summaries first (light, one row per trace): they carry OccurredAt,
           // which bounds the heavy stored_spans scan below to the traces' weekly
           // partitions instead of cold-scanning every partition on S3. A span's
@@ -1851,16 +1908,22 @@ export class ClickHouseTraceService {
         FROM trace_summaries AS t
         WHERE t.TenantId = {tenantId:String}
           AND t.TraceId IN ({traceIds:Array(String)})
+          ${summaryTimeFilterOuter}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND TraceId IN ({traceIds:Array(String)})
+              ${summaryTimeFilterInner}
             GROUP BY TenantId, TraceId
           )
         ORDER BY t.TraceId
       `,
-            query_params: { tenantId: projectId, traceIds: batchTraceIds },
+            query_params: {
+              tenantId: projectId,
+              traceIds: batchTraceIds,
+              ...summaryTimeParams,
+            },
             format: "JSONEachRow",
           });
 

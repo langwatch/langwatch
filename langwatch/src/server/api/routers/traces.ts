@@ -334,6 +334,7 @@ export const tracesRouter = createTRPCRouter({
         input.projectId,
         traceIds,
         protections,
+        { from: input.startDate, to: input.endDate },
       );
     }),
 
@@ -398,6 +399,7 @@ export const tracesRouter = createTRPCRouter({
         projectId,
         traceIds,
         protections,
+        { from: input.startDate, to: input.endDate },
       );
 
       const passedPreconditions = traceWithSpans.filter(

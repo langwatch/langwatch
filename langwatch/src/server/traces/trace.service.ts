@@ -200,12 +200,16 @@ export class TraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param occurredAt - Optional approximate trace time range (epoch ms). When
+   *   supplied, the trace_summaries read prunes to the matching weekly
+   *   partitions instead of scanning every partition (incl. cold S3).
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    occurredAt?: { from: number; to: number },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
@@ -219,6 +223,7 @@ export class TraceService {
           projectId,
           traceIds,
           protections,
+          occurredAt,
         );
         if (traces === null) {
           throw new Error(
