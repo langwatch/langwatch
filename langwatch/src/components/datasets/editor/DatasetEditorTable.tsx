@@ -514,7 +514,11 @@ export function DatasetEditorTable({
       data-testid="dataset-editor-table"
     >
       <HStack gap={3} align="center" width="full">
-        {typeof title === "string" ? (
+        {title === undefined && datasetName ? (
+          <Text fontSize="lg" fontWeight="semibold" data-testid="dataset-title">
+            {datasetName}
+          </Text>
+        ) : typeof title === "string" ? (
           <Text fontSize="lg" fontWeight="semibold">
             {title}
           </Text>

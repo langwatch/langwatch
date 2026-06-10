@@ -1,6 +1,7 @@
+import { Box } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { DatasetTable } from "../../../components/datasets/DatasetTable";
+import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 
 export default function Dataset() {
   const router = useRouter();
@@ -8,7 +9,9 @@ export default function Dataset() {
 
   return (
     <DashboardLayout>
-      <DatasetTable datasetId={datasetId as string} />
+      <Box width="full" paddingX={6} paddingY={6}>
+        <DatasetEditorTable datasetId={datasetId as string} />
+      </Box>
     </DashboardLayout>
   );
 }

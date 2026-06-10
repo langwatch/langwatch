@@ -10,25 +10,25 @@ Feature: Datasets list page
   # Listing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Datasets are listed with their key facts
     Given my project has datasets
     Then I see one row per dataset
     And each row shows the dataset name, its columns, the number of entries, and when it was last updated
 
-  @integration @unimplemented
+  @integration
   Scenario: Search datasets by name
     Given my project has datasets "offline evals" and "production samples"
     When I search for "offline"
     Then I see "offline evals"
     And I do not see "production samples"
 
-  @integration @unimplemented
+  @integration
   Scenario: Open a dataset
     When I click a dataset row
     Then I land on that dataset's editor page
 
-  @integration @unimplemented
+  @integration
   Scenario: Empty project shows a helpful empty state
     Given my project has no datasets
     Then I see an empty state explaining what datasets are for

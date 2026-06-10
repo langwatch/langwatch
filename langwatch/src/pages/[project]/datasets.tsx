@@ -2,20 +2,24 @@ import {
   Badge,
   Button,
   HStack,
+  Input,
+  InputGroup,
   Skeleton,
   Spacer,
   Table,
   Text,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "~/utils/compat/next-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Copy,
   Edit,
   MoreVertical,
   Play,
+  Search,
   Table as TableIcon,
   Trash2,
   Upload,
@@ -54,6 +58,16 @@ function DatasetsPage() {
   );
 
   type Dataset = inferRouterOutputs<AppRouter>["dataset"]["getAll"][number];
+
+  const [search, setSearch] = useState("");
+  const filteredDatasets = useMemo(() => {
+    if (!datasets.data) return undefined;
+    const query = search.trim().toLowerCase();
+    if (!query) return datasets.data;
+    return datasets.data.filter((dataset: Dataset) =>
+      dataset.name.toLowerCase().includes(query),
+    );
+  }, [datasets.data, search]);
 
   const datasetDelete = api.dataset.deleteById.useMutation();
   const [editDataset, setEditDataset] = useState<
@@ -157,6 +171,18 @@ function DatasetsPage() {
       <PageLayout.Header>
         <PageLayout.Heading>Datasets</PageLayout.Heading>
         <Spacer />
+        <InputGroup
+          maxWidth="280px"
+          startElement={<Search size={14} />}
+        >
+          <Input
+            size="sm"
+            placeholder="Search datasets"
+            data-testid="datasets-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </InputGroup>
         <PageLayout.HeaderButton
           onClick={() => {
             openDrawer("batchEvaluation", {
@@ -180,17 +206,26 @@ function DatasetsPage() {
               title="No datasets yet"
               description="Upload or create datasets on your messages to do further analysis or to train your own models."
               docsInfo={
-                <Text>
-                  To learn more about datasets, please visit our{" "}
-                  <Link
-                    color="orange.400"
-                    href="https://docs.langwatch.ai/datasets/overview"
-                    isExternal
+                <VStack gap={3}>
+                  <Button
+                    colorPalette="orange"
+                    data-testid="empty-state-create-dataset"
+                    onClick={() => uploadCSVModal.onOpen()}
                   >
-                    documentation
-                  </Link>
-                  .
-                </Text>
+                    <Upload size={16} /> Upload or Create Dataset
+                  </Button>
+                  <Text>
+                    To learn more about datasets, please visit our{" "}
+                    <Link
+                      color="orange.400"
+                      href="https://docs.langwatch.ai/datasets/overview"
+                      isExternal
+                    >
+                      documentation
+                    </Link>
+                    .
+                  </Text>
+                </VStack>
               }
               icon={<TableIcon />}
             />
@@ -218,8 +253,18 @@ function DatasetsPage() {
                         ))}
                       </Table.Row>
                     ))
-                  : datasets.data
-                    ? datasets.data.map((dataset: Dataset) => (
+                  : filteredDatasets && filteredDatasets.length === 0
+                    ? (
+                        <Table.Row>
+                          <Table.Cell colSpan={5}>
+                            <Text paddingY={4} color="fg.muted">
+                              No datasets match &quot;{search}&quot;
+                            </Text>
+                          </Table.Cell>
+                        </Table.Row>
+                      )
+                    : filteredDatasets
+                    ? filteredDatasets.map((dataset: Dataset) => (
                         <Table.Row
                           cursor="pointer"
                           onClick={() => goToDataset(dataset.id)}
@@ -243,7 +288,9 @@ function DatasetsPage() {
                               : (dataset._count.datasetRecords ?? 0)}
                           </Table.Cell>
                           <Table.Cell>
-                            {new Date(dataset.createdAt).toLocaleString()}
+                            {new Date(
+                              dataset.updatedAt ?? dataset.createdAt,
+                            ).toLocaleString()}
                           </Table.Cell>
                           <Table.Cell>
                             <Menu.Root>
