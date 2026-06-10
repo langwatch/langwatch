@@ -15,7 +15,7 @@ Feature: Dataset editor
   # Viewing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Records render in a spreadsheet table
     When I open the dataset in the editor
     Then I see one row per record
@@ -33,27 +33,27 @@ Feature: Dataset editor
   # Inline cell editing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Edit a cell inline
     When I double-click a cell
     Then an editor opens over the cell with the current value
     When I type a new value and press Enter
     Then the cell shows the new value
 
-  @integration @unimplemented
+  @integration
   Scenario: Escape cancels a cell edit
     When I double-click a cell and type a new value
     And I press Escape
     Then the cell keeps its original value
 
-  @integration @unimplemented
+  @integration
   Scenario: Boolean cells validate input
     Given the dataset has a "passed" column of type boolean
     When I edit a "passed" cell and enter "maybe"
     Then the editor shows that the value is invalid
     And the value is not saved until corrected
 
-  @integration @unimplemented
+  @integration
   Scenario: Number cells validate input
     Given the dataset has a "score" column of type number
     When I edit a "score" cell and enter "abc"
@@ -64,14 +64,14 @@ Feature: Dataset editor
   # Autosave
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Cell edits autosave to the dataset
     When I edit a cell and press Enter
     Then the change is saved to the dataset automatically
     And the editor shows a saving indicator while the save is in flight
     And the indicator confirms when the save completes
 
-  @integration @unimplemented
+  @integration
   Scenario: A failed save is visible, never silent
     Given saving to the server fails
     When I edit a cell and press Enter
@@ -82,13 +82,13 @@ Feature: Dataset editor
   # Rows
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Add a new row
     When I click "Add row"
     Then an empty row appears at the bottom of the table
     And I can start editing it immediately
 
-  @integration @unimplemented
+  @integration
   Scenario: Select and delete rows
     When I select two rows with their checkboxes
     And I delete the selected rows
