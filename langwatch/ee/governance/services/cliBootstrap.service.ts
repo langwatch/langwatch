@@ -64,6 +64,15 @@ export interface CliBootstrapResult {
     displayName: string;
     configured: boolean;
   }>;
+  /**
+   * Provider families (e.g. "openai", "anthropic") for which the org has a
+   * live, enabled credential the caller can reach - independent of whether a
+   * `model_provider` catalog tile was ever published. This is what the gateway
+   * can actually ROUTE through, so the CLI gateway preflight gates on this,
+   * NOT on `providers` (which is the admin-curated mint-your-own-VK catalog).
+   * Membership-scoped via `listConfiguredProvidersForUser`.
+   */
+  gatewayProviders: string[];
   budget: {
     monthlyLimitUsd: number | null;
     monthlyUsedUsd: number;
@@ -164,6 +173,7 @@ export class CliBootstrapService {
     return {
       tools: catalog.tools,
       providers,
+      gatewayProviders: catalog.configuredProviderKeys,
       budget,
       gatewayUrl: resolveGatewayUrl(),
       adminEmail,

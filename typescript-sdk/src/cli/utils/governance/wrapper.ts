@@ -301,23 +301,45 @@ export async function preflightWrapper(
     };
   }
 
+  // The gateway program is opt-in per tool: an org enables it for a coding
+  // assistant by publishing that tool's coding-assistant tile in the AI Tools
+  // catalog. Without a tile for THIS tool the org hasn't turned the gateway on
+  // for it (direct OTLP ingestion stays available separately), so don't route
+  // a virtual key through it. `tools` undefined => legacy server that can't
+  // report the catalog; skip the gate for back-compat.
+  if (Array.isArray(bootstrap?.tools)) {
+    const published = bootstrap.tools.some((t) => t.slug === tool);
+    if (!published) {
+      return {
+        ok: false,
+        message:
+          `The gateway isn't enabled for \`${tool}\` in your organization.\n` +
+          `An admin needs to publish a ${tool} coding-assistant tile in the\n` +
+          `AI Tools catalog (with the gateway path enabled):\n` +
+          `  ${cp}/settings/governance/tool-catalog\n` +
+          renderContactFooter(adminEmail),
+      };
+    }
+  }
+
+  // The gateway routes through CONFIGURED provider credentials, not the curated
+  // model_provider catalog tiles (those only gate the /me one-click "mint your
+  // own VK" surface). Prefer the credential-derived families; fall back to the
+  // tile list only on legacy servers that don't send `gatewayProviders`.
   const need = TOOL_PROVIDER_FAMILIES[tool];
-  if (
-    need &&
-    need.length > 0 &&
-    bootstrap &&
-    Array.isArray(bootstrap.providers)
-  ) {
-    const have = new Set(bootstrap.providers.map((p) => p.name.toLowerCase()));
+  const configured =
+    bootstrap?.gatewayProviders ?? bootstrap?.providers?.map((p) => p.name);
+  if (need && need.length > 0 && Array.isArray(configured)) {
+    const have = new Set(configured.map((n) => n.toLowerCase()));
     const matches = need.filter((n) => have.has(n));
     if (matches.length === 0) {
       const list = need.map((n) => `\`${n}\``).join(" or ");
       return {
         ok: false,
         message:
-          `No ${list} provider is configured for your organization.\n` +
-          `\`langwatch ${tool}\` needs at least one to route requests through the gateway.\n` +
-          `If you're an admin, configure one at\n` +
+          `No ${list} provider credential is configured for your organization.\n` +
+          `\`langwatch ${tool}\` needs at least one enabled provider to route\n` +
+          `requests through the gateway. If you're an admin, add one at\n` +
           `  ${cp}/settings/model-providers\n` +
           renderContactFooter(adminEmail),
       };
