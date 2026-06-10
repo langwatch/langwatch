@@ -1234,7 +1234,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           // means the conversation hasn't resolved yet. We only want the
           // "loading" gate when a conversationId is declared — otherwise
           // the tab is permanently disabled with a different reason.
-          conversationLoading={
+          isConversationLoading={
             !!trace.conversationId &&
             conversationContext.isLoading &&
             conversationContext.turns.length === 0
